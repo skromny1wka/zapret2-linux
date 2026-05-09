@@ -9,6 +9,8 @@ from settings.mode import is_preset_launch_method
 from ui.runtime_ui_bridge import ensure_runtime_ui_bridge
 
 from .discord_restart_flow import maybe_restart_discord_after_runtime_apply
+from .lifecycle_feedback import show_launch_error_top
+from .status_flow import runner_transition_in_progress
 from .thread_runtime import start_worker_thread
 from .control_workers import PresetSwitchWorker
 from winws_runtime.flow.start_preparation import resolve_launch_method
@@ -25,7 +27,7 @@ def process_pending_presets_switch(controller) -> None:
     if not is_preset_launch_method(launch_method):
         return
 
-    if controller._runner_transition_in_progress(launch_method=launch_method):
+    if runner_transition_in_progress(controller, launch_method=launch_method):
         log(
             f"Preset mode switch отложен: runner transition ещё идёт ({launch_method}), поколение {target_generation}",
             "DEBUG",
@@ -107,7 +109,7 @@ def process_pending_restart_request(controller) -> None:
     force_full_stop = int(controller._restart_force_stop_generation or 0) == target_generation
 
     method = resolve_launch_method()
-    if controller._runner_transition_in_progress(launch_method=method):
+    if runner_transition_in_progress(controller, launch_method=method):
         log(
             f"Перезапуск DPI отложен: runner transition ещё идёт ({method}), актуальное поколение {target_generation}",
             "DEBUG",
@@ -208,7 +210,7 @@ def handle_presets_switch_finished(controller, success, error_message, generatio
                 "❌ ERROR",
             )
             controller.app.set_status(f"❌ Ошибка переключения пресета: {error_message}")
-            controller._show_launch_error_top(error_message)
+            show_launch_error_top(controller, error_message)
     finally:
         if controller._presets_switch_requested_generation > controller._presets_switch_completed_generation:
             QTimer.singleShot(0, controller._process_pending_presets_switch)

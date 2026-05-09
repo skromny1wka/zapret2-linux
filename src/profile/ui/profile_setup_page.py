@@ -266,7 +266,7 @@ class ProfileSetupPageBase(BasePage):
             log(f"{self.__class__.__name__}: не удалось прочитать профиль {self._profile_key}: {exc}", "ERROR")
             payload = None
         if payload is None:
-            self._title.setText("Профиль не найден")
+            self._title.setText("Профиль не найден. Вернитесь к списку и нажмите «Обновить».")
             return
         self._payload = payload
         self._apply_payload(payload)
@@ -484,7 +484,7 @@ class ProfileSetupPageBase(BasePage):
             self.reload_current_profile()
             self.profile_changed.emit(self._profile_key, "strategy")
         except Exception as exc:
-            log(f"{self.__class__.__name__}: не удалось применить strategy: {exc}", "ERROR")
+            log(f"{self.__class__.__name__}: не удалось применить стратегию: {exc}", "ERROR")
 
     def _set_current_strategy_feedback(self, *, rating: str) -> None:
         if self._loading or not self._profile_key:
@@ -494,7 +494,7 @@ class ProfileSetupPageBase(BasePage):
             self.reload_current_profile()
             self.profile_changed.emit(self._profile_key, "feedback")
         except Exception as exc:
-            log(f"{self.__class__.__name__}: не удалось обновить оценку strategy: {exc}", "ERROR")
+            log(f"{self.__class__.__name__}: не удалось обновить оценку стратегии: {exc}", "ERROR")
 
     def _toggle_current_strategy_favorite(self) -> None:
         if self._loading or not self._profile_key or self._payload is None:
@@ -505,7 +505,7 @@ class ProfileSetupPageBase(BasePage):
             self.reload_current_profile()
             self.profile_changed.emit(self._profile_key, "feedback")
         except Exception as exc:
-            log(f"{self.__class__.__name__}: не удалось обновить избранное strategy: {exc}", "ERROR")
+            log(f"{self.__class__.__name__}: не удалось обновить избранную стратегию: {exc}", "ERROR")
 
 
 class Zapret2ProfileSetupPage(ProfileSetupPageBase):

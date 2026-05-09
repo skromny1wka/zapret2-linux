@@ -2,18 +2,10 @@
 Контроллер для управления DPI - содержит orchestration-логику запуска и остановки.
 """
 
-import os
-
 from PyQt6.QtCore import QTimer
-from settings.dpi.strategy_settings import get_strategy_launch_method
-from settings.mode import is_preset_launch_method, normalize_launch_method
+from settings.mode import normalize_launch_method
 from log.log import log
 
-from winws_runtime.flow.start_preparation import (
-    prepare_start_request,
-    resolve_method_name,
-)
-from .conflict_flow import handle_conflicting_processes_before_start
 from .restart_flow import (
     handle_presets_switch_finished,
     process_pending_presets_switch,
@@ -26,21 +18,17 @@ from .lifecycle_feedback import (
     on_dpi_start_finished as on_dpi_start_finished_impl,
     on_dpi_stop_finished as on_dpi_stop_finished_impl,
     on_stop_and_exit_finished as on_stop_and_exit_finished_impl,
-    show_launch_error_top,
-    show_launch_warning_top,
 )
-from .thread_runtime import start_worker_thread
-from .control_workers import (
-    PresetLaunchStopWorker,
-    StopAndExitWorker,
-)
-from .start_workers import (
-    PresetLaunchStartWorker,
-)
+from .start_flow import start_dpi_async as start_dpi_async_impl
+from .status_flow import is_running as is_running_impl
+from .status_flow import transition_pipeline_in_progress as transition_pipeline_in_progress_impl
+from .stop_flow import stop_and_exit_async as stop_and_exit_async_impl
+from .stop_flow import stop_dpi_async as stop_dpi_async_impl
 from ui.runtime_ui_bridge import ensure_runtime_ui_bridge
 
+
 class PresetLaunchController:
-    """Основной orchestrator режима профилей и остановки обхода."""
+    """Координатор запуска, остановки и переключения DPI."""
     
     def __init__(self, app_instance):
         self.app = app_instance
@@ -60,8 +48,8 @@ class PresetLaunchController:
         self._restart_force_stop_generation = 0
         self._restart_runner_wait_queued = False
         self._preset_switch_runner_wait_queued = False
-        # Generation token for async start verification.
-        # Prevents stale QTimer checks from previous start attempts.
+        # Поколение проверки запуска защищает от старых QTimer-проверок
+        # после предыдущих попыток старта.
         self._dpi_start_verify_generation = 0
         self._dpi_start_verify_retry = 0
         self._pending_conflict_request_id = 0
@@ -77,71 +65,7 @@ class PresetLaunchController:
         return ensure_runtime_ui_bridge(self.app)
 
     def transition_pipeline_in_progress(self, launch_method: str | None = None) -> bool:
-        method = normalize_launch_method(launch_method, default="")
-
-        try:
-            if self._dpi_start_thread and self._dpi_start_thread.isRunning():
-                return True
-        except RuntimeError:
-            self._dpi_start_thread = None
-
-        try:
-            if self._dpi_stop_thread and self._dpi_stop_thread.isRunning():
-                return True
-        except RuntimeError:
-            self._dpi_stop_thread = None
-
-        try:
-            if self._presets_switch_thread and self._presets_switch_thread.isRunning():
-                if not method or is_preset_launch_method(method):
-                    return True
-        except RuntimeError:
-            self._presets_switch_thread = None
-
-        if int(self._restart_request_generation or 0) > int(self._restart_completed_generation or 0):
-            return True
-        if int(self._restart_active_start_generation or 0) > 0:
-            return True
-        if int(self._restart_pending_stop_generation or 0) > 0:
-            return True
-        if int(self._presets_switch_requested_generation or 0) > int(self._presets_switch_completed_generation or 0):
-            if not method or is_preset_launch_method(method):
-                return True
-
-        return False
-
-    @staticmethod
-    def _is_runner_transition_state(state_value: object) -> bool:
-        return str(state_value or "").strip().lower() in {"starting", "stopping"}
-
-    def _runner_transition_in_progress(self, *, launch_method: str | None = None) -> bool:
-        try:
-            from winws_runtime.runners.runner_factory import get_current_runner
-
-            runner = get_current_runner()
-            if runner is None:
-                return False
-
-            if launch_method:
-                try:
-                    from settings.mode import exe_name_for_launch_method
-
-
-                    expected_name = exe_name_for_launch_method(launch_method).strip().lower()
-                    runner_name = os.path.basename(str(getattr(runner, "winws_exe", "") or "")).strip().lower()
-                    if expected_name and runner_name and expected_name != runner_name:
-                        return False
-                except Exception:
-                    pass
-
-            snapshot_getter = getattr(runner, "get_runner_state_snapshot", None)
-            if not callable(snapshot_getter):
-                return False
-
-            snapshot = snapshot_getter()
-            return self._is_runner_transition_state(getattr(snapshot, "state", ""))
-        except Exception:
-            return False
+        return transition_pipeline_in_progress_impl(self, launch_method)
 
     def _schedule_pending_restart_retry(self) -> None:
         if self._restart_runner_wait_queued:
@@ -164,13 +88,6 @@ class PresetLaunchController:
             self._process_pending_presets_switch()
 
         QTimer.singleShot(200, _retry)
-
-    def _fail_start_preparation(self, message: str) -> None:
-        text = str(message or "").strip() or "Не удалось подготовить запуск DPI"
-        log(f"Ошибка подготовки запуска: {text}", "❌ ERROR")
-        self.app.set_status(f"❌ {text}")
-        show_launch_error_top(self, text)
-        self._mark_runtime_failed(text)
 
     @staticmethod
     def _expected_process_name(launch_method: str) -> str:
@@ -214,70 +131,6 @@ class PresetLaunchController:
     def _process_pending_restart_request(self) -> None:
         process_pending_restart_request(self)
 
-    def _show_launch_error_top(self, message: str) -> None:
-        show_launch_error_top(self, message)
-
-    def _show_launch_warning_top(self, message: str) -> None:
-        show_launch_warning_top(self, message)
-
-    def _prepare_start_preflight(
-        self,
-        *,
-        selected_mode=None,
-        launch_method=None,
-        skip_conflict_prompt: bool = False,
-    ) -> bool:
-        """Выполняет раннюю preflight-стадию перед построением launch request.
-
-        Здесь ещё не создаётся worker и не читается launch profile.
-        Задача стадии простая:
-        - убедиться, что новый старт не дублирует уже идущий поток;
-        - очистить временное launch-состояние от предыдущей попытки;
-        - прогнать ранние gate-проверки вроде конфликтующих процессов;
-        - инвалидировать старые verification-loop таймеры от предыдущих стартов.
-        """
-        try:
-            if self._dpi_start_thread and self._dpi_start_thread.isRunning():
-                log("Запуск DPI уже выполняется", "DEBUG")
-                return False
-        except RuntimeError:
-            self._dpi_start_thread = None
-
-        self._pending_launch_warnings = []
-
-        if not skip_conflict_prompt and not handle_conflicting_processes_before_start(self, selected_mode, launch_method):
-            return False
-
-        # Invalidate any pending verification loop from older starts.
-        self._dpi_start_verify_generation += 1
-        return True
-
-    def _build_start_request(
-        self,
-        *,
-        selected_mode=None,
-        launch_method=None,
-    ):
-        """Строит launch request и фиксирует сопутствующие launch warnings.
-
-        Это вторая стадия after-preflight:
-        - превращаем сырые входы selected_mode/launch_method в нормализованный request;
-        - сохраняем warning-сообщения, которые worker вернёт позже в lifecycle feedback;
-        - если подготовка не удалась, завершаем попытку через общий fail-path.
-        """
-        try:
-            request, warnings = prepare_start_request(
-                selected_mode,
-                launch_method,
-                app_context=self.app.app_context,
-            )
-        except Exception as e:
-            self._fail_start_preparation(str(e))
-            return None
-
-        self._pending_launch_warnings = list(warnings or [])
-        return request
-
     def start_dpi_async(
         self,
         selected_mode=None,
@@ -292,54 +145,13 @@ class PresetLaunchController:
             selected_mode: Стратегия для запуска
             launch_method: Метод запуска из settings.mode. Если None - читается из settings.json.
         """
-        if not self._prepare_start_preflight(
+        start_dpi_async_impl(
+            self,
             selected_mode=selected_mode,
             launch_method=launch_method,
             skip_conflict_prompt=_skip_conflict_prompt,
-        ):
-            return
-
-        request = self._build_start_request(
-            selected_mode=selected_mode,
-            launch_method=launch_method,
+            startup_autostart=_startup_autostart,
         )
-        if request is None:
-            return
-
-        if isinstance(request.selected_mode, tuple) and len(request.selected_mode) == 2:
-            strategy_id, strategy_name = request.selected_mode
-            log(f"Обработка встроенной стратегии: {strategy_name} (ID: {strategy_id})", "DEBUG")
-        elif isinstance(request.selected_mode, dict):
-            log(f"Обработка стратегии: {request.mode_name}", "DEBUG")
-        elif isinstance(request.selected_mode, str):
-            log(f"Обработка строковой стратегии: {request.mode_name}", "DEBUG")
-
-        self.app.set_status(f"🚀 Запуск DPI ({request.method_name}): {request.mode_name}")
-        
-        # Для автозапуска при открытии программы не накрываем страницу общей
-        # крутилкой. Иначе кажется, что само окно ещё "не открылось", хотя
-        # на деле уже идёт фоновый запуск выбранного пресета.
-        if not _startup_autostart:
-            bridge = self._runtime_ui_bridge()
-            if bridge is not None:
-                bridge.show_active_preset_setup_page_loading()
-
-        if not _startup_autostart:
-            self.app.ui_state_store.set_launch_busy(True, "Запуск Zapret...")
-
-        self._begin_runtime_start(request.launch_method, request.selected_mode)
-
-        start_worker_thread(
-            self,
-            thread_attr="_dpi_start_thread",
-            worker_attr="_dpi_start_worker",
-            worker=PresetLaunchStartWorker(self.app, request.selected_mode, request.launch_method),
-            finished_slot=self._on_dpi_start_finished,
-            progress_slot=self.app.set_status,
-            cleanup_log_label="потока запуска",
-        )
-        
-        log(f"Запуск асинхронного старта DPI: {request.mode_name} (метод: {request.method_name})", "INFO")
 
     def stop_dpi_async(
         self,
@@ -348,61 +160,15 @@ class PresetLaunchController:
         cleanup_services: bool = False,
     ):
         """Асинхронно останавливает DPI без блокировки UI"""
-        # Проверка на уже запущенный поток
-        try:
-            if self._dpi_stop_thread and self._dpi_stop_thread.isRunning():
-                log("Остановка DPI уже выполняется", "DEBUG")
-                return
-        except RuntimeError:
-            self._dpi_stop_thread = None
-        
-        launch_method = get_strategy_launch_method()
-
-        # Показываем состояние остановки
-        method_name = resolve_method_name(launch_method)
-        self.app.set_status(f"🛑 Остановка DPI ({method_name})...")
-        
-        bridge = self._runtime_ui_bridge()
-        if bridge is not None:
-            bridge.show_active_preset_setup_page_loading()
-        
-        self.app.ui_state_store.set_launch_busy(True, "Остановка Zapret...")
-
-        self._begin_runtime_stop()
-
-        # Устанавливаем флаг ручной остановки
-        self.app.manually_stopped = True
-
-        start_worker_thread(
+        stop_dpi_async_impl(
             self,
-            thread_attr="_dpi_stop_thread",
-            worker_attr="_dpi_stop_worker",
-            worker=PresetLaunchStopWorker(
-                self.app,
-                launch_method,
-                force_cleanup=force_cleanup,
-                cleanup_services=cleanup_services,
-            ),
-            finished_slot=self._on_dpi_stop_finished,
-            progress_slot=self.app.set_status,
-            cleanup_log_label="потока остановки",
+            force_cleanup=force_cleanup,
+            cleanup_services=cleanup_services,
         )
-
-        log(f"Запуск асинхронной остановки DPI (метод: {method_name})", "INFO")
     
     def stop_and_exit_async(self):
         """Асинхронно останавливает DPI и закрывает программу"""
-        self.app._is_exiting = True
-
-        start_worker_thread(
-            self,
-            thread_attr="_stop_exit_thread",
-            worker_attr="_stop_exit_worker",
-            worker=StopAndExitWorker(self.app),
-            finished_slot=self._on_stop_and_exit_finished,
-            progress_slot=self.app.set_status,
-            cleanup_log_label="потока stop-and-exit",
-        )
+        stop_and_exit_async_impl(self)
     
     def _on_dpi_start_finished(self, success, error_message):
         on_dpi_start_finished_impl(self, success, error_message)
@@ -433,33 +199,7 @@ class PresetLaunchController:
         Returns:
             True если процесс запущен, False иначе
         """
-        try:
-            snapshot = self.app.launch_runtime_service.snapshot()
-            phase = str(snapshot.phase or "").strip().lower()
-            if bool(snapshot.running) and phase == "running":
-                return True
-        except Exception:
-            pass
-
-        try:
-            from winws_runtime.runners.runner_factory import get_current_runner
-
-            runner = get_current_runner()
-            if runner is not None:
-                snapshot_getter = getattr(runner, "get_runner_state_snapshot", None)
-                if callable(snapshot_getter):
-                    snapshot = snapshot_getter()
-                    state_value = str(getattr(snapshot, "state", "") or "").strip().lower()
-                    if state_value == "running":
-                        return True
-
-                is_runner_running = getattr(runner, "is_running", None)
-                if callable(is_runner_running) and bool(is_runner_running()):
-                    return True
-        except Exception:
-            pass
-
-        return bool(self.app.launch_runtime_api.is_any_running(silent=True))
+        return is_running_impl(self)
 
     def restart_dpi_async(self, *, force_full_stop: bool = False):
         """

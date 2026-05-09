@@ -3517,7 +3517,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Suggest profile",
     },
     "page.winws1_pages.request.hint": {
-        "ru": "Если нужного профиля нет в списке, его можно добавить позже как шаблон.",
+        "ru": "Если нужного профиля нет в списке, его можно добавить позже в набор доступных профилей.",
         "en": "If the needed profile is missing, it can be added later as a template.",
     },
     "page.winws1_pages.loading": {
@@ -3745,11 +3745,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "All sites and games (ALL TCP/UDP)",
     },
     "page.winws1_user_presets.empty.not_found": {
-        "ru": "Ничего не найдено.",
-        "en": "Nothing found.",
+        "ru": "По этому поиску пресетов нет. Измените запрос или очистите строку поиска.",
+        "en": "No presets match this search. Change the query or clear the search field.",
     },
     "page.winws1_user_presets.empty.none": {
-        "ru": "Нет пресетов. Создайте новый или импортируйте из файла.",
+        "ru": "Пресеты не найдены. Создайте новый пресет или импортируйте txt-файл.",
         "en": "No presets. Create a new one or import from file.",
     },
     "page.winws1_user_presets.error.generic": {
@@ -4221,11 +4221,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "All sites and games (ALL TCP/UDP)",
     },
     "page.winws2_user_presets.empty.not_found": {
-        "ru": "Ничего не найдено.",
-        "en": "Nothing found.",
+        "ru": "По этому поиску пресетов нет. Измените запрос или очистите строку поиска.",
+        "en": "No presets match this search. Change the query or clear the search field.",
     },
     "page.winws2_user_presets.empty.none": {
-        "ru": "Нет пресетов. Создайте новый или импортируйте из файла.",
+        "ru": "Пресеты не найдены. Создайте новый пресет или импортируйте txt-файл.",
         "en": "No presets. Create a new one or import from file.",
     },
     "page.winws2_user_presets.error.generic": {
@@ -4753,32 +4753,32 @@ TEXTS_EXTRA: dict[str, dict[str, str]] = {
         "en": "Strategy added",
     },
     "page.winws1_pages.empty.no_categories": {
-        "ru": "Профили не найдены. Проверьте выбранный пресет и файл profile/templates/all_profiles.txt.",
-        "en": "Profiles were not found. Check the selected preset and profile/templates/all_profiles.txt.",
+        "ru": "В выбранном пресете нет профилей, которые можно показать на этой странице. Попробуйте другой пресет или добавьте нужный профиль.",
+        "en": "The selected preset has no profiles to show on this page. Try another preset or add the needed profile.",
     },
     "page.winws2_pages.request.hint": {
         "ru": "Хотите добавить новый сайт или сервис в Zapret 2? Откройте готовую форму на GitHub и опишите, что нужно добавить в hostlist или ipset.",
         "en": "Want to add a new site or service to Zapret 2? Open the GitHub form and describe what should be added to the hostlist or ipset.",
     },
     "page.winws2_pages.empty.no_presets": {
-        "ru": "Пресеты Zapret 2 не найдены. Проверьте папку presets рядом с программой. Если встроенные пресеты отсутствуют, переустановите приложение.",
-        "en": "Zapret 2 presets were not found. Check the presets folder near the program. If built-in presets are missing, reinstall the app.",
+        "ru": "Пресеты Zapret 2 не найдены. Импортируйте пресет или переустановите приложение, чтобы вернуть встроенные пресеты.",
+        "en": "Zapret 2 presets were not found. Import a preset or reinstall the app to restore built-in presets.",
     },
     "page.winws2_pages.empty.no_selected_preset": {
-        "ru": "Не удалось определить выбранный пресет. Откройте список пресетов, выберите любой пресет заново и нажмите «Обновить».",
-        "en": "Could not determine the selected preset. Open the preset list, choose any preset again, and click Refresh.",
+        "ru": "Не удалось понять, какой пресет выбран. Откройте «Мои пресеты», выберите пресет заново и нажмите «Обновить».",
+        "en": "Could not determine which preset is selected. Open My Presets, choose a preset again, and click Refresh.",
     },
     "page.winws2_pages.empty.preset_read_error": {
-        "ru": "Не удалось прочитать выбранный пресет «{preset_name}». Такое бывает, если файл пустой, повреждён или недоступен для чтения.",
-        "en": "Could not read the selected preset \"{preset_name}\". This may happen if the file is empty, corrupted, or unavailable for reading.",
+        "ru": "Не удалось открыть выбранный пресет «{preset_name}». Файл мог быть удалён, очищен или повреждён. Выберите другой пресет или верните встроенный.",
+        "en": "Could not open the selected preset \"{preset_name}\". The file may have been deleted, emptied, or corrupted. Choose another preset or restore the built-in one.",
     },
     "page.winws2_pages.empty.unknown_error": {
-        "ru": "Не удалось построить список профилей для выбранного пресета «{preset_name}». Обычно это значит, что во время чтения пресета произошла внутренняя ошибка. Нажмите «Обновить» и проверьте лог.",
-        "en": "Could not build the profile list for the selected preset \"{preset_name}\". This usually means an internal error happened while reading the preset. Click Refresh and check the log.",
+        "ru": "Не удалось показать профили пресета «{preset_name}». Нажмите «Обновить». Если ошибка повторится, выберите другой пресет.",
+        "en": "Could not show profiles from preset \"{preset_name}\". Click Refresh. If the error repeats, choose another preset.",
     },
     "page.winws2_pages.empty.no_categories": {
-        "ru": "В выбранном пресете «{preset_name}» не найдено ни одного профиля для этой страницы. Это значит, что после разбора файла программа не увидела профиль с фильтрами вроде hostlist, hostlist-domains или ipset.",
-        "en": "No profiles were found for this page in the selected preset \"{preset_name}\". This means that after parsing the file, the app did not find a profile with filters such as hostlist, hostlist-domains, or ipset.",
+        "ru": "В выбранном пресете «{preset_name}» нет профилей, которые можно показать на этой странице. Попробуйте другой пресет или добавьте нужный профиль.",
+        "en": "The selected preset \"{preset_name}\" has no profiles to show on this page. Try another preset or add the needed profile.",
     },
     "page.winws2_pages.current.active_count": {
         "ru": "{count} активных",

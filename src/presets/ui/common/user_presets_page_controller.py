@@ -759,7 +759,7 @@ class UserPresetsPageController:
                         "text": tr_catalog(
                             self._config.empty_not_found_key,
                             language=language,
-                            default="Ничего не найдено.",
+                            default="По этому поиску пресетов нет. Измените запрос или очистите строку поиска.",
                         ),
                     }
                 )
@@ -770,7 +770,7 @@ class UserPresetsPageController:
                         "text": tr_catalog(
                             self._config.empty_none_key,
                             language=language,
-                            default="Нет пресетов. Создайте новый или импортируйте из файла.",
+                            default="Пресеты не найдены. Создайте новый пресет или импортируйте txt-файл.",
                         ),
                     }
                 )

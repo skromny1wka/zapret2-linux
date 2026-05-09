@@ -123,7 +123,11 @@ class PresetSetupPageBase(BasePage):
             self._apply_payload(payload)
         except Exception as exc:
             log(f"{self.__class__.__name__}: не удалось прочитать профили: {exc}", "ERROR")
-            self._show_empty_state("Не удалось прочитать профили выбранного пресета. Проверьте лог и сам пресет-файл.")
+            self._show_empty_state(
+                "Не удалось показать профили выбранного пресета. "
+                "Файл мог быть удалён, очищен или повреждён. "
+                "Выберите пресет заново и нажмите «Обновить»."
+            )
         finally:
             try:
                 if self._reload_btn is not None:
@@ -136,7 +140,10 @@ class PresetSetupPageBase(BasePage):
             return
         self._clear_dynamic_widgets()
         if not payload.items:
-            self._show_empty_state("В выбранном пресете не найдено ни одного профиля.")
+            self._show_empty_state(
+                "В выбранном пресете нет профилей, которые можно показать на этой странице. "
+                "Попробуйте другой пресет или добавьте нужный профиль."
+            )
             return
         profiles_list = ProfilesList(self)
         profiles_list.profile_selected.connect(self._on_profile_clicked)
@@ -199,7 +206,9 @@ class PresetSetupPageBase(BasePage):
     def _show_profile_info(self) -> None:
         MessageBox(
             "Настройка пресета",
-            "На этой странице показаны профили выбранного пресета. Включение шаблона добавляет его в пресет, выключение существующего профиля записывает --skip.",
+            "На этой странице показаны профили выбранного пресета. "
+            "Если профиля ещё нет в пресете, включите его или выберите для него готовую стратегию. "
+            "Если профиль выключить, программа добавит --skip, чтобы движок его пропустил.",
             self,
         ).exec()
 

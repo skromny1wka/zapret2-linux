@@ -100,9 +100,9 @@ class ProfilesList(QWidget):
         description = " | ".join(description_parts)
         tooltip = _match_summary(item)
         if not item.in_preset:
-            tooltip = f"{tooltip}\nШаблон ещё не добавлен в выбранный пресет."
+            tooltip = f"{tooltip}\nЭтого профиля ещё нет в выбранном пресете. Включите его или выберите готовую стратегию, чтобы добавить."
         elif not item.enabled:
-            tooltip = f"{tooltip}\nПрофиль есть в пресете, но выключен через --skip."
+            tooltip = f"{tooltip}\nПрофиль есть в пресете, но сейчас выключен. В файле это записано через --skip."
 
         widget = ProfileItem(
             item.key,
