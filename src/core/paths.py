@@ -4,6 +4,15 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
+from settings.mode import (
+    BUILTIN_PRESETS_DIR_NAME_WINWS1,
+    BUILTIN_PRESETS_DIR_NAME_WINWS2,
+    ENGINE_WINWS1,
+    ENGINE_WINWS2,
+    PRESETS_DIR_NAME_WINWS1,
+    PRESETS_DIR_NAME_WINWS2,
+)
+
 
 @dataclass(frozen=True)
 class EnginePaths:
@@ -29,12 +38,12 @@ class AppPaths:
         engine_key = str(engine or "").strip().lower()
         presets_root_dir = self.user_root / "presets"
 
-        if engine_key == "winws2":
-            user_presets_dir = presets_root_dir / "presets_v2"
-            builtin_presets_dir = presets_root_dir / "presets_v2_builtin"
-        elif engine_key == "winws1":
-            user_presets_dir = presets_root_dir / "presets_v1"
-            builtin_presets_dir = presets_root_dir / "presets_v1_builtin"
+        if engine_key == ENGINE_WINWS2:
+            user_presets_dir = presets_root_dir / PRESETS_DIR_NAME_WINWS2
+            builtin_presets_dir = presets_root_dir / BUILTIN_PRESETS_DIR_NAME_WINWS2
+        elif engine_key == ENGINE_WINWS1:
+            user_presets_dir = presets_root_dir / PRESETS_DIR_NAME_WINWS1
+            builtin_presets_dir = presets_root_dir / BUILTIN_PRESETS_DIR_NAME_WINWS1
         else:
             user_presets_dir = presets_root_dir / engine_key
             builtin_presets_dir = presets_root_dir / f"{engine_key}_builtin"

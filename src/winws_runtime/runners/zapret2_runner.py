@@ -17,6 +17,7 @@ import threading
 from typing import Optional
 
 from log.log import log
+from settings.mode import ENGINE_WINWS2, ZAPRET2_MODE
 
 from .runner_base import StrategyRunnerBase
 from .preset_runner_support import (
@@ -151,7 +152,7 @@ def _strip_outer_quotes(value: str) -> str:
     return v.strip()
 
 
-class StrategyRunnerV2(StrategyRunnerBase):
+class Winws2StrategyRunner(StrategyRunnerBase):
     """
     Runner for Zapret 2 (winws2.exe) with hot-reload support.
 
@@ -163,7 +164,7 @@ class StrategyRunnerV2(StrategyRunnerBase):
 
     def __init__(self, winws_exe_path: str):
         """
-        Initialize V2 strategy runner.
+        Initialize winws2 strategy runner.
 
         Args:
             winws_exe_path: Path to winws2.exe
@@ -179,7 +180,7 @@ class StrategyRunnerV2(StrategyRunnerBase):
         self._last_spawn_exit_code: Optional[int] = None
         self._last_spawn_stderr: str = ""
 
-        log(f"StrategyRunnerV2 initialized with hot-reload support", "INFO")
+        log(f"Winws2StrategyRunner initialized with hot-reload support", "INFO")
 
     def _set_last_error(self, message: Optional[str]) -> None:
         try:
@@ -221,7 +222,7 @@ class StrategyRunnerV2(StrategyRunnerBase):
         )
         if state == PresetRunnerState.FAILED:
             publish_runner_failure(
-                launch_method="zapret2_mode",
+                launch_method=ZAPRET2_MODE,
                 error=error,
             )
         return snapshot
@@ -444,7 +445,7 @@ class StrategyRunnerV2(StrategyRunnerBase):
             from profile.parser import parse_preset_text
             from profile.serializer import serialize_preset, with_profile_strategy_lines
 
-            source = parse_preset_text(cleaned, engine="winws2")
+            source = parse_preset_text(cleaned, engine=ENGINE_WINWS2)
             source_is_circular = self._is_circular_preset_text(cleaned)
             repaired_profiles = 0
             defaulted_profiles = 0
@@ -550,8 +551,8 @@ class StrategyRunnerV2(StrategyRunnerBase):
         Called when config file changes.
         Restarts process with new config.
         """
-        if controller_transition_in_progress("zapret2_mode"):
-            log("Hot-reload пропущен: controller уже выполняет transition для zapret2_mode", "DEBUG")
+        if controller_transition_in_progress(ZAPRET2_MODE):
+            log(f"Hot-reload пропущен: controller уже выполняет transition для {ZAPRET2_MODE}", "DEBUG")
             return
         log("Hot-reload triggered: config file changed", "INFO")
 
@@ -774,9 +775,9 @@ class StrategyRunnerV2(StrategyRunnerBase):
                     except Exception:
                         first_line = ""
                     if first_line:
-                        self._set_last_error(f"winws2 завершился сразу (код {exit_code}): {first_line[:200]}")
+                        self._set_last_error(f"{ENGINE_WINWS2} завершился сразу (код {exit_code}): {first_line[:200]}")
                     else:
-                        self._set_last_error(f"winws2 завершился сразу (код {exit_code})")
+                        self._set_last_error(f"{ENGINE_WINWS2} завершился сразу (код {exit_code})")
             else:
                 first_line = ""
                 try:
@@ -900,7 +901,7 @@ class StrategyRunnerV2(StrategyRunnerBase):
         _retry_count: int = 0,
     ) -> bool:
         """
-        Запускает winws2 из выбранного preset-файла.
+        Запускает движок Zapret 2 из выбранного preset-файла.
 
         Это основной путь для обычного запуска zapret2_mode: берём готовый
         preset-файл, а не собираем аргументы из старых категорий.

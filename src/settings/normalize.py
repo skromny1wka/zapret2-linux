@@ -3,6 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from settings import schema
+from settings.mode import (
+    SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS1,
+    SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS2,
+)
 
 
 def as_dict(value: object) -> dict[str, Any]:
@@ -112,15 +116,16 @@ def normalize_program(data: object) -> dict[str, Any]:
     defaults = schema.default_program()
     return {
         "dpi_autostart": as_bool(raw.get("dpi_autostart"), defaults["dpi_autostart"]),
+        "gui_autostart_enabled": as_bool(raw.get("gui_autostart_enabled"), defaults["gui_autostart_enabled"]),
         "strategy_launch_method": as_str_in(raw.get("strategy_launch_method"), schema.VALID_LAUNCH_METHODS, defaults["strategy_launch_method"]),
         "profile_ui_mode": as_str_in(raw.get("profile_ui_mode"), schema.VALID_PROFILE_UI_MODES, defaults["profile_ui_mode"]),
-        "selected_source_preset_file_name_winws1": as_clean_str(
-            raw.get("selected_source_preset_file_name_winws1"),
-            defaults["selected_source_preset_file_name_winws1"],
+        SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS1: as_clean_str(
+            raw.get(SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS1),
+            defaults[SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS1],
         ),
-        "selected_source_preset_file_name_winws2": as_clean_str(
-            raw.get("selected_source_preset_file_name_winws2"),
-            defaults["selected_source_preset_file_name_winws2"],
+        SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS2: as_clean_str(
+            raw.get(SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS2),
+            defaults[SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS2],
         ),
         "auto_update_enabled": as_bool(raw.get("auto_update_enabled"), defaults["auto_update_enabled"]),
         "remove_github_api": as_bool(raw.get("remove_github_api"), defaults["remove_github_api"]),
@@ -228,6 +233,46 @@ def normalize_hosts(data: object) -> dict[str, Any]:
 def normalize_ui_state(data: object) -> dict[str, Any]:
     _ = data
     return {}
+
+
+def normalize_profile_strategy_state(data: object) -> dict[str, Any]:
+    raw = as_dict(data)
+
+    profiles: dict[str, Any] = {}
+    raw_profiles = as_dict(raw.get("profiles"))
+    for raw_profile_key, raw_profile_row in raw_profiles.items():
+        profile_key = as_clean_str(raw_profile_key)
+        if not (profile_key.startswith("name:") or profile_key.startswith("sig:")):
+            continue
+        profile_row = as_dict(raw_profile_row)
+        raw_strategies = as_dict(profile_row.get("strategies"))
+        strategies: dict[str, Any] = {}
+        for raw_strategy_id, raw_strategy_row in raw_strategies.items():
+            strategy_id = as_clean_str(raw_strategy_id)
+            if not strategy_id or strategy_id in {"none", "custom"}:
+                continue
+            strategy_row = as_dict(raw_strategy_row)
+            rating = as_clean_str(strategy_row.get("rating")).lower()
+            if rating not in {"", "work", "notwork"}:
+                rating = ""
+            favorite = as_bool(strategy_row.get("favorite"), False)
+            if not rating and not favorite:
+                continue
+            normalized_row: dict[str, Any] = {
+                "favorite": favorite,
+                "rating": rating,
+            }
+            updated_at = as_clean_str(strategy_row.get("updated_at"))
+            if updated_at:
+                normalized_row["updated_at"] = updated_at
+            strategies[strategy_id] = normalized_row
+        if strategies:
+            profiles[profile_key] = {"strategies": strategies}
+
+    return {
+        "version": 1,
+        "profiles": profiles,
+    }
 
 
 def normalize_orchestra_settings(data: object) -> dict[str, Any]:
@@ -342,5 +387,6 @@ def normalize_settings(data: object) -> dict[str, Any]:
         "dns": normalize_dns(raw.get("dns")),
         "hosts": normalize_hosts(raw.get("hosts")),
         "ui_state": normalize_ui_state(raw.get("ui_state")),
+        "profile_strategy_state": normalize_profile_strategy_state(raw.get("profile_strategy_state")),
         "orchestra": normalize_orchestra(raw.get("orchestra")),
     }

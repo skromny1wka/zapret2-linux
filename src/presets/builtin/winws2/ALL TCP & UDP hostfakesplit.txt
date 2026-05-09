@@ -1,5 +1,4 @@
 # Preset: ALL TCP & UDP hostfakesplit
-# TemplateOrigin: ALL TCP & UDP hostfakesplit
 # BuiltinVersion: 2.19
 # Description: 
 

@@ -8,6 +8,7 @@ import time
 from PyQt6.QtCore import QTimer
 from app_notifications import advisory_notification, notification_action
 from settings.dpi.strategy_settings import get_strategy_launch_method
+from settings.mode import is_preset_launch_method, normalize_launch_method
 from log.log import log
 
 from winws_runtime.health.process_health_check import (
@@ -80,7 +81,7 @@ class PresetLaunchController:
         return ensure_runtime_ui_bridge(self.app)
 
     def transition_pipeline_in_progress(self, launch_method: str | None = None) -> bool:
-        method = str(launch_method or "").strip().lower()
+        method = normalize_launch_method(launch_method, default="")
 
         try:
             if self._dpi_start_thread and self._dpi_start_thread.isRunning():
@@ -96,7 +97,7 @@ class PresetLaunchController:
 
         try:
             if self._presets_switch_thread and self._presets_switch_thread.isRunning():
-                if not method or method in {"zapret1_mode", "zapret2_mode"}:
+                if not method or is_preset_launch_method(method):
                     return True
         except RuntimeError:
             self._presets_switch_thread = None
@@ -108,7 +109,7 @@ class PresetLaunchController:
         if int(self._restart_pending_stop_generation or 0) > 0:
             return True
         if int(self._presets_switch_requested_generation or 0) > int(self._presets_switch_completed_generation or 0):
-            if not method or method in {"zapret1_mode", "zapret2_mode"}:
+            if not method or is_preset_launch_method(method):
                 return True
 
         return False
@@ -127,10 +128,10 @@ class PresetLaunchController:
 
             if launch_method:
                 try:
-                    from config.config import get_winws_exe_for_method
+                    from settings.mode import exe_name_for_launch_method
 
 
-                    expected_name = os.path.basename(get_winws_exe_for_method(str(launch_method or "").strip().lower())).strip().lower()
+                    expected_name = exe_name_for_launch_method(method).strip().lower()
                     runner_name = os.path.basename(str(getattr(runner, "winws_exe", "") or "")).strip().lower()
                     if expected_name and runner_name and expected_name != runner_name:
                         return False
@@ -297,14 +298,16 @@ class PresetLaunchController:
 
     @staticmethod
     def _expected_process_name(launch_method: str) -> str:
-        method = str(launch_method or "").strip().lower()
-        if method == "orchestra":
+        method = normalize_launch_method(launch_method, default="")
+        from settings.mode import is_orchestra_launch_method
+
+        if is_orchestra_launch_method(method):
             return ""
         try:
-            from config.config import get_winws_exe_for_method
+            from settings.mode import exe_name_for_launch_method
 
 
-            return os.path.basename(get_winws_exe_for_method(method)).strip().lower()
+            return exe_name_for_launch_method(method).strip().lower()
         except Exception:
             return ""
 
@@ -350,7 +353,10 @@ class PresetLaunchController:
 
             discord_manager = getattr(self.app, "discord_manager", None)
             if discord_manager is None:
-                return False
+                from discord.discord import DiscordManager
+
+                discord_manager = DiscordManager(status_callback=self.app.set_status)
+                self.app.discord_manager = discord_manager
 
             return bool(discord_manager.restart_discord_if_running())
         except Exception as e:
@@ -445,7 +451,7 @@ class PresetLaunchController:
 
         Args:
             selected_mode: Стратегия для запуска
-            launch_method: Метод запуска ("zapret2_mode", "zapret1_mode", "orchestra" и т.д.). Если None - читается из реестра
+            launch_method: Метод запуска из settings.mode. Если None - читается из settings.json.
         """
         if not self._prepare_start_preflight(
             selected_mode=selected_mode,
@@ -477,7 +483,7 @@ class PresetLaunchController:
         if not _startup_autostart:
             bridge = self._runtime_ui_bridge()
             if bridge is not None:
-                bridge.show_active_profiles_page_loading()
+                bridge.show_active_preset_setup_page_loading()
 
         store = getattr(self.app, "ui_state_store", None)
         if store is not None and not _startup_autostart:
@@ -520,7 +526,7 @@ class PresetLaunchController:
         
         bridge = self._runtime_ui_bridge()
         if bridge is not None:
-            bridge.show_active_profiles_page_loading()
+            bridge.show_active_preset_setup_page_loading()
         
         store = getattr(self.app, "ui_state_store", None)
         if store is not None:

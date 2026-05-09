@@ -1162,18 +1162,19 @@ class StrategyScanPageController:
     ) -> tuple[str, str]:
         from profile.parser import parse_preset_text
         from profile.serializer import serialize_preset, with_profile_enabled, with_profile_strategy_lines
+        from settings.mode import ENGINE_WINWS2, ZAPRET2_MODE
 
-        manifest = app_context.preset_mode_coordinator.get_selected_source_manifest("zapret2_mode")
+        manifest = app_context.preset_mode_coordinator.get_selected_source_manifest(ZAPRET2_MODE)
         selected_file_name = str(getattr(manifest, "file_name", "") or "").strip()
         if not selected_file_name:
             raise RuntimeError("Не удалось определить выбранный пресет")
 
-        source_text = app_context.preset_file_store.read_source_text("winws2", selected_file_name)
-        source = parse_preset_text(source_text, engine="winws2", source_name=selected_file_name)
+        source_text = app_context.preset_file_store.read_source_text(ENGINE_WINWS2, selected_file_name)
+        source = parse_preset_text(source_text, engine=ENGINE_WINWS2, source_name=selected_file_name)
 
         cleaned_strategy_lines = [line.strip() for line in strategy_lines if line and line.strip()]
         profile_source = "\n".join(cleaned_strategy_lines).rstrip("\n") + "\n"
-        profile_preset = parse_preset_text(profile_source, engine="winws2", source_name=selected_file_name)
+        profile_preset = parse_preset_text(profile_source, engine=ENGINE_WINWS2, source_name=selected_file_name)
         if not profile_preset.profiles:
             raise RuntimeError("Не удалось собрать profile из найденной стратегии")
 
@@ -1209,21 +1210,13 @@ class StrategyScanPageController:
                 "Сначала создайте нужный profile, затем примените найденную стратегию повторно."
             )
 
+        from presets.file_service import PresetFileService
+
         updated_text = serialize_preset(source)
-        updated = app_context.preset_file_store.update_preset(
-            "winws2",
-            selected_file_name,
-            updated_text,
-            getattr(manifest, "name", None),
-        )
-        try:
-            app_context.preset_store.notify_preset_saved(updated.file_name)
-        except Exception:
-            pass
-        try:
-            app_context.preset_mode_coordinator.refresh_selected_launch_preset("zapret2_mode")
-        except Exception:
-            pass
+        PresetFileService.from_launch_method(
+            ZAPRET2_MODE,
+            app_context=app_context,
+        ).save_source_text_by_file_name(selected_file_name, updated_text)
         return selected_file_name, "updated"
 
     @classmethod

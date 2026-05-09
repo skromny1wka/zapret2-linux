@@ -5,6 +5,7 @@ from PyQt6.QtCore import QTimer
 from log.log import log
 
 from settings.dpi.strategy_settings import get_strategy_launch_method
+from settings.mode import is_preset_launch_method
 from ui.runtime_ui_bridge import ensure_runtime_ui_bridge
 
 from .thread_runtime import start_worker_thread
@@ -20,7 +21,7 @@ def process_pending_presets_switch(controller) -> None:
     launch_method = str(
         controller._presets_switch_method or get_strategy_launch_method() or ""
     ).strip().lower()
-    if launch_method not in ("zapret1_mode", "zapret2_mode"):
+    if not is_preset_launch_method(launch_method):
         return
 
     if controller._runner_transition_in_progress(launch_method=launch_method):
@@ -64,7 +65,7 @@ def process_pending_presets_switch(controller) -> None:
 
     bridge = ensure_runtime_ui_bridge(controller.app)
     if bridge is not None:
-        bridge.show_active_profiles_page_loading()
+        bridge.show_active_preset_setup_page_loading()
 
     start_worker_thread(
         controller,
@@ -84,7 +85,7 @@ def process_pending_presets_switch(controller) -> None:
 
 def switch_presets_async(controller, launch_method: str | None = None) -> None:
     method = str(launch_method or get_strategy_launch_method() or "").strip().lower()
-    if method not in ("zapret1_mode", "zapret2_mode"):
+    if not is_preset_launch_method(method):
         controller.restart_dpi_async()
         return
 
@@ -180,7 +181,7 @@ def handle_presets_switch_finished(controller, success, error_message, generatio
 
         bridge = ensure_runtime_ui_bridge(controller.app)
         if bridge is not None:
-            bridge.show_active_profiles_page_success()
+            bridge.show_active_preset_setup_page_success()
 
         controller._presets_switch_completed_generation = max(
             int(controller._presets_switch_completed_generation or 0),

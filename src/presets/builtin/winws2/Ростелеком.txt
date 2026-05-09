@@ -1,5 +1,4 @@
 # Preset: Ростелеком
-# TemplateOrigin: Ростелеком
 # BuiltinVersion: 2.19
 # Description: 
 

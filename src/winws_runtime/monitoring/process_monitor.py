@@ -9,7 +9,7 @@ class ProcessMonitorThread(QThread):
     Шлёт сигнал когда состояние (запущен/остановлен) изменилось.
     """
     processStatusChanged = pyqtSignal(bool)          # True / False
-    processDetailsChanged = pyqtSignal(dict)         # {"winws.exe": [pid, ...], "winws2.exe": [pid, ...]}
+    processDetailsChanged = pyqtSignal(dict)         # имя exe -> список PID
     checkingStarted = pyqtSignal()                   # Начало проверки
     checkingFinished = pyqtSignal()                  # Конец проверки
 

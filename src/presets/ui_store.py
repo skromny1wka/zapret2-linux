@@ -20,7 +20,7 @@ class PresetUiStore(QObject):
     presets_changed = pyqtSignal()
     preset_switched = pyqtSignal(str)
     preset_identity_changed = pyqtSignal(str)
-    preset_updated = pyqtSignal(str)
+    preset_content_changed = pyqtSignal(str)
 
     def __init__(
         self,
@@ -60,9 +60,9 @@ class PresetUiStore(QObject):
         self._reload_metadata()
         self.presets_changed.emit()
 
-    def notify_preset_saved(self, file_name: str) -> None:
+    def notify_preset_content_changed(self, file_name: str) -> None:
         self._invalidate_metadata_cache()
-        self.preset_updated.emit(str(file_name or "").strip())
+        self.preset_content_changed.emit(str(file_name or "").strip())
 
     def notify_presets_changed(self) -> None:
         self._invalidate_metadata_cache()

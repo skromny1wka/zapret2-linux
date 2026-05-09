@@ -46,6 +46,7 @@ from log.ui.worker_workflow import (
     start_tail_worker,
     start_winws_output_worker,
 )
+from settings.mode import ORCHESTRA_MODE
 from ui.text_catalog import tr as tr_catalog
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens, get_themed_qta_icon
 from log.log import log
@@ -670,7 +671,9 @@ class LogsPage(BasePage):
 
     def _is_orchestra_mode(self) -> bool:
         """Проверяет, активен ли режим оркестратора"""
-        return self._get_launch_method() == "orchestra"
+        from settings.mode import is_orchestra_launch_method
+
+        return is_orchestra_launch_method(self._get_launch_method())
 
     def _get_launch_method(self) -> str:
         """Возвращает текущий метод запуска"""
@@ -695,7 +698,9 @@ class LogsPage(BasePage):
         try:
             exe_name = LogsPageController.resolve_winws_exe_name(self._get_launch_method())
         except Exception:
-            exe_name = "winws.exe"
+            from settings.mode import EXE_NAME_WINWS1
+
+            exe_name = EXE_NAME_WINWS1
 
         self.winws_title_label.setText(
             tr_catalog(
@@ -960,7 +965,7 @@ class LogsPage(BasePage):
         self._refresh_winws_title()
         source, runner = self._get_running_runner_source()
 
-        if source == "orchestra" and runner:
+        if source == ORCHESTRA_MODE and runner:
             # Для оркестратора всегда останавливаем worker чтения stdout,
             # чтобы не конкурировать с внутренним reader'ом orchestra_runner.
             if self._winws_thread and self._winws_thread.isRunning():

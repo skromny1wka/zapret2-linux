@@ -9,6 +9,7 @@ from collections.abc import Callable
 from os import urandom
 
 from log.log import log
+from settings.mode import ENGINE_WINWS2
 from telegram_proxy.page_settings_controller import TelegramProxySettingsController
 from utils.windows_process_probe import iter_process_records_winapi
 
@@ -526,9 +527,10 @@ class TelegramProxyDiagnosticsController:
     @staticmethod
     def _check_winws2_running() -> bool:
         try:
-            expected = {"winws2.exe", "winws.exe"}
+            from settings.mode import ALL_WINWS_EXE_NAME_SET
+
             for _pid, process_name in iter_process_records_winapi():
-                if str(process_name or "").strip().lower() in expected:
+                if str(process_name or "").strip().lower() in ALL_WINWS_EXE_NAME_SET:
                     return True
             return False
         except Exception:
@@ -638,7 +640,7 @@ class TelegramProxyDiagnosticsController:
             summary.append("  Прокси: не запущен")
         else:
             summary.append(f"  Прокси: ошибка ({proxy_result.get('error', '?')})")
-        summary.append(f"  winws2: {'запущен' if winws2_running else 'не запущен'}")
+        summary.append(f"  {ENGINE_WINWS2}: {'запущен' if winws2_running else 'не запущен'}")
 
         summary.extend(["", "── Рекомендации ──"])
         if blocked == 0 and ok_count > 0:
@@ -670,9 +672,9 @@ class TelegramProxyDiagnosticsController:
                 f"  [!] {names}: заблокированы, WSS relay нет — часть контента (эмодзи, стикеры) может не загружаться"
             )
             if winws2_running:
-                summary.append(f"  [~] winws2 запущен — {names} могут работать через zapret")
+                summary.append(f"  [~] {ENGINE_WINWS2} запущен — {names} могут работать через zapret")
             else:
-                summary.append(f"  [!] Для {names} запустите winws2/zapret на главной странице")
+                summary.append(f"  [!] Для {names} запустите {ENGINE_WINWS2}/zapret на главной странице")
 
         if proxy_not_running:
             summary.append("  [!] Прокси не запущен — запустите его на этой странице")
@@ -680,6 +682,6 @@ class TelegramProxyDiagnosticsController:
         if not relay_ok and blocked > 0:
             summary.append("  [x] WSS relay недоступен — прокси не будет работать")
             if not winws2_running:
-                summary.append("  [!] Запустите winws2/zapret или используйте VPN")
+                summary.append(f"  [!] Запустите {ENGINE_WINWS2}/zapret или используйте VPN")
 
         return "\n".join(summary)

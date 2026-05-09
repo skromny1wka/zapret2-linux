@@ -42,16 +42,15 @@ def _profiles_for(
 PAGE_PERFORMANCE_PROFILE_OVERRIDES: dict[PageName, PagePerformanceProfile] = {
     **_profiles_for(
         (
-            PageName.CONTROL,
             PageName.ZAPRET2_MODE_CONTROL,
-            PageName.ZAPRET2_MODE,
-            PageName.ZAPRET2_PROFILE_DETAIL,
-            PageName.ZAPRET2_PRESET_DETAIL,
+            PageName.ZAPRET2_PRESET_SETUP,
+            PageName.ZAPRET2_PROFILE_SETUP,
+            PageName.ZAPRET2_PRESET_RAW_EDITOR,
             PageName.ZAPRET1_MODE_CONTROL,
-            PageName.ZAPRET1_MODE,
+            PageName.ZAPRET1_PRESET_SETUP,
             PageName.ZAPRET1_USER_PRESETS,
-            PageName.ZAPRET1_PROFILE_DETAIL,
-            PageName.ZAPRET1_PRESET_DETAIL,
+            PageName.ZAPRET1_PROFILE_SETUP,
+            PageName.ZAPRET1_PRESET_RAW_EDITOR,
             PageName.ZAPRET2_USER_PRESETS,
         ),
         _profile(200),

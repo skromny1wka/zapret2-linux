@@ -2,6 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from settings.mode import (
+    ALL_LAUNCH_METHODS,
+    DEFAULT_LAUNCH_METHOD,
+    SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS1,
+    SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS2,
+)
+
 SETTINGS_DIR_NAME = "settings"
 SETTINGS_FILE_NAME = "settings.json"
 SETTINGS_VERSION = 1
@@ -12,7 +19,7 @@ DEFAULT_TG_PROXY_HOST = "127.0.0.1"
 DEFAULT_TG_PROXY_PORT = 1353
 DEFAULT_TG_PROXY_UPSTREAM_PORT = 1080
 
-VALID_LAUNCH_METHODS = frozenset({"zapret2_mode", "zapret1_mode", "orchestra"})
+VALID_LAUNCH_METHODS = ALL_LAUNCH_METHODS
 VALID_PROFILE_UI_MODES = frozenset({"basic"})
 VALID_DISPLAY_MODES = frozenset({"dark", "light", "system"})
 VALID_UI_LANGUAGES = frozenset({"ru", "en"})
@@ -35,10 +42,11 @@ ORCHESTRA_ASKEYS = (
 def default_program() -> dict[str, Any]:
     return {
         "dpi_autostart": True,
-        "strategy_launch_method": "zapret2_mode",
+        "gui_autostart_enabled": False,
+        "strategy_launch_method": DEFAULT_LAUNCH_METHOD,
         "profile_ui_mode": "basic",
-        "selected_source_preset_file_name_winws1": "",
-        "selected_source_preset_file_name_winws2": "",
+        SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS1: "",
+        SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS2: "",
         "auto_update_enabled": True,
         "remove_github_api": True,
         "discord_auto_restart": True,
@@ -121,6 +129,13 @@ def default_ui_state() -> dict[str, Any]:
     return {}
 
 
+def default_profile_strategy_state() -> dict[str, Any]:
+    return {
+        "version": 1,
+        "profiles": {},
+    }
+
+
 def default_orchestra_settings() -> dict[str, Any]:
     return {
         "strict_detection": True,
@@ -166,5 +181,6 @@ def build_default_settings() -> dict[str, Any]:
         "dns": default_dns(),
         "hosts": default_hosts(),
         "ui_state": default_ui_state(),
+        "profile_strategy_state": default_profile_strategy_state(),
         "orchestra": default_orchestra(),
     }

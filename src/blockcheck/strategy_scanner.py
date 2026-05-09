@@ -39,6 +39,12 @@ from blockcheck.models import TestStatus
 from blockcheck.scan_models import StrategyProbeResult, StrategyScanReport
 from blockcheck.stun_tester import test_stun
 from config.config import MAIN_DIRECTORY
+from settings.mode import (
+    ENGINE_WINWS2,
+    EXE_NAME_WINWS2,
+    ZAPRET2_MODE,
+    exe_path_for_launch_method,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -384,7 +390,7 @@ class StrategyScanner:
         if self.cancelled:
             return False
         self._cb.on_phase("Baseline-тест (без обхода)")
-        self._cb.on_log("\n--- Baseline HTTPS test (без winws2) ---")
+        self._cb.on_log(f"\n--- Baseline HTTPS test (без {ENGINE_WINWS2}) ---")
 
         available_families: list[int] = []
         blocked_families: list[int] = []
@@ -431,7 +437,7 @@ class StrategyScanner:
         if self.cancelled:
             return False
         self._cb.on_phase("Baseline-тест (без обхода)")
-        self._cb.on_log("\n--- Baseline STUN test (без winws2) ---")
+        self._cb.on_log(f"\n--- Baseline STUN test (без {ENGINE_WINWS2}) ---")
 
         available_families: list[int] = []
         blocked_families: list[int] = []
@@ -482,7 +488,7 @@ class StrategyScanner:
 
         All modes load from the canonical preset catalog for the selected
         protocol. The scanner works with the same strategy definitions as the
-        preset mode editor instead of the removed legacy z2 catalog layer.
+        preset mode editor instead of the removed legacy winws2 catalog layer.
         - quick:    30 strategies from cursor
         - standard: 80 strategies from cursor
         - full:     all remaining strategies from cursor
@@ -524,7 +530,9 @@ class StrategyScanner:
             local_root = Path((MAIN_DIRECTORY or "").strip() or self._work_dir)
             user_root = Path((MAIN_DIRECTORY or "").strip() or self._work_dir)
             app_paths = AppPaths(user_root=user_root, local_root=local_root)
-            catalogs = load_strategy_catalogs(app_paths, "winws2")
+            from settings.mode import ENGINE_WINWS2
+
+            catalogs = load_strategy_catalogs(app_paths, ENGINE_WINWS2)
             entries = catalogs.get(catalog_name, {})
 
             result = []
@@ -615,11 +623,11 @@ class StrategyScanner:
                 )
             try:
                 result = self._probe_one_attempt(name, strat_id, args, target)
-                # If winws2 crashed, retry (WinDivert may not have released yet)
-                if not result.success and "winws2 crashed" in result.error:
+                # If the engine crashed, retry (WinDivert may not have released yet)
+                if not result.success and f"{ENGINE_WINWS2} crashed" in result.error:
                     last_error = result.error
                     if attempt < self._WINWS2_CRASH_RETRIES and not self.cancelled:
-                        self._cb.on_log(f"  winws2 crashed, retrying ({attempt + 1})...")
+                        self._cb.on_log(f"  {ENGINE_WINWS2} crashed, retrying ({attempt + 1})...")
                         time.sleep(1.0)
                         continue
                 return result
@@ -710,7 +718,7 @@ class StrategyScanner:
                     target=target,
                     success=False,
                     time_ms=0,
-                    error=f"winws2 crashed (exit={proc.returncode}): {output[:300]}",
+                    error=f"{ENGINE_WINWS2} crashed (exit={proc.returncode}): {output[:300]}",
                 )
 
             # 5. Protocol probe test (one or more address families)
@@ -1554,11 +1562,11 @@ class StrategyScanner:
                         proc.wait(timeout=2)
                         killed_cleanly = True
                     except subprocess.TimeoutExpired:
-                        logger.warning("winws2 process %s did not die after kill(), using force kill", proc.pid)
+                        logger.warning("%s process %s did not die after kill(), using force kill", ENGINE_WINWS2, proc.pid)
             else:
                 killed_cleanly = True
         except OSError as e:
-            logger.warning("Error killing winws2 process: %s", e)
+            logger.warning("Error killing %s process: %s", ENGINE_WINWS2, e)
 
         # Fallback: force-kill all winws processes if graceful kill failed
         if not killed_cleanly:
@@ -1645,18 +1653,10 @@ class StrategyScanner:
 
     def _find_winws2(self) -> str:
         """Find the winws2.exe path."""
-        try:
-            from config.config import WINWS2_EXE
-            if os.path.exists(WINWS2_EXE):
-                return WINWS2_EXE
-        except ImportError:
-            pass
-
-        # Fallback: relative to working directory
-        fallback = os.path.join(self._work_dir, "exe", "winws2.exe")
-        if os.path.exists(fallback):
-            return fallback
+        winws2_path = exe_path_for_launch_method(ZAPRET2_MODE)
+        if os.path.exists(winws2_path):
+            return winws2_path
 
         raise FileNotFoundError(
-            "winws2.exe not found. Ensure zapret2 is installed."
+            f"{EXE_NAME_WINWS2} not found: {winws2_path}"
         )

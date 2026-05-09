@@ -1,5 +1,4 @@
 # Preset: general FAKE TLS AUTO ALT2 (game filter)
-# TemplateOrigin: general FAKE TLS AUTO ALT2 (game filter)
 # BuiltinVersion: 2.19
 
 --lua-init=@lua/zapret-lib.lua

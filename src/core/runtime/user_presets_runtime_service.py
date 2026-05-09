@@ -127,7 +127,7 @@ class UserPresetsRuntimeService:
         if "preset_structure_revision" in changed_fields:
             self.mark_presets_structure_changed(page)
 
-    def on_store_updated(self, file_name_or_name: str, page=None) -> None:
+    def on_store_content_changed(self, file_name_or_name: str, page=None) -> None:
         page = self._resolve_page(page)
         adapter = self._resolve_adapter()
         if adapter.bulk_reset_running():
@@ -409,7 +409,7 @@ class UserPresetsRuntimeService:
 
             file_name = changed_path.name
             if file_name:
-                self.on_store_updated(file_name, page)
+                self.on_store_content_changed(file_name, page)
         except Exception as e:
             log(f"Ошибка обработки изменений файла пресета: {e}", "DEBUG")
 

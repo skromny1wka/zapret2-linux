@@ -237,9 +237,13 @@ def sync_nav_visibility(window, method: str | None = None) -> None:
 
             method = (get_strategy_launch_method() or "").strip().lower()
         except Exception:
-            method = "zapret2_mode"
+            from settings.mode import DEFAULT_LAUNCH_METHOD
+
+            method = DEFAULT_LAUNCH_METHOD
     if not method:
-        method = "zapret2_mode"
+        from settings.mode import DEFAULT_LAUNCH_METHOD
+
+        method = DEFAULT_LAUNCH_METHOD
 
     visibility_by_page = get_nav_visibility(method)
 

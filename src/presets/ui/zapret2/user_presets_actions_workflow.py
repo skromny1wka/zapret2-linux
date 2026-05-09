@@ -30,7 +30,7 @@ def show_inline_action_create(
         log_fn(f"Ошибка создания пресета: {exc}", "ERROR")
         info_bar_cls.error(
             title=tr_fn("common.error.title", "Ошибка"),
-            content=tr_fn("page.z2_user_presets.error.generic", "Ошибка: {error}", error=exc),
+            content=tr_fn("page.winws2_user_presets.error.generic", "Ошибка: {error}", error=exc),
             parent=parent_window,
         )
 
@@ -75,7 +75,7 @@ def show_inline_action_rename(
         log_fn(f"Ошибка переименования пресета: {exc}", "ERROR")
         info_bar_cls.error(
             title=tr_fn("common.error.title", "Ошибка"),
-            content=tr_fn("page.z2_user_presets.error.generic", "Ошибка: {error}", error=exc),
+            content=tr_fn("page.winws2_user_presets.error.generic", "Ошибка: {error}", error=exc),
             parent=parent_window,
         )
 
@@ -93,7 +93,7 @@ def import_preset_action(
 ) -> None:
     file_path, _ = file_dialog_cls.getOpenFileName(
         parent,
-        tr_fn("page.z2_user_presets.file_dialog.import_title", "Импортировать пресет"),
+        tr_fn("page.winws2_user_presets.file_dialog.import_title", "Импортировать пресет"),
         "",
         "Preset files (*.txt);;All files (*.*)",
     )
@@ -121,7 +121,7 @@ def import_preset_action(
         log_fn(f"Ошибка импорта пресета: {exc}", "ERROR")
         info_bar_cls.error(
             title=tr_fn("common.error.title", "Ошибка"),
-            content=tr_fn("page.z2_user_presets.error.import_exception", "Ошибка импорта: {error}", error=exc),
+            content=tr_fn("page.winws2_user_presets.error.import_exception", "Ошибка импорта: {error}", error=exc),
             parent=parent_window,
         )
 
@@ -157,7 +157,7 @@ def run_reset_all_presets_action(
         info_bar_cls.error(
             title=tr_fn("common.error.title", "Ошибка"),
             content=tr_fn(
-                "page.z2_user_presets.error.reset_all_exception",
+                "page.winws2_user_presets.error.reset_all_exception",
                 "Ошибка восстановления пресетов: {error}",
                 error=exc,
             ),
@@ -205,7 +205,7 @@ def restore_reset_all_button_label(
         return
     try:
         reset_all_btn.setText(
-            tr_fn("page.z2_user_presets.button.reset_all", "Вернуть заводские")
+            tr_fn("page.winws2_user_presets.button.reset_all", "Вернуть заводские")
         )
         reset_all_btn.setIcon(themed_icon_fn("fa5s.undo", color=get_theme_tokens_fn().fg))
     except Exception:

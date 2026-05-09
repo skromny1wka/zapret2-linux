@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from log.log import log
 from settings import store as settings_store
-
-_LAUNCH_METHOD_DEFAULT = "zapret2_mode"
-_SUPPORTED_LAUNCH_METHODS = {
-    "zapret2_mode",
-    "zapret1_mode",
-    "orchestra",
-}
+from settings.mode import (
+    DEFAULT_LAUNCH_METHOD,
+    is_known_launch_method,
+    is_preset_launch_method,
+    normalize_launch_method,
+)
 
 PROFILE_UI_MODE_DEFAULT = "basic"
 _VALID_DIRECT_ZAPRET2_UI_MODES = frozenset({"basic"})
@@ -23,24 +22,22 @@ def normalize_profile_ui_mode(value: object) -> str:
 
 def get_strategy_launch_method() -> str:
     try:
-        normalized = str(settings_store.get_strategy_launch_method() or "").strip().lower()
-        if normalized in _SUPPORTED_LAUNCH_METHODS:
-            return normalized
+        return normalize_launch_method(settings_store.get_strategy_launch_method())
     except Exception as e:
         log(f"Ошибка чтения метода запуска из settings.json: {e}", "ERROR")
-    return _LAUNCH_METHOD_DEFAULT
+    return DEFAULT_LAUNCH_METHOD
 
 
 def set_strategy_launch_method(method: str) -> bool:
     try:
-        normalized = str(method or "").strip().lower()
-        if normalized not in _SUPPORTED_LAUNCH_METHODS:
+        normalized = normalize_launch_method(method, default="")
+        if not is_known_launch_method(normalized):
             log(
                 f"Попытка сохранить неподдерживаемый метод запуска: {normalized or 'empty'}. "
-                f"Используем {_LAUNCH_METHOD_DEFAULT}",
+                f"Используем {DEFAULT_LAUNCH_METHOD}",
                 "WARNING",
             )
-            normalized = _LAUNCH_METHOD_DEFAULT
+            normalized = DEFAULT_LAUNCH_METHOD
         settings_store.set_strategy_launch_method(normalized)
         log(f"Метод запуска стратегий изменен на: {normalized}", "INFO")
         return True
@@ -70,8 +67,8 @@ def set_profile_ui_mode(mode: str) -> bool:
 
 
 def _build_preset_runtime_reload_callback(*, launch_method: str, app_context, reason: str):
-    method = str(launch_method or "").strip().lower()
-    if method not in ("zapret2_mode", "zapret1_mode") or app_context is None:
+    method = normalize_launch_method(launch_method, default="")
+    if not is_preset_launch_method(method) or app_context is None:
         return None
 
     def _reload() -> None:
@@ -99,7 +96,7 @@ def _build_preset_runtime_reload_callback(*, launch_method: str, app_context, re
 
 
 def _is_profile_launch_method(method: str) -> bool:
-    return str(method or "").strip().lower() in {"zapret1_mode", "zapret2_mode"}
+    return is_preset_launch_method(method)
 
 
 def _request_profile_runtime_reload(*, app_context=None, launch_method: str, reason: str) -> None:

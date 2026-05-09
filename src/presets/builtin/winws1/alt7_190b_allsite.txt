@@ -1,5 +1,4 @@
 # Preset: alt7_190b_allsite
-# TemplateOrigin: alt7_190b_allsite
 # IconColor: #60cdff
 # Description: Imported from bat/alt7_190b_allsite.txt
 

@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from settings.mode import EXE_NAME_WINWS1
 from presets.ui.control.shared_builders import (
+    PresetEntryCardWidgets,
+    build_my_presets_card_common,
     build_mode_management_section_common,
     build_mode_status_section_common,
-    build_push_setting_card_common,
 )
-from ui.theme import get_cached_qta_pixmap
 
 
 @dataclass(slots=True)
@@ -30,15 +31,7 @@ class Zapret1ManagementWidgets:
     loading_label: object
 
 
-@dataclass(slots=True)
-class Zapret1PresetWidgets:
-    card: object
-    preset_name_label: object
-    preset_caption_label: object
-    presets_btn: object
-
-
-def build_z1_pages_status_section(
+def build_winws1_pages_status_section(
     *,
     tr_fn,
     strong_body_label_cls,
@@ -48,9 +41,9 @@ def build_z1_pages_status_section(
         tr_fn=tr_fn,
         strong_body_label_cls=strong_body_label_cls,
         caption_label_cls=caption_label_cls,
-        checking_key="page.z1_control.status.checking",
+        checking_key="page.winws1_control.status.checking",
         checking_default="Проверка...",
-        detecting_key="page.z1_control.status.detecting",
+        detecting_key="page.winws1_control.status.detecting",
         detecting_default="Определение состояния процесса",
     )
 
@@ -62,7 +55,7 @@ def build_z1_pages_status_section(
     )
 
 
-def build_z1_pages_management_section(
+def build_winws1_pages_management_section(
     *,
     tr_fn,
     caption_label_cls,
@@ -81,11 +74,11 @@ def build_z1_pages_management_section(
             indeterminate_progress_bar_cls=indeterminate_progress_bar_cls,
             big_action_button_cls=big_action_button_cls,
             stop_button_cls=stop_button_cls,
-            start_key="page.z1_control.button.start",
+            start_key="page.winws1_control.button.start",
             start_default="Запустить Zapret",
-            stop_key="page.z1_control.button.stop_winws",
-            stop_default="Остановить winws.exe",
-            stop_exit_key="page.z1_control.button.stop_and_exit",
+            stop_key="page.winws1_control.button.stop_winws",
+            stop_default=f"Остановить {EXE_NAME_WINWS1}",
+            stop_exit_key="page.winws1_control.button.stop_and_exit",
             stop_exit_default="Остановить и закрыть",
             on_start=on_start,
             on_stop=on_stop,
@@ -104,24 +97,17 @@ def build_z1_pages_management_section(
     )
 
 
-def build_z1_presets_section(
+def build_winws1_presets_section(
     *,
     tr_fn,
     push_setting_card_cls,
     on_open_presets,
-) -> Zapret1PresetWidgets:
-    preset_card = build_push_setting_card_common(
+) -> PresetEntryCardWidgets:
+    return build_my_presets_card_common(
+        tr_fn=tr_fn,
         push_setting_card_cls=push_setting_card_cls,
-        button_text=tr_fn("page.z1_control.button.my_presets", "Мои пресеты"),
-        icon=get_cached_qta_pixmap("fa5s.star", color="#ffc107", size=20),
-        title_text=tr_fn("page.z1_control.preset.not_selected", "Не выбран"),
-        content_text=tr_fn("page.z1_control.preset.current", "Текущий активный пресет"),
-        on_click=on_open_presets,
-    )
-
-    return Zapret1PresetWidgets(
-        card=preset_card,
-        preset_name_label=preset_card.titleLabel,
-        preset_caption_label=preset_card.contentLabel,
-        presets_btn=preset_card.button,
+        button_key="page.winws1_control.button.my_presets",
+        not_selected_key="page.winws1_control.preset.not_selected",
+        current_key="page.winws1_control.preset.current",
+        on_open_presets=on_open_presets,
     )

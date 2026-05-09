@@ -1,5 +1,4 @@
 # Preset: alt3_lol11
-# TemplateOrigin: alt3_lol11
 # IconColor: #60cdff
 # Description: Imported from bat/alt3_lol11.txt
 

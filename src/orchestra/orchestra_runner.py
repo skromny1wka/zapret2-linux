@@ -33,6 +33,7 @@ from utils.circular_strategy_numbering import (
     strip_strategy_tags,
 )
 from config.config import MAIN_DIRECTORY, EXE_FOLDER, LUA_FOLDER, LOGS_FOLDER, BIN_FOLDER
+from settings.mode import ENGINE_WINWS2, EXE_NAME_WINWS2
 from lists.core.paths import get_lists_dir
 
 from settings.store import (
@@ -187,7 +188,7 @@ class OrchestraRunner:
             zapret_path = MAIN_DIRECTORY
 
         self.zapret_path = zapret_path
-        self.winws_exe = os.path.join(EXE_FOLDER, "winws2.exe")
+        self.winws_exe = os.path.join(EXE_FOLDER, EXE_NAME_WINWS2)
         self.lua_path = LUA_FOLDER
         self.logs_path = LOGS_FOLDER
         self.bin_path = BIN_FOLDER
@@ -336,7 +337,7 @@ class OrchestraRunner:
         lines = []
 
         if exit_code is not None:
-            lines.append(f"winws2 завершился с кодом {exit_code} через {uptime_sec:.1f}с")
+            lines.append(f"{ENGINE_WINWS2} завершился с кодом {exit_code} через {uptime_sec:.1f}с")
 
         if exit_code == 87:
             lines.append("Код 87 (ERROR_INVALID_PARAMETER): вероятна ошибка параметра в конфиге или командной строке")
@@ -358,14 +359,14 @@ class OrchestraRunner:
 
         tail = self._get_recent_output_tail(8)
         if tail:
-            lines.append("Последние строки winws2:")
+            lines.append(f"Последние строки {ENGINE_WINWS2}:")
             for line in tail:
                 clean = str(line).strip()
                 if len(clean) > 300:
                     clean = clean[:300] + " ..."
                 lines.append(f"  • {clean}")
         else:
-            lines.append("winws2 не успел вывести диагностические строки в stdout")
+            lines.append(f"{ENGINE_WINWS2} не успел вывести диагностические строки в stdout")
 
         if self.current_log_id:
             lines.append(f"Лог сессии: orchestra_{self.current_log_id}.log")
@@ -459,7 +460,7 @@ class OrchestraRunner:
         total_removed = removed_locked + removed_user_locks + removed_history + removed_blocked + removed_user_blocked
         if total_removed:
             log(
-                "Очищены legacy-данные Telegram Proxy из оркестратора: "
+                "Очищены данные Telegram Proxy из оркестратора: "
                 f"locked={removed_locked}, user_locked={removed_user_locks}, "
                 f"history={removed_history}, blocked={removed_blocked}, "
                 f"user_blocked={removed_user_blocked}",
@@ -478,7 +479,7 @@ class OrchestraRunner:
 
         self._startup_forwarded_signatures.append(signature)
         msg = f"[{timestamp}] [WINWS2] {text}"
-        log(f"[winws2 startup] {text}", "INFO")
+        log(f"[{ENGINE_WINWS2} startup] {text}", "INFO")
         if self.output_callback:
             self.output_callback(msg)
 
@@ -487,7 +488,7 @@ class OrchestraRunner:
         tail = "\n".join(self._recent_output_lines).lower()
 
         if exit_code == 87:
-            return "некорректный параметр запуска (проверьте конфиг и параметры winws2)"
+            return f"некорректный параметр запуска (проверьте конфиг и параметры {ENGINE_WINWS2})"
 
         checks = (
             (("windivert", "filter driver", "wd_filter"), "ошибка WinDivert (драйвер/доступ/занято)"),
@@ -723,7 +724,7 @@ class OrchestraRunner:
         self.locked_manager.load()
         self._purge_ignored_training_state()
 
-        # Возвращаем TLS стратегии для backward compatibility
+        # Основной экран оркестратора читает TLS-словарь как краткую сводку.
         return self.locked_manager.locked_by_askey["tls"]
 
     def _generate_learned_lua(self) -> Optional[str]:
@@ -1337,7 +1338,7 @@ class OrchestraRunner:
         """
         # Проверяем winws2.exe
         if not os.path.exists(self.winws_exe):
-            log(f"winws2.exe не найден: {self.winws_exe}", "ERROR")
+            log(f"{EXE_NAME_WINWS2} не найден: {self.winws_exe}", "ERROR")
             return False
 
         # Проверяем Lua файлы
@@ -1481,7 +1482,7 @@ class OrchestraRunner:
             # Debug: выводим в stdout для парсинга, записываем в файл вручную в _read_output
             cmd.append("--debug=1")
 
-            log_msg = f"Запуск: winws2.exe @{os.path.basename(launch_config_path)}"
+            log_msg = f"Запуск: {EXE_NAME_WINWS2} @{os.path.basename(launch_config_path)}"
             if total_locked:
                 log_msg += f" ({total_locked} стратегий из реестра)"
             log(log_msg, "INFO")

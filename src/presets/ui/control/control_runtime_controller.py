@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from typing import Callable
+
+from settings.mode import EXE_NAME_WINWS1
 
 
 @dataclass(slots=True)
@@ -109,14 +110,14 @@ class ControlPageController:
             pass
 
         try:
-            from altmenu.defender_manager import WindowsDefenderManager
+            from windows_features.defender_manager import WindowsDefenderManager
 
             defender_disabled = bool(WindowsDefenderManager().is_defender_disabled())
         except Exception:
             pass
 
         try:
-            from altmenu.max_blocker import is_max_blocked
+            from windows_features.max_blocker import is_max_blocked
 
             max_blocked = bool(is_max_blocked())
         except Exception:
@@ -153,12 +154,12 @@ class ControlPageController:
     def build_stop_button_plan(*, language: str) -> ControlStopButtonPlan:
         try:
             from settings.dpi.strategy_settings import get_strategy_launch_method
-            from config.config import get_winws_exe_for_method
+            from settings.mode import exe_name_for_launch_method
 
             from ui.text_catalog import tr as tr_catalog
 
             method = get_strategy_launch_method()
-            exe_name = os.path.basename(get_winws_exe_for_method(method)) or "winws.exe"
+            exe_name = exe_name_for_launch_method(method)
             template = tr_catalog(
                 "page.control.button.stop_only_template",
                 language=language,
@@ -172,7 +173,7 @@ class ControlPageController:
                 text=tr_catalog(
                     "page.control.button.stop_only_winws",
                     language=language,
-                    default="Остановить только winws.exe",
+                    default=f"Остановить только {EXE_NAME_WINWS1}",
                 )
             )
 
@@ -230,9 +231,10 @@ class ControlPageController:
 
         try:
             from settings.dpi.strategy_settings import get_strategy_launch_method
+            from settings.mode import is_preset_launch_method
 
             method = (get_strategy_launch_method() or "").strip().lower()
-            if method in ("zapret2_mode", "zapret1_mode"):
+            if is_preset_launch_method(method):
                 from ui.window_display_state import get_profile_strategy_summary
 
                 summary = get_profile_strategy_summary(window, max_items=2)
@@ -430,7 +432,7 @@ class ControlPageController:
     @staticmethod
     def run_defender_toggle(*, disable: bool, status_callback: Callable[[str], None] | None = None) -> ControlActionResultPlan:
         try:
-            from altmenu.defender_manager import WindowsDefenderManager, set_defender_disabled
+            from windows_features.defender_manager import WindowsDefenderManager, set_defender_disabled
 
             manager = WindowsDefenderManager(status_callback=status_callback)
 
@@ -545,7 +547,7 @@ class ControlPageController:
     @staticmethod
     def run_max_block_toggle(*, enable: bool, status_callback: Callable[[str], None] | None = None) -> ControlActionResultPlan:
         try:
-            from altmenu.max_blocker import MaxBlockerManager
+            from windows_features.max_blocker import MaxBlockerManager
 
             manager = MaxBlockerManager(status_callback=status_callback)
 

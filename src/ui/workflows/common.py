@@ -26,7 +26,7 @@ def get_current_launch_method(*, default: str = "") -> str:
         return str(default or "").strip().lower()
 
 
-def open_preset_detail_page(window, page_name: PageName, preset_name: str, *, allow_internal: bool) -> None:
+def open_preset_raw_editor_page(window, page_name: PageName, preset_name: str, *, allow_internal: bool) -> None:
     page = ensure_page(window, page_name)
     if page is None:
         return
@@ -37,5 +37,5 @@ def open_preset_detail_page(window, page_name: PageName, preset_name: str, *, al
 __all__ = [
     "call_page_method",
     "get_current_launch_method",
-    "open_preset_detail_page",
+    "open_preset_raw_editor_page",
 ]

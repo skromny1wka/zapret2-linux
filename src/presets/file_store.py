@@ -12,7 +12,6 @@ from .models import PresetManifest
 
 
 _PRESET_HEADER_RE = re.compile(r"^\s*#\s*Preset:\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE)
-_TEMPLATE_ORIGIN_RE = re.compile(r"^\s*#\s*TemplateOrigin:\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE)
 _PRESET_KIND_RE = re.compile(r"^\s*#\s*PresetKind:\s*(.+?)\s*$", re.IGNORECASE | re.MULTILINE)
 
 
@@ -131,11 +130,9 @@ class PresetFileStore:
             normalized_name,
         )
         display_name = self._extract_name(source_text, Path(file_name).stem)
-        template_origin = self._extract_template_origin(source_text)
         updated_at = _now_iso()
         normalized_kind = self._infer_kind(
             engine,
-            template_origin,
             current_kind=kind,
             storage_scope="user",
         )
@@ -143,7 +140,6 @@ class PresetFileStore:
         manifest = PresetManifest(
             file_name=file_name,
             name=display_name,
-            template_origin=template_origin,
             updated_at=updated_at,
             kind=normalized_kind,
             storage_scope="user",
@@ -165,16 +161,13 @@ class PresetFileStore:
         current = manifests[idx]
         storage_scope = "user"
         destination_path = self._engine_paths(engine).user_presets_dir / current.file_name
-        template_origin = self._extract_template_origin(source_text)
 
         updated = PresetManifest(
             file_name=current.file_name,
             name=self._extract_name(source_text, Path(current.file_name).stem),
-            template_origin=template_origin,
             updated_at=_now_iso(),
             kind=self._infer_kind(
                 engine,
-                template_origin,
                 current_kind=current.kind,
                 storage_scope=storage_scope,
             ),
@@ -206,15 +199,12 @@ class PresetFileStore:
             src_path.rename(destination_path)
 
         source_text = _read_text(destination_path) if destination_path.exists() else ""
-        template_origin = self._extract_template_origin(source_text)
         updated = PresetManifest(
             file_name=destination_file_name,
             name=self._extract_name(source_text, Path(destination_file_name).stem),
-            template_origin=template_origin,
             updated_at=_now_iso(),
             kind=self._infer_kind(
                 engine,
-                template_origin,
                 current_kind=current.kind,
                 storage_scope="user",
             ),
@@ -245,7 +235,6 @@ class PresetFileStore:
         payload = {
             "file_name": manifest.file_name,
             "name": manifest.name,
-            "template_origin": manifest.template_origin,
             "updated_at": manifest.updated_at,
             "kind": manifest.kind,
         }
@@ -287,19 +276,16 @@ class PresetFileStore:
             for preset_path in sorted(presets_dir.glob("*.txt"), key=lambda p: p.name.lower()):
                 header_text = _read_header_text(preset_path)
                 display_name = self._extract_name(header_text, preset_path.stem)
-                template_origin = self._extract_template_origin(header_text)
                 updated_at = self._file_time_to_iso(preset_path) or _now_iso()
                 preset_kind = self._extract_preset_kind(header_text)
                 kind = self._infer_kind(
                     engine,
-                    template_origin,
                     current_kind=preset_kind,
                     storage_scope=storage_scope,
                 )
                 manifests_by_file_name[preset_path.name.lower()] = PresetManifest(
                     file_name=preset_path.name,
                     name=display_name,
-                    template_origin=template_origin,
                     updated_at=updated_at,
                     kind=kind,
                     storage_scope=storage_scope,
@@ -316,14 +302,6 @@ class PresetFileStore:
         return str(fallback or "Preset").strip() or "Preset"
 
     @staticmethod
-    def _extract_template_origin(source_text: str) -> str | None:
-        match = _TEMPLATE_ORIGIN_RE.search(source_text or "")
-        if not match:
-            return None
-        value = str(match.group(1) or "").strip()
-        return value or None
-
-    @staticmethod
     def _extract_preset_kind(source_text: str) -> str | None:
         match = _PRESET_KIND_RE.search(source_text or "")
         if not match:
@@ -335,13 +313,11 @@ class PresetFileStore:
     def _infer_kind(
         cls,
         engine: str,
-        template_origin: str | None,
         *,
         current_kind: str | None = None,
         storage_scope: str,
     ) -> str:
         _ = engine
-        _ = template_origin
         normalized_storage_scope = str(storage_scope or "").strip().lower()
         if normalized_storage_scope == "builtin":
             return "builtin"

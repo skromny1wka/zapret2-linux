@@ -7,7 +7,6 @@ from dataclasses import dataclass
 class PresetManifest:
     file_name: str
     name: str
-    template_origin: str | None
     updated_at: str
     kind: str = "user"
     storage_scope: str = "user"

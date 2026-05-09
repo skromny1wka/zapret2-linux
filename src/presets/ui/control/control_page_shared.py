@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app_state.main_window_state import MainWindowStateStore
+from ui.state.main_window_state import MainWindowStateStore
 from presets.ui.control.control_page_runtime_shared import set_toggle_checked
 from ui.window_action_controller import (
     open_connection_test,

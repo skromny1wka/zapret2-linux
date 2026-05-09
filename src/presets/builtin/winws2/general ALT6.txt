@@ -1,5 +1,4 @@
 # Preset: general ALT6
-# TemplateOrigin: general ALT6
 # BuiltinVersion: 2.19
 # IconColor: #67d1e4ff
 

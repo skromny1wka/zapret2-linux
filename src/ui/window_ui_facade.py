@@ -34,7 +34,6 @@ from ui.ui_root import WindowUiRoot
 # Navigation icon mapping (PageName -> FluentIcon)
 # ---------------------------------------------------------------------------
 _NAV_ICONS = {
-    PageName.CONTROL: FluentIcon.COMMAND_PROMPT if HAS_FLUENT else None,
     PageName.ZAPRET2_MODE_CONTROL: FluentIcon.GAME if HAS_FLUENT else None,
     PageName.AUTOSTART: FluentIcon.POWER_BUTTON if HAS_FLUENT else None,
     PageName.NETWORK: FluentIcon.WIFI if HAS_FLUENT else None,
@@ -55,17 +54,15 @@ _NAV_ICONS = {
     PageName.SUPPORT: FluentIcon.CHAT if HAS_FLUENT else None,
     PageName.ORCHESTRA: FluentIcon.MUSIC if HAS_FLUENT else None,
     PageName.ORCHESTRA_SETTINGS: FluentIcon.SETTING if HAS_FLUENT else None,
-    PageName.ZAPRET2_MODE: FluentIcon.PLAY if HAS_FLUENT else None,
+    PageName.ZAPRET2_PRESET_SETUP: FluentIcon.PLAY if HAS_FLUENT else None,
     PageName.ZAPRET1_MODE_CONTROL: FluentIcon.GAME if HAS_FLUENT else None,
-    PageName.ZAPRET1_MODE: FluentIcon.PLAY if HAS_FLUENT else None,
+    PageName.ZAPRET1_PRESET_SETUP: FluentIcon.PLAY if HAS_FLUENT else None,
     PageName.ZAPRET1_USER_PRESETS: FluentIcon.FOLDER if HAS_FLUENT else None,
     PageName.TELEGRAM_PROXY: FluentIcon.SEND if HAS_FLUENT else None,
 }
 
 # Russian labels for navigation
 _NAV_LABELS = {
-    PageName.CONTROL: "Управление",
-    PageName.ZAPRET2_MODE_CONTROL: "Управление Zapret 2",
     PageName.AUTOSTART: "Автозапуск",
     PageName.NETWORK: "Сеть",
     PageName.HOSTS: "Редактор файла hosts",
@@ -80,15 +77,20 @@ _NAV_LABELS = {
     PageName.NETROGAT: "Исключения",
     PageName.CUSTOM_DOMAINS: "Мои hostlist",
     PageName.CUSTOM_IPSET: "Мои ipset",
-    PageName.ZAPRET2_USER_PRESETS: "Мои пресеты",
     PageName.SERVERS: "Обновления",
     PageName.SUPPORT: "Поддержка",
+
     PageName.ORCHESTRA: "Оркестратор",
     PageName.ORCHESTRA_SETTINGS: "Настройки оркестратора",
-    PageName.ZAPRET2_MODE: "Профили",
+
+    PageName.ZAPRET2_MODE_CONTROL: "Управление Zapret 2",
+    PageName.ZAPRET2_PRESET_SETUP: "Настройка preset-а",
+    PageName.ZAPRET2_USER_PRESETS: "Мои пресеты",
+
     PageName.ZAPRET1_MODE_CONTROL: "Управление Zapret 1",
-    PageName.ZAPRET1_MODE: "Стратегии Z1",
-    PageName.ZAPRET1_USER_PRESETS: "Мои пресеты Z1",
+    PageName.ZAPRET1_PRESET_SETUP: "Настройка preset-а",
+    PageName.ZAPRET1_USER_PRESETS: "Мои пресеты",
+
     PageName.TELEGRAM_PROXY: "Telegram Proxy",
 }
 
@@ -196,13 +198,15 @@ class MainWindowUI:
         self._get_ui_root().finish_bootstrap()
 
     def _get_launch_method(self) -> str:
+        from settings.mode import DEFAULT_LAUNCH_METHOD
+
         try:
             from settings.dpi.strategy_settings import get_strategy_launch_method
 
             method = (get_strategy_launch_method() or "").strip().lower()
         except Exception:
             method = ""
-        return method or "zapret2_mode"
+        return method or DEFAULT_LAUNCH_METHOD
 
     # Window-facing API intentionally kept minimal. Page opening and routing go
     # through window_adapter/page_host/workflow layers, not through this mixin.

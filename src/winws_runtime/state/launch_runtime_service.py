@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from app_state.main_window_state import MainWindowStateStore
+from ui.state.main_window_state import MainWindowStateStore
+from settings.mode import ALL_WINWS_EXE_NAMES, normalize_launch_method
 from winws_runtime.runtime.process_probe import is_winws_process_pid_alive
 
 _UNSET = object()
@@ -70,16 +71,15 @@ class LaunchRuntimeService:
                 "main.LupiDPIApp._apply_runner_failure_update",
                 "winws_runtime.runtime.lifecycle_feedback.verify_dpi_process_running",
                 "presets.ui.control.zapret1.page.Zapret1ModeControlPage._get_current_dpi_runtime_state",
-                "ui.pages.control_page.ControlPage._get_current_dpi_runtime_state",
                 "presets.ui.control.zapret2.page.Zapret2ModeControlPage._on_ui_state_changed",
                 "tray.SystemTrayManager._is_launch_running/_launch_phase via AppRuntimeState",
             ),
             allowed_auxiliary_writers=(
-                "managers.initialization_manager.InitializationManager._init_process_monitor -> bootstrap_probe",
-                "managers.launch_autostart_manager.LaunchAutostartManager._mark_runtime_stopped",
+                "winws_runtime.runtime.startup.init_process_monitor -> bootstrap_probe",
+                "winws_runtime.runtime.autostart._mark_runtime_stopped",
                 "main.LupiDPIApp._apply_runner_failure_update",
             ),
-            single_source_of_truth="app_state.main_window_state.MainWindowStateStore",
+            single_source_of_truth="ui.state.main_window_state.MainWindowStateStore",
         )
 
     def __init__(self, app_instance_or_store) -> None:
@@ -138,7 +138,7 @@ class LaunchRuntimeService:
             last_error="",
         )
         if launch_method is not None:
-            changes["launch_method"] = str(launch_method or "").strip().lower()
+            changes["launch_method"] = normalize_launch_method(launch_method, default="")
         return self._apply(**changes)
 
     def mark_autostart_pending(
@@ -154,7 +154,7 @@ class LaunchRuntimeService:
             last_error="",
         )
         if launch_method is not None:
-            changes["launch_method"] = str(launch_method or "").strip().lower()
+            changes["launch_method"] = normalize_launch_method(launch_method, default="")
         return self._apply(**changes)
 
     def begin_stop(self) -> bool:
@@ -235,7 +235,7 @@ class LaunchRuntimeService:
             last_error="",
         )
         if launch_method is not None:
-            changes["launch_method"] = str(launch_method or "").strip().lower()
+            changes["launch_method"] = normalize_launch_method(launch_method, default="")
         return self._apply(**changes)
 
     def observe_process_details(self, details: Mapping[str, Any] | None) -> bool:
@@ -248,7 +248,7 @@ class LaunchRuntimeService:
         matched_pids = normalized.get(expected, [])
 
         if not matched_pids and not expected:
-            for candidate in ("winws.exe", "winws2.exe"):
+            for candidate in ALL_WINWS_EXE_NAMES:
                 candidate_pids = normalized.get(candidate, [])
                 if candidate_pids:
                     matched_name = candidate

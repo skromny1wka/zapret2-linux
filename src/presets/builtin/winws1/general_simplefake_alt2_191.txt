@@ -1,5 +1,4 @@
 # Preset: general_simplefake_alt2_191
-# TemplateOrigin: general_simplefake_alt2_191
 # IconColor: #60cdff
 # Description: Imported from bat/general_simplefake_alt2_191.txt
 

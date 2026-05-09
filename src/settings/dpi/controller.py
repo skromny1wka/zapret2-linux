@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from log.log import log
+from settings.mode import is_orchestra_launch_method, is_preset_launch_method, normalize_launch_method
 
 
 
@@ -40,13 +41,13 @@ class DpiSettingsPageController:
     def get_launch_method() -> str:
         from settings.dpi.strategy_settings import get_strategy_launch_method
 
-        return str(get_strategy_launch_method() or "").strip().lower()
+        return normalize_launch_method(get_strategy_launch_method())
 
     @staticmethod
     def describe_visibility(method: str) -> DpiVisibilityState:
-        method = str(method or "").strip().lower()
+        method = normalize_launch_method(method, default="")
         return DpiVisibilityState(
-            show_orchestra_settings=bool(method == "orchestra"),
+            show_orchestra_settings=bool(is_orchestra_launch_method(method)),
         )
 
     @staticmethod
@@ -77,13 +78,12 @@ class DpiSettingsPageController:
     def apply_launch_method(method: str) -> str:
         from settings.dpi.strategy_settings import get_strategy_launch_method, set_strategy_launch_method
 
-        previous_method = str(get_strategy_launch_method() or "").strip().lower()
-        next_method = str(method or "").strip().lower()
+        previous_method = normalize_launch_method(get_strategy_launch_method())
+        next_method = normalize_launch_method(method)
 
         set_strategy_launch_method(next_method)
 
-        preset_methods = ("zapret2_mode", "zapret1_mode")
-        if previous_method in preset_methods or next_method in preset_methods:
+        if is_preset_launch_method(previous_method) or is_preset_launch_method(next_method):
             if previous_method != next_method:
                 log(f"Смена метода {previous_method} -> {next_method}", "INFO")
 

@@ -1,5 +1,4 @@
 # Preset: rosmts
-# TemplateOrigin: rosmts
 # IconColor: #60cdff
 # Description: Imported from bat/rosmts.txt
 

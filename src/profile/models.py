@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from hashlib import sha1
 from typing import Literal
 
+from settings.mode import ENGINE_WINWS1, ENGINE_WINWS2
 
-EngineName = Literal["winws1", "winws2"]
+EngineName = Literal[ENGINE_WINWS1, ENGINE_WINWS2]
 
 
 @dataclass
@@ -83,6 +83,7 @@ StrategyModel = Winws1Strategy | Winws2Strategy
 
 @dataclass
 class Profile:
+    id: str
     index: int
     engine: EngineName
     display_name: str
@@ -93,18 +94,11 @@ class Profile:
     new_line: str = ""
     name: str = ""
     match_signature: str = ""
-    identity_key: str = ""
+    persistent_key: str = ""
 
     @property
     def key(self) -> str:
-        if self.identity_key:
-            return self.identity_key
-        if self.name:
-            return _profile_identity_key("name", self.name)
-        if self.match_signature:
-            return _profile_identity_key("match", self.match_signature)
-        content = "\n".join(segment.text for segment in self.segments)
-        return _profile_identity_key("content", content)
+        return self.id
 
 
 @dataclass
@@ -117,6 +111,8 @@ class Preset:
     footer_lines: list[str] = field(default_factory=list)
 
 
-def _profile_identity_key(kind: str, value: str) -> str:
-    digest = sha1(str(value or "").encode("utf-8", "surrogatepass")).hexdigest()[:16]
-    return f"profile:{kind}:{digest}"
+def build_profile_persistent_key(name: str, match_signature: str) -> str:
+    clean_name = str(name or "").strip()
+    if clean_name:
+        return f"name:{clean_name}"
+    return f"sig:{str(match_signature or '').strip()}"

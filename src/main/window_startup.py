@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import traceback
 import time as _time
 
 from app_context import build_app_context, install_app_context
@@ -37,15 +38,13 @@ def window_bootstrap_for(window_cls, *, start_in_tray: bool):
 
 
 def manager_bootstrap_for(window) -> None:
-    from managers.initialization_manager import InitializationManager
     from managers.subscription_manager import SubscriptionManager
-    from managers.ui_manager import UIManager
+    from main.startup_coordinator import StartupCoordinator
     from winws_runtime.monitoring import ProcessMonitorManager
 
-    window.initialization_manager = InitializationManager(window)
+    window.startup_coordinator = StartupCoordinator(window)
     window.subscription_manager = SubscriptionManager(window)
     window.process_monitor_manager = ProcessMonitorManager(window)
-    window.ui_manager = UIManager(window)
 
 
 class WindowStartupMixin:
@@ -106,8 +105,8 @@ class WindowStartupMixin:
         self._startup_ttff_ms = None
         self._startup_interactive_logged = False
         self._startup_interactive_ms = None
-        self._startup_managers_ready_logged = False
-        self._startup_managers_ready_ms = None
+        self._startup_services_ready_logged = False
+        self._startup_services_ready_ms = None
         self._startup_post_init_done_logged = False
         self._startup_post_init_done_ms = None
         self._last_active_preset_content_path = ""
@@ -146,15 +145,11 @@ class WindowStartupMixin:
         self._startup_background_init_started = True
 
         try:
-            subscription_manager = getattr(self, "subscription_manager", None)
-            if subscription_manager is not None:
-                subscription_manager.initialize_async()
-        except Exception:
-            pass
+            self.subscription_manager.initialize_async()
+        except Exception as e:
+            log(f"Startup: subscription background init failed: {e}", "DEBUG")
 
-        notification_controller = getattr(self, "window_notification_controller", None)
-        if notification_controller is not None:
-            notification_controller.schedule_startup_notification_queue(0)
+        self.window_notification_controller.schedule_startup_notification_queue(0)
 
     def _deferred_init(self) -> None:
         """Heavy initialization — runs after first frame is shown."""
@@ -172,12 +167,7 @@ class WindowStartupMixin:
             self.build_ui(WIDTH, HEIGHT)
         except Exception as e:
             log(f"Startup: build_ui failed: {e}", "ERROR")
-            try:
-                import traceback
-
-                log(traceback.format_exc(), "DEBUG")
-            except Exception:
-                pass
+            log(traceback.format_exc(), "DEBUG")
             return
 
         log(f"⏱ Startup: build_ui {(_time.perf_counter() - build_started_at) * 1000:.0f}ms", "DEBUG")
@@ -189,13 +179,13 @@ class WindowStartupMixin:
         import time as _time
 
         total_started_at = _time.perf_counter()
-        managers_started_at = _time.perf_counter()
+        bootstrap_started_at = _time.perf_counter()
 
         manager_bootstrap_for(self)
-        log(f"⏱ Startup: managers init {(_time.perf_counter() - managers_started_at) * 1000:.0f}ms", "DEBUG")
+        log(f"⏱ Startup: startup bootstrap {(_time.perf_counter() - bootstrap_started_at) * 1000:.0f}ms", "DEBUG")
 
         self.update_title_with_subscription_status(False, None, 0, source="init")
-        self.initialization_manager.run_async_init()
+        self.startup_coordinator.run_async_init()
         log(f"⏱ Startup: continue init total {(_time.perf_counter() - total_started_at) * 1000:.0f}ms", "DEBUG")
 
         self.finalize_ui_bootstrap_requested.emit()
@@ -223,27 +213,27 @@ class WindowStartupMixin:
             emit_startup_metric("Interactive", source)
         try:
             self.startup_interactive_ready.emit(str(source or "interactive"))
-        except Exception:
-            pass
+        except Exception as e:
+            log(f"Startup: startup_interactive_ready signal failed: {e}", "DEBUG")
 
-    def _mark_startup_managers_ready(self, source: str = "managers_init_done") -> None:
-        if self._startup_managers_ready_logged:
+    def _mark_startup_services_ready(self, source: str = "startup_services_ready") -> None:
+        if self._startup_services_ready_logged:
             return
 
-        self._startup_managers_ready_logged = True
-        managers_ready_ms = startup_elapsed_ms()
-        self._startup_managers_ready_ms = managers_ready_ms
+        self._startup_services_ready_logged = True
+        services_ready_ms = startup_elapsed_ms()
+        self._startup_services_ready_ms = services_ready_ms
 
         details = source
         interactive_ms = self._startup_interactive_ms
         if isinstance(interactive_ms, int):
-            delta_ms = max(0, managers_ready_ms - interactive_ms)
+            delta_ms = max(0, services_ready_ms - interactive_ms)
             details = f"{source}, +{delta_ms}ms after Interactive"
         elif isinstance(self._startup_ttff_ms, int):
-            delta_ms = max(0, managers_ready_ms - self._startup_ttff_ms)
+            delta_ms = max(0, services_ready_ms - self._startup_ttff_ms)
             details = f"{source}, +{delta_ms}ms after TTFF"
 
-        emit_startup_metric("CoreStartupReady", details)
+        emit_startup_metric("StartupServicesReady", details)
 
     def _mark_startup_post_init_done(self, source: str = "post_init_tasks") -> None:
         if self._startup_post_init_done_logged:
@@ -254,10 +244,10 @@ class WindowStartupMixin:
         self._startup_post_init_done_ms = post_init_ms
 
         details = source
-        managers_ready_ms = self._startup_managers_ready_ms
-        if isinstance(managers_ready_ms, int):
-            delta_ms = max(0, post_init_ms - managers_ready_ms)
-            details = f"{source}, +{delta_ms}ms after CoreStartupReady"
+        services_ready_ms = self._startup_services_ready_ms
+        if isinstance(services_ready_ms, int):
+            delta_ms = max(0, post_init_ms - services_ready_ms)
+            details = f"{source}, +{delta_ms}ms after StartupServicesReady"
         elif isinstance(self._startup_interactive_ms, int):
             delta_ms = max(0, post_init_ms - self._startup_interactive_ms)
             details = f"{source}, +{delta_ms}ms after Interactive"
@@ -266,9 +256,7 @@ class WindowStartupMixin:
         self._startup_post_init_ready = True
         try:
             self.startup_post_init_ready.emit(str(source or "post_init"))
-        except Exception:
-            pass
+        except Exception as e:
+            log(f"Startup: startup_post_init_ready signal failed: {e}", "DEBUG")
         self._start_background_init()
-        notification_controller = getattr(self, "window_notification_controller", None)
-        if notification_controller is not None:
-            notification_controller.schedule_startup_notification_queue(0)
+        self.window_notification_controller.schedule_startup_notification_queue(0)

@@ -50,12 +50,12 @@ class CreatePresetDialog(MessageBoxBase):
         self._source = "current"
 
         self.titleLabel = SubtitleLabel(
-            self._tr("page.z1_user_presets.dialog.create.title", "Новый пресет"),
+            self._tr("page.winws1_user_presets.dialog.create.title", "Новый пресет"),
             self.widget,
         )
         self.subtitleLabel = BodyLabel(
             self._tr(
-                "page.z1_user_presets.dialog.create.subtitle",
+                "page.winws1_user_presets.dialog.create.subtitle",
                 "Сохраните текущие настройки как отдельный пресет, чтобы быстро переключаться между конфигурациями.",
             ),
             self.widget,
@@ -63,13 +63,13 @@ class CreatePresetDialog(MessageBoxBase):
         self.subtitleLabel.setWordWrap(True)
 
         name_label = BodyLabel(
-            self._tr("page.z1_user_presets.dialog.create.name", "Название"),
+            self._tr("page.winws1_user_presets.dialog.create.name", "Название"),
             self.widget,
         )
         self.nameEdit = LineEdit(self.widget)
         self.nameEdit.setPlaceholderText(
             self._tr(
-                "page.z1_user_presets.dialog.create.placeholder",
+                "page.winws1_user_presets.dialog.create.placeholder",
                 "Например: Игры / YouTube / Дом",
             )
         )
@@ -77,7 +77,7 @@ class CreatePresetDialog(MessageBoxBase):
 
         source_row = QHBoxLayout()
         source_label = BodyLabel(
-            self._tr("page.z1_user_presets.dialog.create.source", "Создать на основе"),
+            self._tr("page.winws1_user_presets.dialog.create.source", "Создать на основе"),
             self.widget,
         )
         source_row.addWidget(source_label)
@@ -88,11 +88,11 @@ class CreatePresetDialog(MessageBoxBase):
             self._source_seg = SegmentedWidget(self.widget)
             self._source_seg.addItem(
                 "current",
-                self._tr("page.z1_user_presets.dialog.create.source.current", "Текущего активного"),
+                self._tr("page.winws1_user_presets.dialog.create.source.current", "Текущего активного"),
             )
             self._source_seg.addItem(
-                "empty",
-                self._tr("page.z1_user_presets.dialog.create.source.empty", "Пустого"),
+                "standard",
+                self._tr("page.winws1_user_presets.dialog.create.source.standard", "Стандартного preset-а"),
             )
             self._source_seg.setCurrentItem("current")
             self._source_seg.currentItemChanged.connect(lambda k: setattr(self, "_source", k))
@@ -111,15 +111,15 @@ class CreatePresetDialog(MessageBoxBase):
         self.viewLayout.addLayout(source_row)
         self.viewLayout.addWidget(self.warningLabel)
 
-        self.yesButton.setText(self._tr("page.z1_user_presets.dialog.create.button.create", "Создать"))
-        self.cancelButton.setText(self._tr("page.z1_user_presets.dialog.button.cancel", "Отмена"))
+        self.yesButton.setText(self._tr("page.winws1_user_presets.dialog.create.button.create", "Создать"))
+        self.cancelButton.setText(self._tr("page.winws1_user_presets.dialog.button.cancel", "Отмена"))
         self.widget.setMinimumWidth(420)
 
     def validate(self) -> bool:
         name = self.nameEdit.text().strip()
         if not name:
             self.warningLabel.setText(
-                self._tr("page.z1_user_presets.dialog.validation.enter_name", "Введите название.")
+                self._tr("page.winws1_user_presets.dialog.validation.enter_name", "Введите название.")
             )
             self.warningLabel.show()
             return False
@@ -144,12 +144,12 @@ class RenamePresetDialog(MessageBoxBase):
         self._existing_names = [n for n in existing_names if n != self._current_name]
 
         self.titleLabel = SubtitleLabel(
-            self._tr("page.z1_user_presets.dialog.rename.title", "Переименовать"),
+            self._tr("page.winws1_user_presets.dialog.rename.title", "Переименовать"),
             self.widget,
         )
         self.subtitleLabel = BodyLabel(
             self._tr(
-                "page.z1_user_presets.dialog.rename.subtitle",
+                "page.winws1_user_presets.dialog.rename.subtitle",
                 "Имя пресета отображается в списке и используется для переключения.",
             ),
             self.widget,
@@ -158,20 +158,20 @@ class RenamePresetDialog(MessageBoxBase):
 
         from_label = CaptionLabel(
             self._tr(
-                "page.z1_user_presets.dialog.rename.current_name",
+                "page.winws1_user_presets.dialog.rename.current_name",
                 "Текущее имя: {name}",
                 name=self._current_name,
             ),
             self.widget,
         )
         name_label = BodyLabel(
-            self._tr("page.z1_user_presets.dialog.rename.new_name", "Новое имя"),
+            self._tr("page.winws1_user_presets.dialog.rename.new_name", "Новое имя"),
             self.widget,
         )
         self.nameEdit = LineEdit(self.widget)
         self.nameEdit.setText(self._current_name)
         self.nameEdit.setPlaceholderText(
-            self._tr("page.z1_user_presets.dialog.rename.placeholder", "Новое имя...")
+            self._tr("page.winws1_user_presets.dialog.rename.placeholder", "Новое имя...")
         )
         self.nameEdit.selectAll()
         self.nameEdit.setClearButtonEnabled(True)
@@ -187,15 +187,15 @@ class RenamePresetDialog(MessageBoxBase):
         self.viewLayout.addWidget(self.nameEdit)
         self.viewLayout.addWidget(self.warningLabel)
 
-        self.yesButton.setText(self._tr("page.z1_user_presets.dialog.rename.button", "Переименовать"))
-        self.cancelButton.setText(self._tr("page.z1_user_presets.dialog.button.cancel", "Отмена"))
+        self.yesButton.setText(self._tr("page.winws1_user_presets.dialog.rename.button", "Переименовать"))
+        self.cancelButton.setText(self._tr("page.winws1_user_presets.dialog.button.cancel", "Отмена"))
         self.widget.setMinimumWidth(420)
 
     def validate(self) -> bool:
         name = self.nameEdit.text().strip()
         if not name:
             self.warningLabel.setText(
-                self._tr("page.z1_user_presets.dialog.validation.enter_name", "Введите название.")
+                self._tr("page.winws1_user_presets.dialog.validation.enter_name", "Введите название.")
             )
             self.warningLabel.show()
             return False
@@ -207,7 +207,7 @@ class RenamePresetDialog(MessageBoxBase):
 
 
 class ResetAllPresetsDialog(MessageBoxBase):
-    """Диалог подтверждения перезаписи пресетов из шаблонов."""
+    """Диалог подтверждения возврата встроенных preset-ов."""
 
     def __init__(self, parent=None, language: str = "ru"):
         if parent and not parent.isWindow():
@@ -216,7 +216,7 @@ class ResetAllPresetsDialog(MessageBoxBase):
         self._ui_language = language
         self.titleLabel = SubtitleLabel(
             tr_presets_dialog(
-                "page.z1_user_presets.dialog.reset_all.title",
+                "page.winws1_user_presets.dialog.reset_all.title",
                 self._ui_language,
                 "Вернуть заводские пресеты",
             ),
@@ -224,7 +224,7 @@ class ResetAllPresetsDialog(MessageBoxBase):
         )
         self.bodyLabel = BodyLabel(
             tr_presets_dialog(
-                "page.z1_user_presets.dialog.reset_all.body",
+                "page.winws1_user_presets.dialog.reset_all.body",
                 self._ui_language,
                 "Стандартные пресеты будут восстановлены как после установки.\n"
                 "Ваши изменения в стандартных пресетах будут потеряны.\n"
@@ -238,12 +238,12 @@ class ResetAllPresetsDialog(MessageBoxBase):
         self.viewLayout.addWidget(self.bodyLabel)
         self.yesButton.setText(
             tr_presets_dialog(
-                "page.z1_user_presets.dialog.reset_all.button",
+                "page.winws1_user_presets.dialog.reset_all.button",
                 self._ui_language,
                 "Вернуть заводские",
             )
         )
         self.cancelButton.setText(
-            tr_presets_dialog("page.z1_user_presets.dialog.button.cancel", self._ui_language, "Отмена")
+            tr_presets_dialog("page.winws1_user_presets.dialog.button.cancel", self._ui_language, "Отмена")
         )
         self.widget.setMinimumWidth(380)

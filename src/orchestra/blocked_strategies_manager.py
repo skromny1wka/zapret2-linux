@@ -46,13 +46,12 @@ TCP_ASKEYS = ["tls", "http", "mtproto"]
 # UDP профили (используют IP или hostname)
 UDP_ASKEYS = ["quic", "discord", "wireguard", "dns", "stun", "unknown"]
 
-# Маппинг старых proto на новые askey (для backward compatibility)
+# Единая таблица имён профилей оркестратора.
 PROTO_TO_ASKEY = {
     "tls": "tls",
     "http": "http",
-    "udp": "quic",      # Старый "udp" -> "quic" (основной UDP профиль)
+    "udp": "quic",
     "unknown": "unknown",
-    # Новые askey маппятся сами на себя
     "quic": "quic",
     "discord": "discord",
     "wireguard": "wireguard",
@@ -148,8 +147,7 @@ class BlockedStrategiesManager:
         # User blocks - стратегии добавленные пользователем через GUI (не default)
         self.user_blocked_by_askey: Dict[str, Dict[str, Set[int]]] = {askey: {} for askey in ASKEY_ALL}
 
-        # Legacy словарь для backward compatibility (синхронизируется с blocked_by_askey["tls"])
-        # DEPRECATED: использовать blocked_by_askey["tls"]
+        # Короткая ссылка на TLS-блокировки для старых мест внутри оркестратора.
         self.blocked_strategies: Dict[str, List[int]] = self.blocked_by_askey["tls"]
 
         # Менеджер залоченных стратегий (для удаления конфликтов)
@@ -576,6 +574,6 @@ class BlockedStrategiesManager:
             }
         """
         result = {askey: self.blocked_by_askey[askey].copy() for askey in ASKEY_ALL}
-        # Для backward compatibility добавляем 'udp' как alias для 'quic'
+        # UI всё ещё показывает короткое имя udp для общего QUIC/UDP профиля.
         result['udp'] = result['quic']
         return result

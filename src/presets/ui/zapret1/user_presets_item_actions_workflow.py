@@ -42,19 +42,20 @@ def handle_item_dropped_action(*, source_kind: str, source_id: str, destination_
         log_fn(f"Ошибка перетаскивания элемента: {exc}", "ERROR")
 
 
-def activate_preset_action(*, name: str, resolve_display_name_fn, actions_api, runtime_service, info_bar_cls, tr_fn, parent_window, log_fn) -> None:
+def activate_preset_action(*, name: str, resolve_display_name_fn, actions_api, runtime_service, info_bar_cls, tr_fn, parent_window, log_fn) -> bool:
     display_name = resolve_display_name_fn(name)
     result = actions_api.activate_preset(file_name=name, display_name=display_name)
     log_fn(result.log_message, result.log_level)
     if result.ok and result.activated_file_name:
         runtime_service.apply_active_preset_marker_for_file(result.activated_file_name)
-        return
+        return True
     if result.infobar_level == "error":
         info_bar_cls.error(
             title=result.infobar_title or tr_fn("common.error.title", "Ошибка"),
             content=result.infobar_content,
             parent=parent_window,
         )
+    return False
 
 
 def open_edit_preset_menu_action(*, page, name: str, global_pos, is_builtin_preset_file_fn, tr_fn, make_menu_action, fluent_icon, round_menu_cls, on_preset_list_action_fn, show_preset_actions_menu_fn) -> None:
@@ -64,15 +65,15 @@ def open_edit_preset_menu_action(*, page, name: str, global_pos, is_builtin_pres
         global_pos=global_pos,
         is_builtin=is_builtin,
         labels={
-            "open": tr_fn("page.z1_user_presets.menu.open", "Открыть"),
-            "rating": tr_fn("page.z1_user_presets.menu.rating", "Рейтинг"),
-            "move_up": tr_fn("page.z1_user_presets.menu.move_up", "Переместить выше"),
-            "move_down": tr_fn("page.z1_user_presets.menu.move_down", "Переместить ниже"),
-            "rename": tr_fn("page.z1_user_presets.menu.rename", "Переименовать"),
-            "duplicate": tr_fn("page.z1_user_presets.menu.duplicate", "Дублировать"),
-            "export": tr_fn("page.z1_user_presets.menu.export", "Экспорт"),
-            "reset": tr_fn("page.z1_user_presets.menu.reset", "Сбросить"),
-            "delete": tr_fn("page.z1_user_presets.menu.delete", "Удалить"),
+            "open": tr_fn("page.winws1_user_presets.menu.open", "Открыть"),
+            "rating": tr_fn("page.winws1_user_presets.menu.rating", "Рейтинг"),
+            "move_up": tr_fn("page.winws1_user_presets.menu.move_up", "Переместить выше"),
+            "move_down": tr_fn("page.winws1_user_presets.menu.move_down", "Переместить ниже"),
+            "rename": tr_fn("page.winws1_user_presets.menu.rename", "Переименовать"),
+            "duplicate": tr_fn("page.winws1_user_presets.menu.duplicate", "Дублировать"),
+            "export": tr_fn("page.winws1_user_presets.menu.export", "Экспорт"),
+            "reset": tr_fn("page.winws1_user_presets.menu.reset", "Вернуть встроенный"),
+            "delete": tr_fn("page.winws1_user_presets.menu.delete", "Удалить"),
         },
         make_menu_action=make_menu_action,
         icon_resolver=fluent_icon,
@@ -90,7 +91,7 @@ def show_rating_menu_action(*, page, name: str, global_pos, resolve_display_name
         display_name=display_name,
         hierarchy_store=hierarchy_store,
         refresh_callback=refresh_callback,
-        clear_label=tr_fn("page.z1_user_presets.menu.rating_clear", "Сбросить рейтинг"),
+        clear_label=tr_fn("page.winws1_user_presets.menu.rating_clear", "Сбросить рейтинг"),
         global_pos=global_pos,
     )
 
@@ -117,7 +118,7 @@ def duplicate_preset_action(*, name: str, resolve_display_name_fn, actions_api, 
         log_fn(f"Ошибка дублирования пресета: {exc}", "ERROR")
         info_bar_cls.error(
             title=tr_fn("common.error.title", "Ошибка"),
-            content=tr_fn("page.z1_user_presets.error.generic", "Ошибка: {error}", error=exc),
+            content=tr_fn("page.winws1_user_presets.error.generic", "Ошибка: {error}", error=exc),
             parent=parent_window,
         )
 
@@ -127,27 +128,27 @@ def reset_preset_action(*, name: str, resolve_display_name_fn, actions_api, mess
         display_name = resolve_display_name_fn(name)
         if message_box_cls:
             box = message_box_cls(
-                tr_fn("page.z1_user_presets.dialog.reset_single.title", "Сбросить пресет?"),
+                tr_fn("page.winws1_user_presets.dialog.reset_single.title", "Вернуть встроенный preset?"),
                 tr_fn(
-                    "page.z1_user_presets.dialog.reset_single.body",
-                    "Пресет '{name}' будет перезаписан данными из шаблона.\n"
-                    "Все изменения в этом пресете будут потеряны.\n"
-                    "Этот пресет станет активным и будет применен заново.",
+                    "page.winws1_user_presets.dialog.reset_single.body",
+                    "Пользовательский файл preset-а '{name}' будет удалён.\n"
+                    "После этого снова будет использоваться встроенный preset с тем же именем файла.\n"
+                    "Изменения в пользовательском файле будут потеряны.",
                     name=display_name,
                 ),
                 parent_window,
             )
-            box.yesButton.setText(tr_fn("page.z1_user_presets.dialog.reset_single.button", "Сбросить"))
-            box.cancelButton.setText(tr_fn("page.z1_user_presets.dialog.button.cancel", "Отмена"))
+            box.yesButton.setText(tr_fn("page.winws1_user_presets.dialog.reset_single.button", "Вернуть встроенный"))
+            box.cancelButton.setText(tr_fn("page.winws1_user_presets.dialog.button.cancel", "Отмена"))
             if not box.exec():
                 return
-        result = actions_api.reset_preset_to_template(file_name=name, display_name=display_name)
+        result = actions_api.reset_preset_to_builtin(file_name=name, display_name=display_name)
         log_fn(result.log_message, result.log_level)
     except Exception as exc:
         log_fn(f"Ошибка сброса пресета: {exc}", "ERROR")
         info_bar_cls.error(
             title=tr_fn("common.error.title", "Ошибка"),
-            content=tr_fn("page.z1_user_presets.error.generic", "Ошибка: {error}", error=exc),
+            content=tr_fn("page.winws1_user_presets.error.generic", "Ошибка: {error}", error=exc),
             parent=parent_window,
         )
 
@@ -166,18 +167,18 @@ def delete_preset_action(*, name: str, resolve_display_name_fn, storage_api, act
             return
         if message_box_cls:
             box = message_box_cls(
-                tr_fn("page.z1_user_presets.dialog.delete_single.title", "Удалить пресет?"),
+                tr_fn("page.winws1_user_presets.dialog.delete_single.title", "Удалить пресет?"),
                 tr_fn(
-                    "page.z1_user_presets.dialog.delete_single.body",
+                    "page.winws1_user_presets.dialog.delete_single.body",
                     "Пресет '{name}' будет удален из списка пользовательских пресетов.\n"
                     "Изменения в этом пресете будут потеряны.\n"
-                    "Вернуть его можно только через восстановление удаленных пресетов (если доступен шаблон).",
+                    "Вернуть его можно только заново создав preset или импортировав файл.",
                     name=display_name,
                 ),
                 parent_window,
             )
-            box.yesButton.setText(tr_fn("page.z1_user_presets.dialog.delete_single.button", "Удалить"))
-            box.cancelButton.setText(tr_fn("page.z1_user_presets.dialog.button.cancel", "Отмена"))
+            box.yesButton.setText(tr_fn("page.winws1_user_presets.dialog.delete_single.button", "Удалить"))
+            box.cancelButton.setText(tr_fn("page.winws1_user_presets.dialog.button.cancel", "Отмена"))
             if not box.exec():
                 return
         result = actions_api.delete_preset(file_name=name, display_name=display_name)
@@ -192,7 +193,7 @@ def delete_preset_action(*, name: str, resolve_display_name_fn, storage_api, act
         log_fn(f"Ошибка удаления пресета: {exc}", "ERROR")
         info_bar_cls.error(
             title=tr_fn("common.error.title", "Ошибка"),
-            content=tr_fn("page.z1_user_presets.error.generic", "Ошибка: {error}", error=exc),
+            content=tr_fn("page.winws1_user_presets.error.generic", "Ошибка: {error}", error=exc),
             parent=parent_window,
         )
 
@@ -201,7 +202,7 @@ def export_preset_action(*, page, name: str, resolve_display_name_fn, file_dialo
     display_name = resolve_display_name_fn(name)
     file_path, _ = file_dialog_cls.getSaveFileName(
         page,
-        tr_fn("page.z1_user_presets.file_dialog.export_title", "Экспортировать пресет"),
+        tr_fn("page.winws1_user_presets.file_dialog.export_title", "Экспортировать пресет"),
         f"{display_name}.txt",
         "Preset files (*.txt);;All files (*.*)",
     )
@@ -216,7 +217,7 @@ def export_preset_action(*, page, name: str, resolve_display_name_fn, file_dialo
         log_fn(f"Ошибка экспорта пресета: {exc}", "ERROR")
         info_bar_cls.error(
             title=tr_fn("common.error.title", "Ошибка"),
-            content=tr_fn("page.z1_user_presets.error.generic", "Ошибка: {error}", error=exc),
+            content=tr_fn("page.winws1_user_presets.error.generic", "Ошибка: {error}", error=exc),
             parent=parent_window,
         )
 

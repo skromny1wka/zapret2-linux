@@ -14,7 +14,6 @@ from typing import Callable, Optional
 
 from autostart.task_scheduler_api import (
     CANONICAL_TASK_NAME,
-    is_canonical_autostart_enabled,
     register_canonical_autostart_task,
 )
 from startup.admin_check import is_admin, request_admin_restart
@@ -75,10 +74,4 @@ def setup_autostart_for_exe(
     except Exception as exc:
         _log(f"setup_autostart_for_exe: {exc}", "❌ ERROR")
         _status(f"Ошибка: {exc}")
-        return False
-
-def is_autostart_enabled() -> bool:
-    try:
-        return bool(is_canonical_autostart_enabled())
-    except Exception:
         return False

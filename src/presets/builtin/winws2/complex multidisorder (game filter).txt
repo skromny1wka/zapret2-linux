@@ -1,5 +1,4 @@
 # Preset: complex multidisorder (game filter)
-# TemplateOrigin: complex multidisorder (game filter)
 # BuiltinVersion: 2.19
 # Description: 
 

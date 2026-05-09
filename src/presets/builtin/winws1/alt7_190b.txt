@@ -1,5 +1,4 @@
 # Preset: alt7_190b
-# TemplateOrigin: alt7_190b
 # IconColor: #60cdff
 # Description: Imported from bat/alt7_190b.txt
 

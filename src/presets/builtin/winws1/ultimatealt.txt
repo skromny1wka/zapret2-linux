@@ -1,5 +1,4 @@
 # Preset: ultimatealt
-# TemplateOrigin: ultimatealt
 # IconColor: #60cdff
 # Description: Imported from bat/ultimatealt.txt
 

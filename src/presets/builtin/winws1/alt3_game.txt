@@ -1,5 +1,4 @@
 # Preset: alt3_game
-# TemplateOrigin: alt3_game
 # IconColor: #60cdff
 # Description: Imported from bat/alt3_game.txt
 

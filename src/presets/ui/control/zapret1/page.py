@@ -8,27 +8,29 @@ from PyQt6.QtCore import QTimer, pyqtSignal
 
 from ui.pages.base_page import BasePage
 from ui.page_dependencies import require_page_app_context
+from settings.mode import EXE_NAME_WINWS1, ZAPRET1_MODE
 from presets.ui.control.zapret1.build import (
-    build_z1_pages_management_section,
-    build_z1_presets_section,
-    build_z1_pages_status_section,
+    build_winws1_pages_management_section,
+    build_winws1_presets_section,
+    build_winws1_pages_status_section,
 )
 from presets.ui.control.zapret1.deferred_build import (
-    build_z1_pages_deferred_sections,
+    build_winws1_pages_deferred_sections,
 )
 from presets.ui.control.zapret1.runtime_helpers import (
     apply_program_settings_snapshot,
     apply_status_plan,
-    apply_z1_pages_language,
+    apply_winws1_pages_language,
     set_toggle_checked,
 )
 from presets.ui.control.control_runtime_controller import ControlPageController
+from presets.ui.control.windows_features.runtime import ControlPageWindowsFeatureMixin
 from ui.compat_widgets import (
     ActionButton,
     PrimaryActionButton,
     set_tooltip,
 )
-from app_state.main_window_state import AppUiState, MainWindowStateStore
+from ui.state.main_window_state import AppUiState, MainWindowStateStore
 from presets.ui.control.control_page_shared import (
     ControlPageActionMixin,
     attach_program_settings_runtime,
@@ -54,21 +56,21 @@ class StopButton(ActionButton):
         super().__init__(text, icon_name, parent=parent)
 
 
-class Zapret1ModeControlPage(ControlPageActionMixin, BasePage):
+class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMixin, BasePage):
     """Страница управления для zapret1_mode."""
 
-    navigate_to_profiles = pyqtSignal()     # -> PageName.ZAPRET1_MODE, страница профилей
-    navigate_to_presets = pyqtSignal()       # → PageName.ZAPRET1_USER_PRESETS
+    navigate_to_preset_setup = pyqtSignal() # -> "Настройка preset-а": profiles выбранного preset-а
+    navigate_to_presets = pyqtSignal()      # -> "Мои пресеты": выбор, активация, raw-редактор
     navigate_to_blobs = pyqtSignal()         # → PageName.BLOBS
 
     def __init__(self, parent=None):
         super().__init__(
             "Управление Zapret 1",
-            "Настройка и запуск Zapret 1 (winws.exe). Выберите профили и готовые стратегии "
-            "или переключитесь на другой пресет.",
+            f"Настройка и запуск Zapret 1 ({EXE_NAME_WINWS1}). В «Мои пресеты» выбирается preset, "
+            "а в «Настройка preset-а» меняются profiles и готовые стратегии.",
             parent,
-            title_key="page.z1_control.title",
-            subtitle_key="page.z1_control.subtitle",
+            title_key="page.winws1_control.title",
+            subtitle_key="page.winws1_control.subtitle",
         )
         self.parent_app = parent
         self._ui_state_store = None
@@ -82,6 +84,8 @@ class Zapret1ModeControlPage(ControlPageActionMixin, BasePage):
         self._advanced_settings_dirty = True
         self.program_settings_card = None
         self.auto_dpi_toggle = None
+        self.defender_toggle = None
+        self.max_block_toggle = None
         self.discord_restart_toggle = None
         self.wssize_toggle = None
         self.debug_log_toggle = None
@@ -96,8 +100,8 @@ class Zapret1ModeControlPage(ControlPageActionMixin, BasePage):
         self.test_card = None
         self.folder_card = None
         self.docs_card = None
-        self.profiles_card = None
-        self.open_profiles_btn = None
+        self.preset_setup_card = None
+        self.preset_setup_open_btn = None
         self._build_ui()
         try:
             preset_name_text, preset_name_tooltip = self._load_preset_name()
@@ -145,8 +149,8 @@ class Zapret1ModeControlPage(ControlPageActionMixin, BasePage):
 
     def _build_ui(self):
         # ── Статус работы ──────────────────────────────────────────────────
-        self.add_section_title(text_key="page.z1_control.section.status")
-        status_widgets = build_z1_pages_status_section(
+        self.add_section_title(text_key="page.winws1_control.section.status")
+        status_widgets = build_winws1_pages_status_section(
             tr_fn=lambda key, default: tr_catalog(key, language=self._ui_language, default=default),
             strong_body_label_cls=StrongBodyLabel,
             caption_label_cls=CaptionLabel,
@@ -159,8 +163,8 @@ class Zapret1ModeControlPage(ControlPageActionMixin, BasePage):
         self.add_spacing(16)
 
         # ── Управление ─────────────────────────────────────────────────────
-        self.add_section_title(text_key="page.z1_control.section.management")
-        management_widgets = build_z1_pages_management_section(
+        self.add_section_title(text_key="page.winws1_control.section.management")
+        management_widgets = build_winws1_pages_management_section(
             tr_fn=lambda key, default: tr_catalog(key, language=self._ui_language, default=default),
             caption_label_cls=CaptionLabel,
             indeterminate_progress_bar_cls=IndeterminateProgressBar,
@@ -180,16 +184,16 @@ class Zapret1ModeControlPage(ControlPageActionMixin, BasePage):
 
         self.add_spacing(16)
 
-        # ── Пресет / профили ────────────────────────────────────────────────
-        self.add_section_title(text_key="page.z1_control.section.presets")
-        preset_widgets = build_z1_presets_section(
+        # ── Ветка preset-а: выбор preset-а отдельно от настройки его profiles ──
+        self.add_section_title(text_key="page.winws1_control.section.presets")
+        preset_widgets = build_winws1_presets_section(
             tr_fn=lambda key, default: tr_catalog(key, language=self._ui_language, default=default),
             push_setting_card_cls=PushSettingCard,
             on_open_presets=self.navigate_to_presets.emit,
         )
-        self.preset_name_label = preset_widgets.preset_name_label
-        self.preset_caption_label = preset_widgets.preset_caption_label
-        self.presets_btn = preset_widgets.presets_btn
+        self.preset_name_label = preset_widgets.title_label
+        self.preset_caption_label = preset_widgets.caption_label
+        self.presets_btn = preset_widgets.button
         self.add_widget(preset_widgets.card)
 
     def _build_deferred_sections(self) -> None:
@@ -201,15 +205,17 @@ class Zapret1ModeControlPage(ControlPageActionMixin, BasePage):
 
         if Win11ToggleRow is None:
             raise RuntimeError("Win11ToggleRow недоступен для страницы управления Zapret 1")
-        deferred_widgets = build_z1_pages_deferred_sections(
+        deferred_widgets = build_winws1_pages_deferred_sections(
             add_section_title=self.add_section_title,
             tr_fn=lambda key, default: tr_catalog(key, language=self._ui_language, default=default),
             content_parent=self.content,
             push_setting_card_cls=PushSettingCard,
             setting_card_group_cls=SettingCardGroup,
             win11_toggle_row_cls=Win11ToggleRow,
-            on_open_profiles_page=self._open_profiles_page,
+            on_open_preset_setup_page=self._open_preset_setup_page,
             on_auto_dpi_toggled=self._on_auto_dpi_toggled,
+            on_defender_toggled=self._on_defender_toggled,
+            on_max_blocker_toggled=self._on_max_blocker_toggled,
             on_discord_restart_changed=self._on_discord_restart_changed,
             on_wssize_toggled=self._on_wssize_toggled,
             on_debug_log_toggled=self._on_debug_log_toggled,
@@ -218,14 +224,16 @@ class Zapret1ModeControlPage(ControlPageActionMixin, BasePage):
             on_open_folder=self._open_folder,
             on_open_docs=self._open_docs,
         )
-        self.profiles_card = deferred_widgets.profiles_card
-        self.open_profiles_btn = deferred_widgets.open_profiles_btn
-        self.add_widget(self.profiles_card)
+        self.preset_setup_card = deferred_widgets.preset_setup_card
+        self.preset_setup_open_btn = deferred_widgets.preset_setup_open_btn
+        self.add_widget(self.preset_setup_card)
 
         self.add_spacing(16)
         self.program_settings_section_label = deferred_widgets.program_settings_section_label
         self.program_settings_card = deferred_widgets.program_settings_card
         self.auto_dpi_toggle = deferred_widgets.auto_dpi_toggle
+        self.defender_toggle = deferred_widgets.defender_toggle
+        self.max_block_toggle = deferred_widgets.max_block_toggle
         self.add_widget(self.program_settings_card)
 
         self.add_spacing(16)
@@ -262,6 +270,8 @@ class Zapret1ModeControlPage(ControlPageActionMixin, BasePage):
         apply_program_settings_snapshot(
             snapshot,
             auto_dpi_toggle=self.auto_dpi_toggle,
+            defender_toggle=self.defender_toggle,
+            max_block_toggle=self.max_block_toggle,
         )
 
     def _sync_program_settings(self) -> None:
@@ -288,7 +298,7 @@ class Zapret1ModeControlPage(ControlPageActionMixin, BasePage):
     def _load_preset_name(self) -> tuple[str, str]:
         try:
             selected_manifest = self._require_app_context().preset_mode_coordinator.get_selected_source_manifest(
-                "zapret1_mode"
+                ZAPRET1_MODE
             )
             file_name = str(getattr(selected_manifest, "file_name", "") or "").strip()
             if file_name:
@@ -299,7 +309,7 @@ class Zapret1ModeControlPage(ControlPageActionMixin, BasePage):
             pass
 
         return (
-            tr_catalog("page.z1_control.preset.not_selected", language=self._ui_language, default="Не выбран"),
+            tr_catalog("page.winws1_control.preset.not_selected", language=self._ui_language, default="Не выбран"),
             "",
         )
 
@@ -310,7 +320,7 @@ class Zapret1ModeControlPage(ControlPageActionMixin, BasePage):
 
             return get_advanced_settings_state(
                 self._require_app_context(),
-                launch_method="zapret1_mode",
+                launch_method=ZAPRET1_MODE,
             )
         except Exception:
             return {}
@@ -372,7 +382,7 @@ class Zapret1ModeControlPage(ControlPageActionMixin, BasePage):
             set_wssize_enabled(
                 bool(enabled),
                 app_context=self._require_app_context(),
-                launch_method="zapret1_mode",
+                launch_method=ZAPRET1_MODE,
             )
             self._advanced_settings_dirty = False
         except Exception:
@@ -385,14 +395,14 @@ class Zapret1ModeControlPage(ControlPageActionMixin, BasePage):
             set_debug_log_enabled(
                 bool(enabled),
                 app_context=self._require_app_context(),
-                launch_method="zapret1_mode",
+                launch_method=ZAPRET1_MODE,
             )
             self._advanced_settings_dirty = False
         except Exception:
             pass
 
-    def _open_profiles_page(self) -> None:
-        self.navigate_to_profiles.emit()
+    def _open_preset_setup_page(self) -> None:
+        self.navigate_to_preset_setup.emit()
 
     def set_loading(self, loading: bool, text: str = ""):
         if loading:
@@ -478,17 +488,19 @@ class Zapret1ModeControlPage(ControlPageActionMixin, BasePage):
 
     def set_ui_language(self, language: str) -> None:
         super().set_ui_language(language)
-        apply_z1_pages_language(
+        apply_winws1_pages_language(
             language=self._ui_language,
             start_btn=self.start_btn,
             stop_winws_btn=self.stop_winws_btn,
             stop_and_exit_btn=self.stop_and_exit_btn,
             presets_btn=self.presets_btn,
-            open_profiles_btn=self.open_profiles_btn,
+            preset_setup_open_btn=self.preset_setup_open_btn,
             preset_caption_label=self.preset_caption_label,
-            profiles_card=self.profiles_card,
+            preset_setup_card=self.preset_setup_card,
             program_settings_card=self.program_settings_card,
             auto_dpi_toggle=self.auto_dpi_toggle,
+            defender_toggle=self.defender_toggle,
+            max_block_toggle=self.max_block_toggle,
             test_card=self.test_card,
             folder_card=self.folder_card,
             docs_card=self.docs_card,

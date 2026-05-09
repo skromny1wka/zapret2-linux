@@ -1,5 +1,4 @@
 # Preset: Default v4 (game filter)
-# TemplateOrigin: Default v4 (game filter)
 # BuiltinVersion: 2.19
 # Description: 
 

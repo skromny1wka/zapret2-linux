@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Set
 
 from log.log import log
+from settings.mode import WINWS_ENGINE_FAMILY_LABEL
 
 
 
@@ -48,7 +49,7 @@ def maybe_log_disable_dpi_for_update(exc: BaseException, *, scope: str, level: s
 
     _HINT_SHOWN.add(scope)
     log(
-        "ℹ️ Подсказка: ошибка похожа на проблему прокси. Если у вас включен DPI/Запрет (winws/winws2) "+
+        f"ℹ️ Подсказка: ошибка похожа на проблему прокси. Если у вас включен DPI/Запрет ({WINWS_ENGINE_FAMILY_LABEL}) "+
         "или другой прокси/VPN, отключите его на время проверки/скачивания обновлений и повторите.",
         level,
     )

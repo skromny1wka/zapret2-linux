@@ -676,9 +676,11 @@ def get_latest_release(channel: str, use_cache: bool = True) -> Optional[Dict[st
             return cached
     else:
         log(f"🔄 Принудительная проверка обновлений (игнорируем кэш)", "🔄 RELEASE")
+        from settings.mode import WINWS_ENGINE_FAMILY_LABEL
+
         log(
             "ℹ️ Если проверка/скачивание обновлений не работает, попробуйте временно выключить DPI/Запрет "
-            "(остановить winws/winws2 / пресет) и повторить.",
+            f"(остановить {WINWS_ENGINE_FAMILY_LABEL} / пресет) и повторить.",
             "🔄 RELEASE",
         )
     

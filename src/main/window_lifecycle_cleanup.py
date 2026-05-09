@@ -104,13 +104,6 @@ def cleanup_support_managers_for_close(window) -> None:
         log(f"Ошибка очистки subscription_manager: {e}", "DEBUG")
 
     try:
-        dns_ui_manager = getattr(window, "dns_ui_manager", None)
-        if dns_ui_manager is not None:
-            dns_ui_manager.cleanup()
-    except Exception as e:
-        log(f"Ошибка при очистке dns_ui_manager: {e}", "DEBUG")
-
-    try:
         theme_manager = getattr(window, "theme_manager", None)
         if theme_manager is not None:
             theme_manager.cleanup()

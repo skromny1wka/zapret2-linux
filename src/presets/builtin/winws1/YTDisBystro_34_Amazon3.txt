@@ -1,5 +1,4 @@
 # Preset: YTDisBystro_34_Amazon3
-# TemplateOrigin: YTDisBystro_34_Amazon3
 # IconColor: #60cdff
 # Description: Imported from bat/YTDisBystro_34_Amazon3.txt
 

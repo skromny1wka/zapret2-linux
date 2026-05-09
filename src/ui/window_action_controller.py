@@ -27,11 +27,6 @@ def start_dpi(source) -> bool:
     if host is None:
         return False
 
-    handler = getattr(host, "_start_requested_handler", None)
-    if callable(handler):
-        handler()
-        return True
-
     controller = getattr(host, "launch_controller", None)
     if controller is not None:
         controller.start_dpi_async()

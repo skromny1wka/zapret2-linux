@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
 )
 from ui.pages.base_page import BasePage
 from ui.page_dependencies import require_page_app_context
+from settings.mode import ENGINE_WINWS2, PRESETS_SCOPE_WINWS2, ZAPRET2_MODE
 from presets.ui.common.preset_actions_menu import show_preset_actions_menu
 from presets.ui.common.preset_rating_menu import show_preset_rating_menu
 from core.runtime.user_presets_runtime_service import UserPresetsRuntimeAdapter
@@ -77,7 +78,7 @@ from presets.ui.zapret2.user_presets_runtime_helpers import (
     schedule_preset_search,
     update_presets_view_height,
 )
-from app_state.main_window_state import MainWindowStateStore
+from ui.state.main_window_state import MainWindowStateStore
 
 try:
     from qfluentwidgets import (
@@ -138,7 +139,7 @@ class BaseZapret2UserPresetsPage(BasePage):
             "Мои пресеты",
             "",
             parent,
-            title_key="page.z2_user_presets.title",
+            title_key="page.winws2_user_presets.title",
         )
         self._page_api = self._build_controller().build_page_api()
         self._runtime_service = self._build_runtime_service()
@@ -161,7 +162,7 @@ class BaseZapret2UserPresetsPage(BasePage):
             try:
                 tokens = get_theme_tokens()
                 _back_btn = TransparentPushButton()
-                _back_btn.setText(self._tr("page.z2_user_presets.back.control", "Управление"))
+                _back_btn.setText(self._tr("page.winws2_user_presets.back.control", "Управление"))
                 _back_btn.setIcon(get_themed_qta_icon("fa5s.chevron-left", color=tokens.fg_muted))
                 _back_btn.setIconSize(QSize(12, 12))
                 _back_btn.clicked.connect(self.back_clicked.emit)
@@ -215,22 +216,22 @@ class BaseZapret2UserPresetsPage(BasePage):
     def _build_controller(self):
         return UserPresetsPageController(
             UserPresetsPageControllerConfig(
-                launch_method="zapret2_mode",
-                selection_key="winws2",
-                hierarchy_scope="presets_winws2",
-                empty_not_found_key="page.z2_user_presets.empty.not_found",
-                empty_none_key="page.z2_user_presets.empty.none",
-                list_log_prefix="Z2UserPresetsPage",
+                launch_method=ZAPRET2_MODE,
+                selection_key=ENGINE_WINWS2,
+                hierarchy_scope=PRESETS_SCOPE_WINWS2,
+                empty_not_found_key="page.winws2_user_presets.empty.not_found",
+                empty_none_key="page.winws2_user_presets.empty.none",
+                list_log_prefix="Winws2UserPresetsPage",
                 activate_error_level="error",
                 activate_error_mode="raw",
                 copy_hierarchy_meta_on_duplicate=False,
                 require_app_context=self._require_app_context,
-                get_preset_store=lambda: self._require_app_context().preset_store,
+                get_preset_store=lambda: self._require_app_context().preset_store_winws2,
             )
         )
 
     def _build_runtime_service(self):
-        return self._require_app_context().user_presets_runtime_service_factory("presets_winws2")
+        return self._require_app_context().user_presets_runtime_service_factory(PRESETS_SCOPE_WINWS2)
 
     def _build_runtime_adapter(self) -> UserPresetsRuntimeAdapter:
         return UserPresetsRuntimeAdapter(
@@ -250,7 +251,7 @@ class BaseZapret2UserPresetsPage(BasePage):
         )
 
     def _current_breadcrumb_title(self) -> str:
-        return self._tr("page.z2_user_presets.title", "Мои пресеты")
+        return self._tr("page.winws2_user_presets.title", "Мои пресеты")
 
     def _rebuild_breadcrumb(self) -> None:
         if self._breadcrumb is None:
@@ -260,7 +261,7 @@ class BaseZapret2UserPresetsPage(BasePage):
             self._breadcrumb.clear()
             self._breadcrumb.addItem(
                 "control",
-                self._tr("page.z2_user_presets.back.control", "Управление"),
+                self._tr("page.winws2_user_presets.back.control", "Управление"),
             )
             self._breadcrumb.addItem(
                 "presets",
@@ -276,7 +277,7 @@ class BaseZapret2UserPresetsPage(BasePage):
 
     def _apply_mode_labels(self) -> None:
         try:
-            self.title_label.setText(self._tr("page.z2_user_presets.title", "Мои пресеты"))
+            self.title_label.setText(self._tr("page.winws2_user_presets.title", "Мои пресеты"))
             if self.subtitle_label is not None:
                 self.subtitle_label.setText("")
             self._rebuild_breadcrumb()
@@ -322,8 +323,8 @@ class BaseZapret2UserPresetsPage(BasePage):
     def _on_store_changed(self):
         self._runtime_service.on_store_changed()
 
-    def _on_store_updated(self, file_name_or_name: str):
-        self._runtime_service.on_store_updated(file_name_or_name)
+    def _on_store_content_changed(self, file_name_or_name: str):
+        self._runtime_service.on_store_content_changed(file_name_or_name)
 
     def _on_store_switched(self, _name: str):
         self._runtime_service.on_store_switched(_name)
@@ -343,7 +344,7 @@ class BaseZapret2UserPresetsPage(BasePage):
         )
 
     def _hierarchy_scope_key(self) -> str:
-        return "presets_winws2"
+        return PRESETS_SCOPE_WINWS2
 
     def _get_hierarchy_store(self) -> PresetHierarchyStore:
         return self._storage_api().get_hierarchy_store()
@@ -377,7 +378,7 @@ class BaseZapret2UserPresetsPage(BasePage):
             get_preset_store_fn=self._get_preset_store,
             on_store_changed_fn=self._on_store_changed,
             on_store_switched_fn=self._on_store_switched,
-            on_store_updated_fn=self._on_store_updated,
+            on_store_content_changed_fn=self._on_store_content_changed,
             log_fn=log,
         )
 
@@ -510,9 +511,9 @@ class BaseZapret2UserPresetsPage(BasePage):
     def _on_info_clicked(self) -> None:
         if MessageBox:
             box = MessageBox(
-                self._tr("page.z2_user_presets.info.title", "Что это такое?"),
+                self._tr("page.winws2_user_presets.info.title", "Что это такое?"),
                 self._tr(
-                    "page.z2_user_presets.info.body",
+                    "page.winws2_user_presets.info.body",
                     'Здесь кнопка для нубов — "хочу чтобы нажал и всё работало". '
                     "Выбираете любой пресет — тыкаете — перезагружаете вкладку и смотрите, "
                     "что ресурс открывается (или не открывается). Если не открывается — тыкаете на следующий пресет. "
@@ -529,9 +530,9 @@ class BaseZapret2UserPresetsPage(BasePage):
             info_bar_cls=InfoBar,
             tr_fn=self._tr,
             parent_window=self.window(),
-            error_key="page.z2_user_presets.error.open_folder",
+            error_key="page.winws2_user_presets.error.open_folder",
             error_default="Не удалось открыть папку пресетов: {error}",
-            log_prefix="Z2UserPresetsPage",
+            log_prefix="Winws2UserPresetsPage",
             log_fn=log,
         )
 
@@ -695,19 +696,7 @@ class BaseZapret2UserPresetsPage(BasePage):
             handler(name)
 
     def _open_preset_subpage(self, name: str):
-        if not self._on_activate_preset(name):
-            return
-        try:
-            from ui.navigation_pages import resolve_zapret2_navigation_pages
-            from ui.window_adapter import show_page
-
-            show_page(
-                self.parent_app,
-                resolve_zapret2_navigation_pages().profiles_page,
-                allow_internal=True,
-            )
-        except Exception as exc:
-            log(f"Не удалось открыть profiles выбранного пресета: {exc}", "ERROR")
+        self.preset_open_requested.emit(name)
 
     def _on_preset_context_requested(self, name: str, global_pos: QPoint):
         self._on_edit_preset(name, global_pos=global_pos)
@@ -852,8 +841,8 @@ class BaseZapret2UserPresetsPage(BasePage):
             if parent_app is not None:
                 request_preset_runtime_content_apply(
                     parent_app,
-                    launch_method="zapret2_mode",
-                    reason="user_preset_saved",
+                    launch_method=ZAPRET2_MODE,
+                    reason="preset_content_changed",
                 )
         except Exception as e:
             log(f"Ошибка перезапуска DPI: {e}", "ERROR")

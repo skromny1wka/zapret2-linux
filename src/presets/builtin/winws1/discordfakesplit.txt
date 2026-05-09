@@ -1,5 +1,4 @@
 # Preset: discordfakesplit
-# TemplateOrigin: discordfakesplit
 # IconColor: #60cdff
 # Description: Imported from bat/discordfakesplit.txt
 

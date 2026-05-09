@@ -1,5 +1,4 @@
 # Preset: warp1
-# TemplateOrigin: warp1
 # IconColor: #60cdff
 # Description: Imported from bat/warp1.txt
 

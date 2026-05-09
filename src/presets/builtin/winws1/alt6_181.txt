@@ -1,5 +1,4 @@
 # Preset: alt6_181
-# TemplateOrigin: alt6_181
 # IconColor: #60cdff
 # Description: Imported from bat/alt6_181.txt
 

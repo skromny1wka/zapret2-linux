@@ -66,7 +66,6 @@ def _rewrite_preset_headers(
     source_text: str,
     preset_name: str,
     *,
-    template_origin: str | None = None,
     preset_kind: str | None = None,
 ) -> str:
     text = (source_text or "").replace("\r\n", "\n").replace("\r", "\n")
@@ -85,7 +84,6 @@ def _rewrite_preset_headers(
     body = lines[header_end:]
     out_header: list[str] = []
     saw_preset = False
-    saw_template_origin = False
     saw_preset_kind = False
 
     for raw in header:
@@ -94,14 +92,6 @@ def _rewrite_preset_headers(
         if lowered.startswith("# preset:"):
             out_header.append(f"# Preset: {preset_name}")
             saw_preset = True
-            continue
-        if lowered.startswith("# templateorigin:"):
-            if template_origin is not None:
-                out_header.append(f"# TemplateOrigin: {template_origin}")
-                saw_template_origin = True
-            else:
-                out_header.append(raw.rstrip("\n"))
-                saw_template_origin = True
             continue
         if lowered.startswith("# presetkind:"):
             if preset_kind is not None:
@@ -121,10 +111,6 @@ def _rewrite_preset_headers(
         out_header.insert(0, f"# Preset: {preset_name}")
 
     insert_idx = 1 if out_header and out_header[0].startswith("# Preset:") else 0
-    if template_origin is not None and not saw_template_origin:
-        out_header.insert(insert_idx, f"# TemplateOrigin: {template_origin}")
-        insert_idx += 1
-
     if preset_kind is not None and not saw_preset_kind:
         out_header.insert(insert_idx, f"# PresetKind: {preset_kind}")
 

@@ -3,6 +3,15 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from settings.mode import (
+    DEFAULT_LAUNCH_METHOD,
+    ENGINE_WINWS1,
+    ENGINE_WINWS2,
+    engine_for_launch_method,
+    is_preset_launch_method,
+    normalize_launch_method,
+)
+
 from .parser import parse_preset_text
 from .serializer import serialize_preset, with_profile_strategy_lines
 
@@ -11,7 +20,7 @@ _WINWS2_WSSIZE_LINE = "--lua-desync=wssize:wsize=1:scale=6"
 _WINWS1_WSSIZE_LINES = ("--wssize", "1:6", "--wssize-forced-cutoff=0")
 
 
-def get_advanced_settings_state(app_context, launch_method: str = "zapret2_mode") -> dict[str, bool]:
+def get_advanced_settings_state(app_context, launch_method: str = DEFAULT_LAUNCH_METHOD) -> dict[str, bool]:
     discord_restart = True
     try:
         from discord.discord_restart import get_discord_restart_setting
@@ -27,7 +36,7 @@ def get_advanced_settings_state(app_context, launch_method: str = "zapret2_mode"
     }
 
 
-def get_wssize_enabled(app_context, *, launch_method: str = "zapret2_mode") -> bool:
+def get_wssize_enabled(app_context, *, launch_method: str = DEFAULT_LAUNCH_METHOD) -> bool:
     preset, _manifest = _load_selected_profile_preset(app_context, launch_method)
     for profile in preset.profiles:
         if not _profile_tcp_includes_443(profile):
@@ -37,7 +46,7 @@ def get_wssize_enabled(app_context, *, launch_method: str = "zapret2_mode") -> b
     return False
 
 
-def set_wssize_enabled(app_context, enabled: bool, *, launch_method: str = "zapret2_mode") -> bool:
+def set_wssize_enabled(app_context, enabled: bool, *, launch_method: str = DEFAULT_LAUNCH_METHOD) -> bool:
     preset, _manifest = _load_selected_profile_preset(app_context, launch_method)
     changed = False
     touched_any_tcp_443 = False
@@ -64,16 +73,16 @@ def set_wssize_enabled(app_context, enabled: bool, *, launch_method: str = "zapr
     return True
 
 
-def get_debug_log_enabled(app_context, *, launch_method: str = "zapret2_mode") -> bool:
+def get_debug_log_enabled(app_context, *, launch_method: str = DEFAULT_LAUNCH_METHOD) -> bool:
     return bool(get_debug_log_file(app_context, launch_method=launch_method))
 
 
-def get_debug_log_file(app_context, *, launch_method: str = "zapret2_mode") -> str:
+def get_debug_log_file(app_context, *, launch_method: str = DEFAULT_LAUNCH_METHOD) -> str:
     text, _manifest = _load_selected_source_text(app_context, launch_method)
     return _extract_debug_log_file(text)
 
 
-def set_debug_log_enabled(app_context, enabled: bool, *, launch_method: str = "zapret2_mode") -> bool:
+def set_debug_log_enabled(app_context, enabled: bool, *, launch_method: str = DEFAULT_LAUNCH_METHOD) -> bool:
     text, manifest = _load_selected_source_text(app_context, launch_method)
     display_name = str(getattr(manifest, "name", "") or "").strip() or Path(str(getattr(manifest, "file_name", "") or "")).stem
     rewritten = _rewrite_debug_log_setting(text, display_name, bool(enabled))
@@ -93,55 +102,44 @@ def _save_selected_profile_preset(app_context, preset, launch_method: str) -> No
 
 
 def _load_selected_source_text(app_context, launch_method: str) -> tuple[str, object]:
-    method = str(launch_method or "").strip().lower()
+    method = normalize_launch_method(launch_method, default="")
     engine = _engine_for_method(method)
-    if method not in {"zapret1_mode", "zapret2_mode"}:
+    if not is_preset_launch_method(method):
         raise ValueError(f"Unsupported profile settings launch method: {launch_method}")
     manifest = app_context.preset_mode_coordinator.get_selected_source_manifest(method)
     return app_context.preset_file_store.read_source_text(engine, manifest.file_name), manifest
 
 
 def _save_selected_source_text(app_context, source_text: str, launch_method: str) -> None:
-    method = str(launch_method or "").strip().lower()
-    engine = _engine_for_method(method)
-    if method not in {"zapret1_mode", "zapret2_mode"}:
+    method = normalize_launch_method(launch_method, default="")
+    if not is_preset_launch_method(method):
         raise ValueError(f"Unsupported profile settings launch method: {launch_method}")
-    manifest = app_context.preset_mode_coordinator.get_selected_source_manifest(method)
-    updated = app_context.preset_file_store.update_preset(engine, manifest.file_name, source_text, getattr(manifest, "name", None))
-    try:
-        ui_store = app_context.preset_store if engine == "winws2" else app_context.preset_store_v1
-        ui_store.notify_preset_saved(updated.file_name)
-    except Exception:
-        pass
-    try:
-        app_context.preset_mode_coordinator.refresh_selected_launch_preset(method)
-    except Exception:
-        pass
+    from presets.file_service import PresetFileService
+
+    PresetFileService.from_launch_method(
+        method,
+        app_context=app_context,
+    ).save_selected_source_text(source_text)
 
 
 def _engine_for_method(launch_method: str) -> str:
-    method = str(launch_method or "").strip().lower()
-    if method == "zapret1_mode":
-        return "winws1"
-    if method == "zapret2_mode":
-        return "winws2"
-    raise ValueError(f"Unsupported profile settings launch method: {launch_method}")
+    return engine_for_launch_method(launch_method)
 
 
 def _wssize_lines_for_engine(engine: str) -> tuple[str, ...]:
-    return _WINWS1_WSSIZE_LINES if str(engine or "").strip().lower() == "winws1" else (_WINWS2_WSSIZE_LINE,)
+    return _WINWS1_WSSIZE_LINES if str(engine or "").strip().lower() == ENGINE_WINWS1 else (_WINWS2_WSSIZE_LINE,)
 
 
 def _profile_has_wssize(profile) -> bool:
     engine = str(getattr(profile, "engine", "") or "").strip().lower()
     lines = [str(line or "").strip().lower() for line in getattr(profile.strategy, "strategy_lines", ()) or () if str(line or "").strip()]
-    if engine == "winws1":
+    if engine == ENGINE_WINWS1:
         return any(line.startswith("--wssize") for line in lines)
     return _WINWS2_WSSIZE_LINE in lines
 
 
 def _remove_wssize_lines(engine: str, lines: list[str]) -> list[str]:
-    if str(engine or "").strip().lower() != "winws1":
+    if str(engine or "").strip().lower() != ENGINE_WINWS1:
         return [line for line in lines if line.lower() != _WINWS2_WSSIZE_LINE]
 
     cleaned: list[str] = []

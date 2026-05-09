@@ -1,5 +1,4 @@
 # Preset: discord_voice_badseq
-# TemplateOrigin: discord_voice_badseq
 # IconColor: #60cdff
 # Description: Imported from bat/discord_voice_badseq.txt
 

@@ -26,10 +26,8 @@ from ui.window_adapter import sync_titlebar_search_width
 class WindowLifecycleMixin:
     def closeEvent(self, event):
         """Обрабатывает событие закрытия окна."""
-        close_controller = getattr(self, "window_close_controller", None)
-        if close_controller is not None:
-            if not close_controller.should_continue_final_close(event):
-                return
+        if not self.window_close_controller.should_continue_final_close(event):
+            return
 
         self._is_exiting = True
 
@@ -97,15 +95,15 @@ class WindowLifecycleMixin:
         QApplication.quit()
 
     def ensure_tray_manager(self):
-        """Возвращает tray manager, создавая его только как аварийный fallback."""
+        """Возвращает tray manager, лениво создавая его до второй фазы старта."""
         tray_manager = getattr(self, "tray_manager", None)
         if tray_manager is not None:
             return tray_manager
 
         try:
-            initialization_manager = getattr(self, "initialization_manager", None)
-            if initialization_manager is not None:
-                return initialization_manager.ensure_tray_initialized()
+            startup_coordinator = getattr(self, "startup_coordinator", None)
+            if startup_coordinator is not None:
+                return startup_coordinator.ensure_tray_initialized()
         except Exception as e:
             log(f"Не удалось инициализировать системный трей по требованию: {e}", "WARNING")
 
@@ -137,52 +135,46 @@ class WindowLifecycleMixin:
             try:
                 if not self.isActiveWindow():
                     self._release_input_interaction_states()
-            except Exception:
-                pass
+            except Exception as e:
+                log(f"Не удалось сбросить состояние ввода при смене активности окна: {e}", "DEBUG")
 
         if event.type() == QEvent.Type.WindowStateChange:
-            geometry_controller = getattr(self, "window_geometry_controller", None)
-            if geometry_controller is not None:
-                geometry_controller.on_window_state_change()
+            self.window_geometry_controller.on_window_state_change()
 
             try:
                 effects = getattr(self, "_holiday_effects", None)
                 if effects is not None:
                     QTimer.singleShot(0, effects.sync_geometry)
-            except Exception:
-                pass
+            except Exception as e:
+                log(f"Не удалось синхронизировать визуальные эффекты при смене состояния окна: {e}", "DEBUG")
 
         super().changeEvent(event)
 
     def hideEvent(self, event):
         try:
             self._release_input_interaction_states()
-        except Exception:
-            pass
+        except Exception as e:
+            log(f"Не удалось сбросить состояние ввода при скрытии окна: {e}", "DEBUG")
         super().hideEvent(event)
 
     def moveEvent(self, event):
         super().moveEvent(event)
-        geometry_controller = getattr(self, "window_geometry_controller", None)
-        if geometry_controller is not None:
-            geometry_controller.on_geometry_changed()
+        self.window_geometry_controller.on_geometry_changed()
 
     def resizeEvent(self, event):
         """Обновляем геометрию при изменении размера окна."""
         super().resizeEvent(event)
         try:
             sync_titlebar_search_width(self)
-        except Exception:
-            pass
-        geometry_controller = getattr(self, "window_geometry_controller", None)
-        if geometry_controller is not None:
-            geometry_controller.on_geometry_changed()
+        except Exception as e:
+            log(f"Не удалось синхронизировать ширину поиска в заголовке: {e}", "DEBUG")
+        self.window_geometry_controller.on_geometry_changed()
         try:
             effects = getattr(self, "_holiday_effects", None)
             if effects is not None:
                 effects.sync_geometry()
-        except Exception:
-            pass
+        except Exception as e:
+            log(f"Не удалось синхронизировать визуальные эффекты при изменении размера окна: {e}", "DEBUG")
 
     def showEvent(self, event):
         """Первый показ окна."""
@@ -193,22 +185,18 @@ class WindowLifecycleMixin:
             self._startup_ttff_ms = startup_elapsed_ms()
             emit_startup_metric("TTFF", "first showEvent")
 
-        geometry_controller = getattr(self, "window_geometry_controller", None)
-        if geometry_controller is not None:
-            geometry_controller.apply_saved_maximized_state_if_needed()
-            QTimer.singleShot(350, geometry_controller.enable_persistence)
+        self.window_geometry_controller.apply_saved_maximized_state_if_needed()
+        QTimer.singleShot(350, self.window_geometry_controller.enable_persistence)
 
         try:
             effects = getattr(self, "_holiday_effects", None)
             if effects is not None:
                 effects.sync_geometry()
                 QTimer.singleShot(0, effects.sync_geometry)
-        except Exception:
-            pass
+        except Exception as e:
+            log(f"Не удалось синхронизировать визуальные эффекты при показе окна: {e}", "DEBUG")
 
-        notification_controller = getattr(self, "window_notification_controller", None)
-        if notification_controller is not None:
-            notification_controller.schedule_startup_notification_queue(0)
+        self.window_notification_controller.schedule_startup_notification_queue(0)
 
     def _force_style_refresh(self) -> None:
         """Принудительно обновляет стили всех виджетов после показа окна."""

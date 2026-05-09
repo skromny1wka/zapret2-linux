@@ -5,7 +5,8 @@ import os
 import subprocess
 from dataclasses import dataclass
 
-from config.config import LOGS_FOLDER, MAX_DEBUG_LOG_FILES, MAX_LOG_FILES, get_winws_exe_for_method
+from config.config import LOGS_FOLDER, MAX_DEBUG_LOG_FILES, MAX_LOG_FILES
+from settings.mode import EXE_NAME_WINWS1, ORCHESTRA_MODE, exe_name_for_launch_method, is_orchestra_launch_method
 
 from winws_runtime.runners.runner_factory import get_current_runner
 from log.log import LOG_FILE, cleanup_old_logs, global_logger, log
@@ -136,9 +137,9 @@ class LogsPageController:
     @staticmethod
     def resolve_winws_exe_name(launch_method: str) -> str:
         try:
-            return os.path.basename(get_winws_exe_for_method(launch_method)) or "winws.exe"
+            return exe_name_for_launch_method(launch_method)
         except Exception:
-            return "winws.exe"
+            return EXE_NAME_WINWS1
 
     @staticmethod
     def get_running_runner_source(launch_method: str, orchestra_runner):
@@ -147,9 +148,9 @@ class LogsPageController:
         orchestra_running = bool(orchestra_runner and orchestra_runner.is_running())
         direct_running = bool(direct_runner and direct_runner.is_running())
 
-        if launch_method == "orchestra":
+        if is_orchestra_launch_method(launch_method):
             if orchestra_running:
-                return "orchestra", orchestra_runner
+                return ORCHESTRA_MODE, orchestra_runner
             if direct_running:
                 return "direct", direct_runner
             return None, None
@@ -157,7 +158,7 @@ class LogsPageController:
         if direct_running:
             return "direct", direct_runner
         if orchestra_running:
-            return "orchestra", orchestra_runner
+            return ORCHESTRA_MODE, orchestra_runner
         return None, None
 
     @staticmethod
@@ -346,10 +347,10 @@ class LogsPageController:
     def build_winws_output_plan(*, launch_method: str, orchestra_runner, language: str) -> LogsWinwsOutputPlan:
         source, runner = LogsPageController.get_running_runner_source(launch_method, orchestra_runner)
 
-        if source == "orchestra" and runner:
+        if source == ORCHESTRA_MODE and runner:
             pid = LogsPageController.get_runner_pid(runner)
             return LogsWinwsOutputPlan(
-                action="orchestra",
+                action=ORCHESTRA_MODE,
                 status_kind="running",
                 status_text=f"PID: {pid} | Оркестратор",
                 process=None,

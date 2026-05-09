@@ -1,5 +1,4 @@
 # Preset: faketlsauto_181
-# TemplateOrigin: faketlsauto_181
 # IconColor: #60cdff
 # Description: Imported from bat/faketlsauto_181.txt
 

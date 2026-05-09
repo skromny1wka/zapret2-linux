@@ -1,5 +1,4 @@
 # Preset: ALL TCP & UDP discord_urgent_sni
-# TemplateOrigin: ALL TCP & UDP discord_urgent_sni
 # BuiltinVersion: 2.19
 # Description: 
 

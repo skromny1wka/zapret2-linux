@@ -14,6 +14,7 @@ import subprocess
 import time
 from typing import List, Optional
 from log.log import log
+from settings.mode import ALL_WINWS_EXE_NAME_SET, EXE_NAME_WINWS2
 
 
 
@@ -29,7 +30,7 @@ def kill_winws_processes() -> bool:
         for proc in psutil.process_iter(['pid', 'name']):
             try:
                 proc_name = proc.info['name'].lower() if proc.info['name'] else ""
-                if proc_name in ('winws.exe', 'winws2.exe'):
+                if proc_name in ALL_WINWS_EXE_NAME_SET:
                     log(f"🔪 Завершаем процесс {proc_name} (PID: {proc.info['pid']})", "DEBUG")
                     proc.kill()
                     killed_count += 1
@@ -499,14 +500,14 @@ def start_service_with_nssm(service_name: str) -> bool:
             # Дополнительная диагностика по тексту
             if "SERVICE_PAUSED" in stderr_text or "already running" in stderr_text:
                 log("💡 SERVICE_PAUSED / already running:", "WARNING")
-                log("   • Уже работает другой winws2.exe с тем же фильтром", "WARNING")
-                log(f"   • Остановите предыдущий экземпляр: nssm stop {service_name} или taskkill /IM winws2.exe /F", "WARNING")
+                log(f"   • Уже работает другой {EXE_NAME_WINWS2} с тем же фильтром", "WARNING")
+                log(f"   • Остановите предыдущий экземпляр: nssm stop {service_name} или taskkill /IM {EXE_NAME_WINWS2} /F", "WARNING")
                 log("   • После остановки запустите службу снова", "WARNING")
             
             # Дополнительная диагностика
             if error_code == 2:
                 log("💡 Код 2: Служба не запустилась. Возможные причины:", "WARNING")
-                log("   • winws2.exe не запускается (неверные аргументы)", "WARNING")
+                log(f"   • {EXE_NAME_WINWS2} не запускается (неверные аргументы)", "WARNING")
                 log("   • Порт уже занят другим процессом", "WARNING")
                 log("   • Путь к файлу lua или списку некорректен", "WARNING")
             

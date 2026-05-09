@@ -1,5 +1,4 @@
 # Preset: general SIMPLE FAKE (game filter)
-# TemplateOrigin: general SIMPLE FAKE (game filter)
 # BuiltinVersion: 2.19
 
 --lua-init=@lua/zapret-lib.lua

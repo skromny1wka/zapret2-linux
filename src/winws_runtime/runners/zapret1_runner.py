@@ -14,6 +14,7 @@ import time
 from typing import Optional
 from log.log import log
 
+from settings.mode import EXE_NAME_WINWS1, ZAPRET1_MODE
 
 from .constants import CREATE_NO_WINDOW
 from .runner_base import StrategyRunnerBase
@@ -39,7 +40,7 @@ from winws_runtime.health.process_health_check import (
 from winws_runtime.runtime.system_ops import get_process_pids_by_name
 
 
-class StrategyRunnerV1(StrategyRunnerBase):
+class Winws1StrategyRunner(StrategyRunnerBase):
     """
     Runner for Zapret 1 (winws.exe).
     Simple version without hot-reload and Lua functionality.
@@ -101,17 +102,17 @@ class StrategyRunnerV1(StrategyRunnerBase):
         )
         if state == PresetRunnerState.FAILED:
             publish_runner_failure(
-                launch_method="zapret1_mode",
+                launch_method=ZAPRET1_MODE,
                 error=error,
             )
         return snapshot
 
     def _on_config_changed(self) -> None:
         """Called when the preset file changes. Performs full restart."""
-        if controller_transition_in_progress("zapret1_mode"):
-            log("Hot-reload пропущен: controller уже выполняет transition для zapret1_mode", "DEBUG")
+        if controller_transition_in_progress(ZAPRET1_MODE):
+            log(f"Hot-reload пропущен: controller уже выполняет transition для {ZAPRET1_MODE}", "DEBUG")
             return
-        log("Preset file changed, restarting winws.exe...", "INFO")
+        log(f"Preset file changed, restarting {EXE_NAME_WINWS1}...", "INFO")
         try:
             with self._state_lock:
                 preset_path = str(self._preset_file_path or "").strip()
@@ -178,14 +179,14 @@ class StrategyRunnerV1(StrategyRunnerBase):
 
         if watcher:
             watcher.update_file_path(preset_file)
-            log(f"ConfigFileWatcherV1 retargeted to: {preset_file}", "DEBUG")
+            log(f"ConfigFileWatcherWinws1 retargeted to: {preset_file}", "DEBUG")
             return
 
         watcher = ConfigFileWatcher(
             file_path=preset_file,
             callback=self._on_config_changed,
             interval=1.0,
-            thread_name="ConfigFileWatcherV1",
+            thread_name="ConfigFileWatcherWinws1",
         )
         with self._state_lock:
             self._config_watcher = watcher
@@ -406,7 +407,7 @@ class StrategyRunnerV1(StrategyRunnerBase):
 
     def start_from_preset_file(self, preset_path: str, strategy_name: str = "Preset", _retry_count: int = 0) -> bool:
         """
-        Запускает winws1 из выбранного preset-файла через синтаксис @file.
+        Запускает движок Zapret 1 из выбранного preset-файла через синтаксис @file.
 
         Это основной путь для обычного запуска zapret1_mode.
         """
@@ -509,8 +510,8 @@ class StrategyRunnerV1(StrategyRunnerBase):
             return False
 
         if not os.path.exists(self.winws_exe):
-            log(f"winws.exe disappeared: {self.winws_exe}", "ERROR")
-            self._set_last_error(f"winws.exe не найден: {self.winws_exe}")
+            log(f"{EXE_NAME_WINWS1} disappeared: {self.winws_exe}", "ERROR")
+            self._set_last_error(f"{EXE_NAME_WINWS1} не найден: {self.winws_exe}")
             return False
 
         self._preset_file_path = preset_path

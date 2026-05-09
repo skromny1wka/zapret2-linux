@@ -18,7 +18,7 @@ from ui.theme import (
     get_neutral_card_border_qss,
 )
 from ui.theme_semantic import get_semantic_palette
-from app_state.main_window_state import AppUiState, MainWindowStateStore
+from ui.state.main_window_state import AppUiState, MainWindowStateStore
 from ui.text_catalog import tr as tr_catalog
 from log.log import log
 
@@ -262,6 +262,13 @@ class AutostartPage(BasePage):
         enabled: bool,
         strategy_name: str | None = None,
     ) -> None:
+        try:
+            from settings.store import set_gui_autostart_enabled
+
+            set_gui_autostart_enabled(bool(enabled))
+        except Exception as exc:
+            log(f"Не удалось сохранить состояние автозапуска GUI в settings.json: {exc}", "WARNING")
+
         app_runtime_state = resolve_page_app_runtime_state(self, parent=self.parent())
         if self._ui_state_store is not None:
             if strategy_name:
@@ -418,11 +425,18 @@ class AutostartPage(BasePage):
     def _update_mode(self):
         try:
             from settings.dpi.strategy_settings import get_strategy_launch_method
+            from settings.mode import (
+                is_orchestra_launch_method,
+                is_zapret1_launch_method,
+                is_zapret2_launch_method,
+            )
 
             method = str(get_strategy_launch_method() or "").strip()
-            if method == "zapret2_mode":
+            if is_zapret2_launch_method(method):
                 mode_text = "Профили (Zapret 2)"
-            elif method == "orchestra":
+            elif is_zapret1_launch_method(method):
+                mode_text = "Профили (Zapret 1)"
+            elif is_orchestra_launch_method(method):
                 mode_text = "Оркестр (автообучение)"
             else:
                 mode_text = "Неизвестно"

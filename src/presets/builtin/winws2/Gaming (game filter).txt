@@ -1,5 +1,4 @@
 # Preset: Gaming (game filter)
-# TemplateOrigin: Gaming (game filter)
 # BuiltinVersion: 2.19
 # IconColor: #f07575ff
 

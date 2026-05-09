@@ -7,6 +7,7 @@ declarative index used by the left sidebar global search.
 from dataclasses import dataclass
 from typing import Iterable
 
+from settings.mode import ENGINE_WINWS1, ENGINE_WINWS2, EXE_NAME_WINWS1, EXE_NAME_WINWS2
 from ui.page_names import PageName
 
 
@@ -38,10 +39,6 @@ TEXTS: dict[str, dict[str, str]] = {
     "nav.header.appearance": {
         "ru": "Оформление",
         "en": "Appearance",
-    },
-    "nav.page.control": {
-        "ru": "Управление",
-        "en": "Control",
     },
     "nav.page.zapret2_mode_control": {
         "ru": "Управление Zapret 2",
@@ -100,20 +97,20 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "About",
     },
     "nav.page.zapret2_mode": {
-        "ru": "Профили",
-        "en": "Profile Mode",
+        "ru": "Настройка preset-а",
+        "en": "Preset setup",
     },
     "nav.page.zapret2_user_presets": {
         "ru": "Мои пресеты",
         "en": "My Presets",
     },
     "nav.page.zapret1_mode": {
-        "ru": "Стратегии Z1",
-        "en": "Z1 Strategies",
+        "ru": "Настройка preset-а",
+        "en": "Preset setup",
     },
     "nav.page.zapret1_user_presets": {
-        "ru": "Мои пресеты Z1",
-        "en": "Z1 Presets",
+        "ru": "Мои пресеты",
+        "en": "My presets",
     },
     "common.toggle.on_off": {
         "ru": "Вкл/Выкл",
@@ -127,17 +124,9 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Ошибка",
         "en": "Error",
     },
-    "page.control.title": {
-        "ru": "Управление",
-        "en": "Control",
-    },
     "page.control.status": {
         "ru": "Статус работы",
         "en": "Service Status",
-    },
-    "page.control.program_settings": {
-        "ru": "Настройки программы",
-        "en": "Program Settings",
     },
     "page.control.status.checking": {
         "ru": "Проверка...",
@@ -168,8 +157,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Start Zapret",
     },
     "page.control.button.stop_only_winws": {
-        "ru": "Остановить только winws.exe",
-        "en": "Stop only winws.exe",
+        "ru": f"Остановить только {EXE_NAME_WINWS1}",
+        "en": f"Stop only {EXE_NAME_WINWS1}",
     },
     "page.control.button.stop_and_exit": {
         "ru": "Остановить и закрыть программу",
@@ -219,159 +208,159 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Открыть папку",
         "en": "Open Folder",
     },
-    "page.z2_control.title": {
+    "page.winws2_control.title": {
         "ru": "Управление Zapret 2",
         "en": "Zapret 2 Control",
     },
-    "page.z2_control.preset_switch": {
+    "page.winws2_control.preset_switch": {
         "ru": "Сменить пресет обхода блокировок",
         "en": "Switch Bypass Preset",
     },
-    "page.z2_control.profile_tuning": {
-        "ru": "Настройте пресет более тонко через режим профилей",
-        "en": "Fine Tune via Profile Mode",
+    "page.winws2_control.profile_tuning": {
+        "ru": "Настройка preset-а",
+        "en": "Preset setup",
     },
-    "page.z1_control.title": {
+    "page.winws1_control.title": {
         "ru": "Управление Zapret 1",
         "en": "Zapret 1 Control",
     },
-    "page.z1_control.presets": {
-        "ru": "Пресеты и стратегии",
-        "en": "Presets and Strategies",
+    "page.winws1_control.presets": {
+        "ru": "Preset-ы и настройка preset-а",
+        "en": "Presets and preset setup",
     },
-    "page.z1_control.status.checking": {
+    "page.winws1_control.status.checking": {
         "ru": "Проверка...",
         "en": "Checking...",
     },
-    "page.z1_control.status.detecting": {
+    "page.winws1_control.status.detecting": {
         "ru": "Определение состояния процесса",
         "en": "Detecting process state",
     },
-    "page.z1_control.status.running": {
+    "page.winws1_control.status.running": {
         "ru": "Zapret 1 работает",
         "en": "Zapret 1 is running",
     },
-    "page.z1_control.status.stopped": {
+    "page.winws1_control.status.stopped": {
         "ru": "Zapret 1 остановлен",
         "en": "Zapret 1 stopped",
     },
-    "page.z1_control.status.bypass_active": {
+    "page.winws1_control.status.bypass_active": {
         "ru": "Обход блокировок активен",
         "en": "Bypass is active",
     },
-    "page.z1_control.status.press_start": {
+    "page.winws1_control.status.press_start": {
         "ru": "Нажмите «Запустить» для активации",
         "en": "Press Start to activate",
     },
-    "page.z1_control.button.start": {
+    "page.winws1_control.button.start": {
         "ru": "Запустить Zapret",
         "en": "Start Zapret",
     },
-    "page.z1_control.button.stop_winws": {
-        "ru": "Остановить winws.exe",
-        "en": "Stop winws.exe",
+    "page.winws1_control.button.stop_winws": {
+        "ru": f"Остановить {EXE_NAME_WINWS1}",
+        "en": f"Stop {EXE_NAME_WINWS1}",
     },
-    "page.z1_control.button.stop_and_exit": {
+    "page.winws1_control.button.stop_and_exit": {
         "ru": "Остановить и закрыть",
         "en": "Stop and close",
     },
-    "page.z1_control.preset.not_selected": {
+    "page.winws1_control.preset.not_selected": {
         "ru": "Не выбран",
         "en": "Not selected",
     },
-    "page.z1_control.preset.current": {
+    "page.winws1_control.preset.current": {
         "ru": "Текущий активный пресет",
         "en": "Current active preset",
     },
-    "page.z1_control.button.my_presets": {
+    "page.winws1_control.button.my_presets": {
         "ru": "Мои пресеты",
         "en": "My Presets",
     },
-    "page.z1_control.profiles.title": {
-        "ru": "Profiles и стратегии",
-        "en": "Profiles and strategies",
+    "page.winws1_control.profiles.title": {
+        "ru": "Настройка preset-а",
+        "en": "Preset setup",
     },
-    "page.z1_control.profiles.desc": {
-        "ru": "Выбор profile и готовой стратегии из выбранного preset",
-        "en": "Select a profile and ready strategy from the selected preset",
+    "page.winws1_control.profiles.desc": {
+        "ru": "Открыть profiles выбранного preset-а и выбрать готовые стратегии",
+        "en": "Open profiles from the selected preset and choose ready strategies",
     },
-    "page.z1_control.button.open": {
+    "page.winws1_control.button.open": {
         "ru": "Открыть",
         "en": "Open",
     },
-    "page.z1_control.setting.autostart.title": {
+    "page.winws1_control.setting.autostart.title": {
         "ru": "Автозапуск DPI после старта программы",
         "en": "Auto-start DPI after app launch",
     },
-    "page.z1_control.setting.autostart.desc": {
+    "page.winws1_control.setting.autostart.desc": {
         "ru": "После запуска ZapretGUI автоматически запускать текущий DPI-режим",
         "en": "Automatically start the current DPI mode after ZapretGUI launches",
     },
-    "page.z1_control.card.advanced": {
+    "page.winws1_control.card.advanced": {
         "ru": "Дополнительные настройки",
         "en": "ADVANCED SETTINGS",
     },
-    "page.z1_control.advanced.warning": {
+    "page.winws1_control.advanced.warning": {
         "ru": "Изменяйте только если знаете что делаете",
         "en": "Change only if you know what you are doing",
     },
-    "page.z1_control.advanced.discord_restart.title": {
+    "page.winws1_control.advanced.discord_restart.title": {
         "ru": "Перезапуск Discord",
         "en": "Restart Discord",
     },
-    "page.z1_control.advanced.discord_restart.desc": {
+    "page.winws1_control.advanced.discord_restart.desc": {
         "ru": "Автоперезапуск при смене стратегии",
         "en": "Auto-restart on strategy change",
     },
-    "page.z1_control.advanced.wssize.title": {
+    "page.winws1_control.advanced.wssize.title": {
         "ru": "Включить --wssize",
         "en": "Enable --wssize",
     },
-    "page.z1_control.advanced.wssize.desc": {
+    "page.winws1_control.advanced.wssize.desc": {
         "ru": "Добавляет параметр размера окна TCP",
         "en": "Adds TCP window size parameter",
     },
-    "page.z1_control.advanced.debug_log.title": {
+    "page.winws1_control.advanced.debug_log.title": {
         "ru": "Включить лог-файл (--debug)",
         "en": "Enable log file (--debug)",
     },
-    "page.z1_control.advanced.debug_log.desc": {
+    "page.winws1_control.advanced.debug_log.desc": {
         "ru": "Записывает логи winws в папку logs",
         "en": "Writes winws logs to the logs folder",
     },
-    "page.z1_control.blobs.title": {
+    "page.winws1_control.blobs.title": {
         "ru": "Блобы",
         "en": "Blobs",
     },
-    "page.z1_control.blobs.desc": {
+    "page.winws1_control.blobs.desc": {
         "ru": "Бинарные данные (.bin / hex) для стратегий",
         "en": "Binary data (.bin / hex) for strategies",
     },
-    "page.z1_control.section.additional": {
+    "page.winws1_control.section.additional": {
         "ru": "Дополнительные действия",
         "en": "Additional actions",
     },
-    "page.z1_control.button.connection_test": {
+    "page.winws1_control.button.connection_test": {
         "ru": "Тест соединения",
         "en": "Connection test",
     },
-    "page.z1_control.button.connection_test.desc": {
+    "page.winws1_control.button.connection_test.desc": {
         "ru": "Проверить доступность сети и состояние обхода",
         "en": "Check network reachability and bypass state",
     },
-    "page.z1_control.button.open_folder": {
+    "page.winws1_control.button.open_folder": {
         "ru": "Открыть папку",
         "en": "Open folder",
     },
-    "page.z1_control.button.open_folder.desc": {
+    "page.winws1_control.button.open_folder.desc": {
         "ru": "Перейти в папку программы и служебных файлов",
         "en": "Open the app folder and service files",
     },
-    "page.z1_control.button.documentation": {
+    "page.winws1_control.button.documentation": {
         "ru": "Документация",
         "en": "Documentation",
     },
-    "page.z1_control.button.documentation.desc": {
+    "page.winws1_control.button.documentation.desc": {
         "ru": "Открыть справку и описание возможностей",
         "en": "Open help and feature documentation",
     },
@@ -1123,30 +1112,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Ожидает запуска",
         "en": "Waiting to start",
     },
-    "page.control.subtitle": {
-        "ru": "Запуск и остановка Zapret, быстрые настройки программы.",
-        "en": "Start and stop Zapret, quick application settings.",
-    },
-    "page.control.section.status": {
-        "ru": "Статус работы",
-        "en": "Service Status",
-    },
-    "page.control.section.management": {
-        "ru": "Управление Zapret",
-        "en": "Zapret Control",
-    },
-    "page.control.section.current_strategy": {
-        "ru": "Текущая стратегия",
-        "en": "Current Strategy",
-    },
-    "page.control.section.program_settings": {
-        "ru": "Настройки программы",
-        "en": "Program Settings",
-    },
-    "page.control.section.additional": {
-        "ru": "Дополнительно",
-        "en": "Additional",
-    },
     "page.custom_domains.title": {
         "ru": "Кастомные (мои) домены (hostlist) для работы с Zapret",
         "en": "Custom Domains (hostlist) for Zapret",
@@ -1419,13 +1384,13 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Выберите способ запуска обхода блокировок",
         "en": "Choose how to run bypass strategies",
     },
-    "page.dpi_settings.section.z2": {
-        "ru": "Zapret 2 (winws2.exe)",
-        "en": "Zapret 2 (winws2.exe)",
+    "page.dpi_settings.section.zapret2": {
+        "ru": f"Zapret 2 ({EXE_NAME_WINWS2})",
+        "en": f"Zapret 2 ({EXE_NAME_WINWS2})",
     },
-    "page.dpi_settings.section.z1": {
-        "ru": "Zapret 1 (winws.exe)",
-        "en": "Zapret 1 (winws.exe)",
+    "page.dpi_settings.section.zapret1": {
+        "ru": f"Zapret 1 ({EXE_NAME_WINWS1})",
+        "en": f"Zapret 1 ({EXE_NAME_WINWS1})",
     },
     "page.dpi_settings.option.recommended": {
         "ru": "рекомендуется",
@@ -1436,8 +1401,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Zapret 2",
     },
     "page.dpi_settings.method.zapret2_mode.desc": {
-        "ru": "Режим со второй версией Zapret (winws2.exe) + готовые пресеты для быстрого запуска. Поддерживает кастомный lua-код чтобы писать свои стратегии.",
-        "en": "Mode with Zapret v2 (winws2.exe) and ready presets for quick launch. Supports custom Lua code for your own strategies.",
+        "ru": f"Режим Zapret 2 на движке {ENGINE_WINWS2} ({EXE_NAME_WINWS2}) + готовые пресеты для быстрого запуска. Поддерживает Lua-код для своих стратегий.",
+        "en": f"Zapret 2 mode on {ENGINE_WINWS2} ({EXE_NAME_WINWS2}) with ready presets for quick launch. Supports custom Lua code for your own strategies.",
     },
     "page.dpi_settings.method.orchestra.title": {
         "ru": "Оркестратор v0.9.6 (Beta)",
@@ -1452,8 +1417,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Zapret 1",
     },
     "page.dpi_settings.method.zapret1_mode.desc": {
-        "ru": "Режим первой версии Zapret 1 (winws.exe) + готовые пресеты для быстрого запуска. Не использует Lua код, нет понятия блобов.",
-        "en": "Mode with Zapret v1 (winws.exe) and ready presets for quick launch. Does not use Lua and has no blob concept.",
+        "ru": f"Режим Zapret 1 на движке {ENGINE_WINWS1} ({EXE_NAME_WINWS1}) + готовые пресеты для быстрого запуска. Не использует Lua-код и блобы.",
+        "en": f"Zapret 1 mode on {ENGINE_WINWS1} ({EXE_NAME_WINWS1}) with ready presets for quick launch. Does not use Lua code or blobs.",
     },
     "page.dpi_settings.discord_restart.title": {
         "ru": "Перезапуск Discord",
@@ -3499,891 +3464,899 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Не удалось открыть Discord:\n{error}",
         "en": "Failed to open Discord:\n{error}",
     },
-    "page.z1_control.subtitle": {
-        "ru": "Настройка и запуск Zapret 1 (winws.exe). Выберите profiles и готовые стратегии или переключитесь на другой пресет.",
-        "en": "Configure and launch Zapret 1 (winws.exe). Choose profiles and ready strategies or switch preset.",
+    "page.winws1_control.subtitle": {
+        "ru": f"Настройка и запуск Zapret 1 ({EXE_NAME_WINWS1}). В «Мои пресеты» выбирается preset, а в «Настройка preset-а» меняются profiles и готовые стратегии.",
+        "en": f"Configure and launch Zapret 1 ({EXE_NAME_WINWS1}). My presets selects a preset; preset setup changes profiles and ready strategies.",
     },
-    "page.z1_control.section.status": {
+    "page.winws1_control.section.status": {
         "ru": "Статус работы",
         "en": "Service Status",
     },
-    "page.z1_control.section.management": {
+    "page.winws1_control.section.management": {
         "ru": "Управление Zapret 1",
         "en": "Zapret 1 Control",
     },
-    "page.z1_control.section.presets": {
-        "ru": "Пресеты и стратегии",
-        "en": "Presets and Strategies",
+    "page.winws1_control.section.presets": {
+        "ru": "Preset-ы и настройка preset-а",
+        "en": "Presets and preset setup",
     },
-    "page.z1_control.section.program_settings": {
+    "page.winws1_control.section.program_settings": {
         "ru": "Настройки программы",
         "en": "Program Settings",
     },
-    "page.z1_pages.title": {
-        "ru": "Профили Zapret 1",
-        "en": "Zapret 1 Profiles",
+    "page.winws1_pages.title": {
+        "ru": "Настройка preset-а",
+        "en": "Preset setup",
     },
-    "page.z1_pages.back.control": {
+    "page.winws1_pages.back.control": {
         "ru": "\u2190 Управление",
         "en": "\u2190 Control",
     },
-    "page.z1_pages.breadcrumb.control": {
+    "page.winws1_pages.breadcrumb.control": {
         "ru": "Управление",
         "en": "Control",
     },
-    "page.z1_pages.toolbar.expand": {
+    "page.winws1_pages.toolbar.expand": {
         "ru": "Развернуть",
         "en": "Expand",
     },
-    "page.z1_pages.toolbar.collapse": {
+    "page.winws1_pages.toolbar.collapse": {
         "ru": "Свернуть",
         "en": "Collapse",
     },
-    "page.z1_pages.toolbar.info": {
+    "page.winws1_pages.toolbar.info": {
         "ru": "Что это?",
         "en": "What is this?",
     },
-    "page.z1_pages.toolbar.title": {
+    "page.winws1_pages.toolbar.title": {
         "ru": "Profiles",
         "en": "Profiles",
     },
-    "page.z1_pages.request.button": {
+    "page.winws1_pages.request.button": {
         "ru": "Предложить profile",
         "en": "Suggest profile",
     },
-    "page.z1_pages.request.hint": {
+    "page.winws1_pages.request.hint": {
         "ru": "Если нужного profile нет в списке, его можно добавить позже как шаблон.",
         "en": "If the needed profile is missing, it can be added later as a template.",
     },
-    "page.z1_pages.loading": {
+    "page.winws1_pages.loading": {
         "ru": "Читаем profiles из выбранного preset...",
         "en": "Reading profiles from the selected preset...",
     },
-    "page.z1_pages.strategy.off": {
+    "page.winws1_pages.strategy.off": {
         "ru": "Выключено",
         "en": "Off",
     },
-    "page.z1_pages.strategy.custom": {
+    "page.winws1_pages.strategy.custom": {
         "ru": "Свой набор",
         "en": "Custom set",
     },
-    "page.z1_pages.info.title": {
-        "ru": "Профили Zapret 1",
-        "en": "Zapret 1 Profiles",
+    "page.winws1_pages.info.title": {
+        "ru": "Настройка preset-а",
+        "en": "Preset setup",
     },
-    "page.z1_pages.info.body": {
+    "page.winws1_pages.info.body": {
         "ru": "Чтобы запустить zapret напрямую, включите нужные profiles, выберите для них готовые стратегии и нажмите «Запустить» на странице управления.",
         "en": "To start Zapret directly, enable the needed profiles, choose ready strategies for them, and click Start on the control page.",
     },
-    "page.z1_user_presets.title": {
+    "page.winws1_user_presets.title": {
         "ru": "Мои пресеты",
         "en": "My Presets",
     },
-    "page.z1_user_presets.back.control": {
+    "page.winws1_user_presets.back.control": {
         "ru": "Управление",
         "en": "Control",
     },
-    "page.z1_user_presets.configs.title": {
+    "page.winws1_user_presets.configs.title": {
         "ru": "Обменивайтесь пресетами и profiles в разделе GitHub Discussions",
         "en": "Share presets and profiles in GitHub Discussions",
     },
-    "page.z1_user_presets.configs.button": {
+    "page.winws1_user_presets.configs.button": {
         "ru": "Получить конфиги",
         "en": "Get configs",
     },
-    "page.z1_user_presets.button.import": {
+    "page.winws1_user_presets.button.import": {
         "ru": "Импорт",
         "en": "Import",
     },
-    "page.z1_user_presets.button.open_folder": {
+    "page.winws1_user_presets.button.open_folder": {
         "ru": "Папка пресетов",
         "en": "Presets folder",
     },
-    "page.z1_user_presets.button.reset_all": {
+    "page.winws1_user_presets.button.reset_all": {
         "ru": "Вернуть заводские",
         "en": "Restore defaults",
     },
-    "page.z1_user_presets.button.wiki": {
+    "page.winws1_user_presets.button.wiki": {
         "ru": "Вики по пресетам",
         "en": "Preset wiki",
     },
-    "page.z1_user_presets.button.what_is_this": {
+    "page.winws1_user_presets.button.what_is_this": {
         "ru": "Что это такое?",
         "en": "What is this?",
     },
-    "page.z1_user_presets.search.placeholder": {
+    "page.winws1_user_presets.search.placeholder": {
         "ru": "Поиск пресетов по имени...",
         "en": "Search presets by name...",
     },
-    "page.z1_user_presets.tooltip.create": {
+    "page.winws1_user_presets.tooltip.create": {
         "ru": "Создать новый пресет",
         "en": "Create a new preset",
     },
-    "page.z1_user_presets.tooltip.import": {
+    "page.winws1_user_presets.tooltip.import": {
         "ru": "Импорт пресета из файла",
         "en": "Import preset from file",
     },
-    "page.z1_user_presets.tooltip.open_folder": {
+    "page.winws1_user_presets.tooltip.open_folder": {
         "ru": "Открыть папку, где лежат ваши пресеты",
         "en": "Open the folder where your presets are stored",
     },
-    "page.z1_user_presets.tooltip.reset_all": {
+    "page.winws1_user_presets.tooltip.reset_all": {
         "ru": "Восстанавливает стандартные пресеты. Ваши изменения в стандартных пресетах будут потеряны.",
         "en": "Restores default presets. Your changes to default presets will be lost.",
     },
-    "page.z1_user_presets.delegate.tooltip.rename": {
+    "page.winws1_user_presets.delegate.tooltip.rename": {
         "ru": "Переименовать",
         "en": "Rename",
     },
-    "page.z1_user_presets.delegate.tooltip.duplicate": {
+    "page.winws1_user_presets.delegate.tooltip.duplicate": {
         "ru": "Дублировать",
         "en": "Duplicate",
     },
-    "page.z1_user_presets.delegate.tooltip.reset": {
-        "ru": "Сбросить",
-        "en": "Reset",
+    "page.winws1_user_presets.delegate.tooltip.reset": {
+        "ru": "Вернуть встроенный",
+        "en": "Restore built-in",
     },
-    "page.z1_user_presets.delegate.tooltip.delete": {
+    "page.winws1_user_presets.delegate.tooltip.delete": {
         "ru": "Удалить",
         "en": "Delete",
     },
-    "page.z1_user_presets.delegate.tooltip.export": {
+    "page.winws1_user_presets.delegate.tooltip.export": {
         "ru": "Экспорт",
         "en": "Export",
     },
-    "page.z1_user_presets.delegate.tooltip.confirm_again": {
+    "page.winws1_user_presets.delegate.tooltip.confirm_again": {
         "ru": "Нажмите ещё раз для подтверждения",
         "en": "Click again to confirm",
     },
-    "page.z1_user_presets.delegate.badge.active": {
+    "page.winws1_user_presets.delegate.badge.active": {
         "ru": "Активен",
         "en": "Active",
     },
-    "page.z1_user_presets.dialog.button.cancel": {
+    "page.winws1_user_presets.dialog.button.cancel": {
         "ru": "Отмена",
         "en": "Cancel",
     },
-    "page.z1_user_presets.dialog.reset_single.title": {
-        "ru": "Сбросить пресет?",
-        "en": "Reset preset?",
+    "page.winws1_user_presets.dialog.reset_single.title": {
+        "ru": "Вернуть встроенный preset?",
+        "en": "Restore built-in preset?",
     },
-    "page.z1_user_presets.dialog.reset_single.body": {
-        "ru": "Пресет '{name}' будет перезаписан данными из шаблона.\nВсе изменения в этом пресете будут потеряны.\nЭтот пресет станет активным и будет применен заново.",
-        "en": "Preset '{name}' will be overwritten with template data.\nAll changes in this preset will be lost.\nThis preset will become active and be applied again.",
+    "page.winws1_user_presets.dialog.reset_single.body": {
+        "ru": "Пользовательский файл preset-а '{name}' будет удалён.\nПосле этого снова будет использоваться встроенный preset с тем же именем файла.\nИзменения в пользовательском файле будут потеряны.",
+        "en": "User preset file '{name}' will be removed.\nThe built-in preset with the same file name will be used again.\nChanges in the user file will be lost.",
     },
-    "page.z1_user_presets.dialog.reset_single.button": {
-        "ru": "Сбросить",
-        "en": "Reset",
+    "page.winws1_user_presets.dialog.reset_single.button": {
+        "ru": "Вернуть встроенный",
+        "en": "Restore built-in",
     },
-    "page.z1_user_presets.dialog.delete_single.title": {
+    "page.winws1_user_presets.dialog.delete_single.title": {
         "ru": "Удалить пресет?",
         "en": "Delete preset?",
     },
-    "page.z1_user_presets.dialog.delete_single.body": {
-        "ru": "Пресет '{name}' будет удален из списка пользовательских пресетов.\nИзменения в этом пресете будут потеряны.\nВернуть его можно только через восстановление удаленных пресетов (если доступен шаблон).",
-        "en": "Preset '{name}' will be removed from the user presets list.\nChanges in this preset will be lost.\nYou can restore it only via deleted presets restore (if a template exists).",
+    "page.winws1_user_presets.dialog.delete_single.body": {
+        "ru": "Preset '{name}' будет удалён из списка пользовательских preset-ов.\nИзменения в этом preset-е будут потеряны.\nВернуть его можно только заново создав preset или импортировав файл.",
+        "en": "Preset '{name}' will be removed from the user presets list.\nChanges in this preset will be lost.\nYou can restore it only by creating a new preset or importing a file.",
     },
-    "page.z1_user_presets.dialog.delete_single.button": {
+    "page.winws1_user_presets.dialog.delete_single.button": {
         "ru": "Удалить",
         "en": "Delete",
     },
-    "page.z1_user_presets.dialog.create.title": {
+    "page.winws1_user_presets.dialog.create.title": {
         "ru": "Новый пресет",
         "en": "New preset",
     },
-    "page.z1_user_presets.dialog.create.subtitle": {
+    "page.winws1_user_presets.dialog.create.subtitle": {
         "ru": "Сохраните текущие настройки как отдельный пресет, чтобы быстро переключаться между конфигурациями.",
         "en": "Save current settings as a separate preset to switch between configurations quickly.",
     },
-    "page.z1_user_presets.dialog.create.name": {
+    "page.winws1_user_presets.dialog.create.name": {
         "ru": "Название",
         "en": "Name",
     },
-    "page.z1_user_presets.dialog.create.placeholder": {
+    "page.winws1_user_presets.dialog.create.placeholder": {
         "ru": "Например: Игры / YouTube / Дом",
         "en": "For example: Games / YouTube / Home",
     },
-    "page.z1_user_presets.dialog.create.source": {
+    "page.winws1_user_presets.dialog.create.source": {
         "ru": "Создать на основе",
         "en": "Create from",
     },
-    "page.z1_user_presets.dialog.create.source.current": {
+    "page.winws1_user_presets.dialog.create.source.current": {
         "ru": "Текущего активного",
         "en": "Current active",
     },
-    "page.z1_user_presets.dialog.create.source.empty": {
-        "ru": "Пустого",
-        "en": "Empty",
+    "page.winws1_user_presets.dialog.create.source.standard": {
+        "ru": "Стандартного preset-а",
+        "en": "Standard preset",
     },
-    "page.z1_user_presets.dialog.create.button.create": {
+    "page.winws1_user_presets.dialog.create.button.create": {
         "ru": "Создать",
         "en": "Create",
     },
-    "page.z1_user_presets.dialog.rename.title": {
+    "page.winws1_user_presets.dialog.rename.title": {
         "ru": "Переименовать",
         "en": "Rename",
     },
-    "page.z1_user_presets.dialog.rename.subtitle": {
+    "page.winws1_user_presets.dialog.rename.subtitle": {
         "ru": "Имя пресета отображается в списке и используется для переключения.",
         "en": "Preset name is shown in the list and used for switching.",
     },
-    "page.z1_user_presets.dialog.rename.current_name": {
+    "page.winws1_user_presets.dialog.rename.current_name": {
         "ru": "Текущее имя: {name}",
         "en": "Current name: {name}",
     },
-    "page.z1_user_presets.dialog.rename.new_name": {
+    "page.winws1_user_presets.dialog.rename.new_name": {
         "ru": "Новое имя",
         "en": "New name",
     },
-    "page.z1_user_presets.dialog.rename.placeholder": {
+    "page.winws1_user_presets.dialog.rename.placeholder": {
         "ru": "Новое имя...",
         "en": "New name...",
     },
-    "page.z1_user_presets.dialog.rename.button": {
+    "page.winws1_user_presets.dialog.rename.button": {
         "ru": "Переименовать",
         "en": "Rename",
     },
-    "page.z1_user_presets.dialog.validation.enter_name": {
+    "page.winws1_user_presets.dialog.validation.enter_name": {
         "ru": "Введите название.",
         "en": "Enter a name.",
     },
-    "page.z1_user_presets.dialog.validation.exists": {
+    "page.winws1_user_presets.dialog.validation.exists": {
         "ru": "Пресет «{name}» уже существует.",
         "en": "Preset '{name}' already exists.",
     },
-    "page.z1_user_presets.dialog.import_exists.title": {
+    "page.winws1_user_presets.dialog.import_exists.title": {
         "ru": "Пресет существует",
         "en": "Preset exists",
     },
-    "page.z1_user_presets.dialog.import_exists.body": {
+    "page.winws1_user_presets.dialog.import_exists.body": {
         "ru": "Пресет '{name}' уже существует. Импортировать с другим именем?",
         "en": "Preset '{name}' already exists. Import with another name?",
     },
-    "page.z1_user_presets.dialog.reset_all.title": {
+    "page.winws1_user_presets.dialog.reset_all.title": {
         "ru": "Вернуть заводские пресеты",
         "en": "Restore default presets",
     },
-    "page.z1_user_presets.dialog.reset_all.body": {
+    "page.winws1_user_presets.dialog.reset_all.body": {
         "ru": "Стандартные пресеты будут восстановлены как после установки.\nВаши изменения в стандартных пресетах будут потеряны.\nПользовательские пресеты с другими именами останутся.\nТекущий выбранный source-пресет будет применён заново автоматически.",
         "en": "Default presets will be restored as after installation.\nYour changes to default presets will be lost.\nCustom presets with other names will remain.\nCurrent selected source preset will be re-applied automatically.",
     },
-    "page.z1_user_presets.dialog.reset_all.button": {
+    "page.winws1_user_presets.dialog.reset_all.button": {
         "ru": "Вернуть заводские",
         "en": "Restore defaults",
     },
-    "page.z1_user_presets.section.games": {
+    "page.winws1_user_presets.section.games": {
         "ru": "Игры (game filter)",
         "en": "Games (game filter)",
     },
-    "page.z1_user_presets.section.all_tcp_udp": {
+    "page.winws1_user_presets.section.all_tcp_udp": {
         "ru": "Все сайты и игры (ALL TCP/UDP)",
         "en": "All sites and games (ALL TCP/UDP)",
     },
-    "page.z1_user_presets.empty.not_found": {
+    "page.winws1_user_presets.empty.not_found": {
         "ru": "Ничего не найдено.",
         "en": "Nothing found.",
     },
-    "page.z1_user_presets.empty.none": {
+    "page.winws1_user_presets.empty.none": {
         "ru": "Нет пресетов. Создайте новый или импортируйте из файла.",
         "en": "No presets. Create a new one or import from file.",
     },
-    "page.z1_user_presets.error.generic": {
+    "page.winws1_user_presets.error.generic": {
         "ru": "Ошибка: {error}",
         "en": "Error: {error}",
     },
-    "page.z1_user_presets.error.create_failed": {
+    "page.winws1_user_presets.error.create_failed": {
         "ru": "Не удалось создать пресет.",
         "en": "Failed to create preset.",
     },
-    "page.z1_user_presets.error.rename_failed": {
+    "page.winws1_user_presets.error.rename_failed": {
         "ru": "Не удалось переименовать пресет.",
         "en": "Failed to rename preset.",
     },
-    "page.z1_user_presets.error.activate_failed": {
+    "page.winws1_user_presets.error.activate_failed": {
         "ru": "Не удалось активировать пресет '{name}'",
         "en": "Failed to activate preset '{name}'",
     },
-    "page.z1_user_presets.error.duplicate_failed": {
+    "page.winws1_user_presets.error.duplicate_failed": {
         "ru": "Не удалось дублировать пресет",
         "en": "Failed to duplicate preset",
     },
-    "page.z1_user_presets.error.reset_failed": {
-        "ru": "Не удалось сбросить пресет к настройкам шаблона",
-        "en": "Failed to reset preset to template defaults",
+    "page.winws1_user_presets.error.reset_failed": {
+        "ru": "Не удалось вернуть встроенный preset",
+        "en": "Failed to restore built-in preset",
     },
-    "page.z1_user_presets.error.delete_failed": {
+    "page.winws1_user_presets.error.delete_failed": {
         "ru": "Не удалось удалить пресет",
         "en": "Failed to delete preset",
     },
-    "page.z1_user_presets.error.import_failed": {
+    "page.winws1_user_presets.error.import_failed": {
         "ru": "Не удалось импортировать пресет",
         "en": "Failed to import preset",
     },
-    "page.z1_user_presets.error.import_exception": {
+    "page.winws1_user_presets.error.import_exception": {
         "ru": "Ошибка импорта: {error}",
         "en": "Import error: {error}",
     },
-    "page.z1_user_presets.error.open_folder": {
+    "page.winws1_user_presets.error.open_folder": {
         "ru": "Не удалось открыть папку пресетов: {error}",
         "en": "Could not open presets folder: {error}",
     },
-    "page.z1_user_presets.error.export_failed": {
+    "page.winws1_user_presets.error.export_failed": {
         "ru": "Не удалось экспортировать пресет",
         "en": "Failed to export preset",
     },
-    "page.z1_user_presets.error.restore_deleted": {
+    "page.winws1_user_presets.error.restore_deleted": {
         "ru": "Ошибка восстановления: {error}",
         "en": "Restore error: {error}",
     },
-    "page.z1_user_presets.error.reset_all_exception": {
+    "page.winws1_user_presets.error.reset_all_exception": {
         "ru": "Ошибка восстановления пресетов: {error}",
         "en": "Preset restore error: {error}",
     },
-    "page.z1_user_presets.error.open_telegram": {
+    "page.winws1_user_presets.error.open_telegram": {
         "ru": "Не удалось открыть страницу пресетов: {error}",
         "en": "Failed to open presets page: {error}",
     },
-    "page.z1_user_presets.file_dialog.import_title": {
+    "page.winws1_user_presets.file_dialog.import_title": {
         "ru": "Импортировать пресет",
         "en": "Import preset",
     },
-    "page.z1_user_presets.file_dialog.export_title": {
+    "page.winws1_user_presets.file_dialog.export_title": {
         "ru": "Экспортировать пресет",
         "en": "Export preset",
     },
-    "page.z1_user_presets.infobar.success": {
+    "page.winws1_user_presets.infobar.success": {
         "ru": "Успех",
         "en": "Success",
     },
-    "page.z1_user_presets.info.exported": {
+    "page.winws1_user_presets.info.exported": {
         "ru": "Пресет экспортирован: {path}",
         "en": "Preset exported: {path}",
     },
-    "page.z1_user_presets.info.title": {
+    "page.winws1_user_presets.info.title": {
         "ru": "Что это такое?",
         "en": "What is this?",
     },
-    "page.z1_user_presets.info.body": {
+    "page.winws1_user_presets.info.body": {
         "ru": "Здесь кнопка для нубов — \"хочу чтобы нажал и всё работало\". Выбираете любой пресет — тыкаете — перезагружаете вкладку и смотрите, что ресурс открывается (или не открывается). Если не открывается — тыкаете на следующий пресет. Также здесь можно создавать, импортировать, экспортировать и переключать пользовательские пресеты.",
         "en": "This section is for simple workflow: pick any preset, apply it, reload the tab and check if the resource opens. If not, try the next preset. You can also create, import, export and switch custom presets here.",
     },
-    "page.z1_profile_detail.title": {
-        "ru": "Детали profile",
-        "en": "Profile Details",
+    "page.winws1_profile_setup.title": {
+        "ru": "Настройка profile",
+        "en": "Profile setup",
     },
-    "page.z1_profile_detail.breadcrumb.control": {
+    "page.winws1_profile_setup.breadcrumb.control": {
         "ru": "Управление",
         "en": "Control",
     },
-    "page.z2_control.subtitle": {
-        "ru": "Настройка и запуск Zapret 2. Выберите готовые пресеты-конфиги, а при необходимости выполните тонкую настройку для каждого фильтра в разделе «Профили».",
-        "en": "Configure and launch Zapret 2. Choose ready presets and fine-tune categories in Profile Mode.",
+    "page.winws2_control.subtitle": {
+        "ru": "Настройка и запуск Zapret 2. В «Мои пресеты» выбирается preset, а в «Настройка preset-а» меняются profiles и готовые стратегии.",
+        "en": "Configure and launch Zapret 2. My presets selects a preset; preset setup changes profiles and ready strategies.",
     },
-    "page.z2_control.section.status": {
+    "page.winws2_control.section.status": {
         "ru": "Статус работы",
         "en": "Service Status",
     },
-    "page.z2_control.section.management": {
+    "page.winws2_control.section.management": {
         "ru": "Управление Zapret 2",
         "en": "Zapret 2 Control",
     },
-    "page.z2_control.section.preset_switch": {
+    "page.winws2_control.section.preset_switch": {
         "ru": "Сменить пресет обхода блокировок",
         "en": "Switch Bypass Preset",
     },
-    "page.z2_control.section.profile_tuning": {
-        "ru": "Настройте пресет более тонко через режим профилей",
-        "en": "Fine Tune via Profile Mode",
+    "page.winws2_control.section.profile_tuning": {
+        "ru": "Настройка preset-а",
+        "en": "Preset setup",
     },
-    "page.z2_control.section.program_settings": {
+    "page.winws2_control.section.program_settings": {
         "ru": "Настройки программы",
         "en": "Program Settings",
     },
-    "page.z2_control.section.advanced_settings": {
+    "page.winws2_control.section.advanced_settings": {
         "ru": "Дополнительные настройки",
         "en": "Advanced Settings",
     },
-    "page.z2_control.section.additional": {
+    "page.winws2_control.section.additional": {
         "ru": "Дополнительно",
         "en": "Additional",
     },
-    "page.z2_control.status.checking": {
+    "page.winws2_control.status.checking": {
         "ru": "Проверка...",
         "en": "Checking...",
     },
-    "page.z2_control.status.detecting": {
+    "page.winws2_control.status.detecting": {
         "ru": "Определение состояния процесса",
         "en": "Detecting process state",
     },
-    "page.z2_control.status.running": {
+    "page.winws2_control.status.running": {
         "ru": "Zapret работает",
         "en": "Zapret is running",
     },
-    "page.z2_control.status.stopped": {
+    "page.winws2_control.status.stopped": {
         "ru": "Zapret остановлен",
         "en": "Zapret stopped",
     },
-    "page.z2_control.status.bypass_active": {
+    "page.winws2_control.status.bypass_active": {
         "ru": "Обход блокировок активен",
         "en": "Bypass is active",
     },
-    "page.z2_control.status.press_start": {
+    "page.winws2_control.status.press_start": {
         "ru": "Нажмите «Запустить» для активации",
         "en": "Press Start to activate",
     },
-    "page.z2_control.button.start": {
+    "page.winws2_control.button.start": {
         "ru": "Запустить Zapret",
         "en": "Start Zapret",
     },
-    "page.z2_control.button.stop_only_winws": {
-        "ru": "Остановить только winws.exe",
-        "en": "Stop only winws.exe",
+    "page.winws2_control.button.stop_only_winws": {
+        "ru": f"Остановить только {EXE_NAME_WINWS1}",
+        "en": f"Stop only {EXE_NAME_WINWS1}",
     },
-    "page.z2_control.button.stop_only_template": {
+    "page.winws2_control.button.stop_only_template": {
         "ru": "Остановить только {exe_name}",
         "en": "Stop only {exe_name}",
     },
-    "page.z2_control.button.stop_and_exit": {
+    "page.winws2_control.button.stop_and_exit": {
         "ru": "Остановить и закрыть программу",
         "en": "Stop and close app",
     },
-    "page.z2_control.button.my_presets": {
+    "page.winws2_control.button.my_presets": {
         "ru": "Мои пресеты",
         "en": "My presets",
     },
-    "page.z2_control.button.open": {
+    "page.winws2_control.button.open": {
         "ru": "Открыть",
         "en": "Open",
     },
-    "page.z2_control.button.change_mode": {
+    "page.winws2_control.button.change_mode": {
         "ru": "Изменить режим",
         "en": "Change mode",
     },
-    "page.z2_control.profile_ui_mode.caption": {
+    "page.winws2_control.profile_ui_mode.caption": {
         "ru": "Режим отображения profile",
         "en": "Profile UI mode",
     },
-    "page.z2_control.mode.basic": {
+    "page.winws2_control.profile_ui_mode.card.title": {
+        "ru": "Настройка preset-а",
+        "en": "Preset setup",
+    },
+    "page.winws2_control.profile_ui_mode.card.desc": {
+        "ru": "Открыть profiles выбранного preset-а и выбрать готовые стратегии",
+        "en": "Open profiles from the selected preset and choose ready strategies",
+    },
+    "page.winws2_control.mode.basic": {
         "ru": "Basic",
         "en": "Basic",
     },
-    "page.z2_control.mode.advanced": {
+    "page.winws2_control.mode.advanced": {
         "ru": "Advanced",
         "en": "Advanced",
     },
-    "page.z2_control.preset.not_selected": {
+    "page.winws2_control.preset.not_selected": {
         "ru": "Не выбран",
         "en": "Not selected",
     },
-    "page.z2_control.preset.current": {
+    "page.winws2_control.preset.current": {
         "ru": "Текущий выбранный source-пресет",
         "en": "Current selected source preset",
     },
-    "page.z2_control.card.advanced": {
+    "page.winws2_control.card.advanced": {
         "ru": "Дополнительные настройки",
         "en": "ADVANCED SETTINGS",
     },
-    "page.z2_control.advanced.warning": {
+    "page.winws2_control.advanced.warning": {
         "ru": "Изменяйте только если знаете что делаете",
         "en": "Change only if you know what you are doing",
     },
-    "page.z2_control.blobs.title": {
+    "page.winws2_control.blobs.title": {
         "ru": "Блобы",
         "en": "Blobs",
     },
-    "page.z2_control.blobs.desc": {
+    "page.winws2_control.blobs.desc": {
         "ru": "Бинарные данные (.bin / hex) для стратегий",
         "en": "Binary data (.bin / hex) for strategies",
     },
-    "page.z2_control.button.connection_test": {
+    "page.winws2_control.button.connection_test": {
         "ru": "Тест соединения",
         "en": "Connection Test",
     },
-    "page.z2_control.button.open_folder": {
+    "page.winws2_control.button.open_folder": {
         "ru": "Открыть папку",
         "en": "Open Folder",
     },
-    "page.z2_control.button.documentation": {
+    "page.winws2_control.button.documentation": {
         "ru": "Документация",
         "en": "Documentation",
     },
-    "page.z2_pages.title": {
-        "ru": "Профили Zapret 2",
-        "en": "Zapret 2 Profiles",
+    "page.winws2_pages.title": {
+        "ru": "Настройка preset-а",
+        "en": "Preset setup",
     },
-    "page.z2_pages.back.control": {
+    "page.winws2_pages.back.control": {
         "ru": "Управление",
         "en": "Control",
     },
-    "page.z2_pages.current.not_selected": {
+    "page.winws2_pages.current.not_selected": {
         "ru": "Не выбрана",
         "en": "Not selected",
     },
-    "page.z2_pages.request.button": {
+    "page.winws2_pages.request.button": {
         "ru": "ОТКРЫТЬ ФОРМУ НА GITHUB",
         "en": "OPEN GITHUB FORM",
     },
-    "page.z2_pages.toolbar.title": {
+    "page.winws2_pages.toolbar.title": {
         "ru": "Profiles",
         "en": "Profiles",
     },
-    "page.z2_pages.toolbar.expand": {
+    "page.winws2_pages.toolbar.expand": {
         "ru": "Развернуть",
         "en": "Expand",
     },
-    "page.z2_pages.toolbar.collapse": {
+    "page.winws2_pages.toolbar.collapse": {
         "ru": "Свернуть",
         "en": "Collapse",
     },
-    "page.z2_pages.toolbar.info": {
+    "page.winws2_pages.toolbar.info": {
         "ru": "Что это такое?",
         "en": "What is this?",
     },
-    "page.z2_pages.info.title": {
-        "ru": "Профили Zapret 2",
-        "en": "Zapret 2 Profiles",
+    "page.winws2_pages.info.title": {
+        "ru": "Настройка preset-а",
+        "en": "Preset setup",
     },
-    "page.z2_user_presets.title": {
+    "page.winws2_user_presets.title": {
         "ru": "Мои пресеты",
         "en": "My Presets",
     },
-    "page.z2_user_presets.back.control": {
+    "page.winws2_user_presets.back.control": {
         "ru": "Управление",
         "en": "Control",
     },
-    "page.z2_user_presets.configs.title": {
+    "page.winws2_user_presets.configs.title": {
         "ru": "Обменивайтесь пресетами и profiles в разделе GitHub Discussions",
         "en": "Share presets and profiles in GitHub Discussions",
     },
-    "page.z2_user_presets.configs.button": {
+    "page.winws2_user_presets.configs.button": {
         "ru": "Получить конфиги",
         "en": "Get configs",
     },
-    "page.z2_user_presets.button.import": {
+    "page.winws2_user_presets.button.import": {
         "ru": "Импорт",
         "en": "Import",
     },
-    "page.z2_user_presets.button.open_folder": {
+    "page.winws2_user_presets.button.open_folder": {
         "ru": "Папка пресетов",
         "en": "Presets folder",
     },
-    "page.z2_user_presets.button.reset_all": {
+    "page.winws2_user_presets.button.reset_all": {
         "ru": "Вернуть заводские",
         "en": "Restore defaults",
     },
-    "page.z2_user_presets.button.wiki": {
+    "page.winws2_user_presets.button.wiki": {
         "ru": "Вики по пресетам",
         "en": "Preset wiki",
     },
-    "page.z2_user_presets.button.what_is_this": {
+    "page.winws2_user_presets.button.what_is_this": {
         "ru": "Что это такое?",
         "en": "What is this?",
     },
-    "page.z2_user_presets.search.placeholder": {
+    "page.winws2_user_presets.search.placeholder": {
         "ru": "Поиск пресетов по имени...",
         "en": "Search presets by name...",
     },
-    "page.z2_user_presets.tooltip.create": {
+    "page.winws2_user_presets.tooltip.create": {
         "ru": "Создать новый пресет",
         "en": "Create a new preset",
     },
-    "page.z2_user_presets.tooltip.import": {
+    "page.winws2_user_presets.tooltip.import": {
         "ru": "Импорт пресета из файла",
         "en": "Import preset from file",
     },
-    "page.z2_user_presets.tooltip.open_folder": {
+    "page.winws2_user_presets.tooltip.open_folder": {
         "ru": "Открыть папку, где лежат ваши пресеты",
         "en": "Open the folder where your presets are stored",
     },
-    "page.z2_user_presets.tooltip.reset_all": {
+    "page.winws2_user_presets.tooltip.reset_all": {
         "ru": "Восстанавливает стандартные пресеты. Ваши изменения в стандартных пресетах будут потеряны.",
         "en": "Restores default presets. Your changes to default presets will be lost.",
     },
-    "page.z2_user_presets.delegate.tooltip.rename": {
+    "page.winws2_user_presets.delegate.tooltip.rename": {
         "ru": "Переименовать",
         "en": "Rename",
     },
-    "page.z2_user_presets.delegate.tooltip.duplicate": {
+    "page.winws2_user_presets.delegate.tooltip.duplicate": {
         "ru": "Дублировать",
         "en": "Duplicate",
     },
-    "page.z2_user_presets.delegate.tooltip.reset": {
-        "ru": "Сбросить",
-        "en": "Reset",
+    "page.winws2_user_presets.delegate.tooltip.reset": {
+        "ru": "Вернуть встроенный",
+        "en": "Restore built-in",
     },
-    "page.z2_user_presets.delegate.tooltip.delete": {
+    "page.winws2_user_presets.delegate.tooltip.delete": {
         "ru": "Удалить",
         "en": "Delete",
     },
-    "page.z2_user_presets.delegate.tooltip.export": {
+    "page.winws2_user_presets.delegate.tooltip.export": {
         "ru": "Экспорт",
         "en": "Export",
     },
-    "page.z2_user_presets.delegate.tooltip.confirm_again": {
+    "page.winws2_user_presets.delegate.tooltip.confirm_again": {
         "ru": "Нажмите ещё раз для подтверждения",
         "en": "Click again to confirm",
     },
-    "page.z2_user_presets.delegate.badge.active": {
+    "page.winws2_user_presets.delegate.badge.active": {
         "ru": "Активен",
         "en": "Active",
     },
-    "page.z2_user_presets.dialog.button.cancel": {
+    "page.winws2_user_presets.dialog.button.cancel": {
         "ru": "Отмена",
         "en": "Cancel",
     },
-    "page.z2_user_presets.dialog.reset_single.title": {
-        "ru": "Сбросить пресет?",
-        "en": "Reset preset?",
+    "page.winws2_user_presets.dialog.reset_single.title": {
+        "ru": "Вернуть встроенный preset?",
+        "en": "Restore built-in preset?",
     },
-    "page.z2_user_presets.dialog.reset_single.body": {
-        "ru": "Пресет '{name}' будет перезаписан данными из шаблона.\nВсе изменения в этом пресете будут потеряны.\nЭтот пресет станет активным и будет применен заново.",
-        "en": "Preset '{name}' will be overwritten with template data.\nAll changes in this preset will be lost.\nThis preset will become active and be applied again.",
+    "page.winws2_user_presets.dialog.reset_single.body": {
+        "ru": "Пользовательский файл preset-а '{name}' будет удалён.\nПосле этого снова будет использоваться встроенный preset с тем же именем файла.\nИзменения в пользовательском файле будут потеряны.",
+        "en": "User preset file '{name}' will be removed.\nThe built-in preset with the same file name will be used again.\nChanges in the user file will be lost.",
     },
-    "page.z2_user_presets.dialog.reset_single.button": {
-        "ru": "Сбросить",
-        "en": "Reset",
+    "page.winws2_user_presets.dialog.reset_single.button": {
+        "ru": "Вернуть встроенный",
+        "en": "Restore built-in",
     },
-    "page.z2_user_presets.dialog.delete_single.title": {
+    "page.winws2_user_presets.dialog.delete_single.title": {
         "ru": "Удалить пресет?",
         "en": "Delete preset?",
     },
-    "page.z2_user_presets.dialog.delete_single.body": {
-        "ru": "Пресет '{name}' будет удален из списка пользовательских пресетов.\nИзменения в этом пресете будут потеряны.\nВернуть его можно только через восстановление удаленных пресетов (если доступен шаблон).",
-        "en": "Preset '{name}' will be removed from the user presets list.\nChanges in this preset will be lost.\nYou can restore it only via deleted presets restore (if a template exists).",
+    "page.winws2_user_presets.dialog.delete_single.body": {
+        "ru": "Preset '{name}' будет удалён из списка пользовательских preset-ов.\nИзменения в этом preset-е будут потеряны.\nВернуть его можно только заново создав preset или импортировав файл.",
+        "en": "Preset '{name}' will be removed from the user presets list.\nChanges in this preset will be lost.\nYou can restore it only by creating a new preset or importing a file.",
     },
-    "page.z2_user_presets.dialog.delete_single.button": {
+    "page.winws2_user_presets.dialog.delete_single.button": {
         "ru": "Удалить",
         "en": "Delete",
     },
-    "page.z2_user_presets.dialog.create.title": {
+    "page.winws2_user_presets.dialog.create.title": {
         "ru": "Новый пресет",
         "en": "New preset",
     },
-    "page.z2_user_presets.dialog.create.subtitle": {
+    "page.winws2_user_presets.dialog.create.subtitle": {
         "ru": "Сохраните текущие настройки как отдельный пресет, чтобы быстро переключаться между конфигурациями.",
         "en": "Save current settings as a separate preset to switch between configurations quickly.",
     },
-    "page.z2_user_presets.dialog.create.name": {
+    "page.winws2_user_presets.dialog.create.name": {
         "ru": "Название",
         "en": "Name",
     },
-    "page.z2_user_presets.dialog.create.placeholder": {
+    "page.winws2_user_presets.dialog.create.placeholder": {
         "ru": "Например: Игры / YouTube / Дом",
         "en": "For example: Games / YouTube / Home",
     },
-    "page.z2_user_presets.dialog.create.source": {
+    "page.winws2_user_presets.dialog.create.source": {
         "ru": "Создать на основе",
         "en": "Create from",
     },
-    "page.z2_user_presets.dialog.create.source.current": {
+    "page.winws2_user_presets.dialog.create.source.current": {
         "ru": "Текущего активного",
         "en": "Current active",
     },
-    "page.z2_user_presets.dialog.create.source.empty": {
-        "ru": "Пустого",
-        "en": "Empty",
+    "page.winws2_user_presets.dialog.create.source.standard": {
+        "ru": "Стандартного preset-а",
+        "en": "Standard preset",
     },
-    "page.z2_user_presets.dialog.create.button.create": {
+    "page.winws2_user_presets.dialog.create.button.create": {
         "ru": "Создать",
         "en": "Create",
     },
-    "page.z2_user_presets.dialog.rename.title": {
+    "page.winws2_user_presets.dialog.rename.title": {
         "ru": "Переименовать",
         "en": "Rename",
     },
-    "page.z2_user_presets.dialog.rename.subtitle": {
+    "page.winws2_user_presets.dialog.rename.subtitle": {
         "ru": "Имя пресета отображается в списке и используется для переключения.",
         "en": "Preset name is shown in the list and used for switching.",
     },
-    "page.z2_user_presets.dialog.rename.current_name": {
+    "page.winws2_user_presets.dialog.rename.current_name": {
         "ru": "Текущее имя: {name}",
         "en": "Current name: {name}",
     },
-    "page.z2_user_presets.dialog.rename.new_name": {
+    "page.winws2_user_presets.dialog.rename.new_name": {
         "ru": "Новое имя",
         "en": "New name",
     },
-    "page.z2_user_presets.dialog.rename.placeholder": {
+    "page.winws2_user_presets.dialog.rename.placeholder": {
         "ru": "Новое имя...",
         "en": "New name...",
     },
-    "page.z2_user_presets.dialog.rename.button": {
+    "page.winws2_user_presets.dialog.rename.button": {
         "ru": "Переименовать",
         "en": "Rename",
     },
-    "page.z2_user_presets.dialog.validation.enter_name": {
+    "page.winws2_user_presets.dialog.validation.enter_name": {
         "ru": "Введите название.",
         "en": "Enter a name.",
     },
-    "page.z2_user_presets.dialog.validation.exists": {
+    "page.winws2_user_presets.dialog.validation.exists": {
         "ru": "Пресет «{name}» уже существует.",
         "en": "Preset ""{name}"" already exists.",
     },
-    "page.z2_user_presets.dialog.import_exists.title": {
+    "page.winws2_user_presets.dialog.import_exists.title": {
         "ru": "Пресет существует",
         "en": "Preset exists",
     },
-    "page.z2_user_presets.dialog.import_exists.body": {
+    "page.winws2_user_presets.dialog.import_exists.body": {
         "ru": "Пресет '{name}' уже существует. Импортировать с другим именем?",
         "en": "Preset '{name}' already exists. Import with another name?",
     },
-    "page.z2_user_presets.dialog.reset_all.title": {
+    "page.winws2_user_presets.dialog.reset_all.title": {
         "ru": "Вернуть заводские пресеты",
         "en": "Restore default presets",
     },
-    "page.z2_user_presets.dialog.reset_all.body": {
+    "page.winws2_user_presets.dialog.reset_all.body": {
         "ru": "Стандартные пресеты будут восстановлены как после установки.\nВаши изменения в стандартных пресетах будут потеряны.\nПользовательские пресеты с другими именами останутся.\nТекущий выбранный source-пресет будет применён заново автоматически.",
         "en": "Default presets will be restored as after installation.\nYour changes to default presets will be lost.\nCustom presets with other names will remain.\nCurrent selected source preset will be re-applied automatically.",
     },
-    "page.z2_user_presets.dialog.reset_all.button": {
+    "page.winws2_user_presets.dialog.reset_all.button": {
         "ru": "Вернуть заводские",
         "en": "Restore defaults",
     },
-    "page.z2_user_presets.section.games": {
+    "page.winws2_user_presets.section.games": {
         "ru": "Игры (game filter)",
         "en": "Games (game filter)",
     },
-    "page.z2_user_presets.section.all_tcp_udp": {
+    "page.winws2_user_presets.section.all_tcp_udp": {
         "ru": "Все сайты и игры(ALL TCP/UDP)",
         "en": "All sites and games (ALL TCP/UDP)",
     },
-    "page.z2_user_presets.empty.not_found": {
+    "page.winws2_user_presets.empty.not_found": {
         "ru": "Ничего не найдено.",
         "en": "Nothing found.",
     },
-    "page.z2_user_presets.empty.none": {
+    "page.winws2_user_presets.empty.none": {
         "ru": "Нет пресетов. Создайте новый или импортируйте из файла.",
         "en": "No presets. Create a new one or import from file.",
     },
-    "page.z2_user_presets.error.generic": {
+    "page.winws2_user_presets.error.generic": {
         "ru": "Ошибка: {error}",
         "en": "Error: {error}",
     },
-    "page.z2_user_presets.error.create_failed": {
+    "page.winws2_user_presets.error.create_failed": {
         "ru": "Не удалось создать пресет.",
         "en": "Failed to create preset.",
     },
-    "page.z2_user_presets.error.rename_failed": {
+    "page.winws2_user_presets.error.rename_failed": {
         "ru": "Не удалось переименовать пресет.",
         "en": "Failed to rename preset.",
     },
-    "page.z2_user_presets.error.activate_failed": {
+    "page.winws2_user_presets.error.activate_failed": {
         "ru": "Не удалось активировать пресет '{name}'",
         "en": "Failed to activate preset '{name}'",
     },
-    "page.z2_user_presets.error.duplicate_failed": {
+    "page.winws2_user_presets.error.duplicate_failed": {
         "ru": "Не удалось дублировать пресет",
         "en": "Failed to duplicate preset",
     },
-    "page.z2_user_presets.error.reset_failed": {
-        "ru": "Не удалось сбросить пресет к настройкам шаблона",
-        "en": "Failed to reset preset to template defaults",
+    "page.winws2_user_presets.error.reset_failed": {
+        "ru": "Не удалось вернуть встроенный preset",
+        "en": "Failed to restore built-in preset",
     },
-    "page.z2_user_presets.error.delete_failed": {
+    "page.winws2_user_presets.error.delete_failed": {
         "ru": "Не удалось удалить пресет",
         "en": "Failed to delete preset",
     },
-    "page.z2_user_presets.error.import_failed": {
+    "page.winws2_user_presets.error.import_failed": {
         "ru": "Не удалось импортировать пресет",
         "en": "Failed to import preset",
     },
-    "page.z2_user_presets.error.import_exception": {
+    "page.winws2_user_presets.error.import_exception": {
         "ru": "Ошибка импорта: {error}",
         "en": "Import error: {error}",
     },
-    "page.z2_user_presets.error.open_folder": {
+    "page.winws2_user_presets.error.open_folder": {
         "ru": "Не удалось открыть папку пресетов: {error}",
         "en": "Could not open presets folder: {error}",
     },
-    "page.z2_user_presets.error.export_failed": {
+    "page.winws2_user_presets.error.export_failed": {
         "ru": "Не удалось экспортировать пресет",
         "en": "Failed to export preset",
     },
-    "page.z2_user_presets.error.restore_deleted": {
+    "page.winws2_user_presets.error.restore_deleted": {
         "ru": "Ошибка восстановления: {error}",
         "en": "Restore error: {error}",
     },
-    "page.z2_user_presets.error.reset_all_exception": {
+    "page.winws2_user_presets.error.reset_all_exception": {
         "ru": "Ошибка восстановления пресетов: {error}",
         "en": "Preset restore error: {error}",
     },
-    "page.z2_user_presets.error.open_telegram": {
+    "page.winws2_user_presets.error.open_telegram": {
         "ru": "Не удалось открыть страницу пресетов: {error}",
         "en": "Failed to open presets page: {error}",
     },
-    "page.z2_user_presets.file_dialog.import_title": {
+    "page.winws2_user_presets.file_dialog.import_title": {
         "ru": "Импортировать пресет",
         "en": "Import preset",
     },
-    "page.z2_user_presets.file_dialog.export_title": {
+    "page.winws2_user_presets.file_dialog.export_title": {
         "ru": "Экспортировать пресет",
         "en": "Export preset",
     },
-    "page.z2_user_presets.infobar.success": {
+    "page.winws2_user_presets.infobar.success": {
         "ru": "Успех",
         "en": "Success",
     },
-    "page.z2_user_presets.info.exported": {
+    "page.winws2_user_presets.info.exported": {
         "ru": "Пресет экспортирован: {path}",
         "en": "Preset exported: {path}",
     },
-    "page.z2_user_presets.info.title": {
+    "page.winws2_user_presets.info.title": {
         "ru": "Что это такое?",
         "en": "What is this?",
     },
-    "page.z2_user_presets.info.body": {
+    "page.winws2_user_presets.info.body": {
         "ru": "Здесь кнопка для нубов — \"хочу чтобы нажал и всё работало\". Выбираете любой пресет — тыкаете — перезагружаете вкладку и смотрите, что ресурс открывается (или не открывается). Если не открывается — тыкаете на следующий пресет. Также здесь можно создавать, импортировать, экспортировать и переключать пользовательские пресеты.",
         "en": "This section is for simple workflow: pick any preset, apply it, reload the tab and check if the resource opens. If not, try the next preset. You can also create, import, export and switch custom presets here.",
     },
-    "page.z2_profile_detail.title": {
-        "ru": "Profile",
-        "en": "Profile",
+    "page.winws2_profile_setup.title": {
+        "ru": "Настройка profile",
+        "en": "Profile setup",
     },
-    "page.z2_profile_detail.preset_dialog.create.title": {
+    "page.winws2_profile_setup.preset_dialog.create.title": {
         "ru": "Создать пресет",
         "en": "Create preset",
     },
-    "page.z2_profile_detail.preset_dialog.rename.title": {
+    "page.winws2_profile_setup.preset_dialog.rename.title": {
         "ru": "Переименовать пресет",
         "en": "Rename preset",
     },
-    "page.z2_profile_detail.preset_dialog.rename.current_name": {
+    "page.winws2_profile_setup.preset_dialog.rename.current_name": {
         "ru": "Текущее имя: {name}",
         "en": "Current name: {name}",
     },
-    "page.z2_profile_detail.preset_dialog.name_label": {
+    "page.winws2_profile_setup.preset_dialog.name_label": {
         "ru": "Название",
         "en": "Name",
     },
-    "page.z2_profile_detail.preset_dialog.name_placeholder": {
+    "page.winws2_profile_setup.preset_dialog.name_placeholder": {
         "ru": "Введите название пресета...",
         "en": "Enter preset name...",
     },
-    "page.z2_profile_detail.preset_dialog.button.create": {
+    "page.winws2_profile_setup.preset_dialog.button.create": {
         "ru": "Создать",
         "en": "Create",
     },
-    "page.z2_profile_detail.preset_dialog.button.rename": {
+    "page.winws2_profile_setup.preset_dialog.button.rename": {
         "ru": "Переименовать",
         "en": "Rename",
     },
-    "page.z2_profile_detail.preset_dialog.button.cancel": {
+    "page.winws2_profile_setup.preset_dialog.button.cancel": {
         "ru": "Отмена",
         "en": "Cancel",
     },
-    "page.z2_profile_detail.preset_dialog.error.empty": {
+    "page.winws2_profile_setup.preset_dialog.error.empty": {
         "ru": "Введите название пресета",
         "en": "Enter preset name",
     },
-    "page.z2_profile_detail.breadcrumb.control": {
+    "page.winws2_profile_setup.breadcrumb.control": {
         "ru": "Управление",
         "en": "Control",
     },
-    "page.z2_profile_detail.filter.hostlist": {
+    "page.winws2_profile_setup.filter.hostlist": {
         "ru": "Hostlist",
         "en": "Hostlist",
     },
-    "page.z2_profile_detail.filter.ipset": {
+    "page.winws2_profile_setup.filter.ipset": {
         "ru": "IPset",
         "en": "IPset",
     },
@@ -4704,8 +4677,8 @@ TEXTS_EXTRA: dict[str, dict[str, str]] = {
         "en": "Attention",
     },
     "page.strategy_scan.warning_text": {
-        "ru": "Во время сканирования текущий обход DPI будет остановлен. Каждая стратегия тестируется отдельно через winws2. После завершения можно перезапустить обход.",
-        "en": "During scanning, the current DPI bypass will be stopped. Each strategy is tested separately through winws2. You can restart bypass after the scan finishes.",
+        "ru": f"Во время сканирования текущий обход DPI будет остановлен. Каждая стратегия тестируется отдельно через {ENGINE_WINWS2}. После завершения можно перезапустить обход.",
+        "en": f"During scanning, the current DPI bypass will be stopped. Each strategy is tested separately through {ENGINE_WINWS2}. You can restart bypass after the scan finishes.",
     },
     "page.strategy_scan.results": {
         "ru": "Результаты",
@@ -4779,39 +4752,39 @@ TEXTS_EXTRA: dict[str, dict[str, str]] = {
         "ru": "Стратегия добавлена",
         "en": "Strategy added",
     },
-    "page.z1_pages.empty.no_categories": {
-        "ru": "Profiles не найдены. Проверьте выбранный preset и файл src/profile/templates/all_profiles.txt",
-        "en": "Profiles were not found. Check the selected preset and src/profile/templates/all_profiles.txt",
+    "page.winws1_pages.empty.no_categories": {
+        "ru": "Profiles не найдены. Проверьте выбранный preset и файл profile/templates/all_profiles.txt.",
+        "en": "Profiles were not found. Check the selected preset and profile/templates/all_profiles.txt.",
     },
-    "page.z2_pages.request.hint": {
+    "page.winws2_pages.request.hint": {
         "ru": "Хотите добавить новый сайт или сервис в Zapret 2? Откройте готовую форму на GitHub и опишите, что нужно добавить в hostlist или ipset.",
         "en": "Want to add a new site or service to Zapret 2? Open the GitHub form and describe what should be added to the hostlist or ipset.",
     },
-    "page.z2_pages.empty.no_presets": {
+    "page.winws2_pages.empty.no_presets": {
         "ru": "Пресеты Zapret 2 не найдены. Проверьте папку presets рядом с программой. Если системные пресеты отсутствуют, переустановите приложение.",
         "en": "Zapret 2 presets were not found. Check the presets folder near the program. If built-in presets are missing, reinstall the app.",
     },
-    "page.z2_pages.empty.no_selected_preset": {
+    "page.winws2_pages.empty.no_selected_preset": {
         "ru": "Не удалось определить выбранный source preset. Откройте список пресетов, выберите любой пресет заново и нажмите «Обновить».",
         "en": "Could not determine the selected source preset. Open the preset list, choose any preset again, and click Refresh.",
     },
-    "page.z2_pages.empty.preset_read_error": {
+    "page.winws2_pages.empty.preset_read_error": {
         "ru": "Не удалось прочитать выбранный source preset «{preset_name}». Такое бывает, если файл пустой, повреждён или недоступен для чтения.",
         "en": "Could not read the selected source preset \"{preset_name}\". This may happen if the file is empty, corrupted, or unavailable for reading.",
     },
-    "page.z2_pages.empty.unknown_error": {
+    "page.winws2_pages.empty.unknown_error": {
         "ru": "Не удалось построить список profiles для выбранного source preset «{preset_name}». Обычно это значит, что во время чтения preset-а произошла внутренняя ошибка. Нажмите «Обновить» и проверьте лог.",
         "en": "Could not build the profile list for the selected source preset \"{preset_name}\". This usually means an internal error happened while reading the preset. Click Refresh and check the log.",
     },
-    "page.z2_pages.empty.no_categories": {
+    "page.winws2_pages.empty.no_categories": {
         "ru": "В выбранном source preset «{preset_name}» не найдено ни одного profile для этой страницы. Это значит, что после разбора файла программа не увидела profile с фильтрами вроде hostlist, hostlist-domains или ipset.",
         "en": "No profiles were found for this page in the selected source preset \"{preset_name}\". This means that after parsing the file, the app did not find a profile with filters such as hostlist, hostlist-domains, or ipset.",
     },
-    "page.z2_pages.current.active_count": {
+    "page.winws2_pages.current.active_count": {
         "ru": "{count} активных",
         "en": "{count} active",
     },
-    "page.z2_pages.info.body": {
+    "page.winws2_pages.info.body": {
         "ru": "Здесь Вы можете тонко изменить стратегию для каждого profile, который найден в выбранном source preset. Всего существует несколько фаз дурения (send, syndata, fake, multisplit и т.д.). Последовательность сама определяется программой.\n\nВы можете править пресет вручную через txt-файл или выбирать готовые стратегии в этом меню. Каждая стратегия — это набор аргументов, то есть техник дурения или фуллинга, которые меняют содержимое пакетов по модели TCP/IP, отправляемых вашим устройством. Это помогает сбить алгоритмы ТСПУ провайдера, чтобы они не заметили или пропустили запрещённый контент.",
         "en": "Here you can finely tune the strategy for each profile found in the selected source preset. There are several obfuscation phases (send, syndata, fake, multisplit, etc.). Their sequence is determined by the app.\n\nYou can edit the preset manually in a txt file or choose ready-made strategies in this menu. Each strategy is a set of arguments, i.e. packet manipulation techniques used to alter TCP/IP traffic sent by your device. This helps confuse provider TSPU algorithms so they do not detect or block restricted content.",
     },
@@ -4997,71 +4970,39 @@ TEXTS_PAGES_FINAL: dict[str, dict[str, str]] = {
         "ru": "🧹 Ошибки очищены",
         "en": "🧹 Errors cleared",
     },
-    "page.z2_control.mode.dialog.title": {
+    "page.winws2_control.mode.dialog.title": {
         "ru": "Режим отображения profile",
         "en": "Profile UI Mode",
     },
-    "page.z2_control.mode.dialog.description": {
+    "page.winws2_control.mode.dialog.description": {
         "ru": "Профили поддерживает несколько режимов: упрощенный и расширенный для профи. Настройки не сохраняются между режимами Вы можете выбрать любой. Рекомендуем начать с базового. Бывает что базовый из-за готовых стратегий плохо пробивает сайты, тогда рекомендуем попробовать продвинутый в котором можно более тонко настроить техники дурения.",
         "en": "Profile UI supports multiple modes: simplified and advanced for power users. Settings are not shared across modes, so you can choose any mode. We recommend starting with Basic. If Basic does not bypass enough sites, try Advanced for finer technique tuning.",
     },
-    "page.z2_control.mode.dialog.basic_description": {
+    "page.winws2_control.mode.dialog.basic_description": {
         "ru": "Basic (базовый) — готовая таблица стратегий без понятия фаз. Собирать свои стратегии нельзя.",
         "en": "Basic mode is a ready strategy table without phase-level tuning. Custom strategy composition is not available.",
     },
-    "page.z2_control.mode.dialog.advanced_description": {
+    "page.winws2_control.mode.dialog.advanced_description": {
         "ru": "Advanced (продвинутый) — каждая функция настраивается индивидуально, можно выбирать несколько фаз и смешивать их друг с другом.",
         "en": "Advanced mode allows per-function tuning, selecting multiple phases, and combining them.",
     },
-    "page.z2_control.mode.dialog.button.apply": {
+    "page.winws2_control.mode.dialog.button.apply": {
         "ru": "Применить",
         "en": "Apply",
     },
-    "page.z2_control.mode.dialog.button.cancel": {
+    "page.winws2_control.mode.dialog.button.cancel": {
         "ru": "Отмена",
         "en": "Cancel",
     },
-    "page.z2_control.setting.autostart.title": {
+    "page.winws2_control.setting.autostart.title": {
         "ru": "Автозапуск DPI после старта программы",
         "en": "Auto-start DPI after app launch",
     },
-    "page.z2_control.setting.autostart.desc": {
+    "page.winws2_control.setting.autostart.desc": {
         "ru": "После запуска ZapretGUI автоматически запускать текущий DPI-режим",
         "en": "Automatically start the current DPI mode after ZapretGUI launches",
     },
-    "page.z2_control.setting.defender.title": {
-        "ru": "Отключить Windows Defender",
-        "en": "Disable Windows Defender",
-    },
-    "page.z2_control.setting.defender.desc": {
-        "ru": "Требуются права администратора",
-        "en": "Administrator rights required",
-    },
-    "page.z2_control.setting.max_block.title": {
-        "ru": "Блокировать установку MAX",
-        "en": "Block MAX Installation",
-    },
-    "page.z2_control.setting.max_block.desc": {
-        "ru": "Блокирует запуск/установку MAX и домены в hosts",
-        "en": "Blocks MAX launch/installation and hosts domains",
-    },
-    "page.z2_control.dialog.defender_disable.title": {
-        "ru": "Отключение Windows Defender",
-        "en": "Disable Windows Defender",
-    },
-    "page.z2_control.dialog.defender_enable.title": {
-        "ru": "Включение Windows Defender",
-        "en": "Enable Windows Defender",
-    },
-    "page.z2_control.dialog.max_block_enable.title": {
-        "ru": "Блокировка MAX",
-        "en": "Enable MAX Blocking",
-    },
-    "page.z2_control.dialog.max_block_disable.title": {
-        "ru": "Отключение блокировки MAX",
-        "en": "Disable MAX Blocking",
-    },
-    "page.z2_control.strategy.autostart_disabled": {
+    "page.winws2_control.strategy.autostart_disabled": {
         "ru": "Автозапуск DPI после старта программы отключён",
         "en": "Auto-start DPI after app launch is disabled",
     },
@@ -5071,7 +5012,6 @@ TEXTS.update(TEXTS_PAGES_FINAL)
 
 
 NAV_PAGE_TEXT_KEYS: dict[PageName, str] = {
-    PageName.CONTROL: "nav.page.control",
     PageName.ZAPRET2_MODE_CONTROL: "nav.page.zapret2_mode_control",
     PageName.ZAPRET1_MODE_CONTROL: "nav.page.zapret1_mode_control",
     PageName.ORCHESTRA: "nav.page.orchestra",
@@ -5092,12 +5032,12 @@ NAV_PAGE_TEXT_KEYS: dict[PageName, str] = {
     PageName.SERVERS: "page.servers.title",
     PageName.ABOUT: "nav.page.about",
     PageName.SUPPORT: "page.support.title",
-    PageName.ZAPRET2_MODE: "nav.page.zapret2_mode",
+    PageName.ZAPRET2_PRESET_SETUP: "nav.page.zapret2_mode",
     PageName.ZAPRET2_USER_PRESETS: "nav.page.zapret2_user_presets",
-    PageName.ZAPRET2_PROFILE_DETAIL: "page.z2_profile_detail.title",
-    PageName.ZAPRET1_MODE: "nav.page.zapret1_mode",
+    PageName.ZAPRET2_PROFILE_SETUP: "page.winws2_profile_setup.title",
+    PageName.ZAPRET1_PRESET_SETUP: "nav.page.zapret1_mode",
     PageName.ZAPRET1_USER_PRESETS: "nav.page.zapret1_user_presets",
-    PageName.ZAPRET1_PROFILE_DETAIL: "page.z1_profile_detail.title",
+    PageName.ZAPRET1_PROFILE_SETUP: "page.winws1_profile_setup.title",
 }
 
 
@@ -5119,21 +5059,18 @@ class SearchMatch:
 
 
 SEARCH_ENTRIES: tuple[SearchEntry, ...] = (
-    SearchEntry("control.title", PageName.CONTROL, "page.control.title"),
-    SearchEntry("control.status", PageName.CONTROL, "page.control.status", section_key="page.control.status"),
-    SearchEntry("control.settings", PageName.CONTROL, "page.control.program_settings", section_key="page.control.program_settings"),
-    SearchEntry("z2.control.title", PageName.ZAPRET2_MODE_CONTROL, "page.z2_control.title"),
-    SearchEntry("z2.control.status", PageName.ZAPRET2_MODE_CONTROL, "page.control.status", section_key="page.control.status"),
-    SearchEntry("z2.control.preset", PageName.ZAPRET2_MODE_CONTROL, "page.z2_control.preset_switch", section_key="page.z2_control.preset_switch"),
-    SearchEntry("z2.control.mode", PageName.ZAPRET2_MODE_CONTROL, "page.z2_control.profile_tuning", section_key="page.z2_control.profile_tuning"),
-    SearchEntry("z2.mode.title", PageName.ZAPRET2_MODE, "page.z2_pages.title"),
-    SearchEntry("z2.user_presets.title", PageName.ZAPRET2_USER_PRESETS, "page.z2_user_presets.title"),
-    SearchEntry("z2.profile_detail.title", PageName.ZAPRET2_PROFILE_DETAIL, "page.z2_profile_detail.title"),
-    SearchEntry("z1.control.title", PageName.ZAPRET1_MODE_CONTROL, "page.z1_control.title"),
-    SearchEntry("z1.control.presets", PageName.ZAPRET1_MODE_CONTROL, "page.z1_control.presets", section_key="page.z1_control.presets"),
-    SearchEntry("z1.mode.title", PageName.ZAPRET1_MODE, "page.z1_pages.title"),
-    SearchEntry("z1.user_presets.title", PageName.ZAPRET1_USER_PRESETS, "page.z1_user_presets.title"),
-    SearchEntry("z1.profile_detail.title", PageName.ZAPRET1_PROFILE_DETAIL, "page.z1_profile_detail.title"),
+    SearchEntry("winws2.control.title", PageName.ZAPRET2_MODE_CONTROL, "page.winws2_control.title"),
+    SearchEntry("winws2.control.status", PageName.ZAPRET2_MODE_CONTROL, "page.control.status", section_key="page.control.status"),
+    SearchEntry("winws2.control.preset", PageName.ZAPRET2_MODE_CONTROL, "page.winws2_control.preset_switch", section_key="page.winws2_control.preset_switch"),
+    SearchEntry("winws2.control.mode", PageName.ZAPRET2_MODE_CONTROL, "page.winws2_control.profile_tuning", section_key="page.winws2_control.profile_tuning"),
+    SearchEntry("winws2.mode.title", PageName.ZAPRET2_PRESET_SETUP, "page.winws2_pages.title"),
+    SearchEntry("winws2.user_presets.title", PageName.ZAPRET2_USER_PRESETS, "page.winws2_user_presets.title"),
+    SearchEntry("winws2.profile_setup.title", PageName.ZAPRET2_PROFILE_SETUP, "page.winws2_profile_setup.title"),
+    SearchEntry("winws1.control.title", PageName.ZAPRET1_MODE_CONTROL, "page.winws1_control.title"),
+    SearchEntry("winws1.control.presets", PageName.ZAPRET1_MODE_CONTROL, "page.winws1_control.presets", section_key="page.winws1_control.presets"),
+    SearchEntry("winws1.mode.title", PageName.ZAPRET1_PRESET_SETUP, "page.winws1_pages.title"),
+    SearchEntry("winws1.user_presets.title", PageName.ZAPRET1_USER_PRESETS, "page.winws1_user_presets.title"),
+    SearchEntry("winws1.profile_setup.title", PageName.ZAPRET1_PROFILE_SETUP, "page.winws1_profile_setup.title"),
     SearchEntry("orchestra.title", PageName.ORCHESTRA, "page.orchestra.title"),
     SearchEntry("orchestra.training", PageName.ORCHESTRA, "page.orchestra.training_status", section_key="page.orchestra.training_status"),
     SearchEntry("orchestra.log", PageName.ORCHESTRA, "page.orchestra.log", section_key="page.orchestra.log"),
@@ -5201,8 +5138,8 @@ SEARCH_ENTRIES: tuple[SearchEntry, ...] = (
 
 _PAGE_SEARCH_EXTRA_PREFIXES: dict[PageName, tuple[str, ...]] = {
     PageName.HOSTLIST: ("page.ipset.",),
-    PageName.ZAPRET2_MODE: ("page.z2_pages.",),
-    PageName.ZAPRET1_MODE: ("page.z1_pages.",),
+    PageName.ZAPRET2_PRESET_SETUP: ("page.winws2_pages.",),
+    PageName.ZAPRET1_PRESET_SETUP: ("page.winws1_pages.",),
     PageName.BLOCKCHECK: (
         "page.connection.",
         "page.dns_check.",

@@ -1,5 +1,4 @@
 # Preset: general ALT4 (game filter)
-# TemplateOrigin: general ALT4 (game filter)
 # BuiltinVersion: 2.19
 # IconColor: #67d1e4ff
 

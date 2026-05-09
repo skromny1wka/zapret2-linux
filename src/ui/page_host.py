@@ -174,7 +174,7 @@ class WindowPageHost:
             return False
 
         if not allow_internal and not is_page_mode_open_allowed(page_name):
-            log(f"[PAGE_HOST] reject direct-open for internal/detail page {page_name.name}", "WARNING")
+            log(f"[PAGE_HOST] reject direct-open for inner page {page_name.name}", "WARNING")
             return False
 
         page = self.ensure_page(page_name)

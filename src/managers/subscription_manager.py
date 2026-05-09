@@ -122,13 +122,12 @@ class SubscriptionManager:
 
         current_theme = getattr(self.app.theme_manager, 'current_theme', None) if hasattr(self.app, 'theme_manager') else None
 
-        if hasattr(self.app, 'ui_manager'):
-            self.app.ui_manager.update_title_with_subscription_status(
-                is_premium,
-                current_theme,
-                days_remaining
-            )
-            log(f"Обновлены карточки подписки: premium={is_premium}", "DEBUG")
+        self.app.update_title_with_subscription_status(
+            is_premium,
+            current_theme,
+            days_remaining,
+        )
+        log(f"Обновлён заголовок подписки: premium={is_premium}", "DEBUG")
 
         self._last_is_premium = is_premium
         if status_message:
@@ -140,9 +139,7 @@ class SubscriptionManager:
             return
         if not success or not donate_checker:
             log("PremiumService не инициализирован", "⚠ WARNING")
-            # ✅ ИСПОЛЬЗУЕМ UI MANAGER
-            if hasattr(self.app, 'ui_manager'):
-                self.app.ui_manager.update_title_with_subscription_status(False, None, 0)
+            self.app.update_title_with_subscription_status(False, None, 0)
             self.app.set_status("Ошибка инициализации подписок")
             try:
                 if hasattr(self.app, '_mark_startup_subscription_ready'):

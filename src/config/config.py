@@ -41,32 +41,6 @@ def get_default_install_dir() -> str:
     return os.path.join(get_system_drive(), "Zapret", get_install_dir_name())
 
 
-def get_presets_root_dir() -> str:
-    """Возвращает общий корень всех пресетов рядом с программой."""
-    return os.path.join(MAIN_DIRECTORY, "presets")
-
-
-def get_presets_v1_dir() -> str:
-    """Возвращает пользовательскую папку пресетов Zapret 1."""
-    return os.path.join(get_presets_root_dir(), "presets_v1")
-
-
-def get_presets_v2_dir() -> str:
-    """Возвращает пользовательскую папку пресетов Zapret 2."""
-    return os.path.join(get_presets_root_dir(), "presets_v2")
-
-
-def get_builtin_presets_v1_dir() -> str:
-    """Возвращает системную папку встроенных пресетов Zapret 1."""
-    return os.path.join(get_presets_root_dir(), "presets_v1_builtin")
-
-
-def get_builtin_presets_v2_dir() -> str:
-    """Возвращает системную папку встроенных пресетов Zapret 2."""
-    return os.path.join(get_presets_root_dir(), "presets_v2_builtin")
-
-# ═══════════════════════════════════════════════════════════════════
-
 # Все папки относительно MAIN_DIRECTORY
 BIN_FOLDER = os.path.join(MAIN_DIRECTORY, "bin")
 INDEXJSON_FOLDER = os.path.join(MAIN_DIRECTORY, "json")
@@ -82,95 +56,6 @@ MAX_LOG_FILES = 50           # zapret_log_*.txt - основные логи пр
 MAX_DEBUG_LOG_FILES = 20     # zapret_winws2_debug_*.log - debug логи winws2
 
 WINDIVERT_FILTER = os.path.join(MAIN_DIRECTORY, "windivert.filter")
-
-# Пути к файлам
-WINWS_EXE = os.path.join(EXE_FOLDER, "winws.exe")      # Для Zapret 1
-WINWS2_EXE = os.path.join(EXE_FOLDER, "winws2.exe")    # Для Zapret 2
-
-# ═══════════════════════════════════════════════════════════════════
-# ОПРЕДЕЛЕНИЕ EXE ПО МЕТОДУ ЗАПУСКА
-# ═══════════════════════════════════════════════════════════════════
-# Все режимы, которые используют winws2.exe (Zapret 2 с Lua)
-ZAPRET2_MODES = ("zapret2_mode", "orchestra")
-# Режимы, которые используют winws.exe (Zapret 1)
-ZAPRET1_MODE_MODES = ("zapret1_mode",)
-
-def get_winws_exe_for_method(method: str) -> str:
-    """
-    Возвращает путь к winws exe в зависимости от метода запуска.
-
-    Args:
-        method: Метод запуска (zapret2_mode, orchestra, zapret1_mode)
-
-    Returns:
-        Путь к winws2.exe для Zapret 2 режимов, winws.exe для остальных
-    """
-    if method in ZAPRET2_MODES:
-        return WINWS2_EXE
-    return WINWS_EXE
-
-def is_zapret2_mode(method: str) -> bool:
-    """
-    Проверяет, является ли метод режимом Zapret 2 (использует winws2.exe).
-
-    Args:
-        method: Метод запуска
-
-    Returns:
-        True если режим использует winws2.exe
-    """
-    return method in ZAPRET2_MODES
-
-def is_zapret1_mode(method: str) -> bool:
-    """
-    Проверяет, является ли метод режимом Zapret 1 (winws.exe).
-
-    Args:
-        method: Метод запуска
-
-    Returns:
-        True если режим использует winws.exe
-    """
-    return method in ZAPRET1_MODE_MODES
-
-
-def get_current_winws_exe() -> str:
-    """
-    ЕДИНАЯ точка определения winws.exe для всего проекта.
-
-    Получает текущий метод запуска из реестра и возвращает
-    соответствующий путь к исполняемому файлу.
-
-    Returns:
-        Путь к winws2.exe для Zapret 2 режимов (zapret2_mode, orchestra),
-        winws.exe для Zapret 1 режимов (zapret1_mode)
-
-    Примечание:
-        Используйте эту функцию когда метод запуска не передаётся явно.
-        Если метод известен заранее, используйте get_winws_exe_for_method(method).
-    """
-    try:
-        from log.log import log
-
-    except ImportError:
-        log = lambda msg, level="DEBUG": print(f"[{level}] {msg}")
-
-    try:
-        # Импортируем здесь чтобы избежать циклических зависимостей
-        from settings.dpi.strategy_settings import get_strategy_launch_method
-
-        method = get_strategy_launch_method()
-        exe_path = get_winws_exe_for_method(method)
-
-        log(f"get_current_winws_exe(): method={method}, exe={os.path.basename(exe_path)}", "DEBUG")
-
-        return exe_path
-
-    except Exception as e:
-        # Fallback - возвращаем winws2.exe (Zapret 2) как основной вариант
-        log(f"get_current_winws_exe() error: {e}, fallback to winws2.exe", "DEBUG")
-        return WINWS2_EXE
-
 
 # ═══════════════════════════════════════════════════════════════════
 

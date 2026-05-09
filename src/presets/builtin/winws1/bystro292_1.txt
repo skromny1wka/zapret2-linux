@@ -1,5 +1,4 @@
 # Preset: bystro292_1
-# TemplateOrigin: bystro292_1
 # IconColor: #60cdff
 # Description: Imported from bat/bystro292_1.txt
 

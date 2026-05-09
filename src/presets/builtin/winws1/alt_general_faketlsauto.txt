@@ -1,5 +1,4 @@
 # Preset: alt_general_faketlsauto
-# TemplateOrigin: alt_general_faketlsauto
 # IconColor: #60cdff
 # Description: Imported from bat/alt_general_faketlsauto.txt
 

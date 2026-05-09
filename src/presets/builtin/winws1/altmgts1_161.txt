@@ -1,5 +1,4 @@
 # Preset: altmgts1_161
-# TemplateOrigin: altmgts1_161
 # IconColor: #60cdff
 # Description: Imported from bat/altmgts1_161.txt
 

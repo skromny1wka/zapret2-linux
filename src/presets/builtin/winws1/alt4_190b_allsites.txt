@@ -1,5 +1,4 @@
 # Preset: alt4_190b_allsites
-# TemplateOrigin: alt4_190b_allsites
 # IconColor: #60cdff
 # Description: Imported from bat/alt4_190b_allsites.txt
 

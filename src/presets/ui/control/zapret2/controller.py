@@ -1,18 +1,12 @@
 from __future__ import annotations
 
-import os
-
 from PyQt6.QtCore import QThread, pyqtSignal
 
+from settings.mode import EXE_NAME_WINWS1, ZAPRET2_MODE
 from presets.ui.control.control_runtime_controller import (
-    ControlActionResultPlan,
-    ControlAutoDpiPlan,
-    ControlConfirmationDialogPlan,
     ControlPageController,
-    ControlProgramSettingsPlan,
     ControlStatusPlan,
     ControlStopButtonPlan,
-    ControlToggleActionStartPlan,
 )
 from profile.ui.profile_ui_mode import (
     PROFILE_UI_MODE_DEFAULT,
@@ -35,7 +29,7 @@ class AdvancedSettingsLoadWorker(QThread):
         try:
             from profile.settings import get_advanced_settings_state
 
-            state = get_advanced_settings_state(self._app_context, "zapret2_mode") or {}
+            state = get_advanced_settings_state(self._app_context, ZAPRET2_MODE) or {}
         except Exception:
             state = {}
         self.loaded.emit(self._request_id, state)
@@ -103,7 +97,7 @@ class Zapret2ModeControlPageController(ControlPageController):
         try:
             from profile.settings import get_advanced_settings_state
 
-            return get_advanced_settings_state(app_context, "zapret2_mode") or {}
+            return get_advanced_settings_state(app_context, ZAPRET2_MODE) or {}
         except Exception:
             return {}
 
@@ -128,7 +122,7 @@ class Zapret2ModeControlPageController(ControlPageController):
     @staticmethod
     def build_profile_ui_mode_label_plan(*, language: str) -> ProfileUiModeLabelPlan:
         mode = PROFILE_UI_MODE_DEFAULT
-        key = "page.z2_control.mode.basic"
+        key = "page.winws2_control.mode.basic"
         default = "Basic"
         return ProfileUiModeLabelPlan(
             mode=mode,
@@ -172,7 +166,7 @@ class Zapret2ModeControlPageController(ControlPageController):
             set_wssize_enabled(
                 bool(enabled),
                 app_context=app_context,
-                launch_method="zapret2_mode",
+                launch_method=ZAPRET2_MODE,
             )
         except Exception:
             pass
@@ -185,7 +179,7 @@ class Zapret2ModeControlPageController(ControlPageController):
             set_debug_log_enabled(
                 bool(enabled),
                 app_context=app_context,
-                launch_method="zapret2_mode",
+                launch_method=ZAPRET2_MODE,
             )
         except Exception:
             pass
@@ -194,14 +188,14 @@ class Zapret2ModeControlPageController(ControlPageController):
     def build_stop_button_plan(*, language: str) -> ControlStopButtonPlan:
         try:
             from settings.dpi.strategy_settings import get_strategy_launch_method
-            from config.config import get_winws_exe_for_method
+            from settings.mode import exe_name_for_launch_method
 
             from ui.text_catalog import tr as tr_catalog
 
             method = get_strategy_launch_method()
-            exe_name = os.path.basename(get_winws_exe_for_method(method)) or "winws.exe"
+            exe_name = exe_name_for_launch_method(method)
             template = tr_catalog(
-                "page.z2_control.button.stop_only_template",
+                "page.winws2_control.button.stop_only_template",
                 language=language,
                 default="Остановить только {exe_name}",
             )
@@ -211,9 +205,9 @@ class Zapret2ModeControlPageController(ControlPageController):
 
             return ControlStopButtonPlan(
                 text=tr_catalog(
-                    "page.z2_control.button.stop_only_winws",
+                    "page.winws2_control.button.stop_only_winws",
                     language=language,
-                    default="Остановить только winws.exe",
+                    default=f"Остановить только {EXE_NAME_WINWS1}",
                 )
             )
 
@@ -228,8 +222,8 @@ class Zapret2ModeControlPageController(ControlPageController):
         if phase == "running":
             return ControlStatusPlan(
                 phase=phase,
-                title=tr_catalog("page.z2_control.status.running", language=language, default="Zapret работает"),
-                description=tr_catalog("page.z2_control.status.bypass_active", language=language, default="Обход блокировок активен"),
+                title=tr_catalog("page.winws2_control.status.running", language=language, default="Zapret работает"),
+                description=tr_catalog("page.winws2_control.status.bypass_active", language=language, default="Обход блокировок активен"),
                 dot_color="#6ccb5f",
                 pulsing=False,
                 show_start=False,
@@ -282,136 +276,11 @@ class Zapret2ModeControlPageController(ControlPageController):
             )
         return ControlStatusPlan(
             phase="stopped",
-            title=tr_catalog("page.z2_control.status.stopped", language=language, default="Zapret остановлен"),
-            description=tr_catalog("page.z2_control.status.press_start", language=language, default="Нажмите «Запустить» для активации"),
+            title=tr_catalog("page.winws2_control.status.stopped", language=language, default="Zapret остановлен"),
+            description=tr_catalog("page.winws2_control.status.press_start", language=language, default="Нажмите «Запустить» для активации"),
             dot_color="#ff6b6b",
             pulsing=False,
             show_start=True,
             show_stop_only=False,
             show_stop_and_exit=False,
-        )
-
-    @staticmethod
-    def build_defender_toggle_start_plan(*, disable: bool, language: str) -> ControlToggleActionStartPlan:
-        from ui.text_catalog import tr as tr_catalog
-
-        if not ControlPageController.is_user_admin():
-            return ControlToggleActionStartPlan(
-                blocked=True,
-                blocked_title="Требуются права администратора",
-                blocked_content=(
-                    "Для управления Windows Defender требуются права администратора. "
-                    "Перезапустите программу от имени администратора."
-                ),
-                blocked_revert_checked=not bool(disable),
-                confirmations=(),
-                start_status="",
-            )
-
-        if disable:
-            return ControlToggleActionStartPlan(
-                blocked=False,
-                blocked_title="",
-                blocked_content="",
-                blocked_revert_checked=None,
-                confirmations=(
-                    ControlConfirmationDialogPlan(
-                        title=tr_catalog(
-                            "page.z2_control.dialog.defender_disable.title",
-                            language=language,
-                            default="⚠️ Отключение Windows Defender",
-                        ),
-                        content=(
-                            "Вы собираетесь отключить встроенную антивирусную защиту Windows.\n\n"
-                            "Что произойдёт:\n"
-                            "• Защита в реальном времени будет отключена\n"
-                            "• Облачная защита и SmartScreen будут отключены\n"
-                            "• Автоматическая отправка образцов будет отключена\n"
-                            "• Мониторинг поведения программ будет отключён\n\n"
-                            "⚠️ Ваш компьютер станет уязвим для вирусов и вредоносного ПО.\n"
-                            "Отключайте только если вы понимаете, что делаете.\n"
-                            "Вы сможете включить Defender обратно в любой момент."
-                        ),
-                        revert_checked=False,
-                    ),
-                    ControlConfirmationDialogPlan(
-                        title="Подтверждение",
-                        content=(
-                            "Вы уверены? Нажимая «ОК», вы подтверждаете, что:\n\n"
-                            "• Вы самостоятельно приняли решение отключить Windows Defender\n"
-                            "• Вы осознаёте риски работы без антивирусной защиты\n"
-                            "• Вы знаете, что можете включить защиту обратно\n\n"
-                            "Может потребоваться перезагрузка для полного применения."
-                        ),
-                        revert_checked=False,
-                    ),
-                ),
-                start_status="Отключение Windows Defender...",
-            )
-
-        return ControlToggleActionStartPlan(
-            blocked=False,
-            blocked_title="",
-            blocked_content="",
-            blocked_revert_checked=None,
-            confirmations=(
-                ControlConfirmationDialogPlan(
-                    title=tr_catalog(
-                        "page.z2_control.dialog.defender_enable.title",
-                        language=language,
-                        default="Включение Windows Defender",
-                    ),
-                    content="Включить Windows Defender обратно?\n\nЭто восстановит защиту вашего компьютера.",
-                    revert_checked=True,
-                ),
-            ),
-            start_status="Включение Windows Defender...",
-        )
-
-    @staticmethod
-    def build_max_block_toggle_start_plan(*, enable: bool, language: str) -> ControlToggleActionStartPlan:
-        from ui.text_catalog import tr as tr_catalog
-
-        if enable:
-            return ControlToggleActionStartPlan(
-                blocked=False,
-                blocked_title="",
-                blocked_content="",
-                blocked_revert_checked=None,
-                confirmations=(
-                    ControlConfirmationDialogPlan(
-                        title=tr_catalog(
-                            "page.z2_control.dialog.max_block_enable.title",
-                            language=language,
-                            default="Блокировка MAX",
-                        ),
-                        content=(
-                            "Включить блокировку установки и работы программы MAX?\n\n"
-                            "• Заблокирует запуск max.exe, max.msi и других файлов MAX\n"
-                            "• Добавит правила блокировки в Windows Firewall\n"
-                            "• Заблокирует домены MAX в файле hosts"
-                        ),
-                        revert_checked=False,
-                    ),
-                ),
-                start_status="",
-            )
-
-        return ControlToggleActionStartPlan(
-            blocked=False,
-            blocked_title="",
-            blocked_content="",
-            blocked_revert_checked=None,
-            confirmations=(
-                ControlConfirmationDialogPlan(
-                    title=tr_catalog(
-                        "page.z2_control.dialog.max_block_disable.title",
-                        language=language,
-                        default="Отключение блокировки MAX",
-                    ),
-                    content="Отключить блокировку программы MAX?\n\nЭто удалит все созданные блокировки и правила.",
-                    revert_checked=True,
-                ),
-            ),
-            start_status="",
         )

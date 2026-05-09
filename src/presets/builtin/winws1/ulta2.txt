@@ -1,5 +1,4 @@
 # Preset: ulta2
-# TemplateOrigin: ulta2
 # IconColor: #60cdff
 # Description: Imported from bat/ulta2.txt
 

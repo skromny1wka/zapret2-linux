@@ -1,5 +1,4 @@
 # Preset: faketlsmod2
-# TemplateOrigin: faketlsmod2
 # IconColor: #60cdff
 # Description: Imported from bat/faketlsmod2.txt
 

@@ -10,19 +10,19 @@ class PageMethodName:
     SHOW_PROFILE = "show_profile"
     SET_PRESET_FILE_NAME = "set_preset_file_name"
     REFRESH_PRESETS_VIEW = "refresh_presets_view_if_possible"
-    APPLY_STRATEGY_SELECTION = "apply_strategy_selection"
+    APPLY_PROFILE_SETUP_CHANGE = "apply_profile_setup_change"
 
 
 class PageSignalName:
-    OPEN_PROFILE_DETAIL = "open_profile_detail"
+    OPEN_PROFILE_SETUP = "open_profile_setup"
     BACK_CLICKED = "back_clicked"
     PRESET_OPEN_REQUESTED = "preset_open_requested"
     NAVIGATE_TO_ROOT = "navigate_to_root"
     NAVIGATE_TO_PRESETS = "navigate_to_presets"
-    NAVIGATE_TO_PROFILES = "navigate_to_profiles"
+    NAVIGATE_TO_PRESET_SETUP = "navigate_to_preset_setup"
     NAVIGATE_TO_BLOBS = "navigate_to_blobs"
     PROFILE_UI_MODE_CHANGED = "profile_ui_mode_changed"
-    STRATEGY_SELECTED = "strategy_selected"
+    PROFILE_CHANGED = "profile_changed"
     NAVIGATE_TO_CONTROL = "navigate_to_control"
     AUTOSTART_ENABLED = "autostart_enabled"
     AUTOSTART_DISABLED = "autostart_disabled"

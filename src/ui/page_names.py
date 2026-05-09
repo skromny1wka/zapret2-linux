@@ -14,20 +14,23 @@ class PageName(Enum):
     """
 
     # === Основные страницы ===
-    CONTROL = auto()                 # Управление DPI
-    ZAPRET2_MODE_CONTROL = auto()  # Zapret 2 mode: управление
-    ZAPRET2_MODE = auto()          # Zapret 2 mode: profiles
-    ZAPRET1_MODE_CONTROL = auto()  # Zapret 1 mode: управление (главная вкладка)
-    ZAPRET1_MODE = auto()          # Zapret 1 mode: profiles
-    ZAPRET1_USER_PRESETS = auto()    # Zapret 1 mode: пользовательские пресеты
-    ZAPRET1_PROFILE_DETAIL = auto()  # Zapret 1 mode: детали profile
-    ZAPRET2_PROFILE_DETAIL = auto()  # Zapret 2 mode: детали profile
-    ZAPRET2_PRESET_DETAIL = auto()   # Zapret 2 mode: подстраница пресета
-    ZAPRET1_PRESET_DETAIL = auto()   # Zapret 1 mode: подстраница пресета
+    # Zapret 2: управление -> мои пресеты/raw preset или настройка preset-а через profiles
+    ZAPRET2_MODE_CONTROL = auto()
+    ZAPRET2_USER_PRESETS = auto()
+    ZAPRET2_PRESET_RAW_EDITOR = auto()
+    ZAPRET2_PRESET_SETUP = auto()
+    ZAPRET2_PROFILE_SETUP = auto()
+
+    # Zapret 1: зеркальный путь, отличается только strategy внутри profile
+    ZAPRET1_MODE_CONTROL = auto()
+    ZAPRET1_USER_PRESETS = auto()
+    ZAPRET1_PRESET_RAW_EDITOR = auto()
+    ZAPRET1_PRESET_SETUP = auto()
+    ZAPRET1_PROFILE_SETUP = auto()
+
     HOSTLIST = auto()                # Листы (Hostlist + IPset)
     BLOBS = auto()                   # Блобы
     DPI_SETTINGS = auto()            # Настройки DPI
-    ZAPRET2_USER_PRESETS = auto()      # Zapret 2 mode: пользовательские пресеты
 
     # === Мои списки ===
     NETROGAT = auto()                # Исключения (netrogat.txt)
@@ -37,7 +40,6 @@ class PageName(Enum):
     # === Настройки системы ===
     AUTOSTART = auto()               # Автозапуск
     NETWORK = auto()                 # Сеть
-    DNS_CHECK = auto()               # DNS подмена
     HOSTS = auto()                   # Разблокировка сервисов
     BLOCKCHECK = auto()              # BlockCheck
     APPEARANCE = auto()              # Оформление

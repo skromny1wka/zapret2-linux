@@ -46,7 +46,7 @@ def build_profile_shell(
     def _toolbar_key(name: str) -> str:
         if toolbar_key_prefix:
             return f"{toolbar_key_prefix}.{name}"
-        return f"page.z2_pages.toolbar.{name}"
+        return f"page.winws2_pages.toolbar.{name}"
 
     add_section_title(text_key=toolbar_title_key)
     toolbar_actions_bar = QuickActionsBar(content_parent)

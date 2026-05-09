@@ -1,5 +1,4 @@
 # Preset: alt_general_faketlsauto_allsites
-# TemplateOrigin: alt_general_faketlsauto_allsites
 # IconColor: #60cdff
 # Description: Imported from bat/alt_general_faketlsauto_allsites.txt
 

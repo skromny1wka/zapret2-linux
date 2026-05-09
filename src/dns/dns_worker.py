@@ -102,219 +102,125 @@ class SafeDNSWorker(QThread):
             self.finished_with_result.emit(False)
 
 # ══════════════════════════════════════════════════════════════════════
-#  DNSUIManager - менеджер UI для DNS операций
+#  DNS при запуске приложения
 # ══════════════════════════════════════════════════════════════════════
 
-class DNSUIManager:
-    """Менеджер UI для DNS операций"""
-    
-    def __init__(self, parent, status_callback=None):
-        """
-        Args:
-            parent: родительский виджет
-            status_callback: функция для обновления статуса
-        """
-        self.parent = parent
-        self.status_callback = status_callback or (lambda msg: None)
-        self.dns_worker = None
-    
-    def apply_dns_settings_async(self, skip_on_startup=False):
-        """
-        Асинхронное применение DNS настроек
-        
-        Args:
-            skip_on_startup: добавить задержку перед применением
-            
-        Returns:
-            bool: True если запущено успешно
-        """
-        try:
-            # Проверяем, не запущен ли уже воркер
-            if self.dns_worker and self.dns_worker.isRunning():
-                log("DNS worker уже запущен", "WARNING")
-                return False
-            
-            log("Запуск DNS worker", "DEBUG")
-            
-            # Создаем и запускаем воркер
-            self.dns_worker = SafeDNSWorker(skip_on_startup)
-            self.dns_worker.status_update.connect(self.status_callback)
-            self.dns_worker.finished_with_result.connect(self._on_finished)
-            self.dns_worker.start()
-            
-            return True
-            
-        except Exception as e:
-            log(f"Ошибка запуска DNS worker: {e}", "ERROR")
-            self.status_callback("❌ Ошибка запуска DNS")
-            return False
-    
-    def _on_finished(self, success):
-        """Обработчик завершения DNS операции"""
-        try:
-            if success:
-                log("DNS операция завершена успешно", "DNS")
-            else:
-                log("DNS операция завершена с ошибками", "WARNING")
-            
-            # Очищаем воркер
-            if self.dns_worker:
-                self.dns_worker.stop()
-                self.dns_worker.quit()
-                self.dns_worker.wait(500)
-                self.dns_worker.deleteLater()
-                self.dns_worker = None
-                
-        except Exception as e:
-            log(f"Ошибка в обработчике завершения DNS: {e}", "DEBUG")
-    
-    def cleanup(self):
-        """Очистка ресурсов"""
-        try:
-            if self.dns_worker:
-                if self.dns_worker.isRunning():
-                    log("Останавливаем DNS worker...", "DEBUG")
-                    self.dns_worker.stop()
-                    self.dns_worker.quit()
-                    if not self.dns_worker.wait(2000):
-                        log("⚠ DNS worker не завершился, принудительно завершаем", "WARNING")
-                        try:
-                            self.dns_worker.terminate()
-                            self.dns_worker.wait(500)
-                        except:
-                            pass
-                try:
-                    self.dns_worker.deleteLater()
-                except:
-                    pass
-                self.dns_worker = None
-        except Exception as e:
-            log(f"Ошибка очистки DNS worker: {e}", "DEBUG")
+_dns_disabled_on_startup = False
+_startup_worker = None
 
-# ══════════════════════════════════════════════════════════════════════
-#  DNSStartupManager - менеджер DNS при запуске приложения
-# ══════════════════════════════════════════════════════════════════════
 
-class DNSStartupManager:
-    """Менеджер для применения DNS при запуске приложения"""
-    
-    # Флаг для временного отключения (если есть проблемы)
-    DISABLE_ON_STARTUP = False
+def _cleanup_startup_worker():
+    global _startup_worker
+    worker = _startup_worker
+    if worker is None:
+        return
+    try:
+        worker.stop()
+        worker.deleteLater()
+    except Exception:
+        pass
     _startup_worker = None
 
-    @staticmethod
-    def _cleanup_startup_worker():
-        worker = DNSStartupManager._startup_worker
-        if worker is None:
-            return
-        try:
-            worker.stop()
-            worker.deleteLater()
-        except Exception:
-            pass
-        DNSStartupManager._startup_worker = None
-    
-    @staticmethod
-    def apply_dns_on_startup_async(status_callback=None):
-        """
-        Применяет DNS настройки при запуске приложения (отложенно)
-        
-        Args:
-            status_callback: функция для обновления статуса
-            
-        Returns:
-            bool: True если задача запланирована
-        """
-        try:
-            # Проверяем флаг отключения
-            if DNSStartupManager.DISABLE_ON_STARTUP:
-                log("⚠️ DNS при запуске отключен (DISABLE_ON_STARTUP=True)", "WARNING")
-                if status_callback:
-                    status_callback("DNS при запуске отключен")
-                return False
-            
-            log("Планирование применения DNS при запуске", "INFO")
-            
-            # Отложенное применение через QTimer, а затем уже настоящий фоновой воркер.
-            def delayed_apply():
-                try:
-                    existing_worker = DNSStartupManager._startup_worker
-                    if existing_worker is not None and existing_worker.isRunning():
-                        log("DNS startup worker уже запущен", "DEBUG")
-                        return
 
-                    worker = SafeDNSWorker(skip_on_startup=False, startup_mode=True)
-                    DNSStartupManager._startup_worker = worker
+def apply_dns_on_startup_async(status_callback=None):
+    """
+    Применяет DNS настройки при запуске приложения (отложенно).
 
-                    if status_callback:
-                        worker.status_update.connect(status_callback)
+    Args:
+        status_callback: функция для обновления статуса
 
-                    worker.finished.connect(DNSStartupManager._cleanup_startup_worker)
-                    worker.start()
-                    log("DNS worker при старте приложения запущен в фоне", "DEBUG")
-                except Exception as e:
-                    error_msg = f"Ошибка запуска DNS worker при старте: {e}"
-                    log(error_msg, "ERROR")
-                    if status_callback:
-                        status_callback("❌ Ошибка DNS")
-            
-            # Запускаем через 3 секунды после старта приложения
-            QTimer.singleShot(3000, delayed_apply)
-            
-            return True
-            
-        except Exception as e:
-            log(f"Ошибка планирования DNS при запуске: {e}", "ERROR")
+    Returns:
+        bool: True если задача запланирована
+    """
+    try:
+        if _dns_disabled_on_startup:
+            log("⚠️ DNS при запуске отключен", "WARNING")
             if status_callback:
-                status_callback("❌ Ошибка планирования DNS")
+                status_callback("DNS при запуске отключен")
             return False
-    
-    @staticmethod
-    def apply_dns_on_startup_sync(status_callback=None):
-        """
-        Синхронное применение DNS при запуске (блокирующее)
-        
-        Args:
-            status_callback: функция для обновления статуса
-            
-        Returns:
-            bool: True если применено успешно
-        """
-        try:
-            if DNSStartupManager.DISABLE_ON_STARTUP:
-                log("DNS при запуске отключен", "WARNING")
-                return False
-            
-            from .dns_force import DNSForceManager
-            
-            manager = DNSForceManager(status_callback=status_callback)
-            
-            if not manager.is_force_dns_enabled():
-                log("Принудительный DNS отключен", "INFO")
-                return False
-            
-            success, total = manager.force_dns_on_all_adapters(
-                include_disconnected=False,
-                enable_ipv6=True
-            )
-            
-            return success > 0
-            
-        except Exception as e:
-            log(f"Ошибка синхронного применения DNS: {e}", "ERROR")
+
+        log("Планирование применения DNS при запуске", "INFO")
+
+        def delayed_apply():
+            global _startup_worker
+            try:
+                existing_worker = _startup_worker
+                if existing_worker is not None and existing_worker.isRunning():
+                    log("DNS startup worker уже запущен", "DEBUG")
+                    return
+
+                worker = SafeDNSWorker(skip_on_startup=False, startup_mode=True)
+                _startup_worker = worker
+
+                if status_callback:
+                    worker.status_update.connect(status_callback)
+
+                worker.finished.connect(_cleanup_startup_worker)
+                worker.start()
+                log("DNS worker при старте приложения запущен в фоне", "DEBUG")
+            except Exception as e:
+                error_msg = f"Ошибка запуска DNS worker при старте: {e}"
+                log(error_msg, "ERROR")
+                if status_callback:
+                    status_callback("❌ Ошибка DNS")
+
+        QTimer.singleShot(3000, delayed_apply)
+        return True
+
+    except Exception as e:
+        log(f"Ошибка планирования DNS при запуске: {e}", "ERROR")
+        if status_callback:
+            status_callback("❌ Ошибка планирования DNS")
+        return False
+
+
+def apply_dns_on_startup_sync(status_callback=None):
+    """
+    Синхронное применение DNS при запуске (блокирующее).
+
+    Args:
+        status_callback: функция для обновления статуса
+
+    Returns:
+        bool: True если применено успешно
+    """
+    try:
+        if _dns_disabled_on_startup:
+            log("DNS при запуске отключен", "WARNING")
             return False
-    
-    @staticmethod
-    def disable_dns_on_startup():
-        """Отключает применение DNS при запуске"""
-        DNSStartupManager.DISABLE_ON_STARTUP = True
-        log("DNS при запуске отключен программно", "INFO")
-    
-    @staticmethod
-    def enable_dns_on_startup():
-        """Включает применение DNS при запуске"""
-        DNSStartupManager.DISABLE_ON_STARTUP = False
-        log("DNS при запуске включен программно", "INFO")
+
+        from .dns_force import DNSForceManager
+
+        manager = DNSForceManager(status_callback=status_callback)
+
+        if not manager.is_force_dns_enabled():
+            log("Принудительный DNS отключен", "INFO")
+            return False
+
+        success, total = manager.force_dns_on_all_adapters(
+            include_disconnected=False,
+            enable_ipv6=True
+        )
+
+        return success > 0
+
+    except Exception as e:
+        log(f"Ошибка синхронного применения DNS: {e}", "ERROR")
+        return False
+
+
+def disable_dns_on_startup():
+    """Отключает применение DNS при запуске."""
+    global _dns_disabled_on_startup
+    _dns_disabled_on_startup = True
+    log("DNS при запуске отключен программно", "INFO")
+
+
+def enable_dns_on_startup():
+    """Включает применение DNS при запуске."""
+    global _dns_disabled_on_startup
+    _dns_disabled_on_startup = False
+    log("DNS при запуске включен программно", "INFO")
 
 # ══════════════════════════════════════════════════════════════════════
 #  Утилиты

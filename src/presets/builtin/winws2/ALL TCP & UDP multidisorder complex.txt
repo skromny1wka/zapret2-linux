@@ -1,5 +1,4 @@
 # Preset: ALL TCP & UDP multidisorder complex
-# TemplateOrigin: ALL TCP & UDP multidisorder complex
 # BuiltinVersion: 2.19
 # Description: 
 

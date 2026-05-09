@@ -1,5 +1,4 @@
 # Preset: Preset X (game filter)
-# TemplateOrigin: Preset X (game filter)
 # BuiltinVersion: 2.19
 # Description: 
 

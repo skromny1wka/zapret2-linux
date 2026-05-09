@@ -1,5 +1,4 @@
 # Preset: mgts1
-# TemplateOrigin: mgts1
 # IconColor: #60cdff
 # Description: Imported from bat/mgts1.txt
 

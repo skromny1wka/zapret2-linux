@@ -3,6 +3,8 @@ from __future__ import annotations
 from copy import deepcopy
 import re
 
+from settings.mode import ENGINE_WINWS2
+
 from .models import EngineName, Preset, Profile, ProfileSegment
 from .parser import parse_preset_text
 
@@ -71,7 +73,7 @@ def with_profile_strategy_lines(preset: Preset, profile_index: int, strategy_lin
 
 
 def _preserve_missing_winws2_strategy_filters(engine: EngineName, profile: Profile, strategy_lines: list[str]) -> list[str]:
-    if engine != "winws2":
+    if engine != ENGINE_WINWS2:
         return strategy_lines
 
     wanted_names = ("--payload", "--in-range", "--out-range")
@@ -163,7 +165,7 @@ def with_profile_moved(preset: Preset, source_index: int, destination_index: int
 
 def _segment_for_strategy_line(engine: EngineName, line: str) -> ProfileSegment:
     lowered = line.lower()
-    if engine == "winws2" and (
+    if engine == ENGINE_WINWS2 and (
         lowered.startswith("--payload=")
         or lowered.startswith("--in-range")
         or lowered.startswith("--out-range")

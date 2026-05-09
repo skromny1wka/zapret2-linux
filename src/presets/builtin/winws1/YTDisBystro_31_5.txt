@@ -1,5 +1,4 @@
 # Preset: YTDisBystro_31_5
-# TemplateOrigin: YTDisBystro_31_5
 # IconColor: #60cdff
 # Description: Imported from bat/YTDisBystro_31_5.txt
 

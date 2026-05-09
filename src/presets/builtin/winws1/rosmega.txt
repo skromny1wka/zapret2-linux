@@ -1,5 +1,4 @@
 # Preset: rosmega
-# TemplateOrigin: rosmega
 # IconColor: #60cdff
 # Description: Imported from bat/rosmega.txt
 

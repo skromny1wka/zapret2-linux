@@ -1,5 +1,4 @@
 # Preset: alt_simplefake_190b_allsites
-# TemplateOrigin: alt_simplefake_190b_allsites
 # IconColor: #60cdff
 # Description: Imported from bat/alt_simplefake_190b_allsites.txt
 

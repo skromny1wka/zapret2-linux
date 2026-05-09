@@ -6,7 +6,7 @@ from log.log import log
 
 from main.runtime_state import startup_elapsed_ms
 from ui.window_appearance_state import on_animations_changed
-from app_state.main_window_state import AppUiState
+from ui.state.main_window_state import AppUiState
 
 
 class WindowStateSyncMixin:
@@ -31,39 +31,36 @@ class WindowStateSyncMixin:
 
         Здесь важно не смешивать два разных механизма:
         - `get_dpi_autostart()` — запуск DPI после старта уже открытого GUI;
-        - `AppUiState.autostart_enabled` — наличие Windows-задачи для автозапуска
-          самого GUI-приложения.
+        - `AppUiState.autostart_enabled` — сохранённое в settings.json состояние
+          автозапуска самого GUI-приложения.
 
-        До реальной проверки Task Scheduler поле `autostart_enabled` оставляем
-        нейтральным, а DPI-autostart используем только для стартовой launch-phase.
+        На старте не опрашиваем Task Scheduler: это тяжёлая Windows-проверка.
+        UI показывает сохранённый выбор пользователя, а реальная задача Windows
+        меняется только при явном включении или отключении автозапуска.
         """
         try:
-            from settings.store import get_dpi_autostart
+            from settings.store import get_dpi_autostart, get_gui_autostart_enabled
 
             from settings.dpi.strategy_settings import get_strategy_launch_method
+            from settings.mode import ALL_LAUNCH_METHODS, is_preset_launch_method
 
             dpi_autostart_enabled = bool(get_dpi_autostart())
+            gui_autostart_enabled = bool(get_gui_autostart_enabled())
             launch_method = str(get_strategy_launch_method() or "").strip().lower()
 
-            autostart_pending_methods = {
-                "zapret2_mode",
-                "zapret1_mode",
-                "orchestra",
-            }
-
-            if dpi_autostart_enabled and launch_method in autostart_pending_methods:
+            if dpi_autostart_enabled and launch_method in ALL_LAUNCH_METHODS:
                 return AppUiState(
                     launch_method=launch_method,
                     launch_phase="autostart_pending",
                     launch_running=False,
-                    autostart_enabled=False,
+                    autostart_enabled=gui_autostart_enabled,
                 )
 
             return AppUiState(
                 launch_method=launch_method,
                 launch_phase="stopped",
                 launch_running=False,
-                autostart_enabled=False,
+                autostart_enabled=gui_autostart_enabled,
             )
         except Exception:
             return AppUiState()
@@ -77,7 +74,7 @@ class WindowStateSyncMixin:
             return
 
         launch_method = str(payload.get("launch_method") or "").strip().lower()
-        if launch_method not in {"zapret1_mode", "zapret2_mode"}:
+        if not is_preset_launch_method(launch_method):
             return
 
         snapshot = runtime_service.snapshot()

@@ -1,5 +1,4 @@
 # Preset: datanoackpadencap
-# TemplateOrigin: datanoackpadencap
 # IconColor: #60cdff
 # Description: Imported from bat/datanoackpadencap.txt
 

@@ -1,5 +1,4 @@
 # Preset: alt2
-# TemplateOrigin: alt2
 # IconColor: #60cdff
 # Description: Imported from bat/alt2.txt
 

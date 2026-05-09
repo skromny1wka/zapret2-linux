@@ -39,7 +39,7 @@ class ProgramSettingsRuntimeService:
     @staticmethod
     def _read_defender_disabled() -> bool:
         try:
-            from altmenu.defender_manager import WindowsDefenderManager
+            from windows_features.defender_manager import WindowsDefenderManager
 
             return bool(WindowsDefenderManager().is_defender_disabled())
         except Exception:
@@ -48,7 +48,7 @@ class ProgramSettingsRuntimeService:
     @staticmethod
     def _read_max_blocked() -> bool:
         try:
-            from altmenu.max_blocker import is_max_blocked
+            from windows_features.max_blocker import is_max_blocked
 
             return bool(is_max_blocked())
         except Exception:

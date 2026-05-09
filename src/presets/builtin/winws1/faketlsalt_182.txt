@@ -1,5 +1,4 @@
 # Preset: faketlsalt_182
-# TemplateOrigin: faketlsalt_182
 # IconColor: #60cdff
 # Description: Imported from bat/faketlsalt_182.txt
 

@@ -74,17 +74,6 @@ def _try_get_task(root_folder, task_name: str, pywintypes):
         return None
 
 
-def is_canonical_autostart_enabled() -> bool:
-    """Проверяет наличие канонической задачи через Windows Task Scheduler COM API."""
-    try:
-        with _open_scheduler_service() as (service, pywintypes, _win32api, _win32con):
-            root_folder = _get_root_folder(service)
-            return _try_get_task(root_folder, CANONICAL_TASK_NAME, pywintypes) is not None
-    except Exception as exc:
-        log(f"Task Scheduler query failed: {exc}", "WARNING")
-        return False
-
-
 def delete_canonical_autostart_task() -> bool:
     """Удаляет каноническую задачу через Windows Task Scheduler COM API."""
     try:

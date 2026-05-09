@@ -1,5 +1,4 @@
 # Preset: alt_faketlsautoalt3_190b
-# TemplateOrigin: alt_faketlsautoalt3_190b
 # IconColor: #60cdff
 # Description: Imported from bat/alt_faketlsautoalt3_190b.txt
 

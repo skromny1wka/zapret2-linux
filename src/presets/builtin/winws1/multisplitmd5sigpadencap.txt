@@ -1,5 +1,4 @@
 # Preset: multisplitmd5sigpadencap
-# TemplateOrigin: multisplitmd5sigpadencap
 # IconColor: #60cdff
 # Description: Imported from bat/multisplitmd5sigpadencap.txt
 

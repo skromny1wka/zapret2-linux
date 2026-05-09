@@ -1,5 +1,4 @@
 # Preset: Default v5
-# TemplateOrigin: Default v5
 # BuiltinVersion: 2.19
 # Description: 
 

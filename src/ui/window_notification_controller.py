@@ -299,8 +299,8 @@ class WindowNotificationController(QObject):
         if kind == "open_url":
             return lambda: webbrowser.open(str(action.get("value") or ""))
 
-        if kind == "open_profiles_page":
-            return lambda: self._open_profiles_page_for_method(str(action.get("value") or ""), bar)
+        if kind == "open_preset_setup_page":
+            return lambda: self._open_preset_setup_page_for_method(str(action.get("value") or ""), bar)
 
         if kind == "launch_conflict_kill_start":
             return lambda: self._run_launch_conflict_action(
@@ -419,18 +419,18 @@ class WindowNotificationController(QObject):
         except Exception as e:
             log(f"Не удалось отменить запуск после предупреждения о конфликтах: {e}", "DEBUG")
 
-    def _open_profiles_page_for_method(self, method: str, bar=None) -> None:
+    def _open_preset_setup_page_for_method(self, method: str, bar=None) -> None:
         try:
-            from ui.navigation_pages import resolve_profiles_page_for_method
+            from ui.navigation_pages import resolve_preset_setup_page_for_method
             from ui.window_adapter import show_page
 
-            profiles_page = resolve_profiles_page_for_method(str(method or "").strip().lower())
-            if profiles_page is None:
-                raise RuntimeError("Не удалось определить страницу profiles для текущего режима")
+            preset_setup_page = resolve_preset_setup_page_for_method(method)
+            if preset_setup_page is None:
+                raise RuntimeError("Не удалось определить страницу настройки preset-а для текущего режима")
 
-            ok = bool(show_page(self.host, profiles_page, allow_internal=True))
+            ok = bool(show_page(self.host, preset_setup_page, allow_internal=True))
             if not ok:
-                raise RuntimeError("Не удалось открыть страницу profiles")
+                raise RuntimeError("Не удалось открыть страницу настройки preset-а")
 
             try:
                 if bar is not None:
@@ -438,17 +438,17 @@ class WindowNotificationController(QObject):
             except Exception:
                 pass
         except Exception as e:
-            log(f"Не удалось открыть страницу profiles: {e}", "DEBUG")
+            log(f"Не удалось открыть страницу настройки preset-а: {e}", "DEBUG")
             self.notify(
                 advisory_notification(
                     level="warning",
                     title="Не удалось открыть раздел",
-                    content="Не удалось перейти в раздел profiles автоматически.",
-                    source="navigation.profiles_page",
+                    content="Не удалось перейти в настройку preset-а автоматически.",
+                    source="navigation.preset_setup_page",
                     presentation="infobar",
                     queue="immediate",
                     duration=7000,
-                    dedupe_key="navigation.profiles_page",
+                    dedupe_key="navigation.preset_setup_page",
                 )
             )
 

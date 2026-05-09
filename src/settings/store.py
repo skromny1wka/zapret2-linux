@@ -6,9 +6,20 @@ from pathlib import Path
 from threading import RLock
 from typing import Any
 
-import winreg
+try:
+    import winreg
+except ImportError:  # pragma: no cover - WSL/static checks only
+    winreg = None
 
 from config.config import MAIN_DIRECTORY
+from settings.mode import (
+    DEFAULT_LAUNCH_METHOD,
+    ENGINE_WINWS1,
+    ENGINE_WINWS2,
+    SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS1,
+    SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS2,
+    normalize_launch_method,
+)
 from settings.normalize import (
     as_clean_str as _as_clean_str,
     as_dict as _as_dict,
@@ -33,8 +44,8 @@ from utils.atomic_text import atomic_write_text
 
 _SETTINGS_LOCK = RLock()
 _DIRECT_PRESET_SELECTION_PATHS = {
-    "winws1": ("program", "selected_source_preset_file_name_winws1"),
-    "winws2": ("program", "selected_source_preset_file_name_winws2"),
+    ENGINE_WINWS1: ("program", SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS1),
+    ENGINE_WINWS2: ("program", SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS2),
 }
 
 
@@ -247,6 +258,15 @@ def set_ui_state_settings(values: dict[str, Any]) -> dict[str, Any]:
     return copy.deepcopy(updated["ui_state"])
 
 
+def get_profile_strategy_state_settings() -> dict[str, Any]:
+    return copy.deepcopy(read_settings()["profile_strategy_state"])
+
+
+def set_profile_strategy_state_settings(values: dict[str, Any]) -> dict[str, Any]:
+    updated = _update_settings(lambda data: _set_path_value(data, ("profile_strategy_state",), _as_dict(values)))
+    return copy.deepcopy(updated["profile_strategy_state"])
+
+
 def get_orchestra_settings() -> dict[str, Any]:
     return copy.deepcopy(read_settings()["orchestra"]["settings"])
 
@@ -264,12 +284,20 @@ def set_dpi_autostart(value: bool) -> bool:
     return _set_bool(("program", "dpi_autostart"), value)
 
 
+def get_gui_autostart_enabled() -> bool:
+    return _get_bool(("program", "gui_autostart_enabled"), False)
+
+
+def set_gui_autostart_enabled(value: bool) -> bool:
+    return _set_bool(("program", "gui_autostart_enabled"), value)
+
+
 def get_strategy_launch_method() -> str:
-    return _get_str(("program", "strategy_launch_method"), "zapret2_mode")
+    return normalize_launch_method(_get_str(("program", "strategy_launch_method"), DEFAULT_LAUNCH_METHOD))
 
 
 def set_strategy_launch_method(value: str) -> bool:
-    return _set_str(("program", "strategy_launch_method"), value)
+    return _set_str(("program", "strategy_launch_method"), normalize_launch_method(value))
 
 
 def get_profile_ui_mode() -> str:
@@ -487,6 +515,8 @@ def set_selected_theme(value: str) -> bool:
 
 
 def get_windows_system_accent() -> str | None:
+    if winreg is None:
+        return None
     try:
         with winreg.OpenKey(
             winreg.HKEY_CURRENT_USER,
@@ -953,6 +983,7 @@ __all__ = [
     "get_follow_windows_accent",
     "get_force_dns_enabled",
     "get_garland_enabled",
+    "get_gui_autostart_enabled",
     "get_hosts_bootstrap_signature",
     "get_isp_dns_info_shown",
     "get_kaspersky_warning_disabled",
@@ -972,6 +1003,7 @@ __all__ = [
     "get_orchestra_user_locked",
     "get_orchestra_whitelist_user_domains",
     "get_program_settings",
+    "get_profile_strategy_state_settings",
     "get_remove_github_api",
     "get_rkn_background",
     "get_selected_theme",
@@ -1025,6 +1057,7 @@ __all__ = [
     "set_follow_windows_accent",
     "set_force_dns_enabled",
     "set_garland_enabled",
+    "set_gui_autostart_enabled",
     "set_hosts_bootstrap_signature",
     "set_isp_dns_info_shown",
     "set_kaspersky_warning_disabled",
@@ -1046,6 +1079,7 @@ __all__ = [
     "set_orchestra_user_locked",
     "set_orchestra_whitelist_user_domains",
     "set_program_settings",
+    "set_profile_strategy_state_settings",
     "set_remove_github_api",
     "set_rkn_background",
     "set_selected_theme",

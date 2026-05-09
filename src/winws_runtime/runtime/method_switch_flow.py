@@ -6,6 +6,16 @@ from dataclasses import dataclass
 from PyQt6.QtCore import QTimer
 
 from log.log import log
+from settings.mode import (
+    ALL_LAUNCH_METHODS,
+    ZAPRET1_MODE,
+    ZAPRET2_MODE,
+    exe_path_for_launch_method,
+    is_orchestra_launch_method,
+    is_preset_launch_method,
+    is_zapret2_launch_method,
+    normalize_launch_method,
+)
 
 
 
@@ -58,14 +68,12 @@ def handle_launch_method_changed_runtime(window, method: str) -> MethodSwitchRun
 
 def build_method_switch_runtime_plan(window, method: str) -> MethodSwitchRuntimePlan:
     from settings.store import get_dpi_autostart
-    from config.config import get_winws_exe_for_method
 
-
-    normalized_method = str(method or "").strip().lower()
+    normalized_method = normalize_launch_method(method, default="")
     expected_exe_path = ""
     expected_process_name = ""
-    if normalized_method in {"zapret2_mode", "zapret1_mode", "orchestra"}:
-        expected_exe_path = str(get_winws_exe_for_method(normalized_method) or "").strip()
+    if normalized_method in ALL_LAUNCH_METHODS:
+        expected_exe_path = str(exe_path_for_launch_method(normalized_method) or "").strip()
         expected_process_name = os.path.basename(expected_exe_path).strip().lower()
 
     residual_runtime_detected = False
@@ -195,10 +203,10 @@ def apply_method_switch_runtime_plan(window, plan: MethodSwitchRuntimePlan) -> N
 
 
 def _can_autostart_for_method(window, method: str) -> bool:
-    normalized_method = str(method or "").strip().lower()
-    if normalized_method == "orchestra":
+    normalized_method = normalize_launch_method(method, default="")
+    if is_orchestra_launch_method(normalized_method):
         return True
-    if normalized_method not in {"zapret2_mode", "zapret1_mode"}:
+    if not is_preset_launch_method(normalized_method):
         try:
             window.set_status("Ошибка: выбран удалённый или неподдерживаемый режим запуска")
         except Exception:
@@ -211,15 +219,15 @@ def _can_autostart_for_method(window, method: str) -> bool:
         preset_mode_coordinator.get_startup_snapshot(normalized_method)
         return True
     except Exception as e:
-        if normalized_method == "zapret2_mode":
-            log("zapret2_mode: выбранный source-пресет не подготовлен", "ERROR")
+        if is_zapret2_launch_method(normalized_method):
+            log(f"{ZAPRET2_MODE}: выбранный source-пресет не подготовлен", "ERROR")
             try:
                 window.set_status("Ошибка: отсутствует Default v1 (game filter).txt (built-in пресет)")
             except Exception:
                 pass
             return False
 
-        log(f"zapret1_mode: ошибка инициализации пресета: {e}", "WARNING")
+        log(f"{ZAPRET1_MODE}: ошибка инициализации пресета: {e}", "WARNING")
         return False
 
 

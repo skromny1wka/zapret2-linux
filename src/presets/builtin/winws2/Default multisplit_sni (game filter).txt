@@ -1,5 +1,4 @@
 # Preset: Default multisplit_sni (game filter)
-# TemplateOrigin: Default multisplit_sni (game filter)
 # BuiltinVersion: 2.19
 # Description: 
 

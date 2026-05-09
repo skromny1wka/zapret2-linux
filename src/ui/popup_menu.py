@@ -147,11 +147,11 @@ def exec_popup_menu(
     if app is not None:
         app.installEventFilter(lifecycle_filter)
 
-        def _on_app_state_changed(state) -> None:
+        def _on_ui_state_changed(state) -> None:
             if state != Qt.ApplicationState.ApplicationActive:
                 _finish()
 
-        state_handler = _on_app_state_changed
+        state_handler = _on_ui_state_changed
         app.applicationStateChanged.connect(state_handler)
 
     if monitor_global_mouse and sys.platform == "win32":

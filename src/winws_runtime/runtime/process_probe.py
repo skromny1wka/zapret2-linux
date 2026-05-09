@@ -5,8 +5,16 @@ import os
 from ctypes import wintypes
 from dataclasses import dataclass
 
+from settings.mode import (
+    ALL_WINWS_EXE_NAMES,
+    EXE_NAME_WINWS1,
+    EXE_NAME_WINWS2,
+    ZAPRET1_MODE,
+    ZAPRET2_MODE,
+    exe_path_for_launch_method,
+)
 
-_WINWS_NAMES = ("winws.exe", "winws2.exe")
+_WINWS_NAMES = ALL_WINWS_EXE_NAMES
 _WINWS_NAME_SET = frozenset(_WINWS_NAMES)
 
 TH32CS_SNAPPROCESS = 0x00000002
@@ -89,15 +97,9 @@ def _normalize_path(path: str) -> str:
 
 
 def get_expected_winws_paths() -> dict[str, str]:
-    try:
-        from config.config import WINWS_EXE, WINWS2_EXE
-
-    except Exception:
-        return {}
-
     paths = {
-        "winws.exe": _normalize_path(WINWS_EXE),
-        "winws2.exe": _normalize_path(WINWS2_EXE),
+        EXE_NAME_WINWS1: _normalize_path(exe_path_for_launch_method(ZAPRET1_MODE)),
+        EXE_NAME_WINWS2: _normalize_path(exe_path_for_launch_method(ZAPRET2_MODE)),
     }
     return {name: path for name, path in paths.items() if path}
 

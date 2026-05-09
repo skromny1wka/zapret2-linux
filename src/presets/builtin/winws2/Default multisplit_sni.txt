@@ -1,5 +1,4 @@
 # Preset: Default multisplit_sni
-# TemplateOrigin: Default multisplit_sni
 # BuiltinVersion: 2.19
 # IconColor: #a8c5ff
 

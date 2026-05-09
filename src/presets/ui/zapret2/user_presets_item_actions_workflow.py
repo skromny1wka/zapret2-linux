@@ -113,15 +113,15 @@ def open_edit_preset_menu_action(
         global_pos=global_pos,
         is_builtin=is_builtin,
         labels={
-            "open": tr_fn("page.z2_user_presets.menu.open", "Открыть"),
-            "rating": tr_fn("page.z2_user_presets.menu.rating", "Рейтинг"),
-            "move_up": tr_fn("page.z2_user_presets.menu.move_up", "Переместить выше"),
-            "move_down": tr_fn("page.z2_user_presets.menu.move_down", "Переместить ниже"),
-            "rename": tr_fn("page.z2_user_presets.menu.rename", "Переименовать"),
-            "duplicate": tr_fn("page.z2_user_presets.menu.duplicate", "Дублировать"),
-            "export": tr_fn("page.z2_user_presets.menu.export", "Экспорт"),
-            "reset": tr_fn("page.z2_user_presets.menu.reset", "Сбросить"),
-            "delete": tr_fn("page.z2_user_presets.menu.delete", "Удалить"),
+            "open": tr_fn("page.winws2_user_presets.menu.open", "Открыть"),
+            "rating": tr_fn("page.winws2_user_presets.menu.rating", "Рейтинг"),
+            "move_up": tr_fn("page.winws2_user_presets.menu.move_up", "Переместить выше"),
+            "move_down": tr_fn("page.winws2_user_presets.menu.move_down", "Переместить ниже"),
+            "rename": tr_fn("page.winws2_user_presets.menu.rename", "Переименовать"),
+            "duplicate": tr_fn("page.winws2_user_presets.menu.duplicate", "Дублировать"),
+            "export": tr_fn("page.winws2_user_presets.menu.export", "Экспорт"),
+            "reset": tr_fn("page.winws2_user_presets.menu.reset", "Вернуть встроенный"),
+            "delete": tr_fn("page.winws2_user_presets.menu.delete", "Удалить"),
         },
         make_menu_action=make_menu_action,
         icon_resolver=fluent_icon,
@@ -149,7 +149,7 @@ def show_rating_menu_action(
         display_name=display_name,
         hierarchy_store=hierarchy_store,
         refresh_callback=refresh_callback,
-        clear_label=tr_fn("page.z2_user_presets.menu.rating_clear", "Сбросить рейтинг"),
+        clear_label=tr_fn("page.winws2_user_presets.menu.rating_clear", "Сбросить рейтинг"),
         global_pos=global_pos,
     )
 
@@ -194,7 +194,7 @@ def duplicate_preset_action(
         log_fn(f"Ошибка дублирования пресета: {exc}", "ERROR")
         info_bar_cls.error(
             title=tr_fn("common.error.title", "Ошибка"),
-            content=tr_fn("page.z2_user_presets.error.generic", "Ошибка: {error}", error=exc),
+            content=tr_fn("page.winws2_user_presets.error.generic", "Ошибка: {error}", error=exc),
             parent=parent_window,
         )
 
@@ -214,32 +214,32 @@ def reset_preset_action(
         display_name = resolve_display_name_fn(name)
         if message_box_cls:
             box = message_box_cls(
-                tr_fn("page.z2_user_presets.dialog.reset_single.title", "Сбросить пресет?"),
+                tr_fn("page.winws2_user_presets.dialog.reset_single.title", "Вернуть встроенный preset?"),
                 tr_fn(
-                    "page.z2_user_presets.dialog.reset_single.body",
-                    "Пресет '{name}' будет перезаписан данными из шаблона.\n"
-                    "Все изменения в этом пресете будут потеряны.\n"
-                    "Этот пресет станет активным и будет применен заново.",
+                    "page.winws2_user_presets.dialog.reset_single.body",
+                    "Пользовательский файл preset-а '{name}' будет удалён.\n"
+                    "После этого снова будет использоваться встроенный preset с тем же именем файла.\n"
+                    "Изменения в пользовательском файле будут потеряны.",
                     name=display_name,
                 ),
                 parent_window,
             )
             box.yesButton.setText(
-                tr_fn("page.z2_user_presets.dialog.reset_single.button", "Сбросить")
+                tr_fn("page.winws2_user_presets.dialog.reset_single.button", "Вернуть встроенный")
             )
             box.cancelButton.setText(
-                tr_fn("page.z2_user_presets.dialog.button.cancel", "Отмена")
+                tr_fn("page.winws2_user_presets.dialog.button.cancel", "Отмена")
             )
             if not box.exec():
                 return
 
-        result = actions_api.reset_preset_to_template(file_name=name, display_name=display_name)
+        result = actions_api.reset_preset_to_builtin(file_name=name, display_name=display_name)
         log_fn(result.log_message, result.log_level)
     except Exception as exc:
         log_fn(f"Ошибка сброса пресета: {exc}", "ERROR")
         info_bar_cls.error(
             title=tr_fn("common.error.title", "Ошибка"),
-            content=tr_fn("page.z2_user_presets.error.generic", "Ошибка: {error}", error=exc),
+            content=tr_fn("page.winws2_user_presets.error.generic", "Ошибка: {error}", error=exc),
             parent=parent_window,
         )
 
@@ -271,21 +271,21 @@ def delete_preset_action(
 
         if message_box_cls:
             box = message_box_cls(
-                tr_fn("page.z2_user_presets.dialog.delete_single.title", "Удалить пресет?"),
+                tr_fn("page.winws2_user_presets.dialog.delete_single.title", "Удалить пресет?"),
                 tr_fn(
-                    "page.z2_user_presets.dialog.delete_single.body",
+                    "page.winws2_user_presets.dialog.delete_single.body",
                     "Пресет '{name}' будет удален из списка пользовательских пресетов.\n"
                     "Изменения в этом пресете будут потеряны.\n"
-                    "Вернуть его можно только через восстановление удаленных пресетов (если доступен шаблон).",
+                    "Вернуть его можно только заново создав preset или импортировав файл.",
                     name=display_name,
                 ),
                 parent_window,
             )
             box.yesButton.setText(
-                tr_fn("page.z2_user_presets.dialog.delete_single.button", "Удалить")
+                tr_fn("page.winws2_user_presets.dialog.delete_single.button", "Удалить")
             )
             box.cancelButton.setText(
-                tr_fn("page.z2_user_presets.dialog.button.cancel", "Отмена")
+                tr_fn("page.winws2_user_presets.dialog.button.cancel", "Отмена")
             )
             if not box.exec():
                 return
@@ -302,7 +302,7 @@ def delete_preset_action(
         log_fn(f"Ошибка удаления пресета: {exc}", "ERROR")
         info_bar_cls.error(
             title=tr_fn("common.error.title", "Ошибка"),
-            content=tr_fn("page.z2_user_presets.error.generic", "Ошибка: {error}", error=exc),
+            content=tr_fn("page.winws2_user_presets.error.generic", "Ошибка: {error}", error=exc),
             parent=parent_window,
         )
 
@@ -322,7 +322,7 @@ def export_preset_action(
     display_name = resolve_display_name_fn(name)
     file_path, _ = file_dialog_cls.getSaveFileName(
         page,
-        tr_fn("page.z2_user_presets.file_dialog.export_title", "Экспортировать пресет"),
+        tr_fn("page.winws2_user_presets.file_dialog.export_title", "Экспортировать пресет"),
         f"{display_name}.txt",
         "Preset files (*.txt);;All files (*.*)",
     )
@@ -342,7 +342,7 @@ def export_preset_action(
         log_fn(f"Ошибка экспорта пресета: {exc}", "ERROR")
         info_bar_cls.error(
             title=tr_fn("common.error.title", "Ошибка"),
-            content=tr_fn("page.z2_user_presets.error.generic", "Ошибка: {error}", error=exc),
+            content=tr_fn("page.winws2_user_presets.error.generic", "Ошибка: {error}", error=exc),
             parent=parent_window,
         )
 

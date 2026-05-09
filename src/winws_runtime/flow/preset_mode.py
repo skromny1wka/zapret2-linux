@@ -7,6 +7,15 @@ from typing import Callable
 
 from core.paths import AppPaths
 from settings.schema import SETTINGS_DIR_NAME, SETTINGS_FILE_NAME
+from settings.mode import (
+    DEFAULT_PRESET_FILE_NAME_BY_ENGINE,
+    ENGINE_BY_LAUNCH_METHOD,
+    ENGINE_WINWS1,
+    ENGINE_WINWS2,
+    ZAPRET1_MODE,
+    is_zapret2_launch_method,
+    normalize_launch_method,
+)
 
 from presets.cache_signatures import path_cache_signature
 from presets.models import PresetManifest
@@ -71,14 +80,8 @@ class PresetModeStartupSnapshot:
 
 
 class PresetModeCoordinator:
-    _METHOD_TO_ENGINE = {
-        "zapret1_mode": "winws1",
-        "zapret2_mode": "winws2",
-    }
-    _DEFAULT_PRESET_BY_ENGINE = {
-        "winws1": "Default v1.txt",
-        "winws2": "Default v1 (game filter).txt",
-    }
+    _METHOD_TO_ENGINE = ENGINE_BY_LAUNCH_METHOD
+    _DEFAULT_PRESET_BY_ENGINE = DEFAULT_PRESET_FILE_NAME_BY_ENGINE
 
     def __init__(
         self,
@@ -150,7 +153,7 @@ class PresetModeCoordinator:
             t_filters = time.perf_counter()
             has_required_filters = self._has_required_filters(method, text)
             lowered = text.lower()
-            if method == "zapret2_mode":
+            if is_zapret2_launch_method(method):
                 has_placeholder_unknown = ("unknown.txt" in lowered) or ("ipset-unknown.txt" in lowered)
             else:
                 has_placeholder_unknown = False
@@ -226,7 +229,7 @@ class PresetModeCoordinator:
         return self.ensure_launch_preset(launch_method, require_filters=False)
 
     def _normalize_method(self, launch_method: str) -> str:
-        method = str(launch_method or "").strip().lower()
+        method = normalize_launch_method(launch_method, default="")
         if method not in self._METHOD_TO_ENGINE:
             raise PresetModeError(f"Unsupported preset launch method: {launch_method}")
         return method
@@ -275,7 +278,7 @@ class PresetModeCoordinator:
     @staticmethod
     def _has_required_filters(launch_method: str, text: str) -> bool:
         content = str(text or "")
-        if launch_method == "zapret1_mode":
+        if launch_method == ZAPRET1_MODE:
             return any(flag in content for flag in ("--wf-tcp=", "--wf-udp="))
         return any(flag in content for flag in ("--wf-tcp-out", "--wf-udp-out", "--wf-raw-part"))
 

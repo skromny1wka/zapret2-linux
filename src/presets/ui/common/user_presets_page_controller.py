@@ -107,7 +107,7 @@ class UserPresetsActionsApi(Protocol):
     def reset_all_presets(self) -> UserPresetResetAllResult: ...
     def activate_preset(self, *, file_name: str, display_name: str) -> UserPresetActivationResult: ...
     def duplicate_preset(self, *, file_name: str, display_name: str) -> UserPresetActionResult: ...
-    def reset_preset_to_template(self, *, file_name: str, display_name: str) -> UserPresetActionResult: ...
+    def reset_preset_to_builtin(self, *, file_name: str, display_name: str) -> UserPresetActionResult: ...
     def delete_preset(self, *, file_name: str, display_name: str) -> UserPresetActionResult: ...
     def export_preset(self, *, file_name: str, file_path: str, display_name: str) -> UserPresetActionResult: ...
     def open_presets_info(self) -> UserPresetActionResult: ...
@@ -202,8 +202,8 @@ class _UserPresetsActionsApiImpl:
     def duplicate_preset(self, *, file_name: str, display_name: str) -> UserPresetActionResult:
         return self._controller.duplicate_preset(file_name=file_name, display_name=display_name)
 
-    def reset_preset_to_template(self, *, file_name: str, display_name: str) -> UserPresetActionResult:
-        return self._controller.reset_preset_to_template(file_name=file_name, display_name=display_name)
+    def reset_preset_to_builtin(self, *, file_name: str, display_name: str) -> UserPresetActionResult:
+        return self._controller.reset_preset_to_builtin(file_name=file_name, display_name=display_name)
 
     def delete_preset(self, *, file_name: str, display_name: str) -> UserPresetActionResult:
         return self._controller.delete_preset(file_name=file_name, display_name=display_name)
@@ -223,7 +223,7 @@ class _UserPresetsStorageApiImpl:
         self._controller = controller
 
     def get_preset_store(self):
-        return self._controller._require_app_context().preset_store
+        return self._controller.get_preset_store()
 
     def get_hierarchy_store(self):
         return self._controller.get_hierarchy_store()
@@ -354,7 +354,7 @@ class UserPresetsPageController:
 
     def reset_all_presets(self) -> UserPresetResetAllResult:
         service = self._get_preset_file_service()
-        success_count, total, failed = service.reset_all_to_templates()
+        success_count, total, failed = service.reset_all_to_builtin()
         selected_file_name = service.get_selected_file_name()
 
         failed_count = len(failed or [])
@@ -398,14 +398,14 @@ class UserPresetsPageController:
             structure_changed=True,
         )
 
-    def reset_preset_to_template(self, *, file_name: str, display_name: str) -> UserPresetActionResult:
+    def reset_preset_to_builtin(self, *, file_name: str, display_name: str) -> UserPresetActionResult:
         service = self._get_preset_file_service()
-        service.reset_to_template_by_file_name(file_name)
+        service.reset_to_builtin_by_file_name(file_name)
 
         return UserPresetActionResult(
             ok=True,
             log_level="INFO",
-            log_message=f"Сброшен пресет '{display_name}' к шаблону",
+            log_message=f"Восстановлен встроенный preset для '{display_name}'",
             infobar_level=None,
             infobar_title="",
             infobar_content="",

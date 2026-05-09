@@ -5,6 +5,7 @@ from typing import Callable, Optional
 
 from PyQt6.QtCore import QFileSystemWatcher, QTimer, QObject
 
+from settings.mode import is_preset_launch_method, normalize_launch_method
 from winws_runtime.flow.preset_switch_policy import request_selected_source_preset_apply
 from winws_runtime.runners.preset_runner_support import publish_active_preset_content_changed
 from log.log import log
@@ -103,7 +104,32 @@ class PresetRuntimeCoordinator(QObject):
             pass
         self.schedule_refresh_after_preset_switch()
 
-    def _request_selected_source_preset_apply(self) -> None:
+    def handle_preset_content_changed(self, launch_method: str, preset_file_name: str) -> None:
+        """Обновляет watcher после сохранения активного source preset-а."""
+        method = normalize_launch_method(launch_method, default="")
+        current_method = normalize_launch_method(self._get_launch_method(), default="")
+        if not method or method != current_method or not is_preset_launch_method(method):
+            return
+
+        updated_file_name = str(preset_file_name or "").strip()
+        if not updated_file_name or not self._is_selected_source_preset(method, updated_file_name):
+            return
+
+        old_path = self._active_preset_file_path
+        self.setup_active_preset_file_watcher()
+        new_path = str(self._get_active_preset_path() or "").strip()
+        if new_path:
+            publish_active_preset_content_changed(new_path)
+
+        if not self._same_path(old_path, new_path):
+            log(
+                f"Активный preset сохранён в новом source-файле: {new_path or updated_file_name}",
+                "INFO",
+            )
+            self._last_switched_preset_file_name = updated_file_name
+            self._request_selected_source_preset_apply(reason="preset_content_changed")
+
+    def _request_selected_source_preset_apply(self, *, reason: str = "preset_switched") -> None:
         try:
             launch_method = str(self._get_launch_method() or "").strip().lower()
             parent = self.parent()
@@ -112,11 +138,35 @@ class PresetRuntimeCoordinator(QObject):
             request_selected_source_preset_apply(
                 parent,
                 launch_method=launch_method,
-                reason="preset_switched",
+                reason=reason,
                 preset_file_name=str(getattr(self, "_last_switched_preset_file_name", "") or ""),
             )
         except Exception:
             return
+
+    def _is_selected_source_preset(self, launch_method: str, preset_file_name: str) -> bool:
+        try:
+            parent = self.parent()
+            app_context = getattr(parent, "app_context", None)
+            coordinator = getattr(app_context, "preset_mode_coordinator", None)
+            if coordinator is None:
+                return False
+            selected = str(coordinator.get_selected_source_file_name(launch_method) or "").strip()
+            candidate = str(preset_file_name or "").strip()
+            return bool(selected and candidate and selected.lower() == candidate.lower())
+        except Exception:
+            return False
+
+    @staticmethod
+    def _same_path(left: str, right: str) -> bool:
+        left_value = str(left or "").strip()
+        right_value = str(right or "").strip()
+        if not left_value or not right_value:
+            return left_value == right_value
+        return (
+            os.path.abspath(left_value).replace("\\", "/").lower()
+            == os.path.abspath(right_value).replace("\\", "/").lower()
+        )
 
     def schedule_refresh_after_preset_switch(self, delay_ms: int = 0) -> None:
         try:

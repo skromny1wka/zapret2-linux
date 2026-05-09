@@ -246,8 +246,10 @@ def publish_runner_failure(
     error: str = "",
 ) -> None:
     """Best-effort bridge for runner-side launch failures only."""
-    method = str(launch_method or "").strip().lower()
-    if method not in {"zapret1_mode", "zapret2_mode"}:
+    from settings.mode import is_preset_launch_method, normalize_launch_method
+
+    method = normalize_launch_method(launch_method, default="")
+    if not is_preset_launch_method(method):
         return
 
     payload = {
@@ -279,8 +281,10 @@ def publish_active_preset_content_changed(path: str) -> None:
 
 def controller_transition_in_progress(launch_method: str) -> bool:
     """Checks whether the main DPI controller is already applying a runtime transition."""
-    method = str(launch_method or "").strip().lower()
-    if method not in {"zapret1_mode", "zapret2_mode", "orchestra"}:
+    from settings.mode import is_known_launch_method, normalize_launch_method
+
+    method = normalize_launch_method(launch_method, default="")
+    if not is_known_launch_method(method):
         return False
 
     try:

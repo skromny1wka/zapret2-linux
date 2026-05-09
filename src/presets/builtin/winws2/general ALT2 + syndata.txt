@@ -1,5 +1,4 @@
 # Preset: general ALT2 + syndata
-# TemplateOrigin: general ALT2 + syndata
 # BuiltinVersion: 2.19
 # IconColor: #b475f0ff
 

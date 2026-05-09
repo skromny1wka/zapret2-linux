@@ -1,5 +1,4 @@
 # Preset: ALL TCP & UDP v2
-# TemplateOrigin: ALL TCP & UDP v2
 # BuiltinVersion: 2.19
 # Description: 
 

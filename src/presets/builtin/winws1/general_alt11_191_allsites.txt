@@ -1,5 +1,4 @@
 # Preset: general_alt11_191_allsites
-# TemplateOrigin: general_alt11_191_allsites
 # IconColor: #60cdff
 # Description: Imported from bat/general_alt11_191_allsites.txt
 

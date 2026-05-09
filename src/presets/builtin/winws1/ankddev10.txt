@@ -1,5 +1,4 @@
 # Preset: ankddev10
-# TemplateOrigin: ankddev10
 # IconColor: #60cdff
 # Description: Imported from bat/ankddev10.txt
 

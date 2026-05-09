@@ -1,5 +1,4 @@
 # Preset: general_181
-# TemplateOrigin: general_181
 # IconColor: #60cdff
 # Description: Imported from bat/general_181.txt
 

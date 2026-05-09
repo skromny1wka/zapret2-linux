@@ -892,12 +892,12 @@ class SystemTrayManager:
         except Exception as e:
             log(f"Ошибка сохранения геометрии окна: {e}", "ERROR")
 
-    def _cleanup_loaded_detail_page_overlays(self) -> None:
+    def _cleanup_loaded_setup_page_overlays(self) -> None:
         try:
-            from ui.navigation_pages import get_profile_detail_pages
+            from ui.navigation_pages import get_profile_setup_pages
             from ui.page_method_dispatch import close_page_transient_overlays
 
-            for page_name in get_profile_detail_pages():
+            for page_name in get_profile_setup_pages():
                 try:
                     close_page_transient_overlays(self.parent, page_name)
                 except Exception:
@@ -912,7 +912,7 @@ class SystemTrayManager:
         except Exception:
             pass
 
-        self._cleanup_loaded_detail_page_overlays()
+        self._cleanup_loaded_setup_page_overlays()
 
     def hide_to_tray(self, show_hint: bool = True) -> bool:
         try:

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from log.log import log
+from settings.mode import is_preset_launch_method, is_zapret1_launch_method, normalize_launch_method
 
 
 if TYPE_CHECKING:
@@ -21,15 +22,15 @@ def _is_launch_running(app: "LupiDPIApp") -> bool:
 
 
 def _preset_filter_flags(launch_method: str) -> tuple[str, ...]:
-    method = str(launch_method or "").strip().lower()
-    if method == "zapret1_mode":
+    method = normalize_launch_method(launch_method, default="")
+    if is_zapret1_launch_method(method):
         return ("--wf-tcp=", "--wf-udp=")
     return ("--wf-tcp-out", "--wf-udp-out", "--wf-raw-part")
 
 
 def _get_selected_presets_path(app: "LupiDPIApp", launch_method: str) -> Path | None:
-    method = str(launch_method or "").strip().lower()
-    if method not in {"zapret1_mode", "zapret2_mode"}:
+    method = normalize_launch_method(launch_method, default="")
+    if not is_preset_launch_method(method):
         return None
     try:
         snapshot = app.app_context.preset_mode_coordinator.get_startup_snapshot(method, require_filters=False)
@@ -46,8 +47,8 @@ def request_preset_runtime_content_apply(
     profile_key: str | None = None,
 ) -> bool:
     """Apply runtime reaction for edits to the currently selected preset mode."""
-    method = str(launch_method or "").strip().lower()
-    if method not in {"zapret1_mode", "zapret2_mode"}:
+    method = normalize_launch_method(launch_method, default="")
+    if not is_preset_launch_method(method):
         log(f"Preset runtime apply skipped: unsupported method {method}", "DEBUG")
         return False
 

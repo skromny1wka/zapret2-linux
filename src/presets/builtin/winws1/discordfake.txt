@@ -1,5 +1,4 @@
 # Preset: discordfake
-# TemplateOrigin: discordfake
 # IconColor: #60cdff
 # Description: Imported from bat/discordfake.txt
 

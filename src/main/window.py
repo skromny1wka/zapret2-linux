@@ -19,10 +19,8 @@ from ui.window_ui_facade import MainWindowUI
 
 if TYPE_CHECKING:
     from app_context import AppContext
-    from managers.launch_autostart_manager import LaunchAutostartManager
-    from managers.initialization_manager import InitializationManager
     from managers.subscription_manager import SubscriptionManager
-    from managers.ui_manager import UIManager
+    from main.startup_coordinator import StartupCoordinator
     from winws_runtime.monitoring import ProcessMonitorManager
 
 
@@ -45,11 +43,9 @@ class LupiDPIApp(
     runner_failure_requested = pyqtSignal(object)
     active_preset_content_changed_requested = pyqtSignal(str)
 
-    ui_manager: "UIManager"
-    launch_autostart_manager: "LaunchAutostartManager"
     process_monitor_manager: "ProcessMonitorManager"
     subscription_manager: "SubscriptionManager"
-    initialization_manager: "InitializationManager"
+    startup_coordinator: "StartupCoordinator"
 
     def log_startup_metric(self, marker: str, details: str = "") -> None:
         emit_startup_metric(marker, details)

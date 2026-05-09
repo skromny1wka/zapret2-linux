@@ -1,5 +1,4 @@
 # Preset: original_bolvan_v2_badsum_3
-# TemplateOrigin: original_bolvan_v2_badsum_3
 # IconColor: #60cdff
 # Description: Imported from bat/original_bolvan_v2_badsum_3.txt
 

@@ -1,5 +1,4 @@
 # Preset: alt1_161
-# TemplateOrigin: alt1_161
 # IconColor: #60cdff
 # Description: Imported from bat/alt1_161.txt
 

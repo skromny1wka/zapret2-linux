@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
     QListView,
 )
 from ui.pages.base_page import BasePage
+from settings.mode import ENGINE_WINWS1, PRESETS_SCOPE_WINWS1, ZAPRET1_MODE
 from ui.page_dependencies import require_page_app_context
 from presets.ui.common.preset_actions_menu import show_preset_actions_menu
 from presets.ui.common.preset_rating_menu import show_preset_rating_menu
@@ -77,7 +78,7 @@ from presets.ui.zapret1.user_presets_runtime_helpers import (
     schedule_preset_search,
     update_presets_view_height,
 )
-from app_state.main_window_state import MainWindowStateStore
+from ui.state.main_window_state import MainWindowStateStore
 
 try:
     from qfluentwidgets import (
@@ -137,7 +138,7 @@ class Zapret1UserPresetsPage(BasePage):
             "Мои пресеты",
             "",
             parent,
-            title_key="page.z1_user_presets.title",
+            title_key="page.winws1_user_presets.title",
         )
         self._page_api = self._build_controller().build_page_api()
         self._runtime_service = self._build_runtime_service()
@@ -151,7 +152,7 @@ class Zapret1UserPresetsPage(BasePage):
         try:
             tokens = get_theme_tokens()
             _back_btn = TransparentPushButton()
-            _back_btn.setText(self._tr("page.z1_user_presets.back.control", "Управление"))
+            _back_btn.setText(self._tr("page.winws1_user_presets.back.control", "Управление"))
             _back_btn.setIcon(get_themed_qta_icon("fa5s.chevron-left", color=tokens.fg_muted))
             _back_btn.setIconSize(QSize(12, 12))
             _back_btn.clicked.connect(self.back_clicked.emit)
@@ -205,22 +206,22 @@ class Zapret1UserPresetsPage(BasePage):
     def _build_controller(self):
         return UserPresetsPageController(
             UserPresetsPageControllerConfig(
-                launch_method="zapret1_mode",
-                selection_key="winws1",
-                hierarchy_scope="presets_winws1",
-                empty_not_found_key="page.z1_user_presets.empty.not_found",
-                empty_none_key="page.z1_user_presets.empty.none",
-                list_log_prefix="Z1UserPresetsPage",
+                launch_method=ZAPRET1_MODE,
+                selection_key=ENGINE_WINWS1,
+                hierarchy_scope=PRESETS_SCOPE_WINWS1,
+                empty_not_found_key="page.winws1_user_presets.empty.not_found",
+                empty_none_key="page.winws1_user_presets.empty.none",
+                list_log_prefix="Winws1UserPresetsPage",
                 activate_error_level="warning",
                 activate_error_mode="friendly",
                 copy_hierarchy_meta_on_duplicate=True,
                 require_app_context=self._require_app_context,
-                get_preset_store=lambda: self._require_app_context().preset_store_v1,
+                get_preset_store=lambda: self._require_app_context().preset_store_winws1,
             )
         )
 
     def _build_runtime_service(self):
-        return self._require_app_context().user_presets_runtime_service_factory("presets_winws1")
+        return self._require_app_context().user_presets_runtime_service_factory(PRESETS_SCOPE_WINWS1)
 
     def _build_runtime_adapter(self) -> UserPresetsRuntimeAdapter:
         return UserPresetsRuntimeAdapter(
@@ -242,8 +243,8 @@ class Zapret1UserPresetsPage(BasePage):
     def _on_store_changed(self):
         self._runtime_service.on_store_changed()
 
-    def _on_store_updated(self, file_name_or_name: str):
-        self._runtime_service.on_store_updated(file_name_or_name)
+    def _on_store_content_changed(self, file_name_or_name: str):
+        self._runtime_service.on_store_content_changed(file_name_or_name)
 
     def _on_store_switched(self, _name: str):
         self._runtime_service.on_store_switched(_name)
@@ -296,7 +297,7 @@ class Zapret1UserPresetsPage(BasePage):
         )
 
     def _hierarchy_scope_key(self) -> str:
-        return "presets_winws1"
+        return PRESETS_SCOPE_WINWS1
 
     def _get_hierarchy_store(self):
         return self._storage_api().get_hierarchy_store()
@@ -328,7 +329,7 @@ class Zapret1UserPresetsPage(BasePage):
             get_preset_store_fn=self._get_preset_store,
             on_store_changed_fn=self._on_store_changed,
             on_store_switched_fn=self._on_store_switched,
-            on_store_updated_fn=self._on_store_updated,
+            on_store_content_changed_fn=self._on_store_content_changed,
             log_fn=log,
         )
 
@@ -460,9 +461,9 @@ class Zapret1UserPresetsPage(BasePage):
     def _on_info_clicked(self) -> None:
         if MessageBox:
             box = MessageBox(
-                self._tr("page.z1_user_presets.info.title", "Что это такое?"),
+                self._tr("page.winws1_user_presets.info.title", "Что это такое?"),
                 self._tr(
-                    "page.z1_user_presets.info.body",
+                    "page.winws1_user_presets.info.body",
                     'Здесь кнопка для нубов — "хочу чтобы нажал и всё работало". '
                     "Выбираете любой пресет — тыкаете — перезагружаете вкладку и смотрите, "
                     "что ресурс открывается (или не открывается). Если не открывается — тыкаете на следующий пресет. "
@@ -479,9 +480,9 @@ class Zapret1UserPresetsPage(BasePage):
             info_bar_cls=InfoBar,
             tr_fn=self._tr,
             parent_window=self.window(),
-            error_key="page.z1_user_presets.error.open_folder",
+            error_key="page.winws1_user_presets.error.open_folder",
             error_default="Не удалось открыть папку пресетов: {error}",
-            log_prefix="Z1UserPresetsPage",
+            log_prefix="Winws1UserPresetsPage",
             log_fn=log,
         )
 
@@ -684,8 +685,8 @@ class Zapret1UserPresetsPage(BasePage):
             log_fn=log,
         )
 
-    def _on_activate_preset(self, name: str):
-        activate_preset_action(
+    def _on_activate_preset(self, name: str) -> bool:
+        return activate_preset_action(
             name=name,
             resolve_display_name_fn=self._resolve_display_name,
             actions_api=self._actions_api(),
@@ -790,8 +791,8 @@ class Zapret1UserPresetsPage(BasePage):
             if parent_app is not None:
                 request_preset_runtime_content_apply(
                     parent_app,
-                    launch_method="zapret1_mode",
-                    reason="user_preset_saved",
+                    launch_method=ZAPRET1_MODE,
+                    reason="preset_content_changed",
                 )
         except Exception as e:
             log(f"Ошибка перезапуска DPI: {e}", "ERROR")

@@ -1,5 +1,4 @@
 # Preset: Preset X v3 (game filter)
-# TemplateOrigin: Preset X v3 (game filter)
 # BuiltinVersion: 2.19
 # IconColor: #60cdff
 # Description: 

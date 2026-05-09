@@ -1,5 +1,4 @@
 # Preset: splitbadseq
-# TemplateOrigin: splitbadseq
 # IconColor: #60cdff
 # Description: Imported from bat/splitbadseq.txt
 

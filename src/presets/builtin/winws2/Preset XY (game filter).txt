@@ -1,5 +1,4 @@
 # Preset: Preset XY (game filter)
-# TemplateOrigin: Preset XY (game filter)
 # BuiltinVersion: 2.19
 # IconColor: #ff6666
 # Description: 

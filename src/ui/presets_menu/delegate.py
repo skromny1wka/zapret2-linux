@@ -43,10 +43,10 @@ class PresetListDelegate(QStyledItemDelegate):
     _PENDING_SHAKE_ROTATIONS = (0, -8, 8, -6, 6, -4, 4, -2, 0)
     _PENDING_SHAKE_INTERVAL_MS = 50
 
-    def __init__(self, view: QListView, *, language_scope: str = "z2", help_name_role: str = "name"):
+    def __init__(self, view: QListView, *, language_scope: str = "winws2", help_name_role: str = "name"):
         super().__init__(view)
         self._view = view
-        self._language_scope = str(language_scope or "z2")
+        self._language_scope = str(language_scope or "winws2")
         self._help_name_role = str(help_name_role or "name")
         self._ui_language = "ru"
         self._action_tooltips: dict[str, str] = {}

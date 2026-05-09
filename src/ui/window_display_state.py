@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from log.log import log
+from settings.mode import is_preset_launch_method
 
 
 
@@ -9,7 +10,7 @@ def get_profile_strategy_summary(window, max_items: int = 2) -> str:
         from settings.dpi.strategy_settings import get_strategy_launch_method
 
         method = (get_strategy_launch_method() or "").strip().lower()
-        if method not in ("zapret1_mode", "zapret2_mode"):
+        if not is_preset_launch_method(method):
             return "Профили"
 
         from profile.service import ProfilePresetService

@@ -10,6 +10,7 @@ from pathlib import Path
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QMenu
+from settings.mode import ENGINE_WINWS2
 
 from blockcheck.strategy_scan_page_controller import StrategyScanPageController
 from blockcheck.strategy_scan_worker import StrategyScanWorker
@@ -178,7 +179,7 @@ class StrategyScanPage(BasePage):
         warning_text.setText(tr_catalog(
             "page.strategy_scan.warning_text",
             default="Во время сканирования текущий обход DPI будет остановлен. "
-                    "Каждая стратегия тестируется отдельно через winws2. "
+                    f"Каждая стратегия тестируется отдельно через {ENGINE_WINWS2}. "
                     "После завершения можно перезапустить обход.",
         ))
         warning_text.setWordWrap(True)

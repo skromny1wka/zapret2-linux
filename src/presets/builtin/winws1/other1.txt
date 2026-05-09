@@ -1,5 +1,4 @@
 # Preset: other1
-# TemplateOrigin: other1
 # IconColor: #60cdff
 # Description: Imported from bat/other1.txt
 

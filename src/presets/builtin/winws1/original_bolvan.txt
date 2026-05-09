@@ -1,5 +1,4 @@
 # Preset: original_bolvan
-# TemplateOrigin: original_bolvan
 # IconColor: #60cdff
 # Description: Imported from bat/original_bolvan.txt
 

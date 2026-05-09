@@ -164,11 +164,18 @@ class PresetSubpageBase(BasePage):
         return None
 
     def _preset_hierarchy_scope_key(self) -> str | None:
+        from settings.mode import (
+            PRESETS_SCOPE_WINWS1,
+            PRESETS_SCOPE_WINWS2,
+            is_zapret1_launch_method,
+            is_zapret2_launch_method,
+        )
+
         method = self._preset_launch_method()
-        if method == "zapret2_mode":
-            return "presets_winws2"
-        if method == "zapret1_mode":
-            return "presets_winws1"
+        if is_zapret2_launch_method(method):
+            return PRESETS_SCOPE_WINWS2
+        if is_zapret1_launch_method(method):
+            return PRESETS_SCOPE_WINWS1
         return None
 
     def _breadcrumb_root_text(self) -> str:
@@ -189,7 +196,7 @@ class PresetSubpageBase(BasePage):
             breadcrumb.clear()
             breadcrumb.addItem("root", self._breadcrumb_root_text())
             breadcrumb.addItem("list", self._breadcrumb_parent_text())
-            breadcrumb.addItem("detail", self._breadcrumb_current_text())
+            breadcrumb.addItem("raw_preset", self._breadcrumb_current_text())
         finally:
             try:
                 breadcrumb.blockSignals(False)
@@ -463,7 +470,7 @@ class PresetSubpageBase(BasePage):
             menu = RoundMenu(parent=self)
             duplicate_action = _make_menu_action("Дублировать", icon=_fluent_icon("COPY"), parent=menu)
             export_action = _make_menu_action("Экспорт", icon=_fluent_icon("SHARE"), parent=menu)
-            reset_action = _make_menu_action("Сбросить", icon=_fluent_icon("SYNC"), parent=menu)
+            reset_action = _make_menu_action("Вернуть встроенный", icon=_fluent_icon("SYNC"), parent=menu)
             rename_action = None
             delete_action = None
             if not self._is_current_builtin():
@@ -552,11 +559,12 @@ class PresetSubpageBase(BasePage):
         self._flush_pending_save()
         if MessageBox is not None:
             box = MessageBox(
-                "Сбросить пресет?",
-                f"Пресет «{self._preset_name}» будет перезаписан данными из шаблона.",
+                "Вернуть встроенный preset?",
+                f"Пользовательский файл preset-а «{self._preset_name}» будет удалён. "
+                "После этого снова будет использоваться встроенный preset с тем же именем файла.",
                 self.window(),
             )
-            box.yesButton.setText("Сбросить")
+            box.yesButton.setText("Вернуть встроенный")
             box.cancelButton.setText("Отмена")
             if not box.exec():
                 return
@@ -566,13 +574,13 @@ class PresetSubpageBase(BasePage):
                 raise ValueError("Preset mode file service is required")
             if not self._preset_file_name:
                 raise ValueError("Preset file name is required for preset mode reset")
-            updated = service.reset_to_template_by_file_name(self._preset_file_name)
+            updated = service.reset_to_builtin_by_file_name(self._preset_file_name)
             self._preset_name = updated.name
             self._preset_file_name = updated.file_name
             self._preset_path = service.get_source_path_by_file_name(self._preset_file_name)
             self._load_file()
             self._refresh_header()
-            self._show_success(f"Пресет «{self._preset_name}» сброшен")
+            self._show_success(f"Восстановлен встроенный preset «{self._preset_name}»")
         except Exception as e:
             self._show_error(str(e))
 

@@ -4,6 +4,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 from log.log import log
 from settings.dpi.strategy_settings import get_strategy_launch_method
+from settings.mode import is_orchestra_launch_method, is_preset_launch_method
 from winws_runtime.runtime.sync_shutdown import shutdown_runtime_sync
 
 
@@ -28,9 +29,9 @@ class PresetLaunchStopWorker(QObject):
         self.cleanup_services = bool(cleanup_services)
 
     def _get_winws_exe(self) -> str:
-        from config.config import get_winws_exe_for_method
+        from settings.mode import exe_path_for_launch_method
 
-        return get_winws_exe_for_method(self.launch_method)
+        return exe_path_for_launch_method(self.launch_method)
 
     def run(self):
         try:
@@ -46,9 +47,9 @@ class PresetLaunchStopWorker(QObject):
 
             self.progress.emit("Завершение процессов...")
 
-            if self.launch_method == "orchestra":
+            if is_orchestra_launch_method(self.launch_method):
                 success = self._stop_orchestra()
-            elif self.launch_method in ("zapret2_mode", "zapret1_mode"):
+            elif is_preset_launch_method(self.launch_method):
                 success = self._stop_preset_mode()
             else:
                 success = self._stop_preset_mode()
@@ -100,18 +101,20 @@ class PresetSwitchWorker(QObject):
     def __init__(self, app_instance, launch_method: str, generation: int, is_generation_current):
         super().__init__()
         self.app_instance = app_instance
-        self.launch_method = str(launch_method or "").strip().lower()
+        from settings.mode import normalize_launch_method
+
+        self.launch_method = normalize_launch_method(launch_method, default="")
         self.generation = int(generation)
         self._is_generation_current = is_generation_current
 
     def _get_winws_exe(self) -> str:
-        from config.config import get_winws_exe_for_method
+        from settings.mode import exe_path_for_launch_method
 
-        return get_winws_exe_for_method(self.launch_method)
+        return exe_path_for_launch_method(self.launch_method)
 
     def run(self):
         try:
-            if self.launch_method not in ("zapret1_mode", "zapret2_mode"):
+            if not is_preset_launch_method(self.launch_method):
                 self.finished.emit(
                     False,
                     f"Неподдерживаемый метод preset switch: {self.launch_method}",
@@ -175,9 +178,9 @@ class StopAndExitWorker(QObject):
         self.launch_method = get_strategy_launch_method()
 
     def _get_winws_exe(self) -> str:
-        from config.config import get_winws_exe_for_method
+        from settings.mode import exe_path_for_launch_method
 
-        return get_winws_exe_for_method(self.launch_method)
+        return exe_path_for_launch_method(self.launch_method)
 
     def run(self):
         try:

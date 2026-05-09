@@ -1,5 +1,4 @@
 # Preset: ALL TCP & UDP hostfakesplit_multi_syndata
-# TemplateOrigin: ALL TCP & UDP hostfakesplit_multi_syndata
 # BuiltinVersion: 2.19
 # Description: 
 

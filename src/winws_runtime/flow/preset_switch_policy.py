@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from log.log import log
+from settings.mode import is_preset_launch_method, normalize_launch_method
 
 
 if TYPE_CHECKING:
@@ -17,7 +18,7 @@ def request_selected_source_preset_apply(
     preset_file_name: str = "",
 ) -> bool:
     """Применяет выбранный source preset к уже запущенному DPI."""
-    method = str(launch_method or "").strip().lower()
+    method = normalize_launch_method(launch_method, default="")
     selected_preset = str(preset_file_name or "").strip()
 
     if not hasattr(app, "launch_controller") or not app.launch_controller:
@@ -52,7 +53,7 @@ def request_selected_source_preset_apply(
 
     preset_info = f", preset={selected_preset}" if selected_preset else ""
 
-    if method in {"zapret1_mode", "zapret2_mode"}:
+    if is_preset_launch_method(method):
         log(
             f"Применение выбранного source preset ({method}, reason={reason}{preset_info}) -> preset mode switch pipeline",
             "INFO",

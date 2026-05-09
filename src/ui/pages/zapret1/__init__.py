@@ -7,10 +7,10 @@ from importlib import import_module
 
 _PAGE_EXPORTS: dict[str, tuple[str, str]] = {
     "Zapret1ModeControlPage": ("presets.ui.control.zapret1.page", "Zapret1ModeControlPage"),
-    "Zapret1ProfilesPage": ("profile.ui.profiles_page", "Zapret1ProfilesPage"),
+    "Zapret1PresetSetupPage": ("profile.ui.preset_setup_page", "Zapret1PresetSetupPage"),
     "Zapret1UserPresetsPage": ("presets.ui.zapret1.user_presets_page", "Zapret1UserPresetsPage"),
-    "Zapret1ProfileDetailPage": ("profile.ui.detail_page", "Zapret1ProfileDetailPage"),
-    "Zapret1PresetDetailPage": ("presets.ui.zapret1.preset_detail_page", "Zapret1PresetDetailPage"),
+    "Zapret1ProfileSetupPage": ("profile.ui.profile_setup_page", "Zapret1ProfileSetupPage"),
+    "Zapret1PresetRawEditorPage": ("presets.ui.zapret1.preset_raw_editor_page", "Zapret1PresetRawEditorPage"),
 }
 
 __all__ = list(_PAGE_EXPORTS)

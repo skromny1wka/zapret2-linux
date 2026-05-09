@@ -137,7 +137,7 @@ def on_dpi_start_finished(controller, success, error_message):
 
         bridge = ensure_runtime_ui_bridge(controller.app)
         if bridge is not None:
-            bridge.show_active_profiles_page_success()
+            bridge.show_active_preset_setup_page_success()
 
         if success:
             controller._mark_runtime_running(pid=_runner_start_pid(controller))
@@ -179,7 +179,7 @@ def on_dpi_stop_finished(controller, success, error_message):
 
         bridge = ensure_runtime_ui_bridge(controller.app)
         if bridge is not None:
-            bridge.show_active_profiles_page_success()
+            bridge.show_active_preset_setup_page_success()
 
         if success:
             is_still_running = controller.app.launch_runtime_api.has_residual_processes(silent=True)

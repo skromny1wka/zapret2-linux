@@ -5,6 +5,7 @@ from ui.window_appearance_state import (
     on_editor_smooth_scroll_changed,
     on_smooth_scroll_changed,
 )
+from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE
 
 
 def connect_window_page_signals(window) -> None:
@@ -14,16 +15,28 @@ def connect_window_page_signals(window) -> None:
     composition/navigation instead of event wiring.
     """
     try:
-        store = window.app_context.preset_store
+        store = window.app_context.preset_store_winws2
         store.preset_switched.connect(window._preset_runtime_coordinator.handle_preset_switched)
         store.preset_identity_changed.connect(window._preset_runtime_coordinator.handle_preset_identity_changed)
+        store.preset_content_changed.connect(
+            lambda file_name, method=ZAPRET2_MODE: window._preset_runtime_coordinator.handle_preset_content_changed(
+                method,
+                file_name,
+            )
+        )
     except Exception:
         pass
 
     try:
-        store_v1 = window.app_context.preset_store_v1
-        store_v1.preset_switched.connect(window._preset_runtime_coordinator.handle_preset_switched)
-        store_v1.preset_identity_changed.connect(window._preset_runtime_coordinator.handle_preset_identity_changed)
+        store_winws1 = window.app_context.preset_store_winws1
+        store_winws1.preset_switched.connect(window._preset_runtime_coordinator.handle_preset_switched)
+        store_winws1.preset_identity_changed.connect(window._preset_runtime_coordinator.handle_preset_identity_changed)
+        store_winws1.preset_content_changed.connect(
+            lambda file_name, method=ZAPRET1_MODE: window._preset_runtime_coordinator.handle_preset_content_changed(
+                method,
+                file_name,
+            )
+        )
     except Exception:
         pass
 

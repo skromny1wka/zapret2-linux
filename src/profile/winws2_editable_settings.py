@@ -4,6 +4,8 @@ from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import PureWindowsPath
 
+from settings.mode import ENGINE_WINWS2
+
 from .models import Preset, Profile, ProfileSegment
 from .parser import parse_preset_text
 from .serializer import serialize_preset
@@ -34,8 +36,8 @@ def with_winws2_editable_settings(
     profile_index: int,
     settings: Winws2EditableSettings,
 ) -> Preset:
-    if preset.engine != "winws2":
-        raise ValueError("winws2 editable settings are available only for winws2 presets")
+    if preset.engine != ENGINE_WINWS2:
+        raise ValueError(f"{ENGINE_WINWS2} editable settings are available only for {ENGINE_WINWS2} presets")
 
     updated = deepcopy(preset)
     profile = updated.profiles[int(profile_index)]
@@ -92,7 +94,7 @@ def _editable_filter_is_file_based(profile: Profile) -> bool:
 
 
 def _range_value(profile: Profile, option_name: str, *, default: str) -> str:
-    if profile.engine != "winws2":
+    if profile.engine != ENGINE_WINWS2:
         return default
     wanted = str(option_name or "").strip().lower()
     for segment in profile.segments:
@@ -155,7 +157,7 @@ def _canonical_range_line(option_name: str, value: str, *, default_value: str) -
     if parsed is None:
         parsed = parse_out_range_expression(default_value, raw_line=f"{option_name}={default_value}")
     if parsed is None:
-        raise ValueError(f"Invalid winws2 packet range value: {value}")
+        raise ValueError(f"Invalid {ENGINE_WINWS2} packet range value: {value}")
     return f"{option_name}={parsed.expression}"
 
 

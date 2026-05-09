@@ -1,5 +1,4 @@
 # Preset: Default v3 (game filter)
-# TemplateOrigin: Default v3 (game filter)
 # BuiltinVersion: 2.19
 # Description: 
 

@@ -81,7 +81,7 @@ def rebuild_presets_rows(
         if started_at is not None:
             elapsed_ms = int((time.perf_counter() - started_at) * 1000)
             log_fn(
-                f"Z1UserPresetsPage: lightweight list reload {elapsed_ms}ms ({plan.total_presets} presets)",
+                f"Winws1UserPresetsPage: lightweight list reload {elapsed_ms}ms ({plan.total_presets} presets)",
                 "DEBUG",
             )
     except Exception as exc:

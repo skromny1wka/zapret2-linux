@@ -74,10 +74,6 @@ def finalize_page_signal_bootstrap(window) -> None:
 
 
 def ensure_session_memory_defaults(window) -> None:
-    if not hasattr(window, "_zapret2_mode_last_opened_profile_key"):
-        window._zapret2_mode_last_opened_profile_key = None
-    if not hasattr(window, "_zapret2_mode_restore_profile_detail_on_open"):
-        window._zapret2_mode_restore_profile_detail_on_open = False
     if not hasattr(window, "_window_page_signals_connected"):
         window._window_page_signals_connected = False
 
@@ -102,8 +98,10 @@ def get_current_launch_method_for_preset_runtime() -> str:
 
 def resolve_active_preset_watch_path(window) -> str:
     try:
+        from settings.mode import is_preset_launch_method
+
         method = get_current_launch_method_for_preset_runtime()
-        if method not in {"zapret2_mode", "zapret1_mode"}:
+        if not is_preset_launch_method(method):
             return ""
 
         app_context = getattr(window, "app_context", None)

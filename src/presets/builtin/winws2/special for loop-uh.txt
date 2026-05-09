@@ -1,5 +1,4 @@
 # Preset: special for loop-uh
-# TemplateOrigin: special for loop-uh
 # BuiltinVersion: 2.19
 # Description: 
 

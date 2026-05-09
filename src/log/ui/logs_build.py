@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from settings.mode import EXE_NAME_WINWS1
 from ui.theme import get_themed_qta_icon
 
 
@@ -210,7 +211,7 @@ def build_logs_tab_ui(
             "page.logs.winws.title_template",
             language=ui_language,
             default="Вывод {exe_name}",
-        ).format(exe_name="winws.exe")
+        ).format(exe_name=EXE_NAME_WINWS1)
     )
     winws_header.addWidget(winws_title_label)
     winws_header.addSpacing(16)
