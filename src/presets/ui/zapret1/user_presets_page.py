@@ -214,7 +214,6 @@ class Zapret1UserPresetsPage(BasePage):
                 list_log_prefix="Winws1UserPresetsPage",
                 activate_error_level="warning",
                 activate_error_mode="friendly",
-                copy_hierarchy_meta_on_duplicate=True,
                 require_app_context=self._require_app_context,
                 get_preset_store=lambda: self._require_app_context().preset_store_winws1,
             )
@@ -234,17 +233,14 @@ class Zapret1UserPresetsPage(BasePage):
                 all_presets,
                 started_at=started_at,
             ),
-            delete_preset_meta=lambda name: self._get_hierarchy_store().delete_preset_meta(
-                name,
-                display_name=self._resolve_display_name(name),
-            ),
+            delete_preset_meta=lambda name: self._get_hierarchy_store().delete_preset_meta(name),
         )
 
     def _on_store_changed(self):
         self._runtime_service.on_store_changed()
 
-    def _on_store_content_changed(self, file_name_or_name: str):
-        self._runtime_service.on_store_content_changed(file_name_or_name)
+    def _on_store_content_changed(self, file_name: str):
+        self._runtime_service.on_store_content_changed(file_name)
 
     def _on_store_switched(self, _name: str):
         self._runtime_service.on_store_switched(_name)
@@ -281,8 +277,8 @@ class Zapret1UserPresetsPage(BasePage):
     def _get_presets_dir_light(self):
         return self._listing_api().get_presets_dir_light()
 
-    def _read_single_preset_list_metadata_light(self, file_name_or_name: str) -> tuple[str, dict[str, object]] | None:
-        return self._listing_api().read_single_preset_list_metadata_light(file_name_or_name)
+    def _read_single_preset_list_metadata_light(self, file_name: str) -> tuple[str, dict[str, object]] | None:
+        return self._listing_api().read_single_preset_list_metadata_light(file_name)
 
     def _resolve_display_name(self, reference: str) -> str:
         return self._listing_api().resolve_display_name(reference)
@@ -464,9 +460,9 @@ class Zapret1UserPresetsPage(BasePage):
                 self._tr("page.winws1_user_presets.info.title", "Что это такое?"),
                 self._tr(
                     "page.winws1_user_presets.info.body",
-                    'Здесь кнопка для нубов — "хочу чтобы нажал и всё работало". '
-                    "Выбираете любой пресет — тыкаете — перезагружаете вкладку и смотрите, "
-                    "что ресурс открывается (или не открывается). Если не открывается — тыкаете на следующий пресет. "
+                    "Здесь простой режим: выберите любой пресет, примените его, "
+                    "перезагрузите вкладку и проверьте, открывается ли ресурс. "
+                    "Если не открывается, попробуйте следующий пресет. "
                     "Также здесь можно создавать, импортировать, экспортировать и переключать пользовательские пресеты.",
                 ),
                 self.window(),

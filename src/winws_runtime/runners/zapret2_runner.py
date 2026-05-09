@@ -439,7 +439,7 @@ class Winws2StrategyRunner(StrategyRunnerBase):
         source_is_circular = self._is_circular_preset_text(normalized)
         cleaned = normalized if source_is_circular else strip_strategy_tags(normalized)
         if (not source_is_circular) and cleaned != normalized:
-            log("Ignoring legacy :strategy=N tags in launch artifact", "DEBUG")
+            log("Ignoring service :strategy=N tags in launch artifact", "DEBUG")
 
         try:
             from profile.parser import parse_preset_text

@@ -109,7 +109,7 @@ def _replace_primary_match_filter(segments: list[ProfileSegment], filter_line: s
     primary_names = {"--hostlist", "--hostlist-domains", "--ipset", "--ipset-ip"}
     inserted = False
     result: list[ProfileSegment] = []
-    fallback_insert_at: int | None = None
+    strategy_insert_at: int | None = None
 
     for segment in segments:
         name = str(segment.name or "").strip().lower()
@@ -118,12 +118,12 @@ def _replace_primary_match_filter(segments: list[ProfileSegment], filter_line: s
                 result.append(ProfileSegment(kind="match", text=filter_line, name=filter_name, value=filter_value))
                 inserted = True
             continue
-        if fallback_insert_at is None and segment.kind in {"strategy_filter", "strategy"}:
-            fallback_insert_at = len(result)
+        if strategy_insert_at is None and segment.kind in {"strategy_filter", "strategy"}:
+            strategy_insert_at = len(result)
         result.append(segment)
 
     if not inserted:
-        insert_at = fallback_insert_at if fallback_insert_at is not None else len(result)
+        insert_at = strategy_insert_at if strategy_insert_at is not None else len(result)
         result.insert(insert_at, ProfileSegment(kind="match", text=filter_line, name=filter_name, value=filter_value))
     return result
 

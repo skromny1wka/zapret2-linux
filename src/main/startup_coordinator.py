@@ -44,7 +44,7 @@ class StartupCoordinator:
 
     def __init__(self, app_instance):
         self.app = app_instance
-        self.init_tasks_completed = set()
+        self.startup_tasks_completed = set()
 
         # Финализация старта теперь идёт по прямому жизненному циклу, а не через
         # таймерную "проверку готовности".
@@ -169,7 +169,7 @@ class StartupCoordinator:
     def _run_step(self, task_name: str, label: str, func, *, error_status=None) -> bool:
         try:
             func()
-            self.init_tasks_completed.add(task_name)
+            self.startup_tasks_completed.add(task_name)
             return True
         except Exception as exc:
             log(f"Ошибка startup-шага {label}: {exc}", "❌ ERROR")
@@ -206,7 +206,7 @@ class StartupCoordinator:
         Возвращает True если всё готово, иначе False.
         """
         required_components = self._required_components()
-        missing = [c for c in required_components if c not in self.init_tasks_completed]
+        missing = [c for c in required_components if c not in self.startup_tasks_completed]
 
         if missing:
             return False

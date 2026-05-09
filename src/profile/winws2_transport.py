@@ -19,7 +19,7 @@ _OUT_RANGE_INLINE_RE = re.compile(r":out_range=(?P<expr>\"[^\"]+\"|'[^']+'|[^:\s
 _OUT_RANGE_SIMPLE_AUTO_RE = re.compile(r"^a$", re.IGNORECASE)
 _OUT_RANGE_SIMPLE_NEVER_RE = re.compile(r"^x$", re.IGNORECASE)
 _OUT_RANGE_SIMPLE_RE = re.compile(r"^-(?P<mode>[nd])(?P<value>\d+)$", re.IGNORECASE)
-_OUT_RANGE_LEGACY_SIMPLE_RE = re.compile(r"^(?P<mode>[nd]?)(?P<value>\d+)$", re.IGNORECASE)
+_OUT_RANGE_UNSIGNED_SIMPLE_RE = re.compile(r"^(?P<mode>[nd]?)(?P<value>\d+)$", re.IGNORECASE)
 _OUT_RANGE_BOUND_RE = r"(?:[ndspb]?\d+)"
 _OUT_RANGE_RANGE_RE = re.compile(
     rf"^(?:{_OUT_RANGE_BOUND_RE}(?:-|<){_OUT_RANGE_BOUND_RE}|(?:-|<){_OUT_RANGE_BOUND_RE}|{_OUT_RANGE_BOUND_RE}-)$",
@@ -118,10 +118,10 @@ def parse_out_range_expression(expression: object, *, raw_line: str = "") -> Out
         value = int(simple_match.group("value"))
         return OutRangeSettings(enabled=True, value=value, mode=mode, expression=f"-{mode}{value}", raw_line=raw_line)
 
-    legacy_match = _OUT_RANGE_LEGACY_SIMPLE_RE.match(expr)
-    if legacy_match:
-        mode = legacy_match.group("mode").lower() or "n"
-        value = int(legacy_match.group("value"))
+    unsigned_match = _OUT_RANGE_UNSIGNED_SIMPLE_RE.match(expr)
+    if unsigned_match:
+        mode = unsigned_match.group("mode").lower() or "n"
+        value = int(unsigned_match.group("value"))
         return OutRangeSettings(enabled=True, value=value, mode=mode, expression=f"-{mode}{value}", raw_line=raw_line)
 
     if _OUT_RANGE_RANGE_RE.match(expr):
@@ -166,8 +166,8 @@ def normalize_simple_out_range_mode(mode: object, *, default: str = DEFAULT_OUT_
     normalized = str(mode or "").strip().lower()
     if normalized in SIMPLE_OUT_RANGE_MODES:
         return normalized
-    fallback = str(default or DEFAULT_OUT_RANGE_MODE).strip().lower()
-    return fallback if fallback in SIMPLE_OUT_RANGE_MODES else DEFAULT_OUT_RANGE_MODE
+    default_candidate = str(default or DEFAULT_OUT_RANGE_MODE).strip().lower()
+    return default_candidate if default_candidate in SIMPLE_OUT_RANGE_MODES else DEFAULT_OUT_RANGE_MODE
 
 
 def build_simple_out_range_expression(

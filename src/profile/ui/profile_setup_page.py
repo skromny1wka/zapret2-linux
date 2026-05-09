@@ -27,7 +27,7 @@ class ProfileSetupPageBase(BasePage):
     title_key_name = "page.winws2_profile_setup.title"
     control_key = "page.winws2_profile_setup.breadcrumb.control"
     profiles_key = "page.winws2_pages.title"
-    profiles_default = "Настройка preset-а"
+    profiles_default = "Настройка пресета"
 
     def __init__(self, parent=None):
         super().__init__(
@@ -77,7 +77,7 @@ class ProfileSetupPageBase(BasePage):
         self._breadcrumb.currentItemChanged.connect(self._on_breadcrumb_item_changed)
         self.layout.addWidget(self._breadcrumb)
 
-        self._title = TitleLabel("Profile")
+        self._title = TitleLabel("Профиль")
         self.layout.addWidget(self._title)
 
         self._summary = BodyLabel("")
@@ -154,25 +154,25 @@ class ProfileSetupPageBase(BasePage):
         self._in_range_value.textEdited.connect(lambda _text: self._schedule_settings_autosave())
         self._out_range_value.textEdited.connect(lambda _text: self._schedule_settings_autosave())
 
-        self._settings_title = self.add_section_title("Настройки profile", return_widget=True)
+        self._settings_title = self.add_section_title("Настройки профиля", return_widget=True)
         self.layout.addWidget(self._settings_container)
         self._main_widgets.extend([self._settings_title, self._settings_container])
 
-        self._match_title = self.add_section_title("Когда profile применяется", return_widget=True)
+        self._match_title = self.add_section_title("Когда профиль применяется", return_widget=True)
         self._match_text = PlainTextEdit()
         self._match_text.setReadOnly(True)
         self._match_text.setMinimumHeight(110)
         self.layout.addWidget(self._match_text)
         self._main_widgets.extend([self._match_title, self._match_text])
 
-        self._strategy_title = self.add_section_title("Какая готовая стратегия выбрана", return_widget=True)
+        self._strategy_title = self.add_section_title("Выбранная готовая стратегия", return_widget=True)
         self._strategy_text = PlainTextEdit()
         self._strategy_text.setReadOnly(True)
         self._strategy_text.setMinimumHeight(160)
         self.layout.addWidget(self._strategy_text)
         self._main_widgets.extend([self._strategy_title, self._strategy_text])
 
-        self._raw_title = self.add_section_title("Что записано в profile", return_widget=True)
+        self._raw_title = self.add_section_title("Что записано в профиль", return_widget=True)
         self._raw_text = PlainTextEdit()
         self._raw_text.setReadOnly(True)
         self._raw_text.setMinimumHeight(220)
@@ -231,7 +231,7 @@ class ProfileSetupPageBase(BasePage):
             self._breadcrumb.clear()
             self._breadcrumb.addItem("control", tr_catalog(self.control_key, language=self._ui_language, default="Управление"))
             self._breadcrumb.addItem("profiles", tr_catalog(self.profiles_key, language=self._ui_language, default=self.profiles_default))
-            title = str(getattr(getattr(self._payload, "item", None), "display_name", "") or "Profile")
+            title = str(getattr(getattr(self._payload, "item", None), "display_name", "") or "Профиль")
             self._breadcrumb.addItem("profile", title)
             if self._profile_subpage == "feedback":
                 self._breadcrumb.addItem("feedback", "Оценка стратегии")
@@ -263,10 +263,10 @@ class ProfileSetupPageBase(BasePage):
         try:
             payload = self._service().get_profile_setup(self._profile_key)
         except Exception as exc:
-            log(f"{self.__class__.__name__}: не удалось прочитать profile {self._profile_key}: {exc}", "ERROR")
+            log(f"{self.__class__.__name__}: не удалось прочитать профиль {self._profile_key}: {exc}", "ERROR")
             payload = None
         if payload is None:
-            self._title.setText("Profile не найден")
+            self._title.setText("Профиль не найден")
             return
         self._payload = payload
         self._apply_payload(payload)
@@ -327,7 +327,7 @@ class ProfileSetupPageBase(BasePage):
                 status_parts.append("Оценка не выбрана")
             status_parts.append("В избранном" if state.favorite else "Не в избранном")
             if not editable:
-                status_parts.append("Оценка доступна только для выбранной готовой стратегии внутри включённого profile")
+                status_parts.append("Оценка доступна только для готовой стратегии внутри включённого профиля")
             self._feedback_status_label.setText(" • ".join(status_parts))
         if self._favorite_button is not None:
             self._favorite_button.setText("Убрать из избранного" if state.favorite else "В избранное")
@@ -456,7 +456,7 @@ class ProfileSetupPageBase(BasePage):
             self.reload_current_profile()
             self.profile_changed.emit(self._profile_key, "settings")
         except Exception as exc:
-            log(f"{self.__class__.__name__}: не удалось сохранить настройки profile: {exc}", "ERROR")
+            log(f"{self.__class__.__name__}: не удалось сохранить настройки профиля: {exc}", "ERROR")
 
     def _on_enabled_changed(self, state: int) -> None:
         if self._loading or not self._profile_key:
@@ -469,7 +469,7 @@ class ProfileSetupPageBase(BasePage):
             self.reload_current_profile()
             self.profile_changed.emit(self._profile_key, "enabled" if enabled else "disabled")
         except Exception as exc:
-            log(f"{self.__class__.__name__}: не удалось изменить состояние profile: {exc}", "ERROR")
+            log(f"{self.__class__.__name__}: не удалось изменить состояние профиля: {exc}", "ERROR")
 
     def _on_strategy_changed(self, index: int) -> None:
         if self._loading or not self._profile_key:
@@ -513,7 +513,7 @@ class Zapret2ProfileSetupPage(ProfileSetupPageBase):
     title_key_name = "page.winws2_profile_setup.title"
     control_key = "page.winws2_profile_setup.breadcrumb.control"
     profiles_key = "page.winws2_pages.title"
-    profiles_default = "Настройка preset-а"
+    profiles_default = "Настройка пресета"
 
 
 class Zapret1ProfileSetupPage(ProfileSetupPageBase):
@@ -521,4 +521,4 @@ class Zapret1ProfileSetupPage(ProfileSetupPageBase):
     title_key_name = "page.winws1_profile_setup.title"
     control_key = "page.winws1_profile_setup.breadcrumb.control"
     profiles_key = "page.winws1_pages.title"
-    profiles_default = "Настройка preset-а"
+    profiles_default = "Настройка пресета"

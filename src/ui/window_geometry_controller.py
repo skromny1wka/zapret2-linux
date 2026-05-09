@@ -101,7 +101,7 @@ class WindowGeometryController:
             screen_geometry = QApplication.primaryScreen().availableGeometry()
             screens = QApplication.screens()
 
-            def _looks_like_legacy_maximized_geometry(width: int, height: int) -> bool:
+            def _looks_like_saved_maximized_geometry(width: int, height: int) -> bool:
                 if not saved.maximized:
                     return False
                 for screen in screens:
@@ -112,9 +112,9 @@ class WindowGeometryController:
 
             if saved.size:
                 width, height = saved.size
-                if _looks_like_legacy_maximized_geometry(width, height):
+                if _looks_like_saved_maximized_geometry(width, height):
                     log(
-                        "Обнаружена legacy normal-геометрия (размер почти как fullscreen); используем размер по умолчанию",
+                        "Обнаружена сохранённая normal-геометрия почти во весь экран; используем размер по умолчанию",
                         "WARNING",
                     )
                     width, height = self.default_width, self.default_height

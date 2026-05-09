@@ -75,21 +75,14 @@ class PresetListModel(QAbstractListModel):
     def set_active_preset(
         self,
         file_name: str,
-        *,
-        display_name: str = "",
-        use_display_name_fallback: bool = False,
     ) -> bool:
         preset_file_name = str(file_name or "").strip()
-        preset_display_name = str(display_name or "").strip()
         changed_rows: list[int] = []
         for row_index, row in enumerate(self._rows):
             if str(row.get("kind") or "") != "preset":
                 continue
             row_file_name = str(row.get("file_name") or "")
-            row_display_name = str(row.get("name") or "")
             next_active = bool(preset_file_name and row_file_name == preset_file_name)
-            if not next_active and use_display_name_fallback:
-                next_active = bool(preset_display_name and row_display_name == preset_display_name)
             if bool(row.get("is_active", False)) == next_active:
                 continue
             row["is_active"] = next_active

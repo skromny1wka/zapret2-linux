@@ -19,7 +19,7 @@ class PresetSetupPageBase(BasePage):
     profile_ui_mode_override: str | None = None
     launch_method = ZAPRET2_MODE
     engine_label = "Zapret 2"
-    page_title = "Настройка preset-а"
+    page_title = "Настройка пресета"
     title_key = "page.winws2_pages.title"
     control_key = "page.winws2_pages.back.control"
     toolbar_title_key = "page.winws2_pages.toolbar.title"
@@ -122,8 +122,8 @@ class PresetSetupPageBase(BasePage):
             payload = self._service().list_profiles()
             self._apply_payload(payload)
         except Exception as exc:
-            log(f"{self.__class__.__name__}: не удалось прочитать profiles: {exc}", "ERROR")
-            self._show_empty_state("Не удалось прочитать profiles выбранного preset. Проверьте лог и сам preset-файл.")
+            log(f"{self.__class__.__name__}: не удалось прочитать профили: {exc}", "ERROR")
+            self._show_empty_state("Не удалось прочитать профили выбранного пресета. Проверьте лог и сам пресет-файл.")
         finally:
             try:
                 if self._reload_btn is not None:
@@ -136,7 +136,7 @@ class PresetSetupPageBase(BasePage):
             return
         self._clear_dynamic_widgets()
         if not payload.items:
-            self._show_empty_state("В выбранном preset не найдено ни одного profile.")
+            self._show_empty_state("В выбранном пресете не найдено ни одного профиля.")
             return
         profiles_list = ProfilesList(self)
         profiles_list.profile_selected.connect(self._on_profile_clicked)
@@ -175,14 +175,14 @@ class PresetSetupPageBase(BasePage):
             self._service().move_profile_before(source_profile_key, destination_profile_key)
             self.refresh_from_preset_switch()
         except Exception as exc:
-            log(f"{self.__class__.__name__}: не удалось переместить profile: {exc}", "ERROR")
+            log(f"{self.__class__.__name__}: не удалось переместить профиль: {exc}", "ERROR")
 
     def _on_profile_move_to_end_requested(self, profile_key: str) -> None:
         try:
             self._service().move_profile_to_end(profile_key)
             self.refresh_from_preset_switch()
         except Exception as exc:
-            log(f"{self.__class__.__name__}: не удалось переместить profile в конец: {exc}", "ERROR")
+            log(f"{self.__class__.__name__}: не удалось переместить профиль в конец: {exc}", "ERROR")
 
     def apply_profile_setup_change(self, profile_key: str, change_kind: str) -> None:
         _ = (profile_key, change_kind)
@@ -198,8 +198,8 @@ class PresetSetupPageBase(BasePage):
 
     def _show_profile_info(self) -> None:
         MessageBox(
-            "Настройка preset-а",
-            "На этой странице показаны profiles выбранного preset. Включение шаблона добавляет его в preset, выключение существующего profile записывает --skip.",
+            "Настройка пресета",
+            "На этой странице показаны профили выбранного пресета. Включение шаблона добавляет его в пресет, выключение существующего профиля записывает --skip.",
             self,
         ).exec()
 
@@ -207,7 +207,7 @@ class PresetSetupPageBase(BasePage):
 class Zapret2PresetSetupPage(PresetSetupPageBase):
     launch_method = ZAPRET2_MODE
     engine_label = "Zapret 2"
-    page_title = "Настройка preset-а"
+    page_title = "Настройка пресета"
     title_key = "page.winws2_pages.title"
     control_key = "page.winws2_pages.back.control"
     toolbar_title_key = "page.winws2_pages.toolbar.title"
@@ -219,7 +219,7 @@ class Zapret2PresetSetupPage(PresetSetupPageBase):
 class Zapret1PresetSetupPage(PresetSetupPageBase):
     launch_method = ZAPRET1_MODE
     engine_label = "Zapret 1"
-    page_title = "Настройка preset-а"
+    page_title = "Настройка пресета"
     title_key = "page.winws1_pages.title"
     control_key = "page.winws1_pages.back.control"
     toolbar_title_key = "page.winws1_pages.toolbar.title"

@@ -3,23 +3,17 @@
 """
 
 import os
-import time
 
 from PyQt6.QtCore import QTimer
-from app_notifications import advisory_notification, notification_action
 from settings.dpi.strategy_settings import get_strategy_launch_method
 from settings.mode import is_preset_launch_method, normalize_launch_method
 from log.log import log
 
-from winws_runtime.health.process_health_check import (
-    check_conflicting_processes,
-    try_kill_conflicting_processes,
-    get_conflicting_processes_report,
-)
 from winws_runtime.flow.start_preparation import (
     prepare_start_request,
     resolve_method_name,
 )
+from .conflict_flow import handle_conflicting_processes_before_start
 from .restart_flow import (
     handle_presets_switch_finished,
     process_pending_presets_switch,
@@ -73,9 +67,11 @@ class PresetLaunchController:
         self._pending_conflict_request_id = 0
         self._pending_conflict_selected_mode = None
         self._pending_conflict_launch_method = None
+        self._first_runtime_apply = True
+        self._discord_manager = None
 
     def _runtime_service(self):
-        return getattr(self.app, "launch_runtime_service", None)
+        return self.app.launch_runtime_service
 
     def _runtime_ui_bridge(self):
         return ensure_runtime_ui_bridge(self.app)
@@ -131,7 +127,7 @@ class PresetLaunchController:
                     from settings.mode import exe_name_for_launch_method
 
 
-                    expected_name = exe_name_for_launch_method(method).strip().lower()
+                    expected_name = exe_name_for_launch_method(launch_method).strip().lower()
                     runner_name = os.path.basename(str(getattr(runner, "winws_exe", "") or "")).strip().lower()
                     if expected_name and runner_name and expected_name != runner_name:
                         return False
@@ -169,126 +165,6 @@ class PresetLaunchController:
 
         QTimer.singleShot(200, _retry)
 
-    def _store_pending_conflict_request(self, selected_mode=None, launch_method=None) -> int:
-        self._pending_conflict_request_id += 1
-        self._pending_conflict_selected_mode = selected_mode
-        self._pending_conflict_launch_method = launch_method
-        return int(self._pending_conflict_request_id)
-
-    def _has_pending_conflict_request(self, request_id: int) -> bool:
-        return int(request_id or 0) == int(self._pending_conflict_request_id or 0)
-
-    def _clear_pending_conflict_request(self, request_id: int | None = None) -> None:
-        if request_id is not None and not self._has_pending_conflict_request(int(request_id)):
-            return
-        self._pending_conflict_selected_mode = None
-        self._pending_conflict_launch_method = None
-
-    def _show_conflicting_processes_infobar(self, conflicting: list[dict], request_id: int) -> None:
-        controller = getattr(self.app, "window_notification_controller", None)
-        if controller is None:
-            log("WindowNotificationController недоступен для показа предупреждения о конфликтах", "DEBUG")
-            return
-
-        names = ", ".join(str(item.get("name") or item.get("exe") or "неизвестно") for item in conflicting)
-        controller.notify(
-            advisory_notification(
-                level="warning",
-                title="Обнаружены конфликтующие программы",
-                content=(
-                    "Обнаружены программы, которые блокируют WinDivert:\n\n"
-                    f"{names}\n\n"
-                    "Эти программы перехватывают системные вызовы и не дают "
-                    "WinDivert драйверу запуститься."
-                ),
-                source="launch.conflicting_processes",
-                presentation="infobar",
-                queue="immediate",
-                duration=-1,
-                dedupe_key=f"launch.conflicting_processes:{request_id}",
-                dedupe_window_ms=0,
-                buttons=[
-                    notification_action("launch_conflict_kill_start", "Закрыть и продолжить", value=request_id),
-                    notification_action("launch_conflict_ignore_start", "Продолжить без закрытия", value=request_id),
-                    notification_action("launch_conflict_cancel", "Отмена", value=request_id),
-                ],
-            )
-        )
-
-    def _show_conflict_kill_failed_infobar(self, request_id: int) -> None:
-        controller = getattr(self.app, "window_notification_controller", None)
-        if controller is None:
-            log("WindowNotificationController недоступен для показа ошибки закрытия конфликтов", "DEBUG")
-            return
-
-        controller.notify(
-            advisory_notification(
-                level="warning",
-                title="Не удалось закрыть процессы",
-                content=(
-                    "Некоторые конфликтующие процессы не удалось закрыть.\n"
-                    "Запуск DPI может завершиться ошибкой."
-                ),
-                source="launch.conflicting_processes.kill_failed",
-                presentation="infobar",
-                queue="immediate",
-                duration=-1,
-                dedupe_key=f"launch.conflicting_processes.kill_failed:{request_id}",
-                dedupe_window_ms=0,
-                buttons=[
-                    notification_action("launch_conflict_ignore_start", "Продолжить запуск", value=request_id),
-                    notification_action("launch_conflict_cancel", "Отмена", value=request_id),
-                ],
-            )
-        )
-
-    def _handle_conflicting_processes_before_start(self, selected_mode=None, launch_method=None) -> bool:
-        conflicting = check_conflicting_processes()
-        if not conflicting:
-            return True
-
-        report = get_conflicting_processes_report()
-        log(report, "WARNING")
-        request_id = self._store_pending_conflict_request(selected_mode, launch_method)
-        self._show_conflicting_processes_infobar(conflicting, request_id)
-        self.app.set_status("⚠️ Обнаружены конфликтующие программы. Решите, как продолжить запуск.")
-        return False
-
-    def _resume_start_after_conflict_resolution(self, request_id: int, *, close_conflicts: bool) -> None:
-        if not self._has_pending_conflict_request(request_id):
-            log(f"Пропуск устаревшего действия по конфликтующим процессам: {request_id}", "DEBUG")
-            return
-
-        selected_mode = self._pending_conflict_selected_mode
-        launch_method = self._pending_conflict_launch_method
-
-        if close_conflicts:
-            log("Пользователь выбрал закрыть конфликтующие процессы", "INFO")
-            killed = try_kill_conflicting_processes(auto_kill=True)
-            if killed:
-                log("Конфликтующие процессы закрыты, ожидание 1с...", "INFO")
-                time.sleep(1)
-            else:
-                log("Не удалось закрыть все конфликтующие процессы", "WARNING")
-                self._show_conflict_kill_failed_infobar(request_id)
-                return
-        else:
-            log("Пользователь продолжил запуск несмотря на конфликтующие процессы", "WARNING")
-
-        self._clear_pending_conflict_request(request_id)
-        self.start_dpi_async(
-            selected_mode=selected_mode,
-            launch_method=launch_method,
-            _skip_conflict_prompt=True,
-        )
-
-    def _cancel_start_after_conflict_prompt(self, request_id: int) -> None:
-        if not self._has_pending_conflict_request(request_id):
-            return
-        self._clear_pending_conflict_request(request_id)
-        self.app.set_status("Запуск DPI отменён пользователем")
-        log("Запуск DPI отменён пользователем из-за конфликтующих процессов", "INFO")
-
     def _fail_start_preparation(self, message: str) -> None:
         text = str(message or "").strip() or "Не удалось подготовить запуск DPI"
         log(f"Ошибка подготовки запуска: {text}", "❌ ERROR")
@@ -312,59 +188,22 @@ class PresetLaunchController:
             return ""
 
     def _begin_runtime_start(self, launch_method: str, selected_mode) -> None:
-        runtime_service = self._runtime_service()
-        if runtime_service is not None:
-            runtime_service.begin_start(
-                launch_method=launch_method,
-                expected_process=self._expected_process_name(launch_method),
-            )
+        self._runtime_service().begin_start(
+            launch_method=launch_method,
+            expected_process=self._expected_process_name(launch_method),
+        )
 
     def _mark_runtime_running(self, pid: int | None = None) -> None:
-        runtime_service = self._runtime_service()
-        if runtime_service is not None:
-            runtime_service.mark_running(pid=pid)
+        self._runtime_service().mark_running(pid=pid)
 
     def _mark_runtime_failed(self, error_message: str, *, exit_code: int | None = None) -> None:
-        runtime_service = self._runtime_service()
-        if runtime_service is not None:
-            runtime_service.mark_start_failed(error_message)
+        self._runtime_service().mark_start_failed(error_message)
 
     def _begin_runtime_stop(self) -> None:
-        runtime_service = self._runtime_service()
-        if runtime_service is not None:
-            runtime_service.begin_stop()
+        self._runtime_service().begin_stop()
 
     def _mark_runtime_stopped(self) -> None:
-        runtime_service = self._runtime_service()
-        if runtime_service is not None:
-            runtime_service.mark_stopped(clear_error=True)
-
-    def _maybe_restart_discord_after_runtime_apply(self, *, skip_first_start: bool) -> bool:
-        """Перезапускает Discord после применения пресета, если это разрешено настройкой."""
-        try:
-            is_first_start = bool(getattr(self.app, "_first_dpi_start", True))
-            if skip_first_start and is_first_start:
-                return False
-
-            from discord.discord_restart import get_discord_restart_setting
-
-            if not bool(get_discord_restart_setting(default=True)):
-                return False
-
-            discord_manager = getattr(self.app, "discord_manager", None)
-            if discord_manager is None:
-                from discord.discord import DiscordManager
-
-                discord_manager = DiscordManager(status_callback=self.app.set_status)
-                self.app.discord_manager = discord_manager
-
-            return bool(discord_manager.restart_discord_if_running())
-        except Exception as e:
-            log(f"Discord restart check error: {e}", "DEBUG")
-            return False
-        finally:
-            if skip_first_start:
-                self.app._first_dpi_start = False
+        self._runtime_service().mark_stopped(clear_error=True)
 
     def _process_pending_presets_switch(self) -> None:
         process_pending_presets_switch(self)
@@ -406,7 +245,7 @@ class PresetLaunchController:
 
         self._pending_launch_warnings = []
 
-        if not skip_conflict_prompt and not self._handle_conflicting_processes_before_start(selected_mode, launch_method):
+        if not skip_conflict_prompt and not handle_conflicting_processes_before_start(self, selected_mode, launch_method):
             return False
 
         # Invalidate any pending verification loop from older starts.
@@ -485,9 +324,8 @@ class PresetLaunchController:
             if bridge is not None:
                 bridge.show_active_preset_setup_page_loading()
 
-        store = getattr(self.app, "ui_state_store", None)
-        if store is not None and not _startup_autostart:
-            store.set_launch_busy(True, "Запуск Zapret...")
+        if not _startup_autostart:
+            self.app.ui_state_store.set_launch_busy(True, "Запуск Zapret...")
 
         self._begin_runtime_start(request.launch_method, request.selected_mode)
 
@@ -528,9 +366,7 @@ class PresetLaunchController:
         if bridge is not None:
             bridge.show_active_preset_setup_page_loading()
         
-        store = getattr(self.app, "ui_state_store", None)
-        if store is not None:
-            store.set_launch_busy(True, "Остановка Zapret...")
+        self.app.ui_state_store.set_launch_busy(True, "Остановка Zapret...")
 
         self._begin_runtime_stop()
 
@@ -598,12 +434,10 @@ class PresetLaunchController:
             True если процесс запущен, False иначе
         """
         try:
-            runtime_service = getattr(self.app, "launch_runtime_service", None)
-            if runtime_service is not None:
-                snapshot = runtime_service.snapshot()
-                phase = str(getattr(snapshot, "phase", "") or "").strip().lower()
-                if bool(getattr(snapshot, "running", False)) and phase == "running":
-                    return True
+            snapshot = self.app.launch_runtime_service.snapshot()
+            phase = str(snapshot.phase or "").strip().lower()
+            if bool(snapshot.running) and phase == "running":
+                return True
         except Exception:
             pass
 

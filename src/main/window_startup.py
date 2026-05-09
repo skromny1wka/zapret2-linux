@@ -4,7 +4,6 @@ import traceback
 import time as _time
 
 from app_context import build_app_context, install_app_context
-from config.build_info import APP_VERSION
 from config.window_metrics import HEIGHT, MIN_WIDTH, WIDTH
 
 from log.log import log
@@ -37,8 +36,8 @@ def window_bootstrap_for(window_cls, *, start_in_tray: bool):
     return app_context, window
 
 
-def manager_bootstrap_for(window) -> None:
-    from managers.subscription_manager import SubscriptionManager
+def startup_services_bootstrap_for(window) -> None:
+    from donater.subscription_manager import SubscriptionManager
     from main.startup_coordinator import StartupCoordinator
     from winws_runtime.monitoring import ProcessMonitorManager
 
@@ -72,7 +71,6 @@ class WindowStartupMixin:
         self._startup_background_init_started = False
         self._tray_launch_notification_pending = bool(self.start_in_tray)
 
-        self.setWindowTitle(f"Zapret2 v{APP_VERSION}")
         self.setMinimumSize(MIN_WIDTH, 400)
         self.window_close_controller = WindowCloseController(self)
         self.window_geometry_controller = WindowGeometryController(
@@ -181,10 +179,9 @@ class WindowStartupMixin:
         total_started_at = _time.perf_counter()
         bootstrap_started_at = _time.perf_counter()
 
-        manager_bootstrap_for(self)
+        startup_services_bootstrap_for(self)
         log(f"⏱ Startup: startup bootstrap {(_time.perf_counter() - bootstrap_started_at) * 1000:.0f}ms", "DEBUG")
 
-        self.update_title_with_subscription_status(False, None, 0, source="init")
         self.startup_coordinator.run_async_init()
         log(f"⏱ Startup: continue init total {(_time.perf_counter() - total_started_at) * 1000:.0f}ms", "DEBUG")
 

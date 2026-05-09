@@ -67,7 +67,7 @@ def build_winws2_pages_deferred_sections(
     )
 
     preset_setup_card = setting_card_group_cls(
-        tr_fn("page.winws2_control.section.profile_tuning", "Настройка preset-а"),
+        tr_fn("page.winws2_control.section.profile_tuning", "Настройка пресета"),
         content_parent,
     )
     preset_setup_entry = build_preset_setup_open_card_common(
@@ -84,7 +84,7 @@ def build_winws2_pages_deferred_sections(
         button_text=tr_fn("page.winws2_control.button.change_mode", "Изменить режим"),
         icon=get_cached_qta_pixmap("fa5s.sliders-h", color="#8ab4f8", size=20),
         title_text=tr_fn("page.winws2_control.mode.basic", "Basic"),
-        content_text=tr_fn("page.winws2_control.profile_ui_mode.caption", "Режим отображения profile"),
+        content_text=tr_fn("page.winws2_control.profile_ui_mode.caption", "Режим отображения профилей"),
         on_click=on_open_profile_ui_mode_dialog,
         parent=content_parent,
     )

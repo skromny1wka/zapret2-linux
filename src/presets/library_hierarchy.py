@@ -158,22 +158,13 @@ class PresetHierarchyStore:
             if key:
                 self._display_name_by_key[key] = display_name
 
-    def _resolve_preset_key(self, preset_key: str, *, display_name: str | None = None) -> str:
-        _ = display_name
+    def _resolve_preset_key(self, preset_key: str) -> str:
+        return str(preset_key or "").strip()
+
+    def get_preset_meta(self, preset_name: str) -> dict:
         self._ensure_loaded()
         assert self._state is not None
-
-        candidate = str(preset_key or "").strip()
-        if candidate and candidate in self._state["presets"]:
-            return candidate
-        if self._display_name_by_key and candidate and candidate in self._display_name_by_key:
-            return candidate
-        return candidate
-
-    def get_preset_meta(self, preset_name: str, *, display_name: str | None = None) -> dict:
-        self._ensure_loaded()
-        assert self._state is not None
-        key = self._resolve_preset_key(preset_name, display_name=display_name)
+        key = self._resolve_preset_key(preset_name)
         raw = self._state["presets"].get(key) or {}
         return _normalize_preset_meta(raw)
 
@@ -181,22 +172,16 @@ class PresetHierarchyStore:
         self,
         old_name: str,
         new_name: str,
-        *,
-        old_display_name: str | None = None,
-        new_display_name: str | None = None,
     ) -> None:
-        _ = new_display_name
         self._ensure_loaded()
         assert self._state is not None
 
-        old_key = self._resolve_preset_key(old_name, display_name=old_display_name)
+        old_key = self._resolve_preset_key(old_name)
         new_key = str(new_name or "").strip()
         if not old_key or not new_key or old_key == new_key:
             return
 
         raw = self._state["presets"].pop(old_key, None)
-        if raw is None and old_display_name:
-            raw = self._state["presets"].pop(str(old_display_name).strip(), None)
         if raw is not None:
             self._state["presets"][new_key] = _normalize_preset_meta(raw)
             self._save()
@@ -206,13 +191,10 @@ class PresetHierarchyStore:
         source_name: str,
         new_name: str,
         *,
-        source_display_name: str | None = None,
-        new_display_name: str | None = None,
         reset_pin: bool = True,
         reset_rating: bool = True,
     ) -> None:
-        _ = new_display_name
-        source = self.get_preset_meta(source_name, display_name=source_display_name)
+        source = self.get_preset_meta(source_name)
         copied = dict(source)
         if reset_pin:
             copied["pinned"] = False
@@ -221,36 +203,36 @@ class PresetHierarchyStore:
         copied["order"] = None
         self._set_preset_meta(new_name, copied)
 
-    def delete_preset_meta(self, preset_name: str, *, display_name: str | None = None) -> None:
+    def delete_preset_meta(self, preset_name: str) -> None:
         self._ensure_loaded()
         assert self._state is not None
-        key = self._resolve_preset_key(preset_name, display_name=display_name)
+        key = self._resolve_preset_key(preset_name)
         if key and self._state["presets"].pop(key, None) is not None:
             self._save()
 
-    def toggle_preset_pin(self, preset_name: str, *, display_name: str | None = None) -> bool:
-        meta = self.get_preset_meta(preset_name, display_name=display_name)
+    def toggle_preset_pin(self, preset_name: str) -> bool:
+        meta = self.get_preset_meta(preset_name)
         next_value = not bool(meta.get("pinned", False))
-        self.set_preset_pin(preset_name, next_value, display_name=display_name)
+        self.set_preset_pin(preset_name, next_value)
         return next_value
 
-    def set_preset_pin(self, preset_name: str, pinned: bool, *, display_name: str | None = None) -> None:
+    def set_preset_pin(self, preset_name: str, pinned: bool) -> None:
         self._ensure_loaded()
         assert self._state is not None
-        key = self._resolve_preset_key(preset_name, display_name=display_name)
+        key = self._resolve_preset_key(preset_name)
         if not key:
             return
-        meta = self.get_preset_meta(key, display_name=display_name)
+        meta = self.get_preset_meta(key)
         meta["pinned"] = bool(pinned)
         self._set_preset_meta(key, meta)
 
-    def set_preset_rating(self, preset_name: str, rating: int, *, display_name: str | None = None) -> None:
+    def set_preset_rating(self, preset_name: str, rating: int) -> None:
         self._ensure_loaded()
         assert self._state is not None
-        key = self._resolve_preset_key(preset_name, display_name=display_name)
+        key = self._resolve_preset_key(preset_name)
         if not key:
             return
-        meta = self.get_preset_meta(key, display_name=display_name)
+        meta = self.get_preset_meta(key)
         try:
             normalized = int(rating)
         except Exception:
@@ -276,7 +258,7 @@ class PresetHierarchyStore:
 
     def _sort_preset_keys(self, names: Iterable[str]) -> list[str]:
         def sort_key(name: str) -> tuple[int, int, int, int, str]:
-            meta = self.get_preset_meta(name, display_name=self._display_name_for_key(name))
+            meta = self.get_preset_meta(name)
             order = meta.get("order")
             return (
                 0 if meta.get("pinned") else 1,
@@ -323,7 +305,7 @@ class PresetHierarchyStore:
 
     def _apply_preset_order_list(self, ordered_names: Iterable[str]) -> None:
         for index, name in enumerate(ordered_names):
-            meta = self.get_preset_meta(name, display_name=self._display_name_for_key(name))
+            meta = self.get_preset_meta(name)
             meta["order"] = index
             self._state["presets"][name] = _normalize_preset_meta(meta)
         self._save()

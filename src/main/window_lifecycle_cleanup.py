@@ -18,9 +18,7 @@ def detach_global_error_notifier() -> None:
 
 def persist_window_geometry(window, *, context: str, level: str = "DEBUG") -> None:
     try:
-        geometry_controller = getattr(window, "window_geometry_controller", None)
-        if geometry_controller is not None:
-            geometry_controller.persist_now(force=True)
+        window.window_geometry_controller.persist_now(force=True)
     except Exception as e:
         log(f"Ошибка сохранения геометрии окна при {context}: {e}", level)
 
@@ -28,6 +26,8 @@ def persist_window_geometry(window, *, context: str, level: str = "DEBUG") -> No
 def release_input_interaction_states(window) -> None:
     """Сбрасывает drag/resize состояния при скрытии/потере фокуса окна."""
     try:
+        # Эти поля принадлежат безрамочному окну и могут отсутствовать у тестовых
+        # или частично созданных экземпляров.
         if bool(getattr(window, "_is_resizing", False)) and hasattr(window, "_end_resize"):
             window._end_resize()
         else:
@@ -58,6 +58,7 @@ def release_input_interaction_states(window) -> None:
 
 
 def iter_loaded_pages_for_close(window) -> Iterator[tuple[object, object]]:
+    # Страницы создаются лениво: при раннем закрытии список может ещё не появиться.
     loaded_pages = getattr(window, "pages", {}) or {}
     for page_name, page in loaded_pages.items():
         if page is None:
@@ -90,6 +91,8 @@ def cleanup_threaded_pages_for_close(window) -> None:
 
 def cleanup_support_managers_for_close(window) -> None:
     try:
+        # Эти сервисы создаются после первого показа окна, поэтому при очень
+        # раннем закрытии их может ещё не быть.
         process_monitor_manager = getattr(window, "process_monitor_manager", None)
         if process_monitor_manager is not None:
             process_monitor_manager.stop_monitoring()
@@ -138,34 +141,17 @@ def cleanup_visual_and_proxy_resources_for_close(window) -> None:
 
 def cleanup_runtime_threads_for_close(window) -> None:
     try:
+        # launch_controller появляется в первой startup-фазе.
         launch_controller = getattr(window, "launch_controller", None)
         if launch_controller is not None:
             launch_controller.cleanup_threads()
     except Exception as e:
         log(f"Ошибка очистки DPI controller threads: {e}", "DEBUG")
 
-    try:
-        if hasattr(window, "_dpi_start_thread") and window._dpi_start_thread:
-            try:
-                if window._dpi_start_thread.isRunning():
-                    window._dpi_start_thread.quit()
-                    window._dpi_start_thread.wait(1000)
-            except RuntimeError:
-                pass
-
-        if hasattr(window, "_dpi_stop_thread") and window._dpi_stop_thread:
-            try:
-                if window._dpi_stop_thread.isRunning():
-                    window._dpi_stop_thread.quit()
-                    window._dpi_stop_thread.wait(1000)
-            except RuntimeError:
-                pass
-    except Exception as e:
-        log(f"Ошибка при очистке потоков: {e}", "❌ ERROR")
-
 
 def cleanup_tray_for_close(window) -> None:
     try:
+        # Tray создаётся лениво для обычного запуска.
         tray_manager = getattr(window, "tray_manager", None)
         if tray_manager is not None:
             tray_manager.cleanup()
@@ -176,7 +162,9 @@ def cleanup_tray_for_close(window) -> None:
 
 def hide_tray_icon_for_exit(window) -> None:
     try:
-        if hasattr(window, "tray_manager") and window.tray_manager:
-            window.tray_manager.hide_icon()
+        # Tray может ещё не существовать, если пользователь ни разу не сворачивал окно.
+        tray_manager = getattr(window, "tray_manager", None)
+        if tray_manager is not None:
+            tray_manager.hide_icon()
     except Exception:
         pass

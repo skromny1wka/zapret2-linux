@@ -92,7 +92,7 @@ class CreatePresetDialog(MessageBoxBase):
             )
             self._source_seg.addItem(
                 "standard",
-                self._tr("page.winws1_user_presets.dialog.create.source.standard", "Стандартного preset-а"),
+                self._tr("page.winws1_user_presets.dialog.create.source.standard", "Встроенного пресета"),
             )
             self._source_seg.setCurrentItem("current")
             self._source_seg.currentItemChanged.connect(lambda k: setattr(self, "_source", k))
@@ -207,7 +207,7 @@ class RenamePresetDialog(MessageBoxBase):
 
 
 class ResetAllPresetsDialog(MessageBoxBase):
-    """Диалог подтверждения возврата встроенных preset-ов."""
+    """Диалог подтверждения возврата встроенных пресетов."""
 
     def __init__(self, parent=None, language: str = "ru"):
         if parent and not parent.isWindow():
@@ -218,7 +218,7 @@ class ResetAllPresetsDialog(MessageBoxBase):
             tr_presets_dialog(
                 "page.winws1_user_presets.dialog.reset_all.title",
                 self._ui_language,
-                "Вернуть заводские пресеты",
+                "Вернуть встроенные пресеты",
             ),
             self.widget,
         )
@@ -226,10 +226,10 @@ class ResetAllPresetsDialog(MessageBoxBase):
             tr_presets_dialog(
                 "page.winws1_user_presets.dialog.reset_all.body",
                 self._ui_language,
-                "Стандартные пресеты будут восстановлены как после установки.\n"
-                "Ваши изменения в стандартных пресетах будут потеряны.\n"
+                "Встроенные пресеты будут возвращены к состоянию после установки.\n"
+                "Ваши изменения во встроенных пресетах будут потеряны.\n"
                 "Пользовательские пресеты с другими именами останутся.\n"
-                "Текущий активный пресет будет применен заново автоматически.",
+                "Текущий выбранный пресет будет применён заново автоматически.",
             ),
             self.widget,
         )
@@ -240,7 +240,7 @@ class ResetAllPresetsDialog(MessageBoxBase):
             tr_presets_dialog(
                 "page.winws1_user_presets.dialog.reset_all.button",
                 self._ui_language,
-                "Вернуть заводские",
+                "Вернуть встроенные",
             )
         )
         self.cancelButton.setText(

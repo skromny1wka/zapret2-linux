@@ -97,7 +97,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "About",
     },
     "nav.page.zapret2_mode": {
-        "ru": "Настройка preset-а",
+        "ru": "Настройка пресета",
         "en": "Preset setup",
     },
     "nav.page.zapret2_user_presets": {
@@ -105,7 +105,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "My Presets",
     },
     "nav.page.zapret1_mode": {
-        "ru": "Настройка preset-а",
+        "ru": "Настройка пресета",
         "en": "Preset setup",
     },
     "nav.page.zapret1_user_presets": {
@@ -217,7 +217,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Switch Bypass Preset",
     },
     "page.winws2_control.profile_tuning": {
-        "ru": "Настройка preset-а",
+        "ru": "Настройка пресета",
         "en": "Preset setup",
     },
     "page.winws1_control.title": {
@@ -225,7 +225,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Zapret 1 Control",
     },
     "page.winws1_control.presets": {
-        "ru": "Preset-ы и настройка preset-а",
+        "ru": "Пресеты и настройка пресета",
         "en": "Presets and preset setup",
     },
     "page.winws1_control.status.checking": {
@@ -277,11 +277,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "My Presets",
     },
     "page.winws1_control.profiles.title": {
-        "ru": "Настройка preset-а",
+        "ru": "Настройка пресета",
         "en": "Preset setup",
     },
     "page.winws1_control.profiles.desc": {
-        "ru": "Открыть profiles выбранного preset-а и выбрать готовые стратегии",
+        "ru": "Открыть профили выбранного пресета и выбрать готовые стратегии",
         "en": "Open profiles from the selected preset and choose ready strategies",
     },
     "page.winws1_control.button.open": {
@@ -3465,7 +3465,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Failed to open Discord:\n{error}",
     },
     "page.winws1_control.subtitle": {
-        "ru": f"Настройка и запуск Zapret 1 ({EXE_NAME_WINWS1}). В «Мои пресеты» выбирается preset, а в «Настройка preset-а» меняются profiles и готовые стратегии.",
+        "ru": f"Настройка и запуск Zapret 1 ({EXE_NAME_WINWS1}). В «Мои пресеты» выбирается пресет, а в «Настройка пресета» меняются профили и выбранные для них готовые стратегии.",
         "en": f"Configure and launch Zapret 1 ({EXE_NAME_WINWS1}). My presets selects a preset; preset setup changes profiles and ready strategies.",
     },
     "page.winws1_control.section.status": {
@@ -3477,7 +3477,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Zapret 1 Control",
     },
     "page.winws1_control.section.presets": {
-        "ru": "Preset-ы и настройка preset-а",
+        "ru": "Пресеты и настройка пресета",
         "en": "Presets and preset setup",
     },
     "page.winws1_control.section.program_settings": {
@@ -3485,7 +3485,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Program Settings",
     },
     "page.winws1_pages.title": {
-        "ru": "Настройка preset-а",
+        "ru": "Настройка пресета",
         "en": "Preset setup",
     },
     "page.winws1_pages.back.control": {
@@ -3509,19 +3509,19 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "What is this?",
     },
     "page.winws1_pages.toolbar.title": {
-        "ru": "Profiles",
+        "ru": "Профили",
         "en": "Profiles",
     },
     "page.winws1_pages.request.button": {
-        "ru": "Предложить profile",
+        "ru": "Предложить профиль",
         "en": "Suggest profile",
     },
     "page.winws1_pages.request.hint": {
-        "ru": "Если нужного profile нет в списке, его можно добавить позже как шаблон.",
+        "ru": "Если нужного профиля нет в списке, его можно добавить позже как шаблон.",
         "en": "If the needed profile is missing, it can be added later as a template.",
     },
     "page.winws1_pages.loading": {
-        "ru": "Читаем profiles из выбранного preset...",
+        "ru": "Читаем профили из выбранного пресета...",
         "en": "Reading profiles from the selected preset...",
     },
     "page.winws1_pages.strategy.off": {
@@ -3533,11 +3533,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Custom set",
     },
     "page.winws1_pages.info.title": {
-        "ru": "Настройка preset-а",
+        "ru": "Настройка пресета",
         "en": "Preset setup",
     },
     "page.winws1_pages.info.body": {
-        "ru": "Чтобы запустить zapret напрямую, включите нужные profiles, выберите для них готовые стратегии и нажмите «Запустить» на странице управления.",
+        "ru": "Чтобы запустить zapret напрямую, включите нужные профили, выберите для них готовые стратегии и нажмите «Запустить» на странице управления.",
         "en": "To start Zapret directly, enable the needed profiles, choose ready strategies for them, and click Start on the control page.",
     },
     "page.winws1_user_presets.title": {
@@ -3549,7 +3549,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Control",
     },
     "page.winws1_user_presets.configs.title": {
-        "ru": "Обменивайтесь пресетами и profiles в разделе GitHub Discussions",
+        "ru": "Обменивайтесь пресетами и профилями в разделе GitHub Discussions",
         "en": "Share presets and profiles in GitHub Discussions",
     },
     "page.winws1_user_presets.configs.button": {
@@ -3565,7 +3565,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Presets folder",
     },
     "page.winws1_user_presets.button.reset_all": {
-        "ru": "Вернуть заводские",
+        "ru": "Вернуть встроенные",
         "en": "Restore defaults",
     },
     "page.winws1_user_presets.button.wiki": {
@@ -3593,8 +3593,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Open the folder where your presets are stored",
     },
     "page.winws1_user_presets.tooltip.reset_all": {
-        "ru": "Восстанавливает стандартные пресеты. Ваши изменения в стандартных пресетах будут потеряны.",
-        "en": "Restores default presets. Your changes to default presets will be lost.",
+        "ru": "Возвращает встроенные пресеты. Ваши изменения во встроенных пресетах будут потеряны.",
+        "en": "Restores built-in presets. Your changes to built-in presets will be lost.",
     },
     "page.winws1_user_presets.delegate.tooltip.rename": {
         "ru": "Переименовать",
@@ -3629,11 +3629,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Cancel",
     },
     "page.winws1_user_presets.dialog.reset_single.title": {
-        "ru": "Вернуть встроенный preset?",
+        "ru": "Вернуть встроенный пресет?",
         "en": "Restore built-in preset?",
     },
     "page.winws1_user_presets.dialog.reset_single.body": {
-        "ru": "Пользовательский файл preset-а '{name}' будет удалён.\nПосле этого снова будет использоваться встроенный preset с тем же именем файла.\nИзменения в пользовательском файле будут потеряны.",
+        "ru": "Пользовательский файл пресета '{name}' будет удалён.\nПосле этого снова будет использоваться встроенный пресет с тем же именем файла.\nИзменения в пользовательском файле будут потеряны.",
         "en": "User preset file '{name}' will be removed.\nThe built-in preset with the same file name will be used again.\nChanges in the user file will be lost.",
     },
     "page.winws1_user_presets.dialog.reset_single.button": {
@@ -3645,7 +3645,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Delete preset?",
     },
     "page.winws1_user_presets.dialog.delete_single.body": {
-        "ru": "Preset '{name}' будет удалён из списка пользовательских preset-ов.\nИзменения в этом preset-е будут потеряны.\nВернуть его можно только заново создав preset или импортировав файл.",
+        "ru": "Пресет '{name}' будет удалён из списка пользовательских пресетов.\nИзменения в этом пресете будут потеряны.\nВернуть его можно только заново создав пресет или импортировав файл.",
         "en": "Preset '{name}' will be removed from the user presets list.\nChanges in this preset will be lost.\nYou can restore it only by creating a new preset or importing a file.",
     },
     "page.winws1_user_presets.dialog.delete_single.button": {
@@ -3677,7 +3677,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Current active",
     },
     "page.winws1_user_presets.dialog.create.source.standard": {
-        "ru": "Стандартного preset-а",
+        "ru": "Встроенного пресета",
         "en": "Standard preset",
     },
     "page.winws1_user_presets.dialog.create.button.create": {
@@ -3725,15 +3725,15 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Preset '{name}' already exists. Import with another name?",
     },
     "page.winws1_user_presets.dialog.reset_all.title": {
-        "ru": "Вернуть заводские пресеты",
+        "ru": "Вернуть встроенные пресеты",
         "en": "Restore default presets",
     },
     "page.winws1_user_presets.dialog.reset_all.body": {
-        "ru": "Стандартные пресеты будут восстановлены как после установки.\nВаши изменения в стандартных пресетах будут потеряны.\nПользовательские пресеты с другими именами останутся.\nТекущий выбранный source-пресет будет применён заново автоматически.",
-        "en": "Default presets will be restored as after installation.\nYour changes to default presets will be lost.\nCustom presets with other names will remain.\nCurrent selected source preset will be re-applied automatically.",
+        "ru": "Встроенные пресеты будут возвращены к состоянию после установки.\nВаши изменения во встроенных пресетах будут потеряны.\nПользовательские пресеты с другими именами останутся.\nТекущий выбранный пресет будет применён заново автоматически.",
+        "en": "Built-in presets will be restored to their post-install state.\nYour changes to built-in presets will be lost.\nCustom presets with other names will remain.\nCurrent selected preset will be re-applied automatically.",
     },
     "page.winws1_user_presets.dialog.reset_all.button": {
-        "ru": "Вернуть заводские",
+        "ru": "Вернуть встроенные",
         "en": "Restore defaults",
     },
     "page.winws1_user_presets.section.games": {
@@ -3773,7 +3773,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Failed to duplicate preset",
     },
     "page.winws1_user_presets.error.reset_failed": {
-        "ru": "Не удалось вернуть встроенный preset",
+        "ru": "Не удалось вернуть встроенный пресет",
         "en": "Failed to restore built-in preset",
     },
     "page.winws1_user_presets.error.delete_failed": {
@@ -3829,11 +3829,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "What is this?",
     },
     "page.winws1_user_presets.info.body": {
-        "ru": "Здесь кнопка для нубов — \"хочу чтобы нажал и всё работало\". Выбираете любой пресет — тыкаете — перезагружаете вкладку и смотрите, что ресурс открывается (или не открывается). Если не открывается — тыкаете на следующий пресет. Также здесь можно создавать, импортировать, экспортировать и переключать пользовательские пресеты.",
+        "ru": "Здесь простой режим: выберите любой пресет, примените его, перезагрузите вкладку и проверьте, открывается ли ресурс. Если не открывается, попробуйте следующий пресет. Также здесь можно создавать, импортировать, экспортировать и переключать пользовательские пресеты.",
         "en": "This section is for simple workflow: pick any preset, apply it, reload the tab and check if the resource opens. If not, try the next preset. You can also create, import, export and switch custom presets here.",
     },
     "page.winws1_profile_setup.title": {
-        "ru": "Настройка profile",
+        "ru": "Настройка профиля",
         "en": "Profile setup",
     },
     "page.winws1_profile_setup.breadcrumb.control": {
@@ -3841,7 +3841,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Control",
     },
     "page.winws2_control.subtitle": {
-        "ru": "Настройка и запуск Zapret 2. В «Мои пресеты» выбирается preset, а в «Настройка preset-а» меняются profiles и готовые стратегии.",
+        "ru": "Настройка и запуск Zapret 2. В «Мои пресеты» выбирается пресет, а в «Настройка пресета» меняются профили и выбранные для них готовые стратегии.",
         "en": "Configure and launch Zapret 2. My presets selects a preset; preset setup changes profiles and ready strategies.",
     },
     "page.winws2_control.section.status": {
@@ -3857,7 +3857,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Switch Bypass Preset",
     },
     "page.winws2_control.section.profile_tuning": {
-        "ru": "Настройка preset-а",
+        "ru": "Настройка пресета",
         "en": "Preset setup",
     },
     "page.winws2_control.section.program_settings": {
@@ -3925,15 +3925,15 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Change mode",
     },
     "page.winws2_control.profile_ui_mode.caption": {
-        "ru": "Режим отображения profile",
+        "ru": "Режим отображения профилей",
         "en": "Profile UI mode",
     },
     "page.winws2_control.profile_ui_mode.card.title": {
-        "ru": "Настройка preset-а",
+        "ru": "Настройка пресета",
         "en": "Preset setup",
     },
     "page.winws2_control.profile_ui_mode.card.desc": {
-        "ru": "Открыть profiles выбранного preset-а и выбрать готовые стратегии",
+        "ru": "Открыть профили выбранного пресета и выбрать готовые стратегии",
         "en": "Open profiles from the selected preset and choose ready strategies",
     },
     "page.winws2_control.mode.basic": {
@@ -3949,8 +3949,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Not selected",
     },
     "page.winws2_control.preset.current": {
-        "ru": "Текущий выбранный source-пресет",
-        "en": "Current selected source preset",
+        "ru": "Текущий выбранный пресет",
+        "en": "Current selected preset",
     },
     "page.winws2_control.card.advanced": {
         "ru": "Дополнительные настройки",
@@ -3981,7 +3981,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Documentation",
     },
     "page.winws2_pages.title": {
-        "ru": "Настройка preset-а",
+        "ru": "Настройка пресета",
         "en": "Preset setup",
     },
     "page.winws2_pages.back.control": {
@@ -3997,7 +3997,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "OPEN GITHUB FORM",
     },
     "page.winws2_pages.toolbar.title": {
-        "ru": "Profiles",
+        "ru": "Профили",
         "en": "Profiles",
     },
     "page.winws2_pages.toolbar.expand": {
@@ -4013,7 +4013,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "What is this?",
     },
     "page.winws2_pages.info.title": {
-        "ru": "Настройка preset-а",
+        "ru": "Настройка пресета",
         "en": "Preset setup",
     },
     "page.winws2_user_presets.title": {
@@ -4025,7 +4025,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Control",
     },
     "page.winws2_user_presets.configs.title": {
-        "ru": "Обменивайтесь пресетами и profiles в разделе GitHub Discussions",
+        "ru": "Обменивайтесь пресетами и профилями в разделе GitHub Discussions",
         "en": "Share presets and profiles in GitHub Discussions",
     },
     "page.winws2_user_presets.configs.button": {
@@ -4041,7 +4041,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Presets folder",
     },
     "page.winws2_user_presets.button.reset_all": {
-        "ru": "Вернуть заводские",
+        "ru": "Вернуть встроенные",
         "en": "Restore defaults",
     },
     "page.winws2_user_presets.button.wiki": {
@@ -4069,8 +4069,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Open the folder where your presets are stored",
     },
     "page.winws2_user_presets.tooltip.reset_all": {
-        "ru": "Восстанавливает стандартные пресеты. Ваши изменения в стандартных пресетах будут потеряны.",
-        "en": "Restores default presets. Your changes to default presets will be lost.",
+        "ru": "Возвращает встроенные пресеты. Ваши изменения во встроенных пресетах будут потеряны.",
+        "en": "Restores built-in presets. Your changes to built-in presets will be lost.",
     },
     "page.winws2_user_presets.delegate.tooltip.rename": {
         "ru": "Переименовать",
@@ -4105,11 +4105,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Cancel",
     },
     "page.winws2_user_presets.dialog.reset_single.title": {
-        "ru": "Вернуть встроенный preset?",
+        "ru": "Вернуть встроенный пресет?",
         "en": "Restore built-in preset?",
     },
     "page.winws2_user_presets.dialog.reset_single.body": {
-        "ru": "Пользовательский файл preset-а '{name}' будет удалён.\nПосле этого снова будет использоваться встроенный preset с тем же именем файла.\nИзменения в пользовательском файле будут потеряны.",
+        "ru": "Пользовательский файл пресета '{name}' будет удалён.\nПосле этого снова будет использоваться встроенный пресет с тем же именем файла.\nИзменения в пользовательском файле будут потеряны.",
         "en": "User preset file '{name}' will be removed.\nThe built-in preset with the same file name will be used again.\nChanges in the user file will be lost.",
     },
     "page.winws2_user_presets.dialog.reset_single.button": {
@@ -4121,7 +4121,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Delete preset?",
     },
     "page.winws2_user_presets.dialog.delete_single.body": {
-        "ru": "Preset '{name}' будет удалён из списка пользовательских preset-ов.\nИзменения в этом preset-е будут потеряны.\nВернуть его можно только заново создав preset или импортировав файл.",
+        "ru": "Пресет '{name}' будет удалён из списка пользовательских пресетов.\nИзменения в этом пресете будут потеряны.\nВернуть его можно только заново создав пресет или импортировав файл.",
         "en": "Preset '{name}' will be removed from the user presets list.\nChanges in this preset will be lost.\nYou can restore it only by creating a new preset or importing a file.",
     },
     "page.winws2_user_presets.dialog.delete_single.button": {
@@ -4153,7 +4153,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Current active",
     },
     "page.winws2_user_presets.dialog.create.source.standard": {
-        "ru": "Стандартного preset-а",
+        "ru": "Встроенного пресета",
         "en": "Standard preset",
     },
     "page.winws2_user_presets.dialog.create.button.create": {
@@ -4201,15 +4201,15 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Preset '{name}' already exists. Import with another name?",
     },
     "page.winws2_user_presets.dialog.reset_all.title": {
-        "ru": "Вернуть заводские пресеты",
+        "ru": "Вернуть встроенные пресеты",
         "en": "Restore default presets",
     },
     "page.winws2_user_presets.dialog.reset_all.body": {
-        "ru": "Стандартные пресеты будут восстановлены как после установки.\nВаши изменения в стандартных пресетах будут потеряны.\nПользовательские пресеты с другими именами останутся.\nТекущий выбранный source-пресет будет применён заново автоматически.",
-        "en": "Default presets will be restored as after installation.\nYour changes to default presets will be lost.\nCustom presets with other names will remain.\nCurrent selected source preset will be re-applied automatically.",
+        "ru": "Встроенные пресеты будут возвращены к состоянию после установки.\nВаши изменения во встроенных пресетах будут потеряны.\nПользовательские пресеты с другими именами останутся.\nТекущий выбранный пресет будет применён заново автоматически.",
+        "en": "Built-in presets will be restored to their post-install state.\nYour changes to built-in presets will be lost.\nCustom presets with other names will remain.\nCurrent selected preset will be re-applied automatically.",
     },
     "page.winws2_user_presets.dialog.reset_all.button": {
-        "ru": "Вернуть заводские",
+        "ru": "Вернуть встроенные",
         "en": "Restore defaults",
     },
     "page.winws2_user_presets.section.games": {
@@ -4249,7 +4249,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Failed to duplicate preset",
     },
     "page.winws2_user_presets.error.reset_failed": {
-        "ru": "Не удалось вернуть встроенный preset",
+        "ru": "Не удалось вернуть встроенный пресет",
         "en": "Failed to restore built-in preset",
     },
     "page.winws2_user_presets.error.delete_failed": {
@@ -4305,11 +4305,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "What is this?",
     },
     "page.winws2_user_presets.info.body": {
-        "ru": "Здесь кнопка для нубов — \"хочу чтобы нажал и всё работало\". Выбираете любой пресет — тыкаете — перезагружаете вкладку и смотрите, что ресурс открывается (или не открывается). Если не открывается — тыкаете на следующий пресет. Также здесь можно создавать, импортировать, экспортировать и переключать пользовательские пресеты.",
+        "ru": "Здесь простой режим: выберите любой пресет, примените его, перезагрузите вкладку и проверьте, открывается ли ресурс. Если не открывается, попробуйте следующий пресет. Также здесь можно создавать, импортировать, экспортировать и переключать пользовательские пресеты.",
         "en": "This section is for simple workflow: pick any preset, apply it, reload the tab and check if the resource opens. If not, try the next preset. You can also create, import, export and switch custom presets here.",
     },
     "page.winws2_profile_setup.title": {
-        "ru": "Настройка profile",
+        "ru": "Настройка профиля",
         "en": "Profile setup",
     },
     "page.winws2_profile_setup.preset_dialog.create.title": {
@@ -4753,7 +4753,7 @@ TEXTS_EXTRA: dict[str, dict[str, str]] = {
         "en": "Strategy added",
     },
     "page.winws1_pages.empty.no_categories": {
-        "ru": "Profiles не найдены. Проверьте выбранный preset и файл profile/templates/all_profiles.txt.",
+        "ru": "Профили не найдены. Проверьте выбранный пресет и файл profile/templates/all_profiles.txt.",
         "en": "Profiles were not found. Check the selected preset and profile/templates/all_profiles.txt.",
     },
     "page.winws2_pages.request.hint": {
@@ -4761,32 +4761,32 @@ TEXTS_EXTRA: dict[str, dict[str, str]] = {
         "en": "Want to add a new site or service to Zapret 2? Open the GitHub form and describe what should be added to the hostlist or ipset.",
     },
     "page.winws2_pages.empty.no_presets": {
-        "ru": "Пресеты Zapret 2 не найдены. Проверьте папку presets рядом с программой. Если системные пресеты отсутствуют, переустановите приложение.",
+        "ru": "Пресеты Zapret 2 не найдены. Проверьте папку presets рядом с программой. Если встроенные пресеты отсутствуют, переустановите приложение.",
         "en": "Zapret 2 presets were not found. Check the presets folder near the program. If built-in presets are missing, reinstall the app.",
     },
     "page.winws2_pages.empty.no_selected_preset": {
-        "ru": "Не удалось определить выбранный source preset. Откройте список пресетов, выберите любой пресет заново и нажмите «Обновить».",
-        "en": "Could not determine the selected source preset. Open the preset list, choose any preset again, and click Refresh.",
+        "ru": "Не удалось определить выбранный пресет. Откройте список пресетов, выберите любой пресет заново и нажмите «Обновить».",
+        "en": "Could not determine the selected preset. Open the preset list, choose any preset again, and click Refresh.",
     },
     "page.winws2_pages.empty.preset_read_error": {
-        "ru": "Не удалось прочитать выбранный source preset «{preset_name}». Такое бывает, если файл пустой, повреждён или недоступен для чтения.",
-        "en": "Could not read the selected source preset \"{preset_name}\". This may happen if the file is empty, corrupted, or unavailable for reading.",
+        "ru": "Не удалось прочитать выбранный пресет «{preset_name}». Такое бывает, если файл пустой, повреждён или недоступен для чтения.",
+        "en": "Could not read the selected preset \"{preset_name}\". This may happen if the file is empty, corrupted, or unavailable for reading.",
     },
     "page.winws2_pages.empty.unknown_error": {
-        "ru": "Не удалось построить список profiles для выбранного source preset «{preset_name}». Обычно это значит, что во время чтения preset-а произошла внутренняя ошибка. Нажмите «Обновить» и проверьте лог.",
-        "en": "Could not build the profile list for the selected source preset \"{preset_name}\". This usually means an internal error happened while reading the preset. Click Refresh and check the log.",
+        "ru": "Не удалось построить список профилей для выбранного пресета «{preset_name}». Обычно это значит, что во время чтения пресета произошла внутренняя ошибка. Нажмите «Обновить» и проверьте лог.",
+        "en": "Could not build the profile list for the selected preset \"{preset_name}\". This usually means an internal error happened while reading the preset. Click Refresh and check the log.",
     },
     "page.winws2_pages.empty.no_categories": {
-        "ru": "В выбранном source preset «{preset_name}» не найдено ни одного profile для этой страницы. Это значит, что после разбора файла программа не увидела profile с фильтрами вроде hostlist, hostlist-domains или ipset.",
-        "en": "No profiles were found for this page in the selected source preset \"{preset_name}\". This means that after parsing the file, the app did not find a profile with filters such as hostlist, hostlist-domains, or ipset.",
+        "ru": "В выбранном пресете «{preset_name}» не найдено ни одного профиля для этой страницы. Это значит, что после разбора файла программа не увидела профиль с фильтрами вроде hostlist, hostlist-domains или ipset.",
+        "en": "No profiles were found for this page in the selected preset \"{preset_name}\". This means that after parsing the file, the app did not find a profile with filters such as hostlist, hostlist-domains, or ipset.",
     },
     "page.winws2_pages.current.active_count": {
         "ru": "{count} активных",
         "en": "{count} active",
     },
     "page.winws2_pages.info.body": {
-        "ru": "Здесь Вы можете тонко изменить стратегию для каждого profile, который найден в выбранном source preset. Всего существует несколько фаз дурения (send, syndata, fake, multisplit и т.д.). Последовательность сама определяется программой.\n\nВы можете править пресет вручную через txt-файл или выбирать готовые стратегии в этом меню. Каждая стратегия — это набор аргументов, то есть техник дурения или фуллинга, которые меняют содержимое пакетов по модели TCP/IP, отправляемых вашим устройством. Это помогает сбить алгоритмы ТСПУ провайдера, чтобы они не заметили или пропустили запрещённый контент.",
-        "en": "Here you can finely tune the strategy for each profile found in the selected source preset. There are several obfuscation phases (send, syndata, fake, multisplit, etc.). Their sequence is determined by the app.\n\nYou can edit the preset manually in a txt file or choose ready-made strategies in this menu. Each strategy is a set of arguments, i.e. packet manipulation techniques used to alter TCP/IP traffic sent by your device. This helps confuse provider TSPU algorithms so they do not detect or block restricted content.",
+        "ru": "Здесь вы можете тонко изменить стратегию для каждого профиля, который найден в выбранном пресете. Всего существует несколько фаз дурения (send, syndata, fake, multisplit и т.д.). Последовательность сама определяется программой.\n\nВы можете править пресет вручную через txt-файл или выбрать готовую стратегию в этом меню. В интерфейсе готовая стратегия означает заранее собранный набор аргументов, который программа подставляет в профиль. Это не отдельный синтаксис winws2, а удобный способ выбрать техники дурения или фуллинга для TCP/IP-пакетов.",
+        "en": "Here you can finely tune the strategy for each profile found in the selected preset. There are several obfuscation phases (send, syndata, fake, multisplit, etc.). Their sequence is determined by the app.\n\nYou can edit the preset manually in a txt file or choose a ready strategy in this menu. In the interface, a ready strategy means a prebuilt set of arguments that the app inserts into a profile. It is not separate winws2 syntax, but a convenient way to choose obfuscation or fooling techniques for TCP/IP packets.",
     },
 }
 
@@ -4870,11 +4870,11 @@ TEXTS_PAGES_FINAL: dict[str, dict[str, str]] = {
         "ru": "Настройка интенсивности акрилового эффекта всего окна приложения. При 0% эффект минимальный, при 100% — максимальный.",
         "en": "Adjust acrylic effect intensity for the entire app window. At 0% the effect is minimal, at 100% maximal.",
     },
-    "page.appearance.opacity.legacy.title": {
+    "page.appearance.opacity.standard.title": {
         "ru": "Прозрачность окна",
         "en": "Window Opacity",
     },
-    "page.appearance.opacity.legacy.description": {
+    "page.appearance.opacity.standard.description": {
         "ru": "Настройка прозрачности всего окна приложения. При 0% окно полностью прозрачное, при 100% — непрозрачное.",
         "en": "Adjust opacity of the entire app window. At 0% the window is fully transparent, at 100% fully opaque.",
     },
@@ -4971,16 +4971,16 @@ TEXTS_PAGES_FINAL: dict[str, dict[str, str]] = {
         "en": "🧹 Errors cleared",
     },
     "page.winws2_control.mode.dialog.title": {
-        "ru": "Режим отображения profile",
+        "ru": "Режим отображения профилей",
         "en": "Profile UI Mode",
     },
     "page.winws2_control.mode.dialog.description": {
-        "ru": "Профили поддерживает несколько режимов: упрощенный и расширенный для профи. Настройки не сохраняются между режимами Вы можете выбрать любой. Рекомендуем начать с базового. Бывает что базовый из-за готовых стратегий плохо пробивает сайты, тогда рекомендуем попробовать продвинутый в котором можно более тонко настроить техники дурения.",
+        "ru": "Профили поддерживают несколько режимов: упрощённый и расширенный. Настройки не переносятся между режимами, поэтому можно выбрать любой. Рекомендуем начать с базового. Если базовый режим с готовыми стратегиями плохо открывает сайты, попробуйте продвинутый: там можно тоньше настроить техники дурения.",
         "en": "Profile UI supports multiple modes: simplified and advanced for power users. Settings are not shared across modes, so you can choose any mode. We recommend starting with Basic. If Basic does not bypass enough sites, try Advanced for finer technique tuning.",
     },
     "page.winws2_control.mode.dialog.basic_description": {
-        "ru": "Basic (базовый) — готовая таблица стратегий без понятия фаз. Собирать свои стратегии нельзя.",
-        "en": "Basic mode is a ready strategy table without phase-level tuning. Custom strategy composition is not available.",
+        "ru": "Basic (базовый) — выбор готовой стратегии без настройки фаз. Свой набор аргументов в этом режиме собрать нельзя.",
+        "en": "Basic mode lets you choose a ready strategy without phase-level tuning. Custom argument sets are not available in this mode.",
     },
     "page.winws2_control.mode.dialog.advanced_description": {
         "ru": "Advanced (продвинутый) — каждая функция настраивается индивидуально, можно выбирать несколько фаз и смешивать их друг с другом.",

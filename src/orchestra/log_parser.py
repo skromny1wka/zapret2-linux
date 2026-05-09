@@ -157,9 +157,9 @@ class Patterns:
         r"dpi desync src=([\d.:a-fA-F]+):(\d+) dst=([\d.:a-fA-F]+):(\d+) .* connection_proto=(\S+)"
     )
 
-    # --- Legacy patterns ---
-    legacy_lock = re.compile(r"LOCKED (\S+) to strategy=(\d+)(?:\s+\[(TLS|HTTP|UDP)\])?")
-    legacy_unlock = re.compile(r"UNLOCKING (\S+)(?:\s+\[(TLS|HTTP|UDP)\])?")
+    # --- Older log line shapes ---
+    old_lock = re.compile(r"LOCKED (\S+) to strategy=(\d+)(?:\s+\[(TLS|HTTP|UDP)\])?")
+    old_unlock = re.compile(r"UNLOCKING (\S+)(?:\s+\[(TLS|HTTP|UDP)\])?")
     unsticky = re.compile(r"strategy-stats: UNSTICKY (\S+)(?:\s+\[(TLS|HTTP|UDP)\])?")
 
     # circular_quality variants
@@ -640,7 +640,7 @@ class LogParser:
 
         # === LOCK ===
         # Patterns.lock: Groups: 1=protocol, 2=hostname, 3=strategy
-        # Patterns.legacy_lock: Groups: 1=hostname, 2=strategy, 3=proto_tag
+        # Patterns.old_lock: Groups: 1=hostname, 2=strategy, 3=proto_tag
         m = Patterns.lock.search(line)
         if m:
             proto_from_log = m.group(1)  # [tls], [quic], [unknown], or None
@@ -673,8 +673,8 @@ class LogParser:
                 raw_line=line
             )
 
-        # Legacy LOCK: Groups: 1=hostname, 2=strategy, 3=proto_tag
-        m = Patterns.legacy_lock.search(line)
+        # Older LOCK shape: Groups: 1=hostname, 2=strategy, 3=proto_tag
+        m = Patterns.old_lock.search(line)
         if m:
             hostname = m.group(1)
             strategy = int(m.group(2))
@@ -716,7 +716,7 @@ class LogParser:
 
         # === UNLOCK ===
         # Patterns.unlock: Groups: 1=protocol (or None), 2=hostname
-        # Patterns.auto_unlock, Patterns.legacy_unlock: Groups: 1=hostname
+        # Patterns.auto_unlock, Patterns.old_unlock: Groups: 1=hostname
         m = Patterns.unlock.search(line)
         if m:
             proto_from_log = m.group(1)  # [tls], [quic], [unknown], or None
@@ -735,8 +735,8 @@ class LogParser:
                 raw_line=line
             )
 
-        # Legacy UNLOCK / AUTO-UNLOCK: Groups: 1=hostname
-        m = Patterns.auto_unlock.search(line) or Patterns.legacy_unlock.search(line)
+        # Older UNLOCK / AUTO-UNLOCK shape: Groups: 1=hostname
+        m = Patterns.auto_unlock.search(line) or Patterns.old_unlock.search(line)
         if m:
             hostname = m.group(1)
             return ParsedEvent(

@@ -42,8 +42,6 @@ def rename_by_file_name(backend, file_name: str, new_name: str):
     backend._rename_library_meta(
         manifest.file_name,
         updated.file_name,
-        old_display_name=manifest.name,
-        new_display_name=updated.name,
     )
     if was_selected:
         backend.preset_selection_service.select_preset(backend.engine, updated.file_name)
@@ -66,8 +64,6 @@ def duplicate_by_file_name(backend, file_name: str, new_name: str):
     backend._copy_library_meta(
         manifest.file_name,
         duplicated.file_name,
-        source_display_name=manifest.name,
-        new_display_name=duplicated.name,
     )
     backend.notify_presets_changed()
     return duplicated
@@ -93,7 +89,7 @@ def import_from_file(backend, src_path: Path, name: str | None = None):
         preset_kind="imported",
     )
     imported = backend.preset_file_store.create_preset(backend.engine, preset_name, rewritten, kind="imported")
-    backend._delete_library_meta(imported.file_name, display_name=imported.name)
+    backend._delete_library_meta(imported.file_name)
     backend.notify_presets_changed()
     return imported
 
@@ -147,5 +143,5 @@ def delete_by_file_name(backend, file_name: str) -> None:
         raise ValueError(f"Built-in preset cannot be deleted: {manifest.name}")
     backend.preset_selection_service.ensure_can_delete(backend.engine, manifest.file_name)
     backend.preset_file_store.delete_preset(backend.engine, manifest.file_name)
-    backend._delete_library_meta(manifest.file_name, display_name=manifest.name)
+    backend._delete_library_meta(manifest.file_name)
     backend.notify_presets_changed()

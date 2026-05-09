@@ -147,12 +147,12 @@ def apply_user_presets_language(*, tr_fn, back_btn, configs_title_label, get_con
     if reset_all_btn is not None:
         current_text = reset_all_btn.text() or ""
         if "/" not in current_text:
-            reset_all_btn.setText(tr_fn("page.winws1_user_presets.button.reset_all", "Вернуть заводские"))
+            reset_all_btn.setText(tr_fn("page.winws1_user_presets.button.reset_all", "Вернуть встроенные"))
         set_tooltip(
             reset_all_btn,
             tr_fn(
                 "page.winws1_user_presets.tooltip.reset_all",
-                "Восстанавливает стандартные пресеты. Ваши изменения в стандартных пресетах будут потеряны.",
+                "Возвращает встроенные пресеты. Ваши изменения во встроенных пресетах будут потеряны.",
             ),
         )
     if presets_info_btn is not None:

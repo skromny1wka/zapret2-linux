@@ -205,7 +205,7 @@ def restore_reset_all_button_label(
         return
     try:
         reset_all_btn.setText(
-            tr_fn("page.winws2_user_presets.button.reset_all", "Вернуть заводские")
+            tr_fn("page.winws2_user_presets.button.reset_all", "Вернуть встроенные")
         )
         reset_all_btn.setIcon(themed_icon_fn("fa5s.undo", color=get_theme_tokens_fn().fg))
     except Exception:

@@ -127,13 +127,13 @@ class UserPresetsRuntimeService:
         if "preset_structure_revision" in changed_fields:
             self.mark_presets_structure_changed(page)
 
-    def on_store_content_changed(self, file_name_or_name: str, page=None) -> None:
+    def on_store_content_changed(self, file_name: str, page=None) -> None:
         page = self._resolve_page(page)
         adapter = self._resolve_adapter()
         if adapter.bulk_reset_running():
             return
 
-        refreshed = adapter.read_single_metadata(file_name_or_name)
+        refreshed = adapter.read_single_metadata(file_name)
         if refreshed is None:
             self._ui_dirty = True
             if page.isVisible():
@@ -203,8 +203,6 @@ class UserPresetsRuntimeService:
         self,
         file_name: str,
         *,
-        display_name: str = "",
-        use_display_name_fallback: bool = False,
         page=None,
     ) -> None:
         page = self._resolve_page(page)
@@ -212,14 +210,12 @@ class UserPresetsRuntimeService:
             return
 
         preset_file_name = str(file_name or "").strip()
-        preset_display_name = str(display_name or "").strip()
-        if not preset_file_name and not (use_display_name_fallback and preset_display_name):
+        if not preset_file_name:
             return
 
         model_type = type(page._presets_model)
         kind_role = getattr(model_type, "KindRole", None)
         file_role = getattr(model_type, "FileNameRole", None)
-        name_role = getattr(model_type, "NameRole", None)
 
         for row in range(page._presets_model.rowCount()):
             index = page._presets_model.index(row, 0)
@@ -228,17 +224,11 @@ class UserPresetsRuntimeService:
             if preset_file_name and str(index.data(file_role) or "") == preset_file_name:
                 page.presets_list.setCurrentIndex(index)
                 return
-            if use_display_name_fallback and preset_display_name and name_role is not None:
-                if str(index.data(name_role) or "") == preset_display_name:
-                    page.presets_list.setCurrentIndex(index)
-                    return
 
     def apply_active_preset_marker_for_file(
         self,
         file_name: str,
         *,
-        display_name: str = "",
-        use_display_name_fallback: bool = False,
         page=None,
     ) -> bool:
         page = self._resolve_page(page)
@@ -246,14 +236,10 @@ class UserPresetsRuntimeService:
             return False
         changed = page._presets_model.set_active_preset(
             str(file_name or "").strip(),
-            display_name=str(display_name or "").strip(),
-            use_display_name_fallback=bool(use_display_name_fallback),
         )
         if changed and hasattr(page, "presets_list"):
             self.set_current_preset_index(
                 file_name,
-                display_name=display_name,
-                use_display_name_fallback=use_display_name_fallback,
                 page=page,
             )
             page.presets_list.viewport().update()

@@ -155,7 +155,7 @@ class NotificationBanner(QWidget):
         style = dict(self.STYLES.get(notification_type, self.STYLES['info']))
         try:
             tokens = get_theme_tokens()
-            # For "info", track the active accent instead of the legacy fixed blue.
+            # For "info", track the active accent instead of a fixed blue.
             if notification_type == "info":
                 style["bg"] = f"rgba({tokens.accent_rgb_str}, 0.15)"
                 style["border"] = f"rgba({tokens.accent_rgb_str}, 0.40)"

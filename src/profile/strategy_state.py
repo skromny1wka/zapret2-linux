@@ -18,7 +18,7 @@ class ProfileStrategyState:
 
 
 class ProfileStrategyStateStore:
-    """Хранит оценки готовых стратегий profile в общем settings.json."""
+    """Хранит оценки готовых стратегий профилей в общем settings.json."""
 
     @property
     def path(self) -> Path:

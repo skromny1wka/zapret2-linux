@@ -69,22 +69,18 @@ class WindowStateSyncMixin:
         if not isinstance(payload, dict):
             return
 
-        runtime_service = getattr(self, "launch_runtime_service", None)
-        if runtime_service is None:
-            return
-
         launch_method = str(payload.get("launch_method") or "").strip().lower()
         if not is_preset_launch_method(launch_method):
             return
 
-        snapshot = runtime_service.snapshot()
+        snapshot = self.launch_runtime_service.snapshot()
         current_method = str(snapshot.launch_method or "").strip().lower()
         if current_method and current_method != launch_method and snapshot.phase in {"starting", "running", "autostart_pending"}:
             return
 
         error_text = str(payload.get("error") or "").strip()
 
-        runtime_service.mark_start_failed(
+        self.launch_runtime_service.mark_start_failed(
             error_text or "Запуск завершился ошибкой",
         )
 
@@ -95,29 +91,24 @@ class WindowStateSyncMixin:
 
         now_ms = startup_elapsed_ms()
         if (
-            normalized_path == str(getattr(self, "_last_active_preset_content_path", "") or "")
-            and max(0, now_ms - int(getattr(self, "_last_active_preset_content_ms", 0) or 0)) < 500
+            normalized_path == str(self._last_active_preset_content_path or "")
+            and max(0, now_ms - int(self._last_active_preset_content_ms or 0)) < 500
         ):
             return
 
         self._last_active_preset_content_path = normalized_path
         self._last_active_preset_content_ms = now_ms
 
-        store = getattr(self, "ui_state_store", None)
-        if store is None:
-            return
         try:
-            store.bump_preset_content_revision()
+            self.ui_state_store.bump_preset_content_revision()
         except Exception:
             pass
 
     def set_garland_enabled(self, enabled: bool) -> None:
         """Enable/disable top garland overlay in FluentWindow shell."""
         try:
-            store = getattr(self, "ui_state_store", None)
-            if store is not None:
-                snapshot = store.snapshot()
-                store.set_holiday_overlays(bool(enabled), snapshot.snowflakes_enabled)
+            snapshot = self.ui_state_store.snapshot()
+            self.ui_state_store.set_holiday_overlays(bool(enabled), snapshot.snowflakes_enabled)
 
             effects = self._ensure_holiday_effects_manager()
             if effects is None:
@@ -129,10 +120,8 @@ class WindowStateSyncMixin:
     def set_snowflakes_enabled(self, enabled: bool) -> None:
         """Enable/disable snow overlay in FluentWindow shell."""
         try:
-            store = getattr(self, "ui_state_store", None)
-            if store is not None:
-                snapshot = store.snapshot()
-                store.set_holiday_overlays(snapshot.garland_enabled, bool(enabled))
+            snapshot = self.ui_state_store.snapshot()
+            self.ui_state_store.set_holiday_overlays(snapshot.garland_enabled, bool(enabled))
 
             effects = self._ensure_holiday_effects_manager()
             if effects is None:
@@ -148,9 +137,7 @@ class WindowStateSyncMixin:
         В обычном статичном фоне просто пересобирает фон окна.
         """
         try:
-            store = getattr(self, "ui_state_store", None)
-            if store is not None:
-                store.set_window_opacity_value(value)
+            self.ui_state_store.set_window_opacity_value(value)
 
             from settings.store import get_background_preset
 
@@ -178,14 +165,13 @@ class WindowStateSyncMixin:
             snowflakes_saved = get_snowflakes_enabled()
             log(f"🎄 Инициализация: гирлянда={garland_saved}, снежинки={snowflakes_saved}", "DEBUG")
 
-            is_premium = False
-            if hasattr(self, "donate_checker") and self.donate_checker:
-                try:
-                    sub_info = self.donate_checker.get_full_subscription_info(use_cache=True)
-                    is_premium = bool(sub_info.get("is_premium"))
-                    log(f"🎄 Премиум статус: {is_premium}", "DEBUG")
-                except Exception as e:
-                    log(f"🎄 Ошибка проверки премиума: {e}", "DEBUG")
+            try:
+                sub_info = self.donate_checker.get_full_subscription_info(use_cache=True)
+                is_premium = bool(sub_info.get("is_premium"))
+                log(f"🎄 Премиум статус: {is_premium}", "DEBUG")
+            except Exception as e:
+                is_premium = False
+                log(f"🎄 Ошибка проверки премиума: {e}", "DEBUG")
 
             should_enable_garland = is_premium and garland_saved
             self.set_garland_enabled(should_enable_garland)

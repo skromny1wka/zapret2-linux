@@ -5,6 +5,7 @@ from PyQt6.QtCore import QTimer
 from log.log import log
 
 from ui.runtime_ui_bridge import ensure_runtime_ui_bridge
+from .discord_restart_flow import maybe_restart_discord_after_runtime_apply
 
 
 def _runner_start_pid(controller) -> int | None:
@@ -106,7 +107,7 @@ def on_dpi_process_confirmed(controller, running: bool, verify_gen=None):
         controller.app.set_status("✅ DPI успешно запущен")
         controller._mark_runtime_running(pid=_runner_start_pid(controller))
         controller.app.intentional_start = True
-        controller._maybe_restart_discord_after_runtime_apply(skip_first_start=True)
+        maybe_restart_discord_after_runtime_apply(controller, skip_first_start=True)
 
         pending_warnings = list(getattr(controller, "_pending_launch_warnings", []) or [])
         controller._pending_launch_warnings = []

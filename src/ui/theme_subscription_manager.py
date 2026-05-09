@@ -51,13 +51,16 @@ class ThemeSubscriptionManager:
                     premium_text = " [PREMIUM]"
                 
             full_title = f"{base_title}{premium_text}"
+            if self.windowTitle() == full_title:
+                return
             self.setWindowTitle(full_title)
             log(f"Заголовок окна обновлен: {full_title} (source: {source})", "DEBUG")
         else:
+            if self.windowTitle() == base_title:
+                return
             self.setWindowTitle(base_title)
             log(f"Заголовок окна: FREE режим (source: {source})", "DEBUG")
 
         # ✅ title_label больше не используется в новом интерфейсе
         # Статус отображается только в заголовке окна (setWindowTitle выше)
-
 

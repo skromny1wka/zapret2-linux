@@ -240,7 +240,7 @@ def apply_user_presets_language(
         configs_title_label.setText(
             tr_fn(
                 "page.winws2_user_presets.configs.title",
-                "Обменивайтесь пресетами и категориями в разделе GitHub Discussions",
+                "Обменивайтесь пресетами и профилями в разделе GitHub Discussions",
             )
         )
     if get_configs_btn is not None:
@@ -263,12 +263,12 @@ def apply_user_presets_language(
     if reset_all_btn is not None:
         current_text = reset_all_btn.text() or ""
         if "/" not in current_text:
-            reset_all_btn.setText(tr_fn("page.winws2_user_presets.button.reset_all", "Вернуть заводские"))
+            reset_all_btn.setText(tr_fn("page.winws2_user_presets.button.reset_all", "Вернуть встроенные"))
         set_tooltip(
             reset_all_btn,
             tr_fn(
                 "page.winws2_user_presets.tooltip.reset_all",
-                "Восстанавливает стандартные пресеты. Ваши изменения в стандартных пресетах будут потеряны.",
+                "Возвращает встроенные пресеты. Ваши изменения во встроенных пресетах будут потеряны.",
             ),
         )
 

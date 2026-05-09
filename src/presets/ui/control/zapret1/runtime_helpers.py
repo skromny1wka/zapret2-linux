@@ -75,10 +75,10 @@ def apply_winws1_pages_language(
         )
     if preset_setup_card is not None:
         preset_setup_card.setTitle(
-            tr_catalog("page.winws1_control.profiles.title", language=language, default="Настройка preset-а")
+            tr_catalog("page.winws1_control.profiles.title", language=language, default="Настройка пресета")
         )
         preset_setup_card.setContent(
-            tr_catalog("page.winws1_control.profiles.desc", language=language, default="Открыть profiles выбранного preset-а и выбрать готовые стратегии")
+            tr_catalog("page.winws1_control.profiles.desc", language=language, default="Открыть профили выбранного пресета и выбрать готовые стратегии")
         )
         preset_setup_card.button.setText(
             tr_catalog("page.winws1_control.button.open", language=language, default="Открыть")

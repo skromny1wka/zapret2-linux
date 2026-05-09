@@ -55,7 +55,7 @@ ENABLE_FILE_HEAD_CHECK = False
 TIMEOUT = (CONNECT_TIMEOUT, READ_TIMEOUT)
 
 class ServerStats:
-    """Класс для хранения статистики серверов (legacy, для обратной совместимости)"""
+    """Класс для хранения статистики серверов."""
     
     def __init__(self):
         self.stats = self._load_stats()
@@ -134,7 +134,7 @@ class ReleaseManager:
     def __init__(self):
         self.last_error: Optional[str] = None
         self.last_source: Optional[str] = None
-        self.server_stats = ServerStats()  # Legacy статистика
+        self.server_stats = ServerStats()
         self._vps_block_until = self._load_vps_block_until()
         
         # ✅ ИНИЦИАЛИЗАЦИЯ ПУЛА СЕРВЕРОВ
@@ -593,7 +593,7 @@ class ReleaseManager:
             pool_stats = self.server_pool.get_all_stats()
             stats.update(pool_stats)
         
-        # ✅ Добавляем legacy статистику (GitHub и т.д.)
+        # ✅ Добавляем статистику GitHub и других источников
         for server_name, server_stats in self.server_stats.stats.items():
             if server_name not in stats:
                 stats[server_name] = server_stats

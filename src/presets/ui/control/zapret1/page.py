@@ -59,15 +59,15 @@ class StopButton(ActionButton):
 class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMixin, BasePage):
     """Страница управления для zapret1_mode."""
 
-    navigate_to_preset_setup = pyqtSignal() # -> "Настройка preset-а": profiles выбранного preset-а
+    navigate_to_preset_setup = pyqtSignal() # -> "Настройка пресета": профили выбранного пресета
     navigate_to_presets = pyqtSignal()      # -> "Мои пресеты": выбор, активация, raw-редактор
     navigate_to_blobs = pyqtSignal()         # → PageName.BLOBS
 
     def __init__(self, parent=None):
         super().__init__(
             "Управление Zapret 1",
-            f"Настройка и запуск Zapret 1 ({EXE_NAME_WINWS1}). В «Мои пресеты» выбирается preset, "
-            "а в «Настройка preset-а» меняются profiles и готовые стратегии.",
+            f"Настройка и запуск Zapret 1 ({EXE_NAME_WINWS1}). В «Мои пресеты» выбирается пресет, "
+            "а в «Настройка пресета» меняются профили и выбранные для них готовые стратегии.",
             parent,
             title_key="page.winws1_control.title",
             subtitle_key="page.winws1_control.subtitle",
@@ -184,7 +184,7 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
 
         self.add_spacing(16)
 
-        # ── Ветка preset-а: выбор preset-а отдельно от настройки его profiles ──
+        # ── Ветка пресета: выбор пресета отдельно от настройки его профилей ──
         self.add_section_title(text_key="page.winws1_control.section.presets")
         preset_widgets = build_winws1_presets_section(
             tr_fn=lambda key, default: tr_catalog(key, language=self._ui_language, default=default),

@@ -1,6 +1,6 @@
 # profile/ui/widgets/profile_type_selector.py
 """
-Кнопки выбора типа profile/трафика в списке profiles.
+Кнопки выбора типа профиля/трафика в списке профилей.
 Поддерживает множественный выбор (не exclusive).
 """
 
@@ -16,7 +16,7 @@ except ImportError:
 
 
 class _ProfileTypeButton(PillPushButton):
-    """PillPushButton с привязанным ключом типа profile."""
+    """PillPushButton с привязанным ключом типа профиля."""
 
     def __init__(self, label: str, profile_type: str, parent=None):
         super().__init__(parent)
@@ -31,7 +31,7 @@ class _ProfileTypeButton(PillPushButton):
 
 class ProfileTypeSelector(QWidget):
     """
-    Группа кнопок для выбора типа profile/трафика в списке profiles.
+    Группа кнопок для выбора типа профиля/трафика в списке профилей.
 
     Множественный выбор (не exclusive):
     - "Все" снимает остальные типы;
@@ -39,7 +39,7 @@ class ProfileTypeSelector(QWidget):
     - можно комбинировать TCP + Discord и т.д.
 
     Signals:
-        profile_types_changed(set): Эмитит set активных типов profile.
+        profile_types_changed(set): Эмитит set активных типов профиля.
     """
 
     profile_types_changed = pyqtSignal(set)

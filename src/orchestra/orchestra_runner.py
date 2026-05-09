@@ -1392,7 +1392,7 @@ class OrchestraRunner:
             try:
                 with open(self.config_path, "w", encoding="utf-8", newline="\n") as f:
                     f.write(cleaned_source)
-                log("circular-config.txt очищен от legacy :strategy=N тегов", "DEBUG")
+                log("circular-config.txt очищен от служебных :strategy=N тегов", "DEBUG")
             except Exception as e:
                 log(f"Не удалось очистить {self.config_path}: {e}", "DEBUG")
 

@@ -293,13 +293,13 @@ class PresetFileStore:
         return list(manifests_by_file_name.values())
 
     @staticmethod
-    def _extract_name(source_text: str, fallback: str) -> str:
+    def _extract_name(source_text: str, default_name: str) -> str:
         match = _PRESET_HEADER_RE.search(source_text or "")
         if match:
             value = match.group(1).strip()
             if value:
                 return value
-        return str(fallback or "Preset").strip() or "Preset"
+        return str(default_name or "Preset").strip() or "Preset"
 
     @staticmethod
     def _extract_preset_kind(source_text: str) -> str | None:

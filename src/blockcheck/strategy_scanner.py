@@ -486,9 +486,9 @@ class StrategyScanner:
     def _select_strategies(self, mode: str, start_index: int = 0) -> tuple[list[dict], int, int]:
         """Select strategy batch for mode and resume cursor.
 
-        All modes load from the canonical preset catalog for the selected
+        All modes load from the canonical strategy catalog for the selected
         protocol. The scanner works with the same strategy definitions as the
-        preset mode editor instead of the removed legacy winws2 catalog layer.
+        profile setup page.
         - quick:    30 strategies from cursor
         - standard: 80 strategies from cursor
         - full:     all remaining strategies from cursor

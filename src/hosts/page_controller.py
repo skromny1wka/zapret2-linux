@@ -91,7 +91,7 @@ class HostsServiceGroupPlan:
 class HostsServicesCatalogPlan:
     groups: list[HostsServiceGroupPlan]
     new_selection: dict[str, str]
-    selection_migrated: bool
+    selection_changed: bool
 
 
 @dataclass(slots=True)
@@ -752,7 +752,7 @@ class HostsPageController:
         return HostsServicesCatalogPlan(
             groups=groups,
             new_selection=new_selection,
-            selection_migrated=dict(current_selection) != new_selection,
+            selection_changed=dict(current_selection) != new_selection,
         )
 
     @staticmethod

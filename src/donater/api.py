@@ -82,7 +82,7 @@ class PremiumApiClient:
             return self._exception_to_dict(e, nonce=nonce)
 
     def post_activate(self, *, key: str, device_id: str) -> Tuple[Optional[Dict[str, Any]], str]:
-        # Legacy endpoint (removed in new pairing architecture).
+        # Activation by key is disabled in the pairing architecture.
         nonce = secrets.token_urlsafe(16)
         return (None, nonce)
 

@@ -1,6 +1,6 @@
 # profile/ui/widgets/profile_group.py
 """
-Сворачиваемые группы для списка profiles.
+Сворачиваемые группы для списка профилей.
 Использует встроенные виджеты qfluentwidgets: StrongBodyLabel, HorizontalSeparator.
 """
 
@@ -22,7 +22,7 @@ except ImportError:
 
 class ProfileGroupHeader(QFrame):
     """
-    Заголовок сворачиваемой группы profiles.
+    Заголовок сворачиваемой группы профилей.
 
     Содержит:
     - Chevron иконку (вправо/вниз)
@@ -138,7 +138,7 @@ class ProfileGroupHeader(QFrame):
 
 class ProfileGroup(QWidget):
     """
-    Сворачиваемая группа profiles с заголовком и контентом.
+    Сворачиваемая группа профилей с заголовком и контентом.
 
     Signals:
         toggled(str, bool): (group_key, is_expanded)

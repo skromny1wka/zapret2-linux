@@ -36,7 +36,7 @@ class WindowLifecycleMixin:
 
         self._cleanup_before_close()
 
-        if getattr(self, "_stop_dpi_on_exit", False):
+        if self._stop_dpi_on_exit:
             try:
                 from winws_runtime.runtime.sync_shutdown import shutdown_runtime_sync
 
@@ -74,8 +74,11 @@ class WindowLifecycleMixin:
             log("Запрошен выход: остановить DPI и выйти", "INFO")
 
             try:
-                if hasattr(self, "launch_controller") and self.launch_controller:
-                    self.launch_controller.stop_and_exit_async()
+                # Окно можно закрыть очень рано, до первой startup-фазы.
+                # Поэтому launch_controller здесь остаётся ленивой проверкой.
+                launch_controller = getattr(self, "launch_controller", None)
+                if launch_controller is not None:
+                    launch_controller.stop_and_exit_async()
                     return
             except Exception as e:
                 log(f"stop_and_exit_async не удалось: {e}", "WARNING")
@@ -96,14 +99,13 @@ class WindowLifecycleMixin:
 
     def ensure_tray_manager(self):
         """Возвращает tray manager, лениво создавая его до второй фазы старта."""
+        # Tray специально создаётся лениво для обычного запуска.
         tray_manager = getattr(self, "tray_manager", None)
         if tray_manager is not None:
             return tray_manager
 
         try:
-            startup_coordinator = getattr(self, "startup_coordinator", None)
-            if startup_coordinator is not None:
-                return startup_coordinator.ensure_tray_initialized()
+            return self.startup_coordinator.ensure_tray_initialized()
         except Exception as e:
             log(f"Не удалось инициализировать системный трей по требованию: {e}", "WARNING")
 
@@ -125,10 +127,6 @@ class WindowLifecycleMixin:
         self._cleanup_threaded_pages_for_close()
         self._cleanup_visual_and_proxy_resources_for_close()
         self._cleanup_runtime_threads_for_close()
-
-    def setWindowTitle(self, title: str):
-        """Override to update FluentWindow's built-in titlebar."""
-        super().setWindowTitle(title)
 
     def changeEvent(self, event):
         if event.type() == QEvent.Type.ActivationChange:

@@ -46,7 +46,7 @@ class PresetFileService:
 
     Этот сервис работает только с физическими preset-файлами: создать,
     переименовать, импортировать, сбросить, сохранить текст. Он не строит
-    список profile и не читает старую metadata.
+    список profile и не читает содержимое preset-а.
     """
 
     engine: str
@@ -97,16 +97,11 @@ class PresetFileService:
         self,
         old_file_name: str,
         new_file_name: str,
-        *,
-        old_display_name: str,
-        new_display_name: str,
     ) -> None:
         try:
             self._get_hierarchy_store().rename_preset_meta(
                 old_file_name,
                 new_file_name,
-                old_display_name=old_display_name,
-                new_display_name=new_display_name,
             )
         except Exception:
             pass
@@ -115,23 +110,18 @@ class PresetFileService:
         self,
         source_file_name: str,
         new_file_name: str,
-        *,
-        source_display_name: str,
-        new_display_name: str,
     ) -> None:
         try:
             self._get_hierarchy_store().copy_preset_meta_to_new(
                 source_file_name,
                 new_file_name,
-                source_display_name=source_display_name,
-                new_display_name=new_display_name,
             )
         except Exception:
             pass
 
-    def _delete_library_meta(self, preset_file_name: str, *, display_name: str) -> None:
+    def _delete_library_meta(self, preset_file_name: str) -> None:
         try:
-            self._get_hierarchy_store().delete_preset_meta(preset_file_name, display_name=display_name)
+            self._get_hierarchy_store().delete_preset_meta(preset_file_name)
         except Exception:
             pass
 

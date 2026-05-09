@@ -8,6 +8,7 @@ from settings.dpi.strategy_settings import get_strategy_launch_method
 from settings.mode import is_preset_launch_method
 from ui.runtime_ui_bridge import ensure_runtime_ui_bridge
 
+from .discord_restart_flow import maybe_restart_discord_after_runtime_apply
 from .thread_runtime import start_worker_thread
 from .control_workers import PresetSwitchWorker
 from winws_runtime.flow.start_preparation import resolve_launch_method
@@ -198,7 +199,7 @@ def handle_presets_switch_finished(controller, success, error_message, generatio
                 f"Preset mode switch успешно завершён, поколение {generation} ({launch_method})",
                 "INFO",
             )
-            controller._maybe_restart_discord_after_runtime_apply(skip_first_start=False)
+            maybe_restart_discord_after_runtime_apply(controller, skip_first_start=False)
             if int(controller._presets_switch_requested_generation or 0) <= int(controller._presets_switch_completed_generation or 0):
                 controller.app.set_status("✅ Пресет успешно применён")
         else:

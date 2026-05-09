@@ -77,7 +77,6 @@ class UserPresetsPageControllerConfig:
     list_log_prefix: str
     activate_error_level: str
     activate_error_mode: str
-    copy_hierarchy_meta_on_duplicate: bool
     require_app_context: Callable[[], object]
     get_preset_store: Callable[[], object]
 
@@ -88,7 +87,7 @@ class UserPresetsListingApi(Protocol):
     def get_selected_source_preset_file_name_light(self) -> str: ...
     def get_presets_dir_light(self): ...
     def load_preset_list_metadata_light(self) -> dict[str, dict[str, object]]: ...
-    def read_single_preset_list_metadata_light(self, file_name_or_name: str) -> tuple[str, dict[str, object]] | None: ...
+    def read_single_preset_list_metadata_light(self, file_name: str) -> tuple[str, dict[str, object]] | None: ...
     def resolve_display_name(self, reference: str) -> str: ...
     def build_preset_rows_plan(
         self,
@@ -119,7 +118,7 @@ class UserPresetsStorageApi(Protocol):
     def get_hierarchy_store(self): ...
     def is_builtin_preset_file(self, name: str) -> bool: ...
     def is_builtin_preset_file_with_cache(self, name: str, cached_metadata: dict[str, dict[str, object]] | None) -> bool: ...
-    def toggle_preset_pin(self, name: str, display_name: str) -> bool: ...
+    def toggle_preset_pin(self, name: str) -> bool: ...
     def move_preset_by_step(self, name: str, direction: int, *, cached_metadata: dict[str, dict[str, object]] | None = None) -> bool: ...
     def move_preset_on_drop(
         self,
@@ -158,8 +157,8 @@ class _UserPresetsListingApiImpl:
     def load_preset_list_metadata_light(self) -> dict[str, dict[str, object]]:
         return self._controller.load_preset_list_metadata_light()
 
-    def read_single_preset_list_metadata_light(self, file_name_or_name: str) -> tuple[str, dict[str, object]] | None:
-        return self._controller.read_single_preset_list_metadata_light(file_name_or_name)
+    def read_single_preset_list_metadata_light(self, file_name: str) -> tuple[str, dict[str, object]] | None:
+        return self._controller.read_single_preset_list_metadata_light(file_name)
 
     def resolve_display_name(self, reference: str) -> str:
         return self._controller.resolve_display_name(reference)
@@ -234,8 +233,8 @@ class _UserPresetsStorageApiImpl:
     def is_builtin_preset_file_with_cache(self, name: str, cached_metadata: dict[str, dict[str, object]] | None) -> bool:
         return self._controller.is_builtin_preset_file_with_cache(name, cached_metadata)
 
-    def toggle_preset_pin(self, name: str, display_name: str) -> bool:
-        return self._controller.toggle_preset_pin(name, display_name)
+    def toggle_preset_pin(self, name: str) -> bool:
+        return self._controller.toggle_preset_pin(name)
 
     def move_preset_by_step(self, name: str, direction: int, *, cached_metadata: dict[str, dict[str, object]] | None = None) -> bool:
         return self._controller.move_preset_by_step(name, direction, cached_metadata=cached_metadata)
@@ -314,7 +313,7 @@ class UserPresetsPageController:
         return UserPresetActionResult(
             ok=True,
             log_level="INFO",
-            log_message=f"Пресет '{current_name}' переименован в '{new_name}'",
+            log_message=f"Preset '{current_name}' переименован в '{new_name}'",
             infobar_level=None,
             infobar_title="",
             infobar_content="",
@@ -360,12 +359,12 @@ class UserPresetsPageController:
         failed_count = len(failed or [])
         if failed_count:
             log_message = (
-                f"Восстановление заводских пресетов завершено частично: "
+                f"Восстановление встроенных пресетов завершено частично: "
                 f"успешно={success_count}/{total}, ошибки={failed_count}"
             )
             level = "WARNING"
         else:
-            log_message = f"Восстановлены заводские пресеты: {success_count}/{total}"
+            log_message = f"Восстановлены встроенные пресеты: {success_count}/{total}"
             level = "INFO"
 
         return UserPresetResetAllResult(
@@ -383,15 +382,10 @@ class UserPresetsPageController:
         new_name = f"{display_name} (копия)"
         service = self._get_preset_file_service()
         service.duplicate_by_file_name(file_name, new_name)
-        if self._config.copy_hierarchy_meta_on_duplicate:
-            try:
-                self.get_hierarchy_store().copy_preset_meta_to_new(file_name, new_name, source_display_name=display_name)
-            except Exception:
-                pass
         return UserPresetActionResult(
             ok=True,
             log_level="INFO",
-            log_message=f"Пресет '{display_name}' дублирован как '{new_name}'",
+            log_message=f"Preset '{display_name}' дублирован как '{new_name}'",
             infobar_level=None,
             infobar_title="",
             infobar_content="",
@@ -405,7 +399,7 @@ class UserPresetsPageController:
         return UserPresetActionResult(
             ok=True,
             log_level="INFO",
-            log_message=f"Восстановлен встроенный preset для '{display_name}'",
+            log_message=f"Восстановлен встроенный пресет для '{display_name}'",
             infobar_level=None,
             infobar_title="",
             infobar_content="",
@@ -584,10 +578,10 @@ class UserPresetsPageController:
 
         return metadata
 
-    def read_single_preset_list_metadata_light(self, file_name_or_name: str) -> tuple[str, dict[str, object]] | None:
+    def read_single_preset_list_metadata_light(self, file_name: str) -> tuple[str, dict[str, object]] | None:
         from presets.lightweight_metadata import build_lightweight_preset_metadata
 
-        candidate = str(file_name_or_name or "").strip()
+        candidate = str(file_name or "").strip()
         if not candidate:
             return None
 
@@ -595,8 +589,7 @@ class UserPresetsPageController:
         matched_entry = None
         for entry in self.list_preset_entries_light():
             entry_file_name = str(entry.get("file_name") or "").strip()
-            entry_display_name = str(entry.get("display_name") or entry_file_name).strip()
-            if entry_file_name == candidate_file_name or entry_display_name == candidate:
+            if entry_file_name == candidate_file_name:
                 matched_entry = entry
                 candidate_file_name = entry_file_name or candidate_file_name
                 break
@@ -649,9 +642,9 @@ class UserPresetsPageController:
 
         return self.is_builtin_preset_file(candidate)
 
-    def toggle_preset_pin(self, name: str, display_name: str) -> bool:
+    def toggle_preset_pin(self, name: str) -> bool:
         hierarchy = self.get_hierarchy_store()
-        return bool(hierarchy.toggle_preset_pin(name, display_name=display_name))
+        return bool(hierarchy.toggle_preset_pin(name))
 
     def move_preset_by_step(self, name: str, direction: int, *, cached_metadata: dict[str, dict[str, object]] | None = None) -> bool:
         hierarchy = self.get_hierarchy_store()
@@ -741,7 +734,7 @@ class UserPresetsPageController:
                 continue
             display_name = str(preset.get("display_name") or file_name).strip()
             is_builtin = builtin_by_file.get(file_name, False)
-            meta = hierarchy.get_preset_meta(file_name, display_name=display_name)
+            meta = hierarchy.get_preset_meta(file_name)
             rows.append(
                 {
                     "kind": "preset",

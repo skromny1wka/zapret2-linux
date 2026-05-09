@@ -171,12 +171,12 @@ def build_opacity_section(
         )
     else:
         opacity_title_text = tr_catalog(
-            "page.appearance.opacity.legacy.title",
+            "page.appearance.opacity.standard.title",
             language=tr_language,
             default="Прозрачность окна",
         )
         opacity_desc_text = tr_catalog(
-            "page.appearance.opacity.legacy.description",
+            "page.appearance.opacity.standard.description",
             language=tr_language,
             default=(
                 "Настройка прозрачности всего окна приложения. "

@@ -13,8 +13,8 @@ from .models import PresetManifest
 class PresetUiStore(QObject):
     """Lightweight store for preset mode UI notifications and metadata.
 
-    It deliberately avoids legacy preset parsing. It keeps only manifest
-    metadata and the selected source preset file name.
+    It keeps only manifest metadata and the selected source preset file name.
+    Preset content is parsed by the profile layer.
     """
 
     presets_changed = pyqtSignal()

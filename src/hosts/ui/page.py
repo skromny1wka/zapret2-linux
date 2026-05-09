@@ -681,7 +681,7 @@ class HostsPage(BasePage):
             self._building_services_ui = False
 
         self._service_dns_selection = dict(catalog_plan.new_selection)
-        if catalog_plan.selection_migrated:
+        if catalog_plan.selection_changed:
             HostsPageController.save_user_selection(self._service_dns_selection)
 
     def _on_direct_toggle_changed(self, service_name: str, checked: bool) -> None:

@@ -182,8 +182,8 @@ def build_preset_setup_open_card_common(
         push_setting_card_cls=push_setting_card_cls,
         button_text=tr_fn(button_key, "Открыть"),
         icon=get_cached_qta_pixmap("fa5s.play", color="#60cdff", size=20),
-        title_text=tr_fn(title_key, "Настройка preset-а"),
-        content_text=tr_fn(desc_key, "Открыть profiles выбранного preset-а и выбрать готовые стратегии"),
+        title_text=tr_fn(title_key, "Настройка пресета"),
+        content_text=tr_fn(desc_key, "Открыть профили выбранного пресета и выбрать готовые стратегии"),
         on_click=on_open_preset_setup_page,
         parent=parent,
     )

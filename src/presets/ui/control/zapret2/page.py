@@ -60,7 +60,7 @@ class ProfileUiModeDialog(MessageBoxBase):
             tr_catalog(
                 "page.winws2_control.mode.dialog.title",
                 language=language,
-                default="Режим отображения profile",
+                default="Режим отображения профилей",
             ),
             self.widget,
         )
@@ -81,10 +81,10 @@ class ProfileUiModeDialog(MessageBoxBase):
                 "page.winws2_control.mode.dialog.description",
                 language=language,
                 default=(
-                    "Профили поддерживает несколько режимов: упрощенный и расширенный для профи. "
-                    "Настройки не сохраняются между режимами Вы можете выбрать любой. Рекомендуем начать с базового. "
-                    "Бывает что базовый из-за готовых стратегий плохо пробивает сайты, тогда рекомендуем попробовать "
-                    "продвинутый в котором можно более тонко настроить техники дурения."
+                    "Профили поддерживают несколько режимов: упрощённый и расширенный. "
+                    "Настройки не переносятся между режимами, поэтому можно выбрать любой. "
+                    "Рекомендуем начать с базового. Если базовый режим с готовыми стратегиями плохо открывает сайты, "
+                    "попробуйте продвинутый: там можно тоньше настроить техники дурения."
                 ),
             ),
             self.widget,
@@ -94,8 +94,8 @@ class ProfileUiModeDialog(MessageBoxBase):
                 "page.winws2_control.mode.dialog.basic_description",
                 language=language,
                 default=(
-                    "Basic (базовый) — готовая таблица стратегий без понятия фаз. "
-                    "Собирать свои стратегии нельзя."
+                    "Basic (базовый) — выбор готовой стратегии без настройки фаз. "
+                    "Свой набор аргументов в этом режиме собрать нельзя."
                 ),
             ),
             self.widget,
@@ -165,7 +165,7 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
     """Главная страница управления для Zapret 2."""
 
     navigate_to_presets = pyqtSignal()        # -> "Мои пресеты": выбор, активация, raw-редактор
-    navigate_to_preset_setup = pyqtSignal()   # -> "Настройка preset-а": profiles выбранного preset-а
+    navigate_to_preset_setup = pyqtSignal()   # -> "Настройка пресета": профили выбранного пресета
     navigate_to_blobs = pyqtSignal()          # → PageName.BLOBS
     profile_ui_mode_changed = pyqtSignal(str)     # "basic" | "advanced"
     deferred_show_requested = pyqtSignal()
@@ -175,8 +175,8 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         _t_base = _time.perf_counter()
         super().__init__(
             "Управление",
-            "Настройка и запуск Zapret 2. В «Мои пресеты» выбирается preset, "
-            "а в «Настройка preset-а» меняются profiles и готовые стратегии.",
+            "Настройка и запуск Zapret 2. В «Мои пресеты» выбирается пресет, "
+            "а в «Настройка пресета» меняются профили и выбранные для них готовые стратегии.",
             parent,
             title_key="page.winws2_control.title",
             subtitle_key="page.winws2_control.subtitle",
@@ -384,7 +384,7 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
 
         self.add_spacing(16)
 
-        # ── Ветка preset-а: выбор preset-а отдельно от настройки его profiles ──
+        # ── Ветка пресета: выбор пресета отдельно от настройки его профилей ──
         _t_preset = _time.perf_counter()
         preset_widgets = build_winws2_presets_section(
             add_section_title=self.add_section_title,

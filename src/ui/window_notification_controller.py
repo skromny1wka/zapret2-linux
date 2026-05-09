@@ -384,7 +384,10 @@ class WindowNotificationController(QObject):
             pass
 
         try:
-            controller._resume_start_after_conflict_resolution(
+            from winws_runtime.runtime.conflict_flow import resume_start_after_conflict_resolution
+
+            resume_start_after_conflict_resolution(
+                controller,
                 int(request_id or 0),
                 close_conflicts=bool(close_conflicts),
             )
@@ -415,7 +418,9 @@ class WindowNotificationController(QObject):
             pass
 
         try:
-            controller._cancel_start_after_conflict_prompt(int(request_id or 0))
+            from winws_runtime.runtime.conflict_flow import cancel_start_after_conflict_prompt
+
+            cancel_start_after_conflict_prompt(controller, int(request_id or 0))
         except Exception as e:
             log(f"Не удалось отменить запуск после предупреждения о конфликтах: {e}", "DEBUG")
 

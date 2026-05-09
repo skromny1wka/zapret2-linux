@@ -70,8 +70,8 @@ class BasePage(_FluentScrollArea):
 
     Uses qfluentwidgets ScrollArea for smooth Fluent-style scrolling.
     The public API (self.layout, add_widget, add_spacing, add_section_title,
-    self.parent_app, self.title_label, self.subtitle_label) is kept
-    backward-compatible so all 40+ pages work without changes.
+    self.parent_app, self.title_label, self.subtitle_label) is shared by
+    all pages.
     """
 
     def __init__(
@@ -131,13 +131,13 @@ class BasePage(_FluentScrollArea):
         self.content.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.setWidget(self.content)
 
-        # --- Main layout (backward-compat: self.layout) ---
+        # --- Main layout ---
         self.vBoxLayout = QVBoxLayout(self.content)
         self.vBoxLayout.setContentsMargins(36, 28, 36, 28)
         self.vBoxLayout.setSpacing(16)
         self.vBoxLayout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        # Backward compatibility: old pages use self.layout.addWidget(...)
+        # Public layout alias used by page subclasses.
         self.layout = self.vBoxLayout
 
         # --- Title ---

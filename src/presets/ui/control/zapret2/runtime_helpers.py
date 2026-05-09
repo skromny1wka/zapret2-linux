@@ -105,7 +105,7 @@ def apply_profile_language(
 
     current_preset_caption.setText(tr_catalog("page.winws2_control.preset.current", language=language, default="Текущий активный пресет"))
     if profile_ui_mode_caption is not None:
-        profile_ui_mode_caption.setText(tr_catalog("page.winws2_control.profile_ui_mode.caption", language=language, default="Режим отображения profile"))
+        profile_ui_mode_caption.setText(tr_catalog("page.winws2_control.profile_ui_mode.caption", language=language, default="Режим отображения профилей"))
     if advanced_notice is not None:
         advanced_notice.setText(
             tr_catalog("page.winws2_control.advanced.warning", language=language, default="Изменяйте только если знаете что делаете")

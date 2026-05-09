@@ -6,8 +6,8 @@ from __future__ import annotations
 def toggle_pin_preset_action(*, name: str, resolve_display_name_fn, storage_api, refresh_presets_view_from_cache_fn, log_fn) -> None:
     try:
         display_name = resolve_display_name_fn(name)
-        pinned = storage_api.toggle_preset_pin(name, display_name)
-        log_fn(f"Пресет '{display_name}' {'закреплён' if pinned else 'откреплён'}", "INFO")
+        pinned = storage_api.toggle_preset_pin(name)
+        log_fn(f"Preset '{display_name}' {'закреплён' if pinned else 'откреплён'}", "INFO")
         refresh_presets_view_from_cache_fn()
     except Exception as exc:
         log_fn(f"Ошибка закрепления пресета: {exc}", "ERROR")
@@ -128,11 +128,11 @@ def reset_preset_action(*, name: str, resolve_display_name_fn, actions_api, mess
         display_name = resolve_display_name_fn(name)
         if message_box_cls:
             box = message_box_cls(
-                tr_fn("page.winws1_user_presets.dialog.reset_single.title", "Вернуть встроенный preset?"),
+                tr_fn("page.winws1_user_presets.dialog.reset_single.title", "Вернуть встроенный пресет?"),
                 tr_fn(
                     "page.winws1_user_presets.dialog.reset_single.body",
-                    "Пользовательский файл preset-а '{name}' будет удалён.\n"
-                    "После этого снова будет использоваться встроенный preset с тем же именем файла.\n"
+                    "Пользовательский файл пресета '{name}' будет удалён.\n"
+                    "После этого снова будет использоваться встроенный пресет с тем же именем файла.\n"
                     "Изменения в пользовательском файле будут потеряны.",
                     name=display_name,
                 ),
@@ -170,9 +170,9 @@ def delete_preset_action(*, name: str, resolve_display_name_fn, storage_api, act
                 tr_fn("page.winws1_user_presets.dialog.delete_single.title", "Удалить пресет?"),
                 tr_fn(
                     "page.winws1_user_presets.dialog.delete_single.body",
-                    "Пресет '{name}' будет удален из списка пользовательских пресетов.\n"
+                    "Пресет '{name}' будет удалён из списка пользовательских пресетов.\n"
                     "Изменения в этом пресете будут потеряны.\n"
-                    "Вернуть его можно только заново создав preset или импортировав файл.",
+                    "Вернуть его можно только заново создав пресет или импортировав файл.",
                     name=display_name,
                 ),
                 parent_window,

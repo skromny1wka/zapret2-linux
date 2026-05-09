@@ -293,7 +293,7 @@ class PresetSubpageBase(BasePage):
         summary_layout.setContentsMargins(16, 16, 16, 16)
         summary_layout.setSpacing(8)
 
-        self.statusLabel = StrongBodyLabel("Пресет", self.summaryCard)
+        self.statusLabel = StrongBodyLabel("Preset", self.summaryCard)
         self.metaLabel = CaptionLabel("", self.summaryCard)
         self.metaLabel.setWordWrap(True)
         self.pathLabel = CaptionLabel("", self.summaryCard)
@@ -447,7 +447,7 @@ class PresetSubpageBase(BasePage):
         try:
             if self._activate_selected_preset():
                 self._refresh_header()
-                self._show_success(f"Пресет «{self._preset_name}» активирован")
+                self._show_success(f"Preset «{self._preset_name}» активирован")
             else:
                 self._show_error(f"Не удалось активировать пресет «{self._preset_name}»")
         except Exception as e:
@@ -559,9 +559,9 @@ class PresetSubpageBase(BasePage):
         self._flush_pending_save()
         if MessageBox is not None:
             box = MessageBox(
-                "Вернуть встроенный preset?",
-                f"Пользовательский файл preset-а «{self._preset_name}» будет удалён. "
-                "После этого снова будет использоваться встроенный preset с тем же именем файла.",
+                "Вернуть встроенный пресет?",
+                f"Пользовательский файл пресета «{self._preset_name}» будет удалён. "
+                "После этого снова будет использоваться встроенный пресет с тем же именем файла.",
                 self.window(),
             )
             box.yesButton.setText("Вернуть встроенный")
@@ -580,7 +580,7 @@ class PresetSubpageBase(BasePage):
             self._preset_path = service.get_source_path_by_file_name(self._preset_file_name)
             self._load_file()
             self._refresh_header()
-            self._show_success(f"Восстановлен встроенный preset «{self._preset_name}»")
+            self._show_success(f"Восстановлен встроенный пресет «{self._preset_name}»")
         except Exception as e:
             self._show_error(str(e))
 
@@ -592,7 +592,7 @@ class PresetSubpageBase(BasePage):
         if MessageBox is not None:
             box = MessageBox(
                 "Удалить пресет?",
-                f"Пресет «{self._preset_name}» будет удалён.",
+                f"Preset «{self._preset_name}» будет удалён.",
                 self.window(),
             )
             box.yesButton.setText("Удалить")
@@ -609,7 +609,7 @@ class PresetSubpageBase(BasePage):
             service.delete_by_file_name(self._preset_file_name)
             self._notify_preset_structure_changed()
             self.back_clicked.emit()
-            self._show_success(f"Пресет «{name}» удалён")
+            self._show_success(f"Preset «{name}» удалён")
         except Exception as e:
             self._show_error(str(e))
 

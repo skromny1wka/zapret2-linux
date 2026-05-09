@@ -23,10 +23,7 @@ def show_preset_rating_menu(
 
     menu = QMenu(parent)
     current_rating = int(
-        hierarchy_store.get_preset_meta(
-            preset_file_name,
-            display_name=display_name,
-        ).get("rating", 0) or 0
+        hierarchy_store.get_preset_meta(preset_file_name).get("rating", 0) or 0
     )
 
     clear_action = menu.addAction(str(clear_label or "Сбросить рейтинг"))
@@ -48,18 +45,10 @@ def show_preset_rating_menu(
         capture_action=True,
     )
     if chosen == clear_action:
-        hierarchy_store.set_preset_rating(
-            preset_file_name,
-            0,
-            display_name=display_name,
-        )
+        hierarchy_store.set_preset_rating(preset_file_name, 0)
         refresh_callback()
         return
 
     if chosen in actions:
-        hierarchy_store.set_preset_rating(
-            preset_file_name,
-            actions[chosen],
-            display_name=display_name,
-        )
+        hierarchy_store.set_preset_rating(preset_file_name, actions[chosen])
         refresh_callback()

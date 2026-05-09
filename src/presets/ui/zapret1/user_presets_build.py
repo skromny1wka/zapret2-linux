@@ -113,14 +113,14 @@ def build_user_presets_page_shell(
     open_folder_btn.clicked.connect(on_open_folder_clicked)
 
     reset_all_btn = toolbar_layout.create_action_button(
-        tr_fn("page.winws1_user_presets.button.reset_all", "Вернуть заводские"),
+        tr_fn("page.winws1_user_presets.button.reset_all", "Вернуть встроенные"),
         "fa5s.undo",
     )
     set_tooltip(
         reset_all_btn,
         tr_fn(
             "page.winws1_user_presets.tooltip.reset_all",
-            "Восстанавливает стандартные пресеты. Ваши изменения в стандартных пресетах будут потеряны.",
+            "Возвращает встроенные пресеты. Ваши изменения во встроенных пресетах будут потеряны.",
         ),
     )
     reset_all_btn.clicked.connect(on_reset_all_presets_clicked)
