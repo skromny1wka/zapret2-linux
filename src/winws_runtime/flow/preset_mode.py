@@ -8,10 +8,10 @@ from typing import Callable
 from core.paths import AppPaths
 from settings.schema import SETTINGS_DIR_NAME, SETTINGS_FILE_NAME
 
-from core.presets.cache_signatures import path_cache_signature
-from core.presets.models import PresetManifest
-from core.presets.preset_file_store import PresetFileStore
-from core.presets.selection_service import PresetSelectionService
+from presets.cache_signatures import path_cache_signature
+from presets.models import PresetManifest
+from presets.file_store import PresetFileStore
+from presets.selection_service import PresetSelectionService
 
 
 class PresetModeError(RuntimeError):

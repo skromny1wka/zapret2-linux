@@ -4,7 +4,7 @@ from typing import Dict, Optional
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from .preset_file_store import PresetFileStore
+from .file_store import PresetFileStore
 from .selection_service import PresetSelectionService
 
 from .models import PresetManifest

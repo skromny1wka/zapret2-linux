@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from types import SimpleNamespace
 
-from core.presets.preset_file_store import PresetFileStore
+from presets.file_store import PresetFileStore
 
 from .match_filters import ports_label_from_match_lines, protocol_label_from_match_lines, strategy_catalog_from_match_lines
 from .models import EngineName, Preset, Profile

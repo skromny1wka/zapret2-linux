@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 from core.paths import AppPaths
-from core.presets.strategy_catalog_sanitizer import sanitize_strategy_catalog_dir
+from presets.strategy_catalog_sanitizer import sanitize_strategy_catalog_dir
 
 
 @dataclass(frozen=True)

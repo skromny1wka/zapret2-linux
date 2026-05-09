@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from core.presets.list_metadata import read_preset_list_metadata
+from presets.list_metadata import read_preset_list_metadata
 
 
 def build_lightweight_preset_metadata(

@@ -562,7 +562,7 @@ class UserPresetsPageController:
         return self._get_app_paths().engine_paths(self._config.selection_key).ensure_directories().user_presets_dir
 
     def load_preset_list_metadata_light(self) -> dict[str, dict[str, object]]:
-        from core.presets.lightweight_metadata import build_lightweight_preset_metadata
+        from presets.lightweight_metadata import build_lightweight_preset_metadata
 
         metadata: dict[str, dict[str, object]] = {}
         service = self._get_preset_file_service()
@@ -585,7 +585,7 @@ class UserPresetsPageController:
         return metadata
 
     def read_single_preset_list_metadata_light(self, file_name_or_name: str) -> tuple[str, dict[str, object]] | None:
-        from core.presets.lightweight_metadata import build_lightweight_preset_metadata
+        from presets.lightweight_metadata import build_lightweight_preset_metadata
 
         candidate = str(file_name_or_name or "").strip()
         if not candidate:
@@ -633,7 +633,7 @@ class UserPresetsPageController:
         return candidate
 
     def get_hierarchy_store(self):
-        from core.presets.library_hierarchy import PresetHierarchyStore
+        from presets.library_hierarchy import PresetHierarchyStore
 
         return PresetHierarchyStore(self._config.hierarchy_scope)
 

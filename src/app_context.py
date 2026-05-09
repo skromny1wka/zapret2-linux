@@ -10,9 +10,9 @@ if TYPE_CHECKING:
     from winws_runtime.flow.preset_mode import PresetModeCoordinator
     from winws_runtime.state import LaunchRuntimeService
     from core.paths import AppPaths
-    from core.presets.preset_file_store import PresetFileStore
-    from core.presets.ui_store import PresetUiStore
-    from core.presets.selection_service import PresetSelectionService
+    from presets.file_store import PresetFileStore
+    from presets.ui_store import PresetUiStore
+    from presets.selection_service import PresetSelectionService
     from core.runtime.orchestra_whitelist_runtime_service import OrchestraWhitelistRuntimeService
     from core.runtime.preset_runtime_coordinator import PresetRuntimeCoordinator
     from core.runtime.program_settings_runtime_service import ProgramSettingsRuntimeService
@@ -47,9 +47,9 @@ def build_app_context(*, initial_ui_state: AppUiState | None = None) -> AppConte
     from winws_runtime.flow.preset_mode import PresetModeCoordinator
     from winws_runtime.state import LaunchRuntimeService
     from core.paths import AppPaths
-    from core.presets.preset_file_store import PresetFileStore
-    from core.presets.ui_store import PresetUiStore
-    from core.presets.selection_service import PresetSelectionService
+    from presets.file_store import PresetFileStore
+    from presets.ui_store import PresetUiStore
+    from presets.selection_service import PresetSelectionService
     from core.runtime.orchestra_whitelist_runtime_service import OrchestraWhitelistRuntimeService
     from core.runtime.preset_runtime_coordinator import PresetRuntimeCoordinator
     from core.runtime.program_settings_runtime_service import ProgramSettingsRuntimeService

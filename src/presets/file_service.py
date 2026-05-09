@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from core.presets.models import PresetManifest
+from presets.models import PresetManifest
 from presets.preset_file_ops import (
     create_preset as _create_preset,
     delete_by_file_name as _delete_by_file_name,
@@ -20,9 +20,9 @@ from presets.preset_text_ops import _normalize_presets_source_text
 if TYPE_CHECKING:
     from app_context import AppContext
     from core.paths import AppPaths
-    from core.presets.preset_file_store import PresetFileStore
-    from core.presets.ui_store import PresetUiStore
-    from core.presets.selection_service import PresetSelectionService
+    from presets.file_store import PresetFileStore
+    from presets.ui_store import PresetUiStore
+    from presets.selection_service import PresetSelectionService
     from winws_runtime.flow.preset_mode import PresetModeCoordinator
 
 
@@ -86,7 +86,7 @@ class PresetFileService:
         return scope_key
 
     def _get_hierarchy_store(self):
-        from core.presets.library_hierarchy import PresetHierarchyStore
+        from presets.library_hierarchy import PresetHierarchyStore
 
         return PresetHierarchyStore(self._hierarchy_scope_key())
 

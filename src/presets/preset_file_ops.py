@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from core.presets.template_support import (
+from presets.template_support import (
     resolve_reset_template as _template_support_resolve_reset_template,
     reset_all_templates as _template_support_reset_all_templates,
 )

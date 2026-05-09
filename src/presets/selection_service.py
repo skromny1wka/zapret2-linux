@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from .models import PresetManifest
-from .preset_file_store import PresetFileStore
+from .file_store import PresetFileStore
 
 
 class PresetSelectionService:
