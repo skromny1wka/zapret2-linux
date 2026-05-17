@@ -46,6 +46,9 @@ Desktop.ini
 # Logs
 *.log
 
+# Runtime user state
+/settings/
+
 # Local config
 .env.local
 
