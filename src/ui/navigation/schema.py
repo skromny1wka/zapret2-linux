@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import Iterable
 
-from ui.page_names import PageName
+from settings.mode import DEFAULT_LAUNCH_METHOD, ORCHESTRA_MODE, ZAPRET1_MODE, ZAPRET2_MODE
+from app.page_names import PageName
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,140 +18,117 @@ class PageRouteSpec:
     launch_modes: tuple[str, ...]
     breadcrumb_parent: PageName | None
     sidebar_group: str | None
-    attr_name: str
     cleanup_priority: int = 10_000
 
 
 _COMMON = ()
-_Z2_MODE = ("zapret2_mode",)
-_Z1_MODE = ("zapret1_mode",)
-_ORCHESTRA = ("orchestra",)
+_WINWS2_MODE = (ZAPRET2_MODE,)
+_WINWS1_MODE = (ZAPRET1_MODE,)
+_ORCHESTRA = (ORCHESTRA_MODE,)
 
 
 PAGE_ROUTE_SPECS: dict[PageName, PageRouteSpec] = {
-    PageName.CONTROL: PageRouteSpec(
-        page_name=PageName.CONTROL,
-        attr_name="control_page",
-        module_name="ui.pages.control_page",
-        class_name="ControlPage",
-        route_key="ControlPage",
-        is_top_level=True,
-        is_hidden=False,
-        launch_modes=_COMMON,
-        breadcrumb_parent=None,
-        sidebar_group="root",
-    ),
     PageName.ZAPRET2_MODE_CONTROL: PageRouteSpec(
         page_name=PageName.ZAPRET2_MODE_CONTROL,
-        attr_name="zapret2_mode_control_page",
         module_name="presets.ui.control.zapret2.page",
         class_name="Zapret2ModeControlPage",
         route_key="Zapret2ModeControlPage",
         is_top_level=True,
         is_hidden=False,
-        launch_modes=_Z2_MODE,
+        launch_modes=_WINWS2_MODE,
         breadcrumb_parent=None,
         sidebar_group="root",
     ),
-    PageName.ZAPRET2_MODE: PageRouteSpec(
-        page_name=PageName.ZAPRET2_MODE,
-        attr_name="zapret2_profiles_page",
-        module_name="profile.ui.profiles_page",
-        class_name="Zapret2ProfilesPage",
-        route_key="Zapret2ProfilesPage",
+    PageName.ZAPRET2_PRESET_SETUP: PageRouteSpec(
+        page_name=PageName.ZAPRET2_PRESET_SETUP,
+        module_name="profile.ui.preset_setup_page",
+        class_name="Zapret2PresetSetupPage",
+        route_key="Zapret2PresetSetupPage",
         is_top_level=False,
         is_hidden=True,
-        launch_modes=_Z2_MODE,
+        launch_modes=_WINWS2_MODE,
         breadcrumb_parent=PageName.ZAPRET2_MODE_CONTROL,
         sidebar_group=None,
     ),
-    PageName.ZAPRET2_PROFILE_DETAIL: PageRouteSpec(
-        page_name=PageName.ZAPRET2_PROFILE_DETAIL,
-        attr_name="profile_detail_page",
-        module_name="profile.ui.detail_page",
-        class_name="ProfileDetailPage",
-        route_key="ProfileDetailPage",
+    PageName.ZAPRET2_PROFILE_SETUP: PageRouteSpec(
+        page_name=PageName.ZAPRET2_PROFILE_SETUP,
+        module_name="profile.ui.profile_setup_page",
+        class_name="Zapret2ProfileSetupPage",
+        route_key="Zapret2ProfileSetupPage",
         is_top_level=False,
         is_hidden=True,
-        launch_modes=_Z2_MODE,
-        breadcrumb_parent=PageName.ZAPRET2_MODE,
+        launch_modes=_WINWS2_MODE,
+        breadcrumb_parent=PageName.ZAPRET2_PRESET_SETUP,
         sidebar_group=None,
     ),
-    PageName.ZAPRET2_PRESET_DETAIL: PageRouteSpec(
-        page_name=PageName.ZAPRET2_PRESET_DETAIL,
-        attr_name="zapret2_preset_detail_page",
-        module_name="presets.ui.zapret2.preset_detail_page",
-        class_name="Zapret2PresetDetailPage",
-        route_key="Zapret2PresetDetailPage",
+    PageName.ZAPRET2_PRESET_RAW_EDITOR: PageRouteSpec(
+        page_name=PageName.ZAPRET2_PRESET_RAW_EDITOR,
+        module_name="presets.ui.common.preset_subpage_base",
+        class_name="PresetRawEditorPage",
+        route_key="Zapret2PresetRawEditor",
         is_top_level=False,
         is_hidden=True,
-        launch_modes=_Z2_MODE,
+        launch_modes=_WINWS2_MODE,
         breadcrumb_parent=PageName.ZAPRET2_USER_PRESETS,
         sidebar_group=None,
     ),
     PageName.ZAPRET1_MODE_CONTROL: PageRouteSpec(
         page_name=PageName.ZAPRET1_MODE_CONTROL,
-        attr_name="zapret1_mode_control_page",
         module_name="presets.ui.control.zapret1.page",
         class_name="Zapret1ModeControlPage",
         route_key="Zapret1ModeControlPage",
         is_top_level=True,
         is_hidden=False,
-        launch_modes=_Z1_MODE,
+        launch_modes=_WINWS1_MODE,
         breadcrumb_parent=None,
         sidebar_group="root",
     ),
-    PageName.ZAPRET1_MODE: PageRouteSpec(
-        page_name=PageName.ZAPRET1_MODE,
-        attr_name="zapret1_profiles_page",
-        module_name="profile.ui.profiles_page",
-        class_name="Zapret1ProfilesPage",
-        route_key="Zapret1ProfilesPage",
+    PageName.ZAPRET1_PRESET_SETUP: PageRouteSpec(
+        page_name=PageName.ZAPRET1_PRESET_SETUP,
+        module_name="profile.ui.preset_setup_page",
+        class_name="Zapret1PresetSetupPage",
+        route_key="Zapret1PresetSetupPage",
         is_top_level=False,
         is_hidden=True,
-        launch_modes=_Z1_MODE,
+        launch_modes=_WINWS1_MODE,
         breadcrumb_parent=PageName.ZAPRET1_MODE_CONTROL,
         sidebar_group=None,
     ),
     PageName.ZAPRET1_USER_PRESETS: PageRouteSpec(
         page_name=PageName.ZAPRET1_USER_PRESETS,
-        attr_name="zapret1_user_presets_page",
         module_name="presets.ui.zapret1.user_presets_page",
         class_name="Zapret1UserPresetsPage",
         route_key="Zapret1UserPresetsPage",
         is_top_level=False,
         is_hidden=True,
-        launch_modes=_Z1_MODE,
+        launch_modes=_WINWS1_MODE,
         breadcrumb_parent=PageName.ZAPRET1_MODE_CONTROL,
         sidebar_group=None,
     ),
-    PageName.ZAPRET1_PROFILE_DETAIL: PageRouteSpec(
-        page_name=PageName.ZAPRET1_PROFILE_DETAIL,
-        attr_name="zapret1_profile_detail_page",
-        module_name="profile.ui.detail_page",
-        class_name="Zapret1ProfileDetailPage",
-        route_key="Zapret1ProfileDetailPage",
+    PageName.ZAPRET1_PROFILE_SETUP: PageRouteSpec(
+        page_name=PageName.ZAPRET1_PROFILE_SETUP,
+        module_name="profile.ui.profile_setup_page",
+        class_name="Zapret1ProfileSetupPage",
+        route_key="Zapret1ProfileSetupPage",
         is_top_level=False,
         is_hidden=True,
-        launch_modes=_Z1_MODE,
-        breadcrumb_parent=PageName.ZAPRET1_MODE,
+        launch_modes=_WINWS1_MODE,
+        breadcrumb_parent=PageName.ZAPRET1_PRESET_SETUP,
         sidebar_group=None,
     ),
-    PageName.ZAPRET1_PRESET_DETAIL: PageRouteSpec(
-        page_name=PageName.ZAPRET1_PRESET_DETAIL,
-        attr_name="zapret1_preset_detail_page",
-        module_name="presets.ui.zapret1.preset_detail_page",
-        class_name="Zapret1PresetDetailPage",
-        route_key="Zapret1PresetDetailPage",
+    PageName.ZAPRET1_PRESET_RAW_EDITOR: PageRouteSpec(
+        page_name=PageName.ZAPRET1_PRESET_RAW_EDITOR,
+        module_name="presets.ui.common.preset_subpage_base",
+        class_name="PresetRawEditorPage",
+        route_key="Zapret1PresetRawEditor",
         is_top_level=False,
         is_hidden=True,
-        launch_modes=_Z1_MODE,
+        launch_modes=_WINWS1_MODE,
         breadcrumb_parent=PageName.ZAPRET1_USER_PRESETS,
         sidebar_group=None,
     ),
     PageName.HOSTLIST: PageRouteSpec(
         page_name=PageName.HOSTLIST,
-        attr_name="hostlist_page",
         module_name="lists.ui.hostlist_page",
         class_name="HostlistPage",
         route_key="HostlistPage",
@@ -162,7 +140,6 @@ PAGE_ROUTE_SPECS: dict[PageName, PageRouteSpec] = {
     ),
     PageName.BLOBS: PageRouteSpec(
         page_name=PageName.BLOBS,
-        attr_name="blobs_page",
         module_name="blobs.ui.page",
         class_name="BlobsPage",
         route_key="BlobsPage",
@@ -174,7 +151,6 @@ PAGE_ROUTE_SPECS: dict[PageName, PageRouteSpec] = {
     ),
     PageName.DPI_SETTINGS: PageRouteSpec(
         page_name=PageName.DPI_SETTINGS,
-        attr_name="dpi_settings_page",
         module_name="settings.dpi.page",
         class_name="DpiSettingsPage",
         route_key="DpiSettingsPage",
@@ -186,19 +162,17 @@ PAGE_ROUTE_SPECS: dict[PageName, PageRouteSpec] = {
     ),
     PageName.ZAPRET2_USER_PRESETS: PageRouteSpec(
         page_name=PageName.ZAPRET2_USER_PRESETS,
-        attr_name="zapret2_user_presets_page",
         module_name="presets.ui.zapret2.user_presets_page",
         class_name="Zapret2UserPresetsPage",
         route_key="Zapret2UserPresetsPage_Mode",
         is_top_level=False,
         is_hidden=True,
-        launch_modes=_Z2_MODE,
+        launch_modes=_WINWS2_MODE,
         breadcrumb_parent=PageName.ZAPRET2_MODE_CONTROL,
         sidebar_group=None,
     ),
     PageName.NETROGAT: PageRouteSpec(
         page_name=PageName.NETROGAT,
-        attr_name="netrogat_page",
         module_name="lists.ui.netrogat_page",
         class_name="NetrogatPage",
         route_key="NetrogatPage",
@@ -210,7 +184,6 @@ PAGE_ROUTE_SPECS: dict[PageName, PageRouteSpec] = {
     ),
     PageName.CUSTOM_DOMAINS: PageRouteSpec(
         page_name=PageName.CUSTOM_DOMAINS,
-        attr_name="custom_domains_page",
         module_name="lists.ui.custom_domains_page",
         class_name="CustomDomainsPage",
         route_key="CustomDomainsPage",
@@ -222,7 +195,6 @@ PAGE_ROUTE_SPECS: dict[PageName, PageRouteSpec] = {
     ),
     PageName.CUSTOM_IPSET: PageRouteSpec(
         page_name=PageName.CUSTOM_IPSET,
-        attr_name="custom_ipset_page",
         module_name="lists.ui.custom_ipset_page",
         class_name="CustomIpSetPage",
         route_key="CustomIpSetPage",
@@ -234,7 +206,6 @@ PAGE_ROUTE_SPECS: dict[PageName, PageRouteSpec] = {
     ),
     PageName.AUTOSTART: PageRouteSpec(
         page_name=PageName.AUTOSTART,
-        attr_name="autostart_page",
         module_name="autostart.ui.page",
         class_name="AutostartPage",
         route_key="AutostartPage",
@@ -246,7 +217,6 @@ PAGE_ROUTE_SPECS: dict[PageName, PageRouteSpec] = {
     ),
     PageName.NETWORK: PageRouteSpec(
         page_name=PageName.NETWORK,
-        attr_name="network_page",
         module_name="dns.ui.page",
         class_name="NetworkPage",
         route_key="NetworkPage",
@@ -258,7 +228,6 @@ PAGE_ROUTE_SPECS: dict[PageName, PageRouteSpec] = {
     ),
     PageName.HOSTS: PageRouteSpec(
         page_name=PageName.HOSTS,
-        attr_name="hosts_page",
         module_name="hosts.ui.page",
         class_name="HostsPage",
         route_key="HostsPage",
@@ -270,7 +239,6 @@ PAGE_ROUTE_SPECS: dict[PageName, PageRouteSpec] = {
     ),
     PageName.BLOCKCHECK: PageRouteSpec(
         page_name=PageName.BLOCKCHECK,
-        attr_name="blockcheck_page",
         module_name="blockcheck.ui.page",
         class_name="BlockcheckPage",
         route_key="BlockcheckPage",
@@ -282,7 +250,6 @@ PAGE_ROUTE_SPECS: dict[PageName, PageRouteSpec] = {
     ),
     PageName.APPEARANCE: PageRouteSpec(
         page_name=PageName.APPEARANCE,
-        attr_name="appearance_page",
         module_name="ui.pages.appearance_page",
         class_name="AppearancePage",
         route_key="AppearancePage",
@@ -294,7 +261,6 @@ PAGE_ROUTE_SPECS: dict[PageName, PageRouteSpec] = {
     ),
     PageName.PREMIUM: PageRouteSpec(
         page_name=PageName.PREMIUM,
-        attr_name="premium_page",
         module_name="donater.ui.page",
         class_name="PremiumPage",
         route_key="PremiumPage",
@@ -306,7 +272,6 @@ PAGE_ROUTE_SPECS: dict[PageName, PageRouteSpec] = {
     ),
     PageName.LOGS: PageRouteSpec(
         page_name=PageName.LOGS,
-        attr_name="logs_page",
         module_name="log.ui.page",
         class_name="LogsPage",
         route_key="LogsPage",
@@ -318,7 +283,6 @@ PAGE_ROUTE_SPECS: dict[PageName, PageRouteSpec] = {
     ),
     PageName.SERVERS: PageRouteSpec(
         page_name=PageName.SERVERS,
-        attr_name="servers_page",
         module_name="updater.ui.page",
         class_name="ServersPage",
         route_key="ServersPage",
@@ -330,7 +294,6 @@ PAGE_ROUTE_SPECS: dict[PageName, PageRouteSpec] = {
     ),
     PageName.ABOUT: PageRouteSpec(
         page_name=PageName.ABOUT,
-        attr_name="about_page",
         module_name="ui.pages.about_page",
         class_name="AboutPage",
         route_key="AboutPage",
@@ -342,7 +305,6 @@ PAGE_ROUTE_SPECS: dict[PageName, PageRouteSpec] = {
     ),
     PageName.SUPPORT: PageRouteSpec(
         page_name=PageName.SUPPORT,
-        attr_name="support_page",
         module_name="ui.pages.support_page",
         class_name="SupportPage",
         route_key="SupportPage",
@@ -354,7 +316,6 @@ PAGE_ROUTE_SPECS: dict[PageName, PageRouteSpec] = {
     ),
     PageName.ORCHESTRA: PageRouteSpec(
         page_name=PageName.ORCHESTRA,
-        attr_name="orchestra_page",
         module_name="orchestra.ui.page",
         class_name="OrchestraPage",
         route_key="OrchestraPage",
@@ -366,7 +327,6 @@ PAGE_ROUTE_SPECS: dict[PageName, PageRouteSpec] = {
     ),
     PageName.ORCHESTRA_SETTINGS: PageRouteSpec(
         page_name=PageName.ORCHESTRA_SETTINGS,
-        attr_name="orchestra_settings_page",
         module_name="orchestra.ui.settings_page",
         class_name="OrchestraSettingsPage",
         route_key="OrchestraSettingsPage",
@@ -378,7 +338,6 @@ PAGE_ROUTE_SPECS: dict[PageName, PageRouteSpec] = {
     ),
     PageName.TELEGRAM_PROXY: PageRouteSpec(
         page_name=PageName.TELEGRAM_PROXY,
-        attr_name="telegram_proxy_page",
         module_name="telegram_proxy.ui.page",
         class_name="TelegramProxyPage",
         route_key="TelegramProxyPage",
@@ -393,16 +352,17 @@ PAGE_ROUTE_SPECS: dict[PageName, PageRouteSpec] = {
 PAGE_CLEANUP_ORDER: tuple[PageName, ...] = (
     PageName.AUTOSTART,
     PageName.BLOBS,
-    PageName.CONTROL,
     PageName.CUSTOM_DOMAINS,
     PageName.CUSTOM_IPSET,
     PageName.ZAPRET2_MODE_CONTROL,
-    PageName.ZAPRET2_MODE,
-    PageName.ZAPRET2_PROFILE_DETAIL,
+    PageName.ZAPRET2_PRESET_SETUP,
+    PageName.ZAPRET2_PROFILE_SETUP,
+    PageName.ZAPRET2_PRESET_RAW_EDITOR,
     PageName.ZAPRET2_USER_PRESETS,
     PageName.ZAPRET1_MODE_CONTROL,
-    PageName.ZAPRET1_MODE,
-    PageName.ZAPRET1_PROFILE_DETAIL,
+    PageName.ZAPRET1_PRESET_SETUP,
+    PageName.ZAPRET1_PROFILE_SETUP,
+    PageName.ZAPRET1_PRESET_RAW_EDITOR,
     PageName.ZAPRET1_USER_PRESETS,
     PageName.NETROGAT,
     PageName.HOSTLIST,
@@ -440,19 +400,19 @@ PAGE_ROUTE_SPECS = {
 
 SIDEBAR_GROUP_ORDER: tuple[str, ...] = ("root", "settings", "system", "diagnostics", "appearance")
 
-DETAIL_PAGE_NAMES: frozenset[PageName] = frozenset(
+INNER_PAGE_NAMES: frozenset[PageName] = frozenset(
     {
-        PageName.ZAPRET2_PROFILE_DETAIL,
-        PageName.ZAPRET2_PRESET_DETAIL,
-        PageName.ZAPRET1_PROFILE_DETAIL,
-        PageName.ZAPRET1_PRESET_DETAIL,
+        PageName.ZAPRET2_PROFILE_SETUP,
+        PageName.ZAPRET2_PRESET_RAW_EDITOR,
+        PageName.ZAPRET1_PROFILE_SETUP,
+        PageName.ZAPRET1_PRESET_RAW_EDITOR,
     }
 )
 
 MODE_ENTRY_PAGES: dict[str, PageName] = {
-    "zapret2_mode": PageName.ZAPRET2_MODE_CONTROL,
-    "zapret1_mode": PageName.ZAPRET1_MODE_CONTROL,
-    "orchestra": PageName.ORCHESTRA,
+    ZAPRET2_MODE: PageName.ZAPRET2_MODE_CONTROL,
+    ZAPRET1_MODE: PageName.ZAPRET1_MODE_CONTROL,
+    ORCHESTRA_MODE: PageName.ORCHESTRA,
 }
 
 
@@ -481,7 +441,7 @@ def iter_page_names_for_cleanup(page_names: Iterable[PageName]) -> tuple[PageNam
 
 def normalize_launch_method_for_ui(method: str | None) -> str:
     normalized = (method or "").strip().lower()
-    return normalized or "zapret2_mode"
+    return normalized or DEFAULT_LAUNCH_METHOD
 
 
 def _matches_method(spec: PageRouteSpec, method: str | None) -> bool:
@@ -494,13 +454,6 @@ def _matches_method(spec: PageRouteSpec, method: str | None) -> bool:
 def _is_sidebar_visible_in_method(spec: PageRouteSpec, method: str | None) -> bool:
     normalized_method = normalize_launch_method_for_ui(method)
 
-    if spec.page_name == PageName.CONTROL:
-        return normalized_method not in {
-            "zapret2_mode",
-            "zapret1_mode",
-            "orchestra",
-        }
-
     return _matches_method(spec, normalized_method)
 
 
@@ -512,11 +465,11 @@ def is_page_allowed_for_method(page_name: PageName, method: str | None) -> bool:
 
 
 def is_page_mode_open_allowed(page_name: PageName) -> bool:
-    return page_name not in DETAIL_PAGE_NAMES
+    return page_name not in INNER_PAGE_NAMES
 
 
 def is_page_search_visible(page_name: PageName) -> bool:
-    return page_name not in DETAIL_PAGE_NAMES
+    return page_name not in INNER_PAGE_NAMES
 
 
 def get_page_route_key(page_name: PageName) -> str:
@@ -525,7 +478,7 @@ def get_page_route_key(page_name: PageName) -> str:
 
 def get_mode_entry_page(method: str | None) -> PageName:
     normalized = normalize_launch_method_for_ui(method)
-    return MODE_ENTRY_PAGES.get(normalized, PageName.CONTROL)
+    return MODE_ENTRY_PAGES.get(normalized, MODE_ENTRY_PAGES[DEFAULT_LAUNCH_METHOD])
 
 
 def get_eager_page_names_for_method(method: str | None) -> tuple[PageName, ...]:

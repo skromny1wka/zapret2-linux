@@ -7,11 +7,12 @@
 """
 
 from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QSize
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QGraphicsOpacityEffect
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QGraphicsOpacityEffect
+from qfluentwidgets import TransparentToolButton
 
 from ui.animation_policy import register_managed_animation, start_managed_animation
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens, get_themed_qta_icon
-from ui.theme_refresh import ThemeRefreshController
+from ui.theme_refresh import ThemeRefreshBinding
 
 
 class NotificationBanner(QWidget):
@@ -57,7 +58,7 @@ class NotificationBanner(QWidget):
         super().__init__(parent)
         self._setup_ui()
         self._setup_animation()
-        self._theme_refresh = ThemeRefreshController(self, self._refresh_theme)
+        self._theme_refresh = ThemeRefreshBinding(self, self._refresh_theme)
         self._refresh_theme()
         self.hide()  # Скрыт по умолчанию
 
@@ -86,7 +87,7 @@ class NotificationBanner(QWidget):
         layout.addWidget(self.message_label, 1)
 
         # Кнопка закрытия
-        self.close_btn = QPushButton()
+        self.close_btn = TransparentToolButton()
         self.close_btn.setIconSize(QSize(16, 16))
         self.close_btn.setFixedSize(28, 28)
         self.close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -111,15 +112,15 @@ class NotificationBanner(QWidget):
 
         self.close_btn.setIcon(get_themed_qta_icon("mdi.close", color=icon_color))
         self.close_btn.setStyleSheet(f"""
-            QPushButton {{
+            TransparentToolButton {{
                 background-color: transparent;
                 border: none;
                 border-radius: 4px;
             }}
-            QPushButton:hover {{
+            TransparentToolButton:hover {{
                 background-color: {hover_bg};
             }}
-            QPushButton:pressed {{
+            TransparentToolButton:pressed {{
                 background-color: {pressed_bg};
             }}
         """)
@@ -155,7 +156,7 @@ class NotificationBanner(QWidget):
         style = dict(self.STYLES.get(notification_type, self.STYLES['info']))
         try:
             tokens = get_theme_tokens()
-            # For "info", track the active accent instead of the legacy fixed blue.
+            # For "info", track the active accent instead of a fixed blue.
             if notification_type == "info":
                 style["bg"] = f"rgba({tokens.accent_rgb_str}, 0.15)"
                 style["border"] = f"rgba({tokens.accent_rgb_str}, 0.40)"

@@ -4,23 +4,20 @@
 import time as _time
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QScrollArea, QFrame,
-    QSizePolicy, QPlainTextEdit, QTextEdit,
+    QWidget, QVBoxLayout, QFrame, QSizePolicy,
+)
+from qfluentwidgets import (
+    BodyLabel,
+    PlainTextEdit as _FluentPlainTextEdit,
+    ScrollArea as _FluentScrollArea,
+    StrongBodyLabel,
+    TextEdit as _FluentTextEdit,
+    TitleLabel,
 )
 
-try:
-    from qfluentwidgets import (ScrollArea as _FluentScrollArea, TitleLabel, BodyLabel, StrongBodyLabel,
-                                PlainTextEdit as _FluentPlainTextEdit, TextEdit as _FluentTextEdit)
-    _USE_FLUENT = True
-except ImportError:
-    _FluentScrollArea = QScrollArea
-    _FluentPlainTextEdit = QPlainTextEdit
-    _FluentTextEdit = QTextEdit
-    _USE_FLUENT = False
-
-from ui.text_catalog import tr as tr_catalog, normalize_language
+from app.text_catalog import tr as tr_catalog, normalize_language
 from ui.page_performance import log_page_metric
-from ui.theme_refresh import ThemeRefreshController
+from ui.theme_refresh import ThemeRefreshBinding
 from ui.smooth_scroll import (
     apply_editor_smooth_scroll_preference,
     apply_page_smooth_scroll_preference,
@@ -70,8 +67,7 @@ class BasePage(_FluentScrollArea):
 
     Uses qfluentwidgets ScrollArea for smooth Fluent-style scrolling.
     The public API (self.layout, add_widget, add_spacing, add_section_title,
-    self.parent_app, self.title_label, self.subtitle_label) is kept
-    backward-compatible so all 40+ pages work without changes.
+    self.title_label, self.subtitle_label) is shared by all pages.
     """
 
     def __init__(
@@ -84,7 +80,6 @@ class BasePage(_FluentScrollArea):
         subtitle_key: str | None = None,
     ):
         super().__init__(parent)
-        self.parent_app = parent
         self._ui_language = self._resolve_ui_language()
         self._title_key = title_key
         self._subtitle_key = subtitle_key
@@ -97,7 +92,7 @@ class BasePage(_FluentScrollArea):
         self._page_load_generation = 0
         self._ready_callbacks: list[object] = []
         self._cleanup_in_progress = False
-        self._page_theme_refresh = ThemeRefreshController(
+        self._page_theme_refresh = ThemeRefreshBinding(
             self,
             self._apply_page_theme,
             is_build_pending=lambda: False,
@@ -131,36 +126,24 @@ class BasePage(_FluentScrollArea):
         self.content.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.setWidget(self.content)
 
-        # --- Main layout (backward-compat: self.layout) ---
+        # --- Main layout ---
         self.vBoxLayout = QVBoxLayout(self.content)
         self.vBoxLayout.setContentsMargins(36, 28, 36, 28)
         self.vBoxLayout.setSpacing(16)
         self.vBoxLayout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        # Backward compatibility: old pages use self.layout.addWidget(...)
+        # Public layout alias used by page subclasses.
         self.layout = self.vBoxLayout
 
         # --- Title ---
-        if _USE_FLUENT:
-            self.title_label = TitleLabel(self.content)
-            self.title_label.setText(title)
-        else:
-            self.title_label = QLabel(title)
-            self.title_label.setStyleSheet(
-                "font-size: 28px; font-weight: 600; "
-                "font-family: 'Segoe UI Variable Display', 'Segoe UI', sans-serif; "
-                "padding-bottom: 4px;"
-            )
+        self.title_label = TitleLabel(self.content)
+        self.title_label.setText(title)
         self.vBoxLayout.addWidget(self.title_label)
 
         # --- Subtitle ---
         if subtitle:
-            if _USE_FLUENT:
-                self.subtitle_label = BodyLabel(self.content)
-                self.subtitle_label.setText(subtitle)
-            else:
-                self.subtitle_label = QLabel(subtitle)
-                self.subtitle_label.setStyleSheet("font-size: 12px; padding-bottom: 16px;")
+            self.subtitle_label = BodyLabel(self.content)
+            self.subtitle_label.setText(subtitle)
             self.subtitle_label.setWordWrap(True)
             self.vBoxLayout.addWidget(self.subtitle_label)
         else:
@@ -217,9 +200,9 @@ class BasePage(_FluentScrollArea):
 
     def _resolve_ui_language(self) -> str:
         try:
-            from settings.store import get_ui_language
+            from settings.appearance import load_ui_language
 
-            return normalize_language(get_ui_language())
+            return normalize_language(load_ui_language().language)
         except Exception:
             return normalize_language(None)
 
@@ -249,12 +232,8 @@ class BasePage(_FluentScrollArea):
         if text_key:
             text = tr_catalog(text_key, language=self._ui_language, default=text or text_key)
 
-        if _USE_FLUENT:
-            label = StrongBodyLabel(self.content)
-            label.setText(text)
-        else:
-            label = QLabel(text)
-            label.setStyleSheet("font-size: 13px; font-weight: 600; padding-top: 8px; padding-bottom: 4px;")
+        label = StrongBodyLabel(self.content)
+        label.setText(text)
         label.setProperty("tone", "primary")
         if text_key:
             self._section_title_bindings.append((label, text_key, fallback_text or text_key))

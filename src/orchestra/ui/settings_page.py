@@ -9,14 +9,8 @@
 """
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget
-from ui.text_catalog import normalize_language, tr as tr_catalog
-
-try:
-    from qfluentwidgets import SegmentedWidget
-    _PIVOT_OK = True
-except ImportError:
-    SegmentedWidget = None
-    _PIVOT_OK = False
+from app.text_catalog import normalize_language, tr as tr_catalog
+from qfluentwidgets import SegmentedWidget
 
 
 class OrchestraSettingsPage(QWidget):
@@ -31,12 +25,15 @@ class OrchestraSettingsPage(QWidget):
     ]
     TAB_LABELS = ["Залоченные", "Заблокированные", "Белый список", "Рейтинги"]
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, controllers):
         super().__init__(parent)
         self.setObjectName("OrchestraSettingsPage")
         self._ui_language = self._resolve_ui_language()
 
-        self._app_parent = parent
+        self._locked_controller = controllers["locked"]
+        self._blocked_controller = controllers["blocked"]
+        self._whitelist_controller = controllers["whitelist"]
+        self._ratings_controller = controllers["ratings"]
         self.locked_page = None
         self.blocked_page = None
         self.whitelist_page = None
@@ -49,14 +46,7 @@ class OrchestraSettingsPage(QWidget):
             self.stacked.addWidget(QWidget(self))
 
         # Pivot tab bar
-        if _PIVOT_OK:
-            pivot_cls = SegmentedWidget
-            if pivot_cls is None:
-                self.pivot = None
-            else:
-                self.pivot = pivot_cls(self)
-        else:
-            self.pivot = None
+        self.pivot = SegmentedWidget(self)
 
         if self.pivot is not None:
             for i, (key, label) in enumerate(zip(self.TAB_KEYS, self._get_tab_labels())):
@@ -91,22 +81,31 @@ class OrchestraSettingsPage(QWidget):
         if index == 0:
             from orchestra.ui.locked_page import OrchestraLockedPage
 
-            page = OrchestraLockedPage(self._app_parent)
+            page = OrchestraLockedPage(
+                self,
+                controller=self._locked_controller,
+            )
             self.locked_page = page
         elif index == 1:
             from orchestra.ui.blocked_page import OrchestraBlockedPage
 
-            page = OrchestraBlockedPage(self._app_parent)
+            page = OrchestraBlockedPage(
+                self,
+                controller=self._blocked_controller,
+            )
             self.blocked_page = page
         elif index == 2:
             from orchestra.ui.whitelist_page import OrchestraWhitelistPage
 
-            page = OrchestraWhitelistPage(self._app_parent)
+            page = OrchestraWhitelistPage(
+                self,
+                controller=self._whitelist_controller,
+            )
             self.whitelist_page = page
         else:
             from orchestra.ui.ratings_page import OrchestraRatingsPage
 
-            page = OrchestraRatingsPage(self._app_parent)
+            page = OrchestraRatingsPage(self, controller=self._ratings_controller)
             self.ratings_page = page
 
         set_lang = getattr(page, "set_ui_language", None)
@@ -127,9 +126,9 @@ class OrchestraSettingsPage(QWidget):
 
     def _resolve_ui_language(self) -> str:
         try:
-            from settings.store import get_ui_language
+            from settings.appearance import load_ui_language
 
-            return normalize_language(get_ui_language())
+            return normalize_language(load_ui_language().language)
         except Exception:
             return normalize_language(None)
 

@@ -52,13 +52,12 @@ TCP_ASKEYS = ["tls", "http", "mtproto"]
 # UDP профили (используют IP или hostname)
 UDP_ASKEYS = ["quic", "discord", "wireguard", "dns", "stun", "unknown"]
 
-# Маппинг старых proto на новые askey (для backward compatibility)
+# Единая таблица имён профилей оркестратора.
 PROTO_TO_ASKEY = {
     "tls": "tls",
     "http": "http",
-    "udp": "quic",      # Старый "udp" -> "quic" (основной UDP профиль)
+    "udp": "quic",
     "unknown": "unknown",
-    # Новые askey маппятся сами на себя
     "quic": "quic",
     "discord": "discord",
     "wireguard": "wireguard",
@@ -115,8 +114,6 @@ class LockedStrategiesManager:
         """Устанавливает менеджер заблокированных стратегий"""
         self.blocked_manager = blocked_manager
 
-    # ==================== МИГРАЦИЯ ====================
-
     def _normalize_askey(self, proto: str) -> str:
         """Нормализует proto/askey к стандартному askey"""
         proto = proto.lower().strip()
@@ -126,10 +123,6 @@ class LockedStrategiesManager:
         """Проверяет, запрещён ли этот хост для lock/history контура оркестратора."""
         return is_orchestra_ignored_target(hostname)
 
-    def _migrate_old_registry_format(self):
-        """Legacy-миграция удалена: стартуем только из settings.json."""
-        return None
-
     # ==================== ЗАГРУЗКА/СОХРАНЕНИЕ ====================
 
     def load(self) -> Dict[str, int]:
@@ -137,7 +130,7 @@ class LockedStrategiesManager:
         Загружает залоченные стратегии и историю из settings.json.
 
         Returns:
-            Словарь TLS стратегий {hostname: strategy} (для backward compatibility)
+            Словарь TLS стратегий {hostname: strategy}
         """
         # Очищаем все словари по askey БЕЗ создания новых (сохраняем ссылки!)
         for askey in ASKEY_ALL:
@@ -286,14 +279,14 @@ class LockedStrategiesManager:
                 self.output_callback(f"[INFO] Пропущен lock для proxy-цели {hostname}")
             return
 
-        # Получаем словари и пути реестра для данного askey
+        # Получаем словари settings.json для данного askey
         target_dict = self.locked_by_askey[askey]
         user_set = self.user_locked_by_askey[askey]
         # Сохраняем стратегию
         target_dict[hostname] = strategy
         set_orchestra_locked_strategy(askey, hostname, strategy)
 
-        # Если user_lock - добавляем в user set и сохраняем в реестр
+        # Если user_lock - добавляем в user set и сохраняем в settings.json
         if user_lock:
             user_set.add(hostname)
             set_orchestra_user_locked(askey, sorted(user_set))
@@ -321,7 +314,7 @@ class LockedStrategiesManager:
         hostname = hostname.lower()
         askey = self._normalize_askey(proto)
 
-        # Получаем словари и пути реестра для данного askey
+        # Получаем словари settings.json для данного askey
         target_dict = self.locked_by_askey[askey]
         user_set = self.user_locked_by_askey[askey]
         if hostname in target_dict:
@@ -451,7 +444,7 @@ class LockedStrategiesManager:
         }
         result['history'] = history_with_rates
 
-        # Для backward compatibility добавляем 'udp' как alias для 'quic'
+        # UI всё ещё показывает короткое имя udp для общего QUIC/UDP профиля.
         result['udp'] = result['quic']
 
         return result

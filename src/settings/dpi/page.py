@@ -1,15 +1,23 @@
 # settings/dpi/page.py
 """Страница настроек DPI"""
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame
 
 from ui.pages.base_page import BasePage
-from settings.dpi.controller import DpiSettingsPageController
-from ui.compat_widgets import (
+from settings.mode import (
+    ENGINE_WINWS1,
+    ENGINE_WINWS2,
+    EXE_NAME_WINWS1,
+    EXE_NAME_WINWS2,
+    ORCHESTRA_MODE,
+    ZAPRET1_MODE,
+    ZAPRET2_MODE,
+)
+from ui.fluent_widgets import (
     SettingsCard,
 )
-from ui.text_catalog import tr as tr_catalog
+from app.text_catalog import tr as tr_catalog
 from ui.theme import get_theme_tokens
 from ui.widgets.win11_controls import (
     Win11ComboRow,
@@ -18,23 +26,53 @@ from ui.widgets.win11_controls import (
     Win11ToggleRow,
 )
 from log.log import log
+from qfluentwidgets import StrongBodyLabel, CaptionLabel as _CaptionLabel
 
 
-try:
-    from qfluentwidgets import StrongBodyLabel, CaptionLabel as _CaptionLabel, SettingCardGroup
-    _HAS_FLUENT_LABELS = True
-except ImportError:
-    StrongBodyLabel = QLabel  # type: ignore[assignment,misc]
-    _CaptionLabel = QLabel  # type: ignore[assignment,misc]
-    SettingCardGroup = None  # type: ignore[assignment,misc]
-    _HAS_FLUENT_LABELS = False
+METHOD_OPTION_TEXT = {
+    ZAPRET2_MODE: {
+        "title_key": "page.dpi_settings.method.zapret2_mode.title",
+        "title": "Zapret 2",
+        "desc_key": "page.dpi_settings.method.zapret2_mode.desc",
+        "desc": (
+            f"Режим Zapret 2 на движке {ENGINE_WINWS2} ({EXE_NAME_WINWS2}) "
+            "+ готовые пресеты для быстрого запуска. Поддерживает Lua-код для своих стратегий."
+        ),
+    },
+    ORCHESTRA_MODE: {
+        "title_key": "page.dpi_settings.method.orchestra.title",
+        "title": "Оркестратор v0.9.6 (Beta)",
+        "desc_key": "page.dpi_settings.method.orchestra.desc",
+        "desc": (
+            "Автоматическое обучение. Система сама подбирает лучшие стратегии "
+            "для каждого домена. Запоминает результаты между запусками."
+        ),
+    },
+    ZAPRET1_MODE: {
+        "title_key": "page.dpi_settings.method.zapret1_mode.title",
+        "title": "Zapret 1",
+        "desc_key": "page.dpi_settings.method.zapret1_mode.desc",
+        "desc": (
+            f"Режим Zapret 1 на движке {ENGINE_WINWS1} ({EXE_NAME_WINWS1}) "
+            "+ готовые пресеты для быстрого запуска. Не использует Lua-код и блобы."
+        ),
+    },
+}
+
 
 class DpiSettingsPage(BasePage):
     """Страница настроек DPI"""
-
-    launch_method_changed = pyqtSignal(str)
     
-    def __init__(self, parent=None):
+    def __init__(
+        self,
+        parent=None,
+        *,
+        dpi_settings_feature,
+        orchestra_feature,
+        runtime_feature,
+        set_status,
+        after_launch_method_changed,
+    ):
         super().__init__(
             "Настройки DPI",
             "Параметры обхода блокировок",
@@ -42,6 +80,11 @@ class DpiSettingsPage(BasePage):
             title_key="page.dpi_settings.title",
             subtitle_key="page.dpi_settings.subtitle",
         )
+        self._dpi_settings = dpi_settings_feature
+        self._orchestra = orchestra_feature
+        self._runtime = runtime_feature
+        self._set_status = set_status
+        self._after_launch_method_changed = after_launch_method_changed
         self._method_card = None
         self._method_desc_label = None
         self._zapret1_header = None
@@ -58,6 +101,13 @@ class DpiSettingsPage(BasePage):
             except Exception:
                 return text
         return text
+
+    def _method_option_text(self, method: str) -> tuple[str, str]:
+        text = METHOD_OPTION_TEXT[method]
+        return (
+            self._tr(text["title_key"], text["title"]),
+            self._tr(text["desc_key"], text["desc"]),
+        )
 
     def _apply_page_theme(self, tokens=None, force: bool = False) -> None:
         _ = force
@@ -90,62 +140,50 @@ class DpiSettingsPage(BasePage):
         method_layout.addWidget(method_desc)
 
         # ═══════════════════════════════════════
-        # ZAPRET 2 (winws2.exe)
+        # ZAPRET 2
         # ═══════════════════════════════════════
         self.zapret2_header = StrongBodyLabel(
-            self._tr("page.dpi_settings.section.z2", "Zapret 2 (winws2.exe)")
+            self._tr("page.dpi_settings.section.zapret2", f"Zapret 2 ({EXE_NAME_WINWS2})")
         )
         self.zapret2_header.setContentsMargins(0, 8, 0, 4)
         method_layout.addWidget(self.zapret2_header)
 
         # Zapret 2 mode - рекомендуется
         self.method_zapret2_mode = Win11RadioOption(
-            self._tr("page.dpi_settings.method.zapret2_mode.title", "Zapret 2"),
-            self._tr(
-                "page.dpi_settings.method.zapret2_mode.desc",
-                "Режим со второй версией Zapret (winws2.exe) + готовые пресеты для быстрого запуска. Поддерживает кастомный lua-код чтобы писать свои стратегии.",
-            ),
+            *self._method_option_text(ZAPRET2_MODE),
             icon_name="mdi.rocket-launch",
             recommended=True,
             recommended_badge=self._tr("page.dpi_settings.option.recommended", "рекомендуется"),
         )
-        self.method_zapret2_mode.clicked.connect(lambda: self._select_method("zapret2_mode"))
+        self.method_zapret2_mode.clicked.connect(lambda: self._select_method(ZAPRET2_MODE))
         method_layout.addWidget(self.method_zapret2_mode)
 
         # Оркестр (auto-learning)
         self.method_orchestra = Win11RadioOption(
-            self._tr("page.dpi_settings.method.orchestra.title", "Оркестратор v0.9.6 (Beta)"),
-            self._tr(
-                "page.dpi_settings.method.orchestra.desc",
-                "Автоматическое обучение. Система сама подбирает лучшие стратегии для каждого домена. Запоминает результаты между запусками.",
-            ),
+            *self._method_option_text(ORCHESTRA_MODE),
             icon_name="mdi.brain",
             icon_color="#9c27b0"
         )
-        self.method_orchestra.clicked.connect(lambda: self._select_method("orchestra"))
+        self.method_orchestra.clicked.connect(lambda: self._select_method(ORCHESTRA_MODE))
         method_layout.addWidget(self.method_orchestra)
 
         # ───────────────────────────────────────
-        # ZAPRET 1 (winws.exe)
+        # ZAPRET 1
         # ───────────────────────────────────────
         zapret1_header = StrongBodyLabel(
-            self._tr("page.dpi_settings.section.z1", "Zapret 1 (winws.exe)")
+            self._tr("page.dpi_settings.section.zapret1", f"Zapret 1 ({EXE_NAME_WINWS1})")
         )
         self._zapret1_header = zapret1_header
         zapret1_header.setContentsMargins(0, 12, 0, 4)
         method_layout.addWidget(zapret1_header)
 
-        # Zapret 1 mode (режим профилей winws.exe с JSON стратегиями)
+        # Zapret 1 mode
         self.method_zapret1_mode = Win11RadioOption(
-            self._tr("page.dpi_settings.method.zapret1_mode.title", "Zapret 1"),
-            self._tr(
-                "page.dpi_settings.method.zapret1_mode.desc",
-                "Режим первой версии Zapret 1 (winws.exe) + готовые пресеты для быстрого запуска. Не использует Lua код, нет понятия блобов.",
-            ),
+            *self._method_option_text(ZAPRET1_MODE),
             icon_name="mdi.rocket-launch-outline",
             icon_color="#ff9800"
         )
-        self.method_zapret1_mode.clicked.connect(lambda: self._select_method("zapret1_mode"))
+        self.method_zapret1_mode.clicked.connect(lambda: self._select_method(ZAPRET1_MODE))
         method_layout.addWidget(self.method_zapret1_mode)
 
         # Разделитель 2
@@ -244,7 +282,7 @@ class DpiSettingsPage(BasePage):
     def _load_settings(self):
         """Загружает настройки"""
         try:
-            initial = DpiSettingsPageController.load_initial_state()
+            initial = self._dpi_settings.load_initial_state()
             self._update_method_selection(initial.launch_method)
             self._update_filters_visibility(initial.launch_method)
             self._sync_visible_settings()
@@ -254,18 +292,19 @@ class DpiSettingsPage(BasePage):
     
     def _update_method_selection(self, method: str):
         """Обновляет визуальное состояние выбора метода"""
-        self.method_zapret2_mode.setSelected(method == "zapret2_mode")
-        self.method_zapret1_mode.setSelected(method == "zapret1_mode")
-        self.method_orchestra.setSelected(method == "orchestra")
+        self.method_zapret2_mode.setSelected(method == ZAPRET2_MODE)
+        self.method_zapret1_mode.setSelected(method == ZAPRET1_MODE)
+        self.method_orchestra.setSelected(method == ORCHESTRA_MODE)
     
     def _select_method(self, method: str):
         """Обработчик выбора метода"""
         try:
-            next_method = DpiSettingsPageController.apply_launch_method(method)
+            next_method = self._dpi_settings.apply_launch_method(method)
             self._update_method_selection(next_method)
             self._update_filters_visibility(next_method)
             self._sync_visible_settings()
-            self.launch_method_changed.emit(next_method)
+            self._runtime.handle_launch_method_changed(next_method, set_status=self._set_status)
+            self._after_launch_method_changed(next_method)
         except Exception as e:
             log(f"Ошибка смены метода: {e}", "ERROR")
 
@@ -294,7 +333,7 @@ class DpiSettingsPage(BasePage):
     def _on_strict_detection_changed(self, enabled: bool):
         """Обработчик изменения строгого режима детекции"""
         try:
-            DpiSettingsPageController.set_orchestra_setting("strict_detection", enabled, app=self)
+            self._orchestra.set_setting("strict_detection", enabled)
             log(f"Строгий режим детекции: {'включён' if enabled else 'выключен'}", "INFO")
 
         except Exception as e:
@@ -303,7 +342,7 @@ class DpiSettingsPage(BasePage):
     def _on_debug_file_changed(self, enabled: bool):
         """Обработчик изменения сохранения debug файла"""
         try:
-            DpiSettingsPageController.set_orchestra_setting("debug_file", enabled, app=self)
+            self._orchestra.set_setting("debug_file", enabled)
             log(f"Сохранение debug файла: {'включено' if enabled else 'выключено'}", "INFO")
 
         except Exception as e:
@@ -312,7 +351,7 @@ class DpiSettingsPage(BasePage):
     def _on_auto_restart_discord_changed(self, enabled: bool):
         """Обработчик изменения авторестарта при Discord FAIL"""
         try:
-            DpiSettingsPageController.set_orchestra_setting("auto_restart_discord", enabled, app=self)
+            self._orchestra.set_setting("auto_restart_discord", enabled)
             log(f"Авторестарт при Discord FAIL: {'включён' if enabled else 'выключен'}", "INFO")
 
         except Exception as e:
@@ -321,7 +360,7 @@ class DpiSettingsPage(BasePage):
     def _on_discord_fails_changed(self, value: int):
         """Обработчик изменения количества фейлов для рестарта Discord"""
         try:
-            DpiSettingsPageController.set_orchestra_setting("discord_fails", value, app=self)
+            self._orchestra.set_setting("discord_fails", value)
             log(f"Фейлов для рестарта Discord: {value}", "INFO")
 
         except Exception as e:
@@ -330,7 +369,7 @@ class DpiSettingsPage(BasePage):
     def _on_lock_successes_changed(self, value: int):
         """Обработчик изменения количества успехов для LOCK"""
         try:
-            DpiSettingsPageController.set_orchestra_setting("lock_successes", value, app=self)
+            self._orchestra.set_setting("lock_successes", value)
             log(f"Успехов для LOCK: {value}", "INFO")
 
         except Exception as e:
@@ -339,7 +378,7 @@ class DpiSettingsPage(BasePage):
     def _on_unlock_fails_changed(self, value: int):
         """Обработчик изменения количества ошибок для AUTO-UNLOCK"""
         try:
-            DpiSettingsPageController.set_orchestra_setting("unlock_fails", value, app=self)
+            self._orchestra.set_setting("unlock_fails", value)
             log(f"Ошибок для AUTO-UNLOCK: {value}", "INFO")
 
         except Exception as e:
@@ -348,8 +387,8 @@ class DpiSettingsPage(BasePage):
     def _update_filters_visibility(self, method: str | None = None):
         """Обновляет видимость фильтров и секций"""
         try:
-            resolved_method = str(method or DpiSettingsPageController.get_launch_method()).strip().lower()
-            visibility = DpiSettingsPageController.describe_visibility(resolved_method)
+            resolved_method = str(method or self._dpi_settings.get_launch_method()).strip().lower()
+            visibility = self._dpi_settings.describe_visibility(resolved_method)
 
             # Настройки оркестратора только для Python-оркестратора.
             self.orchestra_settings_container.setVisible(visibility.show_orchestra_settings)
@@ -359,12 +398,12 @@ class DpiSettingsPage(BasePage):
 
     def _sync_visible_settings(self) -> None:
         try:
-            visibility = DpiSettingsPageController.describe_visibility(
-                DpiSettingsPageController.get_launch_method()
+            visibility = self._dpi_settings.describe_visibility(
+                self._dpi_settings.get_launch_method()
             )
             if visibility.show_orchestra_settings:
                 self._load_orchestra_settings(
-                    DpiSettingsPageController.load_orchestra_settings()
+                    self._dpi_settings.load_orchestra_settings()
                 )
         except Exception as e:
             log(f"Ошибка синхронизации видимых настроек DPI: {e}", "WARNING")
@@ -385,35 +424,23 @@ class DpiSettingsPage(BasePage):
             )
 
         if hasattr(self, "zapret2_header") and self.zapret2_header is not None:
-            self.zapret2_header.setText(self._tr("page.dpi_settings.section.z2", "Zapret 2 (winws2.exe)"))
+            self.zapret2_header.setText(self._tr("page.dpi_settings.section.zapret2", f"Zapret 2 ({EXE_NAME_WINWS2})"))
         if self._zapret1_header is not None:
-            self._zapret1_header.setText(self._tr("page.dpi_settings.section.z1", "Zapret 1 (winws.exe)"))
+            self._zapret1_header.setText(self._tr("page.dpi_settings.section.zapret1", f"Zapret 1 ({EXE_NAME_WINWS1})"))
         if self._orchestra_label is not None:
             self._orchestra_label.setText(
                 self._tr("page.dpi_settings.section.orchestra_settings", "Настройки оркестратора")
             )
 
         self.method_zapret2_mode.set_texts(
-            self._tr("page.dpi_settings.method.zapret2_mode.title", "Zapret 2"),
-            self._tr(
-                "page.dpi_settings.method.zapret2_mode.desc",
-                "Режим со второй версией Zapret (winws2.exe) + готовые пресеты для быстрого запуска. Поддерживает кастомный lua-код чтобы писать свои стратегии.",
-            ),
+            *self._method_option_text(ZAPRET2_MODE),
             recommended_badge=self._tr("page.dpi_settings.option.recommended", "рекомендуется"),
         )
         self.method_orchestra.set_texts(
-            self._tr("page.dpi_settings.method.orchestra.title", "Оркестратор v0.9.6 (Beta)"),
-            self._tr(
-                "page.dpi_settings.method.orchestra.desc",
-                "Автоматическое обучение. Система сама подбирает лучшие стратегии для каждого домена. Запоминает результаты между запусками.",
-            ),
+            *self._method_option_text(ORCHESTRA_MODE),
         )
         self.method_zapret1_mode.set_texts(
-            self._tr("page.dpi_settings.method.zapret1_mode.title", "Zapret 1"),
-            self._tr(
-                "page.dpi_settings.method.zapret1_mode.desc",
-                "Режим первой версии Zapret 1 (winws.exe) + готовые пресеты для быстрого запуска. Не использует Lua код, нет понятия блобов.",
-            ),
+            *self._method_option_text(ZAPRET1_MODE),
         )
 
         self.strict_detection_toggle.set_texts(

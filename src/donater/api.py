@@ -81,11 +81,6 @@ class PremiumApiClient:
         except Exception as e:
             return self._exception_to_dict(e, nonce=nonce)
 
-    def post_activate(self, *, key: str, device_id: str) -> Tuple[Optional[Dict[str, Any]], str]:
-        # Legacy endpoint (removed in new pairing architecture).
-        nonce = secrets.token_urlsafe(16)
-        return (None, nonce)
-
     def post_pair_start(self, *, device_id: str, device_name: str | None = None) -> Tuple[Optional[Dict[str, Any]], str]:
         nonce = secrets.token_urlsafe(16)
         try:

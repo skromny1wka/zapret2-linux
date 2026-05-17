@@ -438,11 +438,14 @@ class ConnectionTestWorker(QObject):
         
         try:
             import psutil
+            from settings.mode import ALL_WINWS_EXE_NAME_SET, EXE_NAME_WINWS1, EXE_NAME_WINWS2
+
             winws_found = False
             for proc in psutil.process_iter(['pid', 'name', 'memory_info']):
                 try:
                     proc_name = proc.info['name']
-                    if proc_name and proc_name.lower() in ('winws.exe', 'winws2.exe'):
+
+                    if proc_name and proc_name.lower() in ALL_WINWS_EXE_NAME_SET:
                         winws_found = True
                         pid = proc.info['pid']
                         try:
@@ -456,7 +459,7 @@ class ConnectionTestWorker(QObject):
                     continue
 
             if not winws_found:
-                self.log_message("❌ Процессы winws.exe и winws2.exe НЕ запущены")
+                self.log_message(f"❌ Процессы {EXE_NAME_WINWS1} и {EXE_NAME_WINWS2} НЕ запущены")
                 self.log_message("   Zapret не работает!")
 
         except Exception as e:

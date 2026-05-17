@@ -3,8 +3,9 @@ from __future__ import annotations
 from typing import Callable
 
 from PyQt6.QtCore import QPoint
-from PyQt6.QtGui import QAction, QCursor
-from PyQt6.QtWidgets import QMenu, QWidget
+from PyQt6.QtGui import QCursor
+from PyQt6.QtWidgets import QWidget
+from qfluentwidgets import RoundMenu
 
 from ui.popup_menu import exec_popup_menu
 
@@ -15,9 +16,9 @@ def show_preset_actions_menu(
     global_pos: QPoint | None,
     is_builtin: bool,
     labels: dict[str, str],
-    make_menu_action: Callable[..., QAction],
+    make_menu_action: Callable[..., object],
     icon_resolver: Callable[[str], object | None],
-    round_menu_cls=None,
+    round_menu_cls=RoundMenu,
 ) -> str | None:
     """Show shared preset actions menu and return chosen action key."""
 
@@ -33,7 +34,7 @@ def show_preset_actions_menu(
         ("delete", "DELETE"),
     ]
 
-    def _create_action(menu, key: str) -> QAction:
+    def _create_action(menu, key: str) -> object:
         return make_menu_action(
             labels[key],
             icon=icon_resolver(action_specs_map[key]),
@@ -46,23 +47,12 @@ def show_preset_actions_menu(
         action_order.insert(4, "rename")
         action_order.append("delete")
 
-    if round_menu_cls is not None:
-        menu = round_menu_cls(parent=parent)
-        action_map: dict[QAction, str] = {}
-        for key in action_order:
-            action = _create_action(menu, key)
-            menu.addAction(action)
-            action_map[action] = key
-        chosen = exec_popup_menu(
-            menu,
-            global_pos or QCursor.pos(),
-            owner=parent,
-            capture_action=True,
-        )
-        return action_map.get(chosen)
-
-    menu = QMenu(parent)
-    action_map = {menu.addAction(labels[key]): key for key in action_order}
+    menu = round_menu_cls(parent=parent)
+    action_map: dict[object, str] = {}
+    for key in action_order:
+        action = _create_action(menu, key)
+        menu.addAction(action)
+        action_map[action] = key
     chosen = exec_popup_menu(
         menu,
         global_pos or QCursor.pos(),

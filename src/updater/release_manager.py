@@ -8,8 +8,6 @@ release_manager.py
 from __future__ import annotations
 from typing import Optional, Dict, Any, List
 import requests
-import os
-import json
 import time
 import urllib3
 from datetime import datetime
@@ -34,16 +32,11 @@ from .channel_utils import (
 from .network_hints import maybe_log_disable_dpi_for_update
 from .proxy_bypass import request_get_bypass_proxy
 from log.log import log
-
-from config.config import LOGS_FOLDER
+from settings import store as settings_store
 
 
 # Отключаем предупреждения SSL для самоподписанных сертификатов
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-# ✅ ИСПРАВЛЕННЫЕ ПУТИ
-VPS_BLOCK_FILE = os.path.join(LOGS_FOLDER, '.vps_block.json')
-STATS_FILE = os.path.join(LOGS_FOLDER, '.server_stats.json')
 
 # Длительность блокировки VPS (применяется ко ВСЕМ серверам)
 VPS_BLOCK_DURATION = 24 * 3600  # 24 часа
@@ -55,27 +48,32 @@ ENABLE_FILE_HEAD_CHECK = False
 TIMEOUT = (CONNECT_TIMEOUT, READ_TIMEOUT)
 
 class ServerStats:
-    """Класс для хранения статистики серверов (legacy, для обратной совместимости)"""
+    """Класс для хранения статистики серверов."""
     
     def __init__(self):
         self.stats = self._load_stats()
     
     def _load_stats(self) -> Dict[str, Dict[str, Any]]:
-        """Загружает статистику из файла"""
+        """Загружает статистику из settings.json."""
         try:
-            if os.path.exists(STATS_FILE):
-                with open(STATS_FILE, 'r') as f:
-                    return json.load(f)
-        except:
+            updater = settings_store.get_updater_settings()
+            release_manager = updater.get("release_manager", {})
+            stats = release_manager.get("server_stats") if isinstance(release_manager, dict) else {}
+            return stats if isinstance(stats, dict) else {}
+        except Exception:
             pass
         return {}
     
     def _save_stats(self):
-        """Сохраняет статистику в файл"""
+        """Сохраняет статистику в settings.json."""
         try:
-            with open(STATS_FILE, 'w') as f:
-                json.dump(self.stats, f)
-        except:
+            updater = settings_store.get_updater_settings()
+            release_manager = updater.get("release_manager", {})
+            if not isinstance(release_manager, dict):
+                release_manager = {}
+            release_manager["server_stats"] = self.stats
+            settings_store.set_updater_settings({"release_manager": release_manager})
+        except Exception:
             pass
     
     def record_success(self, server_name: str, response_time: float):
@@ -134,7 +132,7 @@ class ReleaseManager:
     def __init__(self):
         self.last_error: Optional[str] = None
         self.last_source: Optional[str] = None
-        self.server_stats = ServerStats()  # Legacy статистика
+        self.server_stats = ServerStats()
         self._vps_block_until = self._load_vps_block_until()
         
         # ✅ ИНИЦИАЛИЗАЦИЯ ПУЛА СЕРВЕРОВ
@@ -264,7 +262,7 @@ class ReleaseManager:
             if self.server_pool.is_server_blocked(server_id):
                 log(f"⏭️ {current_server['name']} заблокирован, пропускаем", "🔄 RELEASE")
                 # Принудительно переключаемся на другой сервер
-                self.server_pool.force_switch()
+                self.server_pool.force_switch_server()
                 if server_id in tried_servers:
                     continue  # Уже пробовали этот сервер
                 tried_servers.add(server_id)
@@ -593,7 +591,7 @@ class ReleaseManager:
             pool_stats = self.server_pool.get_all_stats()
             stats.update(pool_stats)
         
-        # ✅ Добавляем legacy статистику (GitHub и т.д.)
+        # ✅ Добавляем статистику GitHub и других источников
         for server_name, server_stats in self.server_stats.stats.items():
             if server_name not in stats:
                 stats[server_name] = server_stats
@@ -612,12 +610,12 @@ class ReleaseManager:
         }
 
     def _load_vps_block_until(self) -> float:
-        """Читает из файла до какого времени заблокирован VPS"""
+        """Читает из settings.json, до какого времени заблокирован VPS."""
         try:
-            if os.path.exists(VPS_BLOCK_FILE):
-                with open(VPS_BLOCK_FILE, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                return float(data.get("until", 0))
+            updater = settings_store.get_updater_settings()
+            release_manager = updater.get("release_manager", {})
+            if isinstance(release_manager, dict):
+                return float(release_manager.get("vps_block_until", 0) or 0)
         except Exception:
             pass
         return 0.0
@@ -632,11 +630,15 @@ class ReleaseManager:
         (Индивидуальная блокировка серверов управляется ServerPool)
         """
         self._vps_block_until = time.time() + VPS_BLOCK_DURATION
-        data = {"until": self._vps_block_until, "reason": reason}
         
         try:
-            with open(VPS_BLOCK_FILE, 'w', encoding='utf-8') as f:
-                json.dump(data, f)
+            updater = settings_store.get_updater_settings()
+            release_manager = updater.get("release_manager", {})
+            if not isinstance(release_manager, dict):
+                release_manager = {}
+            release_manager["vps_block_until"] = int(self._vps_block_until)
+            release_manager["vps_block_reason"] = str(reason or "")
+            settings_store.set_updater_settings({"release_manager": release_manager})
         except Exception as e:
             log(f"⚠️ Не удалось сохранить блокировку VPS: {e}", "🔄 RELEASE")
         
@@ -676,9 +678,11 @@ def get_latest_release(channel: str, use_cache: bool = True) -> Optional[Dict[st
             return cached
     else:
         log(f"🔄 Принудительная проверка обновлений (игнорируем кэш)", "🔄 RELEASE")
+        from settings.mode import WINWS_ENGINE_FAMILY_LABEL
+
         log(
             "ℹ️ Если проверка/скачивание обновлений не работает, попробуйте временно выключить DPI/Запрет "
-            "(остановить winws/winws2 / пресет) и повторить.",
+            f"(остановить {WINWS_ENGINE_FAMILY_LABEL} / пресет) и повторить.",
             "🔄 RELEASE",
         )
     

@@ -3,6 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from settings import schema
+from settings.mode import (
+    SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS1,
+    SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS2,
+)
 
 
 def as_dict(value: object) -> dict[str, Any]:
@@ -112,15 +116,16 @@ def normalize_program(data: object) -> dict[str, Any]:
     defaults = schema.default_program()
     return {
         "dpi_autostart": as_bool(raw.get("dpi_autostart"), defaults["dpi_autostart"]),
+        "gui_autostart_enabled": as_bool(raw.get("gui_autostart_enabled"), defaults["gui_autostart_enabled"]),
         "strategy_launch_method": as_str_in(raw.get("strategy_launch_method"), schema.VALID_LAUNCH_METHODS, defaults["strategy_launch_method"]),
         "profile_ui_mode": as_str_in(raw.get("profile_ui_mode"), schema.VALID_PROFILE_UI_MODES, defaults["profile_ui_mode"]),
-        "selected_source_preset_file_name_winws1": as_clean_str(
-            raw.get("selected_source_preset_file_name_winws1"),
-            defaults["selected_source_preset_file_name_winws1"],
+        SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS1: as_clean_str(
+            raw.get(SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS1),
+            defaults[SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS1],
         ),
-        "selected_source_preset_file_name_winws2": as_clean_str(
-            raw.get("selected_source_preset_file_name_winws2"),
-            defaults["selected_source_preset_file_name_winws2"],
+        SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS2: as_clean_str(
+            raw.get(SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS2),
+            defaults[SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS2],
         ),
         "auto_update_enabled": as_bool(raw.get("auto_update_enabled"), defaults["auto_update_enabled"]),
         "remove_github_api": as_bool(raw.get("remove_github_api"), defaults["remove_github_api"]),
@@ -219,15 +224,78 @@ def normalize_dns(data: object) -> dict[str, Any]:
 
 def normalize_hosts(data: object) -> dict[str, Any]:
     raw = as_dict(data)
+    selection_raw = as_dict(raw.get("selection"))
+    selection: dict[str, str] = {}
+    for raw_service_name, raw_profile_name in selection_raw.items():
+        service_name = as_clean_str(raw_service_name)
+        profile_name = as_clean_str(raw_profile_name)
+        if service_name and profile_name:
+            selection[service_name] = profile_name
     return {
         "bootstrap_signature": as_nullable_str(raw.get("bootstrap_signature")),
         "active_domains": unique_str_list(raw.get("active_domains")),
+        "selection": selection,
+    }
+
+
+def normalize_premium(data: object) -> dict[str, Any]:
+    raw = as_dict(data)
+    cache = raw.get("premium_cache")
+    pair_code = as_clean_str(raw.get("pair_code")).upper()
+    return {
+        "device_id": as_clean_str(raw.get("device_id")),
+        "device_token": as_nullable_str(raw.get("device_token")),
+        "last_check": as_nullable_str(raw.get("last_check")),
+        "last_network_failure_ts": as_nullable_int(raw.get("last_network_failure_ts")),
+        "pair_code": pair_code or None,
+        "pair_expires_at": as_nullable_int(raw.get("pair_expires_at")),
+        "premium_cache": cache if isinstance(cache, dict) else None,
     }
 
 
 def normalize_ui_state(data: object) -> dict[str, Any]:
     _ = data
     return {}
+
+
+def normalize_profile_strategy_state(data: object) -> dict[str, Any]:
+    raw = as_dict(data)
+
+    profiles: dict[str, Any] = {}
+    raw_profiles = as_dict(raw.get("profiles"))
+    for raw_profile_key, raw_profile_row in raw_profiles.items():
+        profile_key = as_clean_str(raw_profile_key)
+        if not (profile_key.startswith("name:") or profile_key.startswith("sig:")):
+            continue
+        profile_row = as_dict(raw_profile_row)
+        raw_strategies = as_dict(profile_row.get("strategies"))
+        strategies: dict[str, Any] = {}
+        for raw_strategy_id, raw_strategy_row in raw_strategies.items():
+            strategy_id = as_clean_str(raw_strategy_id)
+            if not strategy_id or strategy_id in {"none", "custom"}:
+                continue
+            strategy_row = as_dict(raw_strategy_row)
+            rating = as_clean_str(strategy_row.get("rating")).lower()
+            if rating not in {"", "work", "notwork"}:
+                rating = ""
+            favorite = as_bool(strategy_row.get("favorite"), False)
+            if not rating and not favorite:
+                continue
+            normalized_row: dict[str, Any] = {
+                "favorite": favorite,
+                "rating": rating,
+            }
+            updated_at = as_clean_str(strategy_row.get("updated_at"))
+            if updated_at:
+                normalized_row["updated_at"] = updated_at
+            strategies[strategy_id] = normalized_row
+        if strategies:
+            profiles[profile_key] = {"strategies": strategies}
+
+    return {
+        "version": 1,
+        "profiles": profiles,
+    }
 
 
 def normalize_orchestra_settings(data: object) -> dict[str, Any]:
@@ -330,6 +398,111 @@ def normalize_orchestra(data: object) -> dict[str, Any]:
     }
 
 
+def _json_safe(value: object) -> object:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {as_clean_str(key): _json_safe(item) for key, item in value.items() if as_clean_str(key)}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    return as_str(value)
+
+
+def normalize_updater(data: object) -> dict[str, Any]:
+    raw = as_dict(data)
+    defaults = schema.default_updater()
+
+    server_pool_raw = as_dict(raw.get("server_pool"))
+    release_manager_raw = as_dict(raw.get("release_manager"))
+
+    return {
+        "release_cache": as_dict(_json_safe(raw.get("release_cache"))),
+        "rate_limit": as_dict(_json_safe(raw.get("rate_limit"))),
+        "github_cache": as_dict(_json_safe(raw.get("github_cache"))),
+        "github_rate_limit_reset": as_nullable_int(raw.get("github_rate_limit_reset")),
+        "server_pool": {
+            "stats": as_dict(_json_safe(server_pool_raw.get("stats"))),
+            "selected_server_id": as_nullable_str(server_pool_raw.get("selected_server_id")),
+            "selected_at": as_nullable_int(server_pool_raw.get("selected_at")),
+        },
+        "release_manager": {
+            "vps_block_until": as_int(
+                release_manager_raw.get("vps_block_until"),
+                defaults["release_manager"]["vps_block_until"],
+                minimum=0,
+            ),
+            "server_stats": as_dict(_json_safe(release_manager_raw.get("server_stats"))),
+        },
+    }
+
+
+def normalize_blockcheck_scan_resume(data: object) -> dict[str, Any]:
+    raw = as_dict(data)
+    domains: dict[str, dict[str, int]] = {}
+    for raw_key, raw_value in as_dict(raw.get("domains")).items():
+        key = as_clean_str(raw_key).lower()
+        if not key:
+            continue
+        value_raw = as_dict(raw_value)
+        domains[key] = {"next_index": as_int(value_raw.get("next_index"), 0, minimum=0)}
+    return {"domains": domains}
+
+
+def normalize_blockcheck(data: object) -> dict[str, Any]:
+    raw = as_dict(data)
+    return {
+        "user_domains": [
+            normalize_lookup_key(item)
+            for item in unique_str_list(raw.get("user_domains"))
+            if normalize_lookup_key(item)
+        ],
+        "scan_resume": normalize_blockcheck_scan_resume(raw.get("scan_resume")),
+    }
+
+
+def normalize_preset_library(data: object) -> dict[str, Any]:
+    raw = as_dict(data)
+    scopes: dict[str, Any] = {}
+    for raw_scope, raw_state in as_dict(raw.get("scopes")).items():
+        scope = as_clean_str(raw_scope).lower()
+        state_raw = as_dict(raw_state)
+        presets: dict[str, Any] = {}
+        for raw_preset, raw_meta in as_dict(state_raw.get("presets")).items():
+            preset = as_clean_str(raw_preset)
+            if not preset:
+                continue
+            meta_raw = as_dict(raw_meta)
+            rating = as_int(meta_raw.get("rating"), 0, minimum=0, maximum=10)
+            pinned = as_bool(meta_raw.get("pinned"), False)
+            order = as_nullable_int(meta_raw.get("order"))
+            if rating or pinned or order is not None:
+                presets[preset] = {"rating": rating, "pinned": pinned, "order": order}
+        if scope:
+            scopes[scope] = {"version": 3, "presets": presets}
+    return {"version": 1, "scopes": scopes}
+
+
+def normalize_blobs(data: object) -> dict[str, Any]:
+    raw = as_dict(data)
+    user_blobs: dict[str, Any] = {}
+    for raw_name, raw_blob in as_dict(raw.get("user_blobs")).items():
+        name = as_clean_str(raw_name)
+        blob = as_dict(raw_blob)
+        if not name:
+            continue
+        normalized = {"description": as_str(blob.get("description"), "")}
+        hex_value = as_clean_str(blob.get("hex"))
+        path_value = as_clean_str(blob.get("path"))
+        if hex_value:
+            normalized["hex"] = hex_value
+        elif path_value:
+            normalized["path"] = path_value
+        else:
+            continue
+        user_blobs[name] = normalized
+    return {"user_blobs": user_blobs}
+
+
 def normalize_settings(data: object) -> dict[str, Any]:
     raw = as_dict(data)
     return {
@@ -341,6 +514,12 @@ def normalize_settings(data: object) -> dict[str, Any]:
         "telegram_proxy": normalize_telegram_proxy(raw.get("telegram_proxy")),
         "dns": normalize_dns(raw.get("dns")),
         "hosts": normalize_hosts(raw.get("hosts")),
+        "premium": normalize_premium(raw.get("premium")),
         "ui_state": normalize_ui_state(raw.get("ui_state")),
+        "profile_strategy_state": normalize_profile_strategy_state(raw.get("profile_strategy_state")),
         "orchestra": normalize_orchestra(raw.get("orchestra")),
+        "updater": normalize_updater(raw.get("updater")),
+        "blockcheck": normalize_blockcheck(raw.get("blockcheck")),
+        "preset_library": normalize_preset_library(raw.get("preset_library")),
+        "blobs": normalize_blobs(raw.get("blobs")),
     }

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from pathlib import PureWindowsPath
-import re
 
-from .models import EngineName, Preset, Profile, ProfileMatch, ProfileSegment
+from settings.mode import ENGINE_WINWS1, ENGINE_WINWS2
+
+from .models import EngineName, Preset, Profile, ProfileMatch, ProfileSegment, build_profile_persistent_key
 from .winws1 import parse_winws1_strategy
 from .winws2 import parse_winws2_strategy
 
@@ -63,7 +64,7 @@ def parse_preset_text(text: str, *, engine: str, source_name: str = "") -> Prese
 
 def _normalize_engine(engine: str) -> EngineName:
     normalized = str(engine or "").strip().lower()
-    if normalized not in {"winws1", "winws2"}:
+    if normalized not in {ENGINE_WINWS1, ENGINE_WINWS2}:
         raise ValueError(f"Unsupported profile preset engine: {engine}")
     return normalized  # type: ignore[return-value]
 
@@ -197,7 +198,7 @@ def _parse_profile(lines: list[str], *, engine: EngineName, index: int, new_line
             option_name, option_value = _split_option(stripped)
             segments.append(ProfileSegment(kind="strategy", text=stripped, name=option_name, value=option_value))
             continue
-        if engine == "winws1" and saw_strategy:
+        if engine == ENGINE_WINWS1 and saw_strategy:
             strategy_lines.append(stripped)
             option_name, option_value = _split_option(stripped)
             segments.append(ProfileSegment(kind="strategy", text=stripped, name=option_name, value=option_value))
@@ -207,9 +208,10 @@ def _parse_profile(lines: list[str], *, engine: EngineName, index: int, new_line
         option_name, option_value = _split_option(stripped)
         segments.append(ProfileSegment(kind="match", text=stripped, name=option_name, value=option_value))
 
-    strategy = parse_winws2_strategy(strategy_lines) if engine == "winws2" else parse_winws1_strategy(strategy_lines)
+    strategy = parse_winws2_strategy(strategy_lines) if engine == ENGINE_WINWS2 else parse_winws1_strategy(strategy_lines)
     display_name = name or infer_profile_display_name(match, index)
     return Profile(
+        id=f"profile:{index}",
         index=index,
         engine=engine,
         display_name=display_name,
@@ -224,12 +226,8 @@ def _parse_profile(lines: list[str], *, engine: EngineName, index: int, new_line
 
 
 def _assign_profile_keys(profiles: list[Profile]) -> None:
-    seen: dict[str, int] = {}
     for profile in profiles:
-        base_key = profile.key
-        count = seen.get(base_key, 0)
-        seen[base_key] = count + 1
-        profile.identity_key = base_key if count == 0 else f"{base_key}:dup{count + 1}"
+        profile.persistent_key = build_profile_persistent_key(profile.name, profile.match_signature)
 
 
 def _name_from_new_line(new_line: str) -> str:
@@ -248,7 +246,7 @@ def _is_match_line(stripped: str) -> bool:
 
 
 def _is_strategy_filter_line(stripped: str, engine: EngineName) -> bool:
-    if engine != "winws2":
+    if engine != ENGINE_WINWS2:
         return False
     lowered = stripped.lower()
     return lowered.startswith("--payload=") or lowered.startswith("--in-range") or lowered.startswith("--out-range")
@@ -256,7 +254,7 @@ def _is_strategy_filter_line(stripped: str, engine: EngineName) -> bool:
 
 def _is_strategy_line(stripped: str, engine: EngineName) -> bool:
     lowered = stripped.lower()
-    if engine == "winws2":
+    if engine == ENGINE_WINWS2:
         return lowered.startswith("--lua-desync=")
     return any(lowered.startswith(prefix) for prefix in _WINWS1_STRATEGY_PREFIXES)
 
@@ -299,31 +297,79 @@ def build_match_signature(match: ProfileMatch) -> str:
             continue
         if "=" in stripped:
             name, _, value = stripped.partition("=")
+            name = name.strip()
             if name in {"--hostlist", "--hostlist-exclude", "--hostlist-auto", "--ipset", "--ipset-exclude"}:
                 value = PureWindowsPath(value.lstrip("@").strip('"').strip("'")).name.lower()
             elif name in {"--hostlist-domains", "--hostlist-exclude-domains", "--ipset-ip", "--ipset-exclude-ip"}:
                 value = ",".join(sorted(token.strip().lower() for token in value.split(",") if token.strip()))
-            stripped = f"{name}={value}"
+            stripped = f"{_signature_option_name(name)}={value}"
         normalized.append(stripped)
     return "|".join(sorted(normalized))
 
 
+def _signature_option_name(name: str) -> str:
+    clean = str(name or "").strip().lower()
+    if clean.startswith("--filter-"):
+        return clean.removeprefix("--filter-")
+    return clean.removeprefix("--")
+
+
 def infer_profile_display_name(match: ProfileMatch, index: int) -> str:
-    for line in [*match.hostlist_lines, *match.ipset_lines]:
-        value = line.split("=", 1)[1].strip() if "=" in line else ""
-        name = PureWindowsPath(value.lstrip("@").strip('"').strip("'")).name
-        stem = re.sub(r"^ipset[-_]", "", PureWindowsPath(name).stem, flags=re.IGNORECASE)
-        if stem:
-            return _humanize_name(stem)
-    for line in match.hostlist_domains_lines:
-        value = line.split("=", 1)[1].strip() if "=" in line else ""
-        token = next((part.strip() for part in value.split(",") if part.strip()), "")
-        if token:
-            return _humanize_name(token.replace("*.", "").split(".", 1)[0])
-    return f"profile {index + 1}"
+    base_parts: list[str] = []
+    for label, option_name in (("TCP", "--filter-tcp"), ("UDP", "--filter-udp"), ("L7", "--filter-l7")):
+        values = _match_values(match.filter_lines, option_name)
+        if values:
+            base_parts.append(f"{label} {','.join(values)}")
+    base = " / ".join(base_parts) if base_parts else "Без фильтра"
+
+    suffixes: list[str] = []
+    simple_hostlist = _single_file_name(match.hostlist_lines)
+    simple_ipset = _single_file_name(match.ipset_lines)
+    complex_match = _is_complex_match(match)
+
+    if simple_hostlist:
+        suffixes.append(f"hostlist {simple_hostlist}")
+    if simple_ipset:
+        suffixes.append(f"ipset {simple_ipset}")
+    if complex_match:
+        suffixes.append("сложный match")
+
+    if suffixes:
+        return f"{base} • {' • '.join(suffixes)}"
+    return base or f"profile {index + 1}"
 
 
-def _humanize_name(value: str) -> str:
-    text = re.sub(r"[_\\-]+", " ", str(value or "").strip())
-    text = re.sub(r"\s+", " ", text).strip()
-    return text[:1].upper() + text[1:] if text else ""
+def _match_values(lines: list[str], option_name: str) -> list[str]:
+    prefix = f"{option_name.lower()}="
+    values: list[str] = []
+    for line in lines:
+        stripped = str(line or "").strip()
+        if stripped.lower().startswith(prefix) and "=" in stripped:
+            values.append(stripped.split("=", 1)[1].strip())
+    return values
+
+
+def _single_file_name(lines: list[str]) -> str:
+    if len(lines) != 1:
+        return ""
+    value = lines[0].split("=", 1)[1].strip() if "=" in lines[0] else ""
+    name = PureWindowsPath(value.lstrip("@").strip('"').strip("'")).name
+    return name
+
+
+def _is_complex_match(match: ProfileMatch) -> bool:
+    list_line_count = (
+        len(match.hostlist_lines)
+        + len(match.ipset_lines)
+        + len(match.hostlist_domains_lines)
+        + len(match.inline_ipset_lines)
+    )
+    if list_line_count > 1:
+        return True
+    if match.hostlist_exclude_lines or match.ipset_exclude_lines:
+        return True
+    if match.hostlist_auto_lines:
+        return True
+    if match.other_lines:
+        return True
+    return False

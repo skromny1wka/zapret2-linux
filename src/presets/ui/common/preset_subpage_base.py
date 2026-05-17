@@ -1,88 +1,48 @@
 from __future__ import annotations
 
-import os
-import subprocess
-from datetime import datetime
 from pathlib import Path
 
-from PyQt6.QtCore import QTimer, pyqtSignal
-from PyQt6.QtGui import QAction
+from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget, QFileDialog
 
 from ui.pages.base_page import BasePage
-from ui.page_dependencies import require_page_app_context
-from ui.compat_widgets import style_semantic_caption_label
+from ui.fluent_widgets import style_semantic_caption_label
 from ui.popup_menu import exec_popup_menu
 from ui.smooth_scroll import apply_editor_smooth_scroll_preference
-
-try:
-    from qfluentwidgets import (
-        Action,
-        BodyLabel,
-        CaptionLabel,
-        FluentIcon,
-        InfoBar,
-        LineEdit,
-        MessageBox,
-        MessageBoxBase,
-        PlainTextEdit,
-        PushButton,
-        RoundMenu,
-        SimpleCardWidget,
-        StrongBodyLabel,
-        TransparentPushButton,
-        TransparentToolButton,
-    )
-except ImportError:
-    from PyQt6.QtWidgets import (
-        QLabel as BodyLabel,
-        QLabel as CaptionLabel,
-        QLabel as StrongBodyLabel,
-        QLineEdit as LineEdit,
-        QPlainTextEdit as PlainTextEdit,
-        QPushButton as PushButton,
-        QPushButton as TransparentPushButton,
-        QPushButton as TransparentToolButton,
-        QFrame as SimpleCardWidget,
-    )
-
-    MessageBox = None
-    MessageBoxBase = object
-    RoundMenu = None
-    Action = None
-    FluentIcon = None
-    InfoBar = None
+from qfluentwidgets import (
+    Action,
+    BodyLabel,
+    BreadcrumbBar,
+    CaptionLabel,
+    FluentIcon,
+    InfoBar,
+    LineEdit,
+    MessageBox,
+    MessageBoxBase,
+    PlainTextEdit,
+    PushButton,
+    RoundMenu,
+    SimpleCardWidget,
+    StrongBodyLabel,
+    TransparentToolButton,
+)
+from presets.raw_preset_editor_workflow import RawPresetEditorController
 
 
 def _fluent_icon(name: str):
-    if FluentIcon is None:
-        return None
     return getattr(FluentIcon, name, None)
 
 
 def _make_menu_action(text: str, *, icon=None, parent=None):
-    if Action is not None:
-        if icon is not None:
-            try:
-                return Action(icon, text, parent)
-            except TypeError:
-                pass
+    if icon is not None:
         try:
-            action = Action(text, parent)
+            return Action(icon, text, parent)
         except TypeError:
-            try:
-                action = Action(text)
-            except TypeError:
-                action = None
-        if action is not None:
-            try:
-                if icon is not None and hasattr(action, "setIcon"):
-                    action.setIcon(icon)
-            except Exception:
-                pass
-            return action
-
-    action = QAction(text, parent)
+            pass
+    try:
+        action = Action(text, parent)
+    except TypeError:
+        action = Action(text)
     try:
         if icon is not None:
             action.setIcon(icon)
@@ -134,41 +94,64 @@ class _RenameDialog(MessageBoxBase):
         return True
 
 
-class PresetSubpageBase(BasePage):
-    back_clicked = pyqtSignal()
-    navigate_to_root = pyqtSignal()
-
-    def __init__(self, parent=None):
-        super().__init__(self._default_title(), "", parent)
+class PresetRawEditorPage(BasePage):
+    def __init__(
+        self,
+        parent=None,
+        *,
+        presets_feature,
+        launch_method: str,
+        title: str,
+        open_back,
+        open_root,
+        ui_state_store,
+    ):
+        self._launch_method = str(launch_method or "").strip()
+        self._title = str(title or "").strip() or "Пресет"
+        super().__init__(self._title, "", parent)
+        self._open_back_callback = open_back
+        self._open_root_callback = open_root
         self._preset_name = ""
         self._preset_file_name = ""
         self._preset_path: Path | None = None
         self._is_loading = False
         self._cleanup_in_progress = False
-        self._preset_file_service = None
         self._ui_state_store = None
 
+        self._controller = RawPresetEditorController(
+            presets_feature=presets_feature,
+            launch_method=self._launch_method,
+        )
         self._save_timer = QTimer(self)
         self._save_timer.setSingleShot(True)
         self._save_timer.timeout.connect(self._save_file)
 
         self._build_ui()
+        self.bind_ui_state_store(ui_state_store)
 
     def _default_title(self) -> str:
-        raise NotImplementedError
+        return self._title
 
     def _get_preset_path(self, name: str) -> Path:
-        raise NotImplementedError
+        return self._controller.source_path(str(name or "").strip())
 
     def _preset_launch_method(self) -> str | None:
-        return None
+        return self._launch_method
+
 
     def _preset_hierarchy_scope_key(self) -> str | None:
+        from settings.mode import (
+            PRESETS_SCOPE_WINWS1,
+            PRESETS_SCOPE_WINWS2,
+            is_zapret1_launch_method,
+            is_zapret2_launch_method,
+        )
+
         method = self._preset_launch_method()
-        if method == "zapret2_mode":
-            return "presets_winws2"
-        if method == "zapret1_mode":
-            return "presets_winws1"
+        if is_zapret2_launch_method(method):
+            return PRESETS_SCOPE_WINWS2
+        if is_zapret1_launch_method(method):
+            return PRESETS_SCOPE_WINWS1
         return None
 
     def _breadcrumb_root_text(self) -> str:
@@ -189,7 +172,7 @@ class PresetSubpageBase(BasePage):
             breadcrumb.clear()
             breadcrumb.addItem("root", self._breadcrumb_root_text())
             breadcrumb.addItem("list", self._breadcrumb_parent_text())
-            breadcrumb.addItem("detail", self._breadcrumb_current_text())
+            breadcrumb.addItem("raw_preset", self._breadcrumb_current_text())
         finally:
             try:
                 breadcrumb.blockSignals(False)
@@ -199,22 +182,9 @@ class PresetSubpageBase(BasePage):
     def _on_breadcrumb_item_changed(self, key: str) -> None:
         self._rebuild_breadcrumb()
         if key == "root":
-            self.navigate_to_root.emit()
+            self._open_root_callback()
         elif key == "list":
-            self.back_clicked.emit()
-
-    def _get_preset_file_service(self):
-        method = self._preset_launch_method()
-        if not method:
-            return None
-        if self._preset_file_service is None:
-            from presets.file_service import PresetFileService
-
-            self._preset_file_service = PresetFileService.from_launch_method(
-                method,
-                app_context=self._require_app_context(),
-            )
-        return self._preset_file_service
+            self._open_back_callback()
 
     def _show_success(self, text: str) -> None:
         if InfoBar is not None:
@@ -233,14 +203,10 @@ class PresetSubpageBase(BasePage):
                 pass
 
     def _is_current_builtin(self) -> bool:
-        service = self._get_preset_file_service()
-        if service is None:
-            return False
         try:
             if not self._preset_file_name:
                 return False
-            manifest = service.get_manifest_by_file_name(self._preset_file_name)
-            return bool(manifest is not None and str(manifest.kind or "").strip().lower() == "builtin")
+            return self._controller.is_builtin(self._preset_file_name)
         except Exception:
             return False
 
@@ -261,19 +227,10 @@ class PresetSubpageBase(BasePage):
         top_layout.setContentsMargins(0, 0, 0, 0)
         top_layout.setSpacing(8)
 
-        try:
-            from qfluentwidgets import BreadcrumbBar as _BreadcrumbBar
-
-            self._breadcrumb = _BreadcrumbBar(self)
-            self._rebuild_breadcrumb()
-            self._breadcrumb.currentItemChanged.connect(self._on_breadcrumb_item_changed)
-            top_layout.addWidget(self._breadcrumb, 1)
-        except Exception:
-            self.backButton = TransparentPushButton(self)
-            self.backButton.setText("Назад к списку")
-            self.backButton.setIcon(_fluent_icon("LEFT_ARROW"))
-            self.backButton.clicked.connect(self.back_clicked.emit)
-            top_layout.addWidget(self.backButton, 0)
+        self._breadcrumb = BreadcrumbBar(self)
+        self._rebuild_breadcrumb()
+        self._breadcrumb.currentItemChanged.connect(self._on_breadcrumb_item_changed)
+        top_layout.addWidget(self._breadcrumb, 1)
         top_layout.addStretch(1)
 
         self.menuButton = TransparentToolButton(_fluent_icon("MENU"), self)
@@ -326,20 +283,25 @@ class PresetSubpageBase(BasePage):
         self._flush_pending_save()
         self._preset_file_name = str(file_name or "").strip()
         self._preset_name = Path(self._preset_file_name).stem if self._preset_file_name else ""
-        service = self._get_preset_file_service()
-        if service is not None and self._preset_file_name:
+        if self._preset_file_name:
             try:
-                manifest = service.get_manifest_by_file_name(self._preset_file_name)
+                manifest = self._controller.manifest(self._preset_file_name)
                 if manifest is not None:
                     self._preset_name = manifest.name
                     self._preset_file_name = manifest.file_name
-                self._preset_path = service.get_source_path_by_file_name(self._preset_file_name)
+                self._preset_path = self._controller.source_path(self._preset_file_name)
             except Exception:
                 self._preset_path = self._get_preset_path(self._preset_name)
         else:
             self._preset_path = self._get_preset_path(self._preset_name)
         self._load_file()
         self._refresh_header()
+
+    def handle_page_command(self, command: str, payload: dict) -> bool:
+        if command == "open_raw_preset":
+            self.set_preset_file_name(str((payload or {}).get("preset_name") or ""))
+            return True
+        return False
 
     def _flush_pending_save(self) -> None:
         if self._cleanup_in_progress:
@@ -357,11 +319,10 @@ class PresetSubpageBase(BasePage):
             is_active = active_file_name.lower() == self._preset_file_name.lower()
         elif self._preset_name:
             is_active = active_name.lower() == self._preset_name.lower()
-        service = self._get_preset_file_service()
         origin = "builtin" if self._is_current_builtin() else "user"
-        if service is not None and self._preset_file_name:
+        if self._preset_file_name:
             try:
-                manifest = service.get_manifest_by_file_name(self._preset_file_name)
+                manifest = self._controller.manifest(self._preset_file_name)
                 if manifest is not None:
                     kind = str(manifest.kind or "").strip().lower()
                     if kind in {"builtin", "imported", "user"}:
@@ -389,12 +350,9 @@ class PresetSubpageBase(BasePage):
     def _load_file(self) -> None:
         self._is_loading = True
         try:
-            if self._preset_path is None or not self._preset_path.exists():
-                self.editor.setPlainText("")
-                self._set_footer("Файл не найден")
-                return
-            self.editor.setPlainText(self._preset_path.read_text(encoding="utf-8", errors="replace"))
-            self._set_footer("Загружено")
+            result = self._controller.load_text(self._preset_path)
+            self.editor.setPlainText(result.text)
+            self._set_footer(result.footer_text)
         except Exception as e:
             self._set_footer(f"Ошибка загрузки: {e}")
         finally:
@@ -415,16 +373,15 @@ class PresetSubpageBase(BasePage):
         if self._preset_path is None:
             return
         try:
-            service = self._get_preset_file_service()
-            if service is None:
-                raise ValueError("Preset mode file service is required")
-            if not self._preset_file_name:
-                raise ValueError("Preset file name is required for preset mode saving")
-            updated = service.save_source_text_by_file_name(self._preset_file_name, self.editor.toPlainText())
+            result = self._controller.save_text(
+                file_name=self._preset_file_name,
+                source_text=self.editor.toPlainText(),
+            )
+            updated = result.updated
             self._preset_name = updated.name
             self._preset_file_name = updated.file_name
-            self._preset_path = service.get_source_path_by_file_name(self._preset_file_name)
-            self._set_footer(f"Сохранено {datetime.now().strftime('%H:%M:%S')}")
+            self._preset_path = result.path
+            self._set_footer(result.footer_text)
         except Exception as e:
             self._set_footer(f"Ошибка сохранения: {e}")
             self._show_error(str(e))
@@ -451,10 +408,7 @@ class PresetSubpageBase(BasePage):
             self._flush_pending_save()
             if self._preset_path is None:
                 return
-            if os.name == "nt":
-                os.startfile(str(self._preset_path))  # type: ignore[attr-defined]
-            else:
-                subprocess.Popen(["xdg-open", str(self._preset_path)])
+            self._controller.open_source_file(self._preset_path)
         except Exception as e:
             self._show_error(str(e))
 
@@ -463,7 +417,7 @@ class PresetSubpageBase(BasePage):
             menu = RoundMenu(parent=self)
             duplicate_action = _make_menu_action("Дублировать", icon=_fluent_icon("COPY"), parent=menu)
             export_action = _make_menu_action("Экспорт", icon=_fluent_icon("SHARE"), parent=menu)
-            reset_action = _make_menu_action("Сбросить", icon=_fluent_icon("SYNC"), parent=menu)
+            reset_action = _make_menu_action("Вернуть встроенный", icon=_fluent_icon("SYNC"), parent=menu)
             rename_action = None
             delete_action = None
             if not self._is_current_builtin():
@@ -499,12 +453,10 @@ class PresetSubpageBase(BasePage):
         if not new_name or new_name == self._preset_name:
             return
         try:
-            service = self._get_preset_file_service()
-            if service is None:
-                raise ValueError("Preset mode file service is required")
-            if not self._preset_file_name:
-                raise ValueError("Preset file name is required for preset mode rename")
-            updated = service.rename_by_file_name(self._preset_file_name, new_name)
+            updated = self._controller.rename(
+                file_name=self._preset_file_name,
+                new_name=new_name,
+            )
             self._notify_preset_structure_changed()
             self.set_preset_file_name(updated.file_name)
             self._show_success(f"Пресет переименован: {new_name}")
@@ -515,12 +467,10 @@ class PresetSubpageBase(BasePage):
         self._flush_pending_save()
         try:
             new_name = f"{self._preset_name} (копия)"
-            service = self._get_preset_file_service()
-            if service is None:
-                raise ValueError("Preset mode file service is required")
-            if not self._preset_file_name:
-                raise ValueError("Preset file name is required for preset mode duplicate")
-            duplicated = service.duplicate_by_file_name(self._preset_file_name, new_name)
+            duplicated = self._controller.duplicate(
+                file_name=self._preset_file_name,
+                new_name=new_name,
+            )
             self._notify_preset_structure_changed()
             self.set_preset_file_name(duplicated.file_name)
             self._show_success(f"Создан дубликат: {new_name}")
@@ -533,17 +483,15 @@ class PresetSubpageBase(BasePage):
             self,
             "Экспортировать пресет",
             f"{self._preset_name}.txt",
-            "Preset files (*.txt);;All files (*.*)",
+            "Файлы пресетов (*.txt);;Все файлы (*.*)",
         )
         if not file_path:
             return
         try:
-            service = self._get_preset_file_service()
-            if service is None:
-                raise ValueError("Preset mode file service is required")
-            if not self._preset_file_name:
-                raise ValueError("Preset file name is required for preset mode export")
-            service.export_plain_text_by_file_name(self._preset_file_name, Path(file_path))
+            self._controller.export(
+                file_name=self._preset_file_name,
+                target_path=file_path,
+            )
             self._show_success(f"Пресет экспортирован: {file_path}")
         except Exception as e:
             self._show_error(str(e))
@@ -552,27 +500,26 @@ class PresetSubpageBase(BasePage):
         self._flush_pending_save()
         if MessageBox is not None:
             box = MessageBox(
-                "Сбросить пресет?",
-                f"Пресет «{self._preset_name}» будет перезаписан данными из шаблона.",
+                "Вернуть встроенный пресет?",
+                f"Будет удалён ваш изменённый файл пресета «{self._preset_name}».\n"
+                "После этого снова появится встроенный пресет с тем же именем файла.\n"
+                "Изменения в этом файле будут потеряны.",
                 self.window(),
             )
-            box.yesButton.setText("Сбросить")
+            box.yesButton.setText("Вернуть встроенный")
             box.cancelButton.setText("Отмена")
             if not box.exec():
                 return
         try:
-            service = self._get_preset_file_service()
-            if service is None:
-                raise ValueError("Preset mode file service is required")
-            if not self._preset_file_name:
-                raise ValueError("Preset file name is required for preset mode reset")
-            updated = service.reset_to_template_by_file_name(self._preset_file_name)
+            updated = self._controller.reset_to_builtin(
+                file_name=self._preset_file_name,
+            )
             self._preset_name = updated.name
             self._preset_file_name = updated.file_name
-            self._preset_path = service.get_source_path_by_file_name(self._preset_file_name)
+            self._preset_path = self._controller.source_path(self._preset_file_name)
             self._load_file()
             self._refresh_header()
-            self._show_success(f"Пресет «{self._preset_name}» сброшен")
+            self._show_success(f"Восстановлен встроенный пресет «{self._preset_name}»")
         except Exception as e:
             self._show_error(str(e))
 
@@ -584,7 +531,8 @@ class PresetSubpageBase(BasePage):
         if MessageBox is not None:
             box = MessageBox(
                 "Удалить пресет?",
-                f"Пресет «{self._preset_name}» будет удалён.",
+                f"Пользовательский пресет «{self._preset_name}» будет удалён.\n"
+                "Изменения в нём будут потеряны.",
                 self.window(),
             )
             box.yesButton.setText("Удалить")
@@ -593,54 +541,37 @@ class PresetSubpageBase(BasePage):
                 return
         try:
             name = self._preset_name
-            service = self._get_preset_file_service()
-            if service is None:
-                raise ValueError("Preset mode file service is required")
-            if not self._preset_file_name:
-                raise ValueError("Preset file name is required for preset mode delete")
-            service.delete_by_file_name(self._preset_file_name)
+            self._controller.delete(
+                file_name=self._preset_file_name,
+            )
             self._notify_preset_structure_changed()
-            self.back_clicked.emit()
+            self._open_back_callback()
             self._show_success(f"Пресет «{name}» удалён")
         except Exception as e:
             self._show_error(str(e))
 
     def _current_selected_name(self) -> str:
         try:
-            method = self._preset_launch_method()
-            selected = self._require_app_context().preset_mode_coordinator.get_selected_source_manifest(method)
-            return (selected.name if selected is not None else "").strip()
+            return self._controller.selected_name()
         except Exception:
             return ""
 
     def _current_selected_file_name(self) -> str:
         try:
-            method = self._preset_launch_method()
-            return (self._require_app_context().preset_mode_coordinator.get_selected_source_file_name(method) or "").strip()
+            return self._controller.selected_file_name()
         except Exception:
             return ""
 
-    def _require_app_context(self):
-        return require_page_app_context(
-            self,
-            parent=self.parent(),
-            error_message="AppContext is required for preset subpage",
-        )
-
-    def _get_preset_mode_coordinator(self):
-        return self._require_app_context().preset_mode_coordinator
-
     def _activate_selected_preset(self) -> bool:
         try:
-            if not self._preset_file_name:
-                return False
-            self._get_preset_file_service().activate_preset_file(self._preset_file_name)
-            return True
+            return self._controller.activate(
+                file_name=self._preset_file_name,
+            )
         except Exception:
             return False
 
     def _notify_preset_structure_changed(self) -> None:
-        store = getattr(self, "_ui_state_store", None)
+        store = self._ui_state_store
         if store is None:
             return
         try:

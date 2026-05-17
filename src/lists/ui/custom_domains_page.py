@@ -4,29 +4,15 @@
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QLabel,
-    QLineEdit
 )
 import qtawesome as qta
-try:
-    from qfluentwidgets import LineEdit, InfoBar, MessageBox, SettingCardGroup
-    _HAS_FLUENT = True
-except ImportError:
-    LineEdit = QLineEdit
-    InfoBar = None
-    MessageBox = None  # type: ignore[assignment]
-    SettingCardGroup = None  # type: ignore[assignment]
-    _HAS_FLUENT = False
-
-try:
-    from qfluentwidgets import StrongBodyLabel, BodyLabel, CaptionLabel
-    _HAS_FLUENT_LABELS = True
-except ImportError:
-    StrongBodyLabel = QLabel; BodyLabel = QLabel; CaptionLabel = QLabel
-    _HAS_FLUENT_LABELS = False
+from qfluentwidgets import (
+    BodyLabel, CaptionLabel, InfoBar, LineEdit, MessageBox, SettingCardGroup,
+    StrongBodyLabel,
+)
 
 from ui.pages.base_page import BasePage, ScrollBlockingPlainTextEdit
-from lists.controller import HostlistPageController
-from ui.compat_widgets import (
+from ui.fluent_widgets import (
     SettingsCard,
     ActionButton,
     PrimaryActionButton,
@@ -35,8 +21,11 @@ from ui.compat_widgets import (
     set_tooltip,
 )
 from ui.theme import get_theme_tokens
-from ui.text_catalog import tr as tr_catalog
+from app.text_catalog import tr as tr_catalog
 from log.log import log
+from lists.editor_workflow import (
+    ListsEditorController,
+)
 
 
 
@@ -45,7 +34,7 @@ class CustomDomainsPage(BasePage):
     
     domains_changed = pyqtSignal()
     
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, lists_feature):
         super().__init__(
             "Кастомные (мои) домены (hostlist) для работы с Zapret",
             "Управление доменами (other.txt). Субдомены учитываются автоматически. Строчка rkn.ru учитывает и сайт fuckyou.rkn.ru и сайт ass.rkn.ru. Чтобы исключить субдомены напишите домен с символов ^ в начале, то есть например так ^rkn.ru",
@@ -53,6 +42,7 @@ class CustomDomainsPage(BasePage):
             title_key="page.custom_domains.title",
             subtitle_key="page.custom_domains.subtitle",
         )
+        self._lists_controller = ListsEditorController(lists_feature)
         self._runtime_initialized = False
         self._cleanup_in_progress = False
         self._actions_group = None
@@ -263,7 +253,7 @@ class CustomDomainsPage(BasePage):
         if self._cleanup_in_progress:
             return
         try:
-            state = HostlistPageController.load_custom_domains_text()
+            state = self._lists_controller.load_text("domains")
             
             # Блокируем сигнал чтобы не срабатывало автосохранение
             self.text_edit.blockSignals(True)
@@ -300,7 +290,7 @@ class CustomDomainsPage(BasePage):
         """Сохраняет домены в файл"""
         try:
             text = self.text_edit.toPlainText()
-            state = HostlistPageController.save_custom_domains_text(text)
+            state = self._lists_controller.save_text("domains", text)
             
             # Обновляем UI - заменяем URL на домены
             new_text = state.normalized_text
@@ -327,7 +317,7 @@ class CustomDomainsPage(BasePage):
         """Обновляет статус"""
         if self._cleanup_in_progress:
             return
-        plan = HostlistPageController.build_custom_domains_status_plan(self.text_edit.toPlainText())
+        plan = self._lists_controller.status_plan("domains", self.text_edit.toPlainText())
         self.status_label.setText(
             self._tr(
                 "page.custom_domains.status.stats",
@@ -337,7 +327,8 @@ class CustomDomainsPage(BasePage):
         
     def _add_domain(self):
         """Добавляет домен"""
-        plan = HostlistPageController.build_add_custom_domain_plan(
+        plan = self._lists_controller.add_entry_plan(
+            "domains",
             raw_text=self.domain_input.text().strip(),
             current_text=self.text_edit.toPlainText(),
         )
@@ -405,7 +396,7 @@ class CustomDomainsPage(BasePage):
     def _reset_file(self):
         """Очищает lists/user/other.txt и пересобирает lists/other.txt из базы."""
         try:
-            if HostlistPageController.reset_domains_file():
+            if self._lists_controller.reset_domains_file():
                 self._load_domains()
                 self.status_label.setText(
                     self.status_label.text()
@@ -437,7 +428,7 @@ class CustomDomainsPage(BasePage):
         try:
             # Сначала сохраняем
             self._save_domains()
-            HostlistPageController.open_domains_user_file()
+            self._lists_controller.open_user_file("domains")
                 
         except Exception as e:
             log(f"Ошибка открытия файла: {e}", "ERROR")

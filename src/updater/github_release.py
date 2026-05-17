@@ -10,10 +10,10 @@ from typing import Optional, List, Dict, Any, Tuple
 from packaging import version
 from datetime import datetime
 import time
-import json
 import os
 import requests
 from log.log import log
+from settings import store as settings_store
 
 from .channel_utils import (
     normalize_update_channel,
@@ -21,16 +21,10 @@ from .channel_utils import (
 )
 from .network_hints import maybe_log_disable_dpi_for_update
 from .proxy_bypass import request_get_bypass_proxy
-from config.config import LOGS_FOLDER
-
-
 # ────────────────────────────────────────────────────────────────
 #  GITHUB ТОКЕН (из _build_secrets при сборке, иначе env)
 # ────────────────────────────────────────────────────────────────
-try:
-    from config._build_secrets import GITHUB_UPDATE_TOKEN as _BUILD_GH_TOKEN
-except ImportError:
-    _BUILD_GH_TOKEN = ""
+from config._build_secrets import GITHUB_UPDATE_TOKEN as _BUILD_GH_TOKEN
 
 
 def _get_token() -> str:
@@ -54,55 +48,51 @@ TIMEOUT = 10  # сек.
 _github_cache: Dict[str, Tuple[Any, float]] = {}
 CACHE_TTL = 300  # 5 минут
 
-# Файл для сохранения кэша между запусками
-CACHE_FILE = os.path.join(LOGS_FOLDER, '.github_cache.json')
-RATE_LIMIT_FILE = os.path.join(LOGS_FOLDER, '.github_rate_limit')
-
 def _load_persistent_cache():
-    """Загружает кэш из файла"""
+    """Загружает кэш из settings.json."""
     global _github_cache
     try:
-        if os.path.exists(CACHE_FILE):
-            with open(CACHE_FILE, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                # Проверяем TTL для каждой записи
-                current_time = time.time()
-                _github_cache = {
-                    url: (content, timestamp) 
-                    for url, (content, timestamp) in data.items()
-                    if current_time - timestamp < CACHE_TTL
-                }
-                if _github_cache:
-                    log(f"📦 Загружено {len(_github_cache)} записей из кэша", "🔄 CACHE")
+        data = settings_store.get_updater_settings().get("github_cache", {})
+        if not isinstance(data, dict):
+            _github_cache = {}
+            return
+        current_time = time.time()
+        next_cache: Dict[str, Tuple[Any, float]] = {}
+        for url, raw_entry in data.items():
+            if not isinstance(raw_entry, dict):
+                continue
+            timestamp = float(raw_entry.get("timestamp", 0) or 0)
+            if current_time - timestamp < CACHE_TTL:
+                next_cache[str(url)] = (raw_entry.get("content"), timestamp)
+        _github_cache = next_cache
+        if _github_cache:
+            log(f"📦 Загружено {len(_github_cache)} записей из кэша", "🔄 CACHE")
     except Exception as e:
         log(f"Ошибка загрузки кэша: {e}", "⚠️ CACHE")
         _github_cache = {}
 
 def _save_persistent_cache():
-    """Сохраняет кэш в файл"""
+    """Сохраняет кэш в settings.json."""
     try:
-        # Конвертируем Response объекты в JSON-сериализуемые данные
         cache_data = {}
         for url, (content, timestamp) in _github_cache.items():
             if isinstance(content, requests.Response):
-                cache_data[url] = ({
+                saved_content = {
                     'status_code': content.status_code,
                     'json': content.json() if content.status_code == 200 else None,
-                    'headers': dict(content.headers)
-                }, timestamp)
+                    'headers': dict(content.headers),
+                }
             else:
-                cache_data[url] = (content, timestamp)
-        
-        with open(CACHE_FILE, 'w', encoding='utf-8') as f:
-            json.dump(cache_data, f)
+                saved_content = content
+            cache_data[url] = {"content": saved_content, "timestamp": timestamp}
+        settings_store.set_updater_settings({"github_cache": cache_data})
     except Exception as e:
         log(f"Ошибка сохранения кэша: {e}", "⚠️ CACHE")
 
 def _save_rate_limit_info(reset_time: int):
     """Сохраняет информацию о rate limit"""
     try:
-        with open(RATE_LIMIT_FILE, 'w') as f:
-            f.write(str(reset_time))
+        settings_store.set_updater_settings({"github_rate_limit_reset": int(reset_time)})
     except Exception as e:
         log(f"Ошибка сохранения rate limit: {e}", "⚠️ CACHE")
 
@@ -112,13 +102,13 @@ def is_rate_limited() -> Tuple[bool, Optional[datetime]]:
     Returns: (is_limited, reset_time)
     """
     try:
-        if os.path.exists(RATE_LIMIT_FILE):
-            with open(RATE_LIMIT_FILE, 'r') as f:
-                reset_time = float(f.read())
-                if time.time() < reset_time:
-                    reset_dt = datetime.fromtimestamp(reset_time)
-                    return True, reset_dt
-    except:
+        reset_time = settings_store.get_updater_settings().get("github_rate_limit_reset")
+        if reset_time is not None:
+            reset_time = float(reset_time)
+            if time.time() < reset_time:
+                reset_dt = datetime.fromtimestamp(reset_time)
+                return True, reset_dt
+    except Exception:
         pass
     return False, None
 

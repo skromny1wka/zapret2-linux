@@ -9,18 +9,19 @@ from config.build_info import APP_VERSION
 
 from startup.ipc_manager import IPCManager
 
+from main.application_post_startup import build_application_post_startup_deps
 from main.post_startup import install_post_startup_tasks
 from main.qt_runtime import application_bootstrap
 from main.runtime_state import is_qt_event_diagnostic_enabled
 from main.shell import shell_bootstrap
 
 
-def _configure_window_appearance(window) -> None:
+def _configure_window_appearance(window, appearance_actions) -> None:
     try:
-        from settings.store import get_background_preset
+        from settings.appearance import load_background_preset
         from ui.theme import apply_window_background
 
-        background_preset = get_background_preset()
+        background_preset = load_background_preset().preset
         apply_window_background(window, preset=background_preset)
     except Exception:
         pass
@@ -34,11 +35,11 @@ def _configure_window_appearance(window) -> None:
         pass
 
     try:
-        from settings.store import get_window_opacity
+        from settings.appearance import load_window_opacity
 
-        opacity = get_window_opacity()
+        opacity = load_window_opacity().value
         if opacity != 100:
-            window.set_window_opacity(opacity)
+            appearance_actions.set_window_opacity(opacity)
     except Exception:
         pass
 
@@ -64,10 +65,15 @@ def main() -> None:
         except Exception as exc:
             log(f"Не удалось включить Qt event diagnostic: {exc}", "WARNING")
 
-    from main.window import window_bootstrap
+    from main.application_controller import ApplicationController
+    from main.window import LupiDPIApp
 
-    _app_context, window = window_bootstrap(start_in_tray=start_in_tray)
-    _configure_window_appearance(window)
+    application_controller = ApplicationController(
+        window_cls=LupiDPIApp,
+        start_in_tray=start_in_tray,
+    )
+    window = application_controller.create_window()
+    _configure_window_appearance(window, application_controller.window_state_actions)
 
     ipc_manager = IPCManager()
     ipc_manager.start_server(window)
@@ -76,5 +82,10 @@ def main() -> None:
     if start_in_tray:
         log("Запуск приложения скрыто в трее", "TRAY")
 
-    install_post_startup_tasks(window)
+    install_post_startup_tasks(
+        build_application_post_startup_deps(
+            window=window,
+            app_runtime=application_controller.app_runtime,
+        )
+    )
     sys.exit(app.exec())

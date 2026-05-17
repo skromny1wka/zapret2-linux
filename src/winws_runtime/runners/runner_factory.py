@@ -1,16 +1,18 @@
 # winws_runtime/runners/runner_factory.py
 """
 Factory module for strategy runners.
-Выбирает между StrategyRunnerV1 и StrategyRunnerV2 в зависимости от режима.
+Выбирает между Winws1StrategyRunner и Winws2StrategyRunner по выбранному exe-файлу.
 """
 
+import os
 from typing import Optional
 from log.log import log
 
+from settings.mode import EXE_NAME_WINWS2
 
 # Import both runner classes
-from .zapret1_runner import StrategyRunnerV1
-from .zapret2_runner import StrategyRunnerV2
+from .zapret1_runner import Winws1StrategyRunner
+from .zapret2_runner import Winws2StrategyRunner
 from .runner_base import StrategyRunnerBase
 
 _strategy_runner_instance: Optional[StrategyRunnerBase] = None
@@ -19,17 +21,15 @@ _strategy_runner_instance: Optional[StrategyRunnerBase] = None
 def get_strategy_runner(winws_exe_path: str) -> StrategyRunnerBase:
     """
     Получает или создает экземпляр runner'а.
-    Автоматически выбирает V1 или V2 на основе пути к exe.
+    Автоматически выбирает winws1 или winws2 на основе выбранного exe-файла.
     """
     global _strategy_runner_instance
 
-    from config.config import WINWS_EXE, WINWS2_EXE
-
-    # Определяем какой класс использовать
-    if winws_exe_path == WINWS2_EXE or "winws2" in winws_exe_path.lower():
-        runner_class = StrategyRunnerV2
+    exe_name = os.path.basename(str(winws_exe_path or "")).lower()
+    if exe_name == EXE_NAME_WINWS2:
+        runner_class = Winws2StrategyRunner
     else:
-        runner_class = StrategyRunnerV1
+        runner_class = Winws1StrategyRunner
 
     # Пересоздаём если exe или класс изменился
     if _strategy_runner_instance is not None:

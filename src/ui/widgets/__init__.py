@@ -15,9 +15,9 @@ _WIDGET_EXPORTS: dict[str, tuple[str, str]] = {
     "StrategiesListTooltip": (".strategies_tooltip", "StrategiesListTooltip"),
     "NotificationBanner": (".notification_banner", "NotificationBanner"),
     "Win11Spinner": (".win11_spinner", "Win11Spinner"),
-    "FilterButtonGroup": ("filters.ui.filter_chip_button", "FilterButtonGroup"),
-    "CollapsibleGroup": ("filters.ui.collapsible_group", "CollapsibleGroup"),
-    "ProfileStrategyItem": ("filters.ui.profile_strategy_item", "ProfileStrategyItem"),
+    "ProfileItem": ("profile.ui.profile_item", "ProfileItem"),
+    "ProfileGroup": ("profile.ui.widgets.profile_group", "ProfileGroup"),
+    "ProfileTypeSelector": ("profile.ui.widgets.profile_type_selector", "ProfileTypeSelector"),
 }
 
 __all__ = list(_WIDGET_EXPORTS)

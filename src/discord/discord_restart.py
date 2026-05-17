@@ -29,24 +29,19 @@ def set_discord_restart_setting(enabled: bool) -> bool:
 # 2.  UI-переключатель
 # ----------------------------------------------------------------------
 def toggle_discord_restart(
-        parent,
         status_callback=None,
-        discord_auto_restart_attr_name: str = "discord_auto_restart"
     ) -> bool:
     """
     Переключает настройку автоперезапуска Discord, показывая диалоги
     подтверждения/информирования.
 
-    parent  – QWidget-родитель для QMessageBox
     status_callback(msg) – функция вывода статуса (можно None)
-    discord_auto_restart_attr_name – имя атрибута во `parent`,
-                                     где хранится текущее значение
     """
     current = get_discord_restart_setting()
 
     # ----- хотим ОТКЛЮЧИТЬ ------------------------------------------------
     if current:
-        msg = QMessageBox(parent)
+        msg = QMessageBox()
         msg.setIcon(QMessageBox.Icon.Warning)
         msg.setWindowTitle("Отключение автоперезапуска Discord")
         msg.setText("Вы действительно хотите отключить автоматический "
@@ -61,25 +56,21 @@ def toggle_discord_restart(
             return False   # пользователь отменил
 
         set_discord_restart_setting(False)
-        if hasattr(parent, discord_auto_restart_attr_name):
-            setattr(parent, discord_auto_restart_attr_name, False)
 
         if status_callback:
             status_callback("Автоматический перезапуск Discord отключён")
 
-        QMessageBox.information(parent, "Настройка изменена",
+        QMessageBox.information(None, "Настройка изменена",
                                 "Автоматический перезапуск Discord отключён.\n\n"
                                 "При смене стратегии перезапускайте Discord вручную.")
         return True
 
     # ----- хотим ВКЛЮЧИТЬ -------------------------------------------------
     set_discord_restart_setting(True)
-    if hasattr(parent, discord_auto_restart_attr_name):
-        setattr(parent, discord_auto_restart_attr_name, True)
 
     if status_callback:
         status_callback("Автоматический перезапуск Discord включён")
 
-    QMessageBox.information(parent, "Настройка изменена",
+    QMessageBox.information(None, "Настройка изменена",
                             "Автоматический перезапуск Discord снова включён.")
     return True

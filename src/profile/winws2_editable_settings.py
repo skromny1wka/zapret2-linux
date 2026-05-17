@@ -4,6 +4,8 @@ from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import PureWindowsPath
 
+from settings.mode import ENGINE_WINWS2
+
 from .models import Preset, Profile, ProfileSegment
 from .parser import parse_preset_text
 from .serializer import serialize_preset
@@ -34,8 +36,8 @@ def with_winws2_editable_settings(
     profile_index: int,
     settings: Winws2EditableSettings,
 ) -> Preset:
-    if preset.engine != "winws2":
-        raise ValueError("winws2 editable settings are available only for winws2 presets")
+    if preset.engine != ENGINE_WINWS2:
+        raise ValueError(f"{ENGINE_WINWS2} editable settings are available only for {ENGINE_WINWS2} presets")
 
     updated = deepcopy(preset)
     profile = updated.profiles[int(profile_index)]
@@ -43,8 +45,8 @@ def with_winws2_editable_settings(
     if filter_kind not in {"hostlist", "ipset"}:
         raise ValueError("filter_kind must be hostlist or ipset")
 
-    in_line = _canonical_range_line("--in-range", settings.in_range, default_value="x")
-    out_line = _canonical_range_line("--out-range", settings.out_range, default_value="a")
+    in_line = _canonical_range_line("--in-range", settings.in_range)
+    out_line = _canonical_range_line("--out-range", settings.out_range)
 
     if _editable_filter_is_file_based(profile):
         filter_value = normalize_winws2_filter_value(settings.filter_value, filter_kind)
@@ -92,7 +94,7 @@ def _editable_filter_is_file_based(profile: Profile) -> bool:
 
 
 def _range_value(profile: Profile, option_name: str, *, default: str) -> str:
-    if profile.engine != "winws2":
+    if profile.engine != ENGINE_WINWS2:
         return default
     wanted = str(option_name or "").strip().lower()
     for segment in profile.segments:
@@ -107,7 +109,7 @@ def _replace_primary_match_filter(segments: list[ProfileSegment], filter_line: s
     primary_names = {"--hostlist", "--hostlist-domains", "--ipset", "--ipset-ip"}
     inserted = False
     result: list[ProfileSegment] = []
-    fallback_insert_at: int | None = None
+    strategy_insert_at: int | None = None
 
     for segment in segments:
         name = str(segment.name or "").strip().lower()
@@ -116,12 +118,12 @@ def _replace_primary_match_filter(segments: list[ProfileSegment], filter_line: s
                 result.append(ProfileSegment(kind="match", text=filter_line, name=filter_name, value=filter_value))
                 inserted = True
             continue
-        if fallback_insert_at is None and segment.kind in {"strategy_filter", "strategy"}:
-            fallback_insert_at = len(result)
+        if strategy_insert_at is None and segment.kind in {"strategy_filter", "strategy"}:
+            strategy_insert_at = len(result)
         result.append(segment)
 
     if not inserted:
-        insert_at = fallback_insert_at if fallback_insert_at is not None else len(result)
+        insert_at = strategy_insert_at if strategy_insert_at is not None else len(result)
         result.insert(insert_at, ProfileSegment(kind="match", text=filter_line, name=filter_name, value=filter_value))
     return result
 
@@ -150,12 +152,10 @@ def _replace_range_filters(segments: list[ProfileSegment], range_lines: list[str
     return [*result[:insert_at], *range_segments, *result[insert_at:]]
 
 
-def _canonical_range_line(option_name: str, value: str, *, default_value: str) -> str:
+def _canonical_range_line(option_name: str, value: str) -> str:
     parsed = parse_out_range_expression(value, raw_line=f"{option_name}={value}")
     if parsed is None:
-        parsed = parse_out_range_expression(default_value, raw_line=f"{option_name}={default_value}")
-    if parsed is None:
-        raise ValueError(f"Invalid winws2 packet range value: {value}")
+        raise ValueError(f"Invalid {ENGINE_WINWS2} packet range value: {value}")
     return f"{option_name}={parsed.expression}"
 
 

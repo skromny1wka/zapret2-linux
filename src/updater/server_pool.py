@@ -4,16 +4,13 @@ server_pool.py
 Умная балансировка нагрузки между VPS серверами
 """
 
-import os
-import json
 import time
 import random
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Any
 
 from log.log import log
-
-from config.config import LOGS_FOLDER
+from settings import store as settings_store
 
 
 from .server_config import (
@@ -23,13 +20,6 @@ from .server_config import (
     FAST_RESPONSE_THRESHOLD,
     AUTO_SWITCH_TO_FASTER,
 )
-
-# Файл статистики серверов
-POOL_STATS_FILE = os.path.join(LOGS_FOLDER, '.server_pool_stats.json')
-
-# Файл выбранного сервера
-SELECTED_SERVER_FILE = os.path.join(LOGS_FOLDER, '.selected_server.json')
-
 
 class ServerPool:
     """Пул серверов с балансировкой нагрузки и автоматическим переключением"""
@@ -53,11 +43,12 @@ class ServerPool:
         log(f"📍 Выбран сервер: {self.selected_server['name']}", "POOL")
     
     def _load_stats(self) -> Dict[str, Any]:
-        """Загружает статистику серверов"""
+        """Загружает статистику серверов из settings.json."""
         try:
-            if os.path.exists(POOL_STATS_FILE):
-                with open(POOL_STATS_FILE, 'r', encoding='utf-8') as f:
-                    return json.load(f)
+            pool = settings_store.get_updater_settings().get("server_pool", {})
+            stats = pool.get("stats") if isinstance(pool, dict) else {}
+            if isinstance(stats, dict) and stats:
+                return stats
         except Exception as e:
             log(f"Ошибка загрузки статистики серверов: {e}", "⚠️ POOL")
         
@@ -77,39 +68,43 @@ class ServerPool:
         return stats
     
     def _save_stats(self):
-        """Сохраняет статистику"""
+        """Сохраняет статистику серверов в settings.json."""
         try:
-            with open(POOL_STATS_FILE, 'w', encoding='utf-8') as f:
-                json.dump(self.stats, f, indent=2)
+            pool = settings_store.get_updater_settings().get("server_pool", {})
+            if not isinstance(pool, dict):
+                pool = {}
+            pool["stats"] = self.stats
+            settings_store.set_updater_settings({"server_pool": pool})
         except Exception as e:
             log(f"Ошибка сохранения статистики: {e}", "⚠️ POOL")
     
     def _load_selected_server(self) -> Optional[Dict[str, Any]]:
-        """Загружает выбранный сервер"""
+        """Загружает выбранный сервер из settings.json."""
         try:
-            if os.path.exists(SELECTED_SERVER_FILE):
-                with open(SELECTED_SERVER_FILE, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    server_id = data.get('server_id')
-                    
-                    # Ищем сервер по ID
-                    for server in self.servers:
-                        if server['id'] == server_id:
-                            return server
+            pool = settings_store.get_updater_settings().get("server_pool", {})
+            server_id = pool.get("selected_server_id") if isinstance(pool, dict) else None
+            for server in self.servers:
+                if server["id"] == server_id:
+                    return server
         except Exception as e:
             log(f"Ошибка загрузки выбранного сервера: {e}", "⚠️ POOL")
         
         return None
     
     def _save_selected_server(self):
-        """Сохраняет выбранный сервер"""
+        """Сохраняет выбранный сервер в settings.json."""
         try:
-            data = {
-                'server_id': self.selected_server['id'],
-                'selected_at': time.time(),
-            }
-            with open(SELECTED_SERVER_FILE, 'w', encoding='utf-8') as f:
-                json.dump(data, f, indent=2)
+            pool = settings_store.get_updater_settings().get("server_pool", {})
+            if not isinstance(pool, dict):
+                pool = {}
+            pool.update(
+                {
+                    "stats": self.stats,
+                    "selected_server_id": self.selected_server["id"],
+                    "selected_at": int(time.time()),
+                }
+            )
+            settings_store.set_updater_settings({"server_pool": pool})
         except Exception as e:
             log(f"Ошибка сохранения выбранного сервера: {e}", "⚠️ POOL")
     
@@ -287,9 +282,6 @@ class ServerPool:
         else:
             log("⚠️ Нет других доступных серверов", "POOL")
             return False
-    
-    # Алиас для совместимости
-    force_switch = force_switch_server
     
     def is_server_blocked(self, server_id: str) -> bool:
         """Проверяет заблокирован ли сервер"""

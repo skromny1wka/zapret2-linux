@@ -17,18 +17,16 @@ import threading
 from typing import Optional
 
 from log.log import log
+from settings.mode import ENGINE_WINWS2, ZAPRET2_MODE
 
 from .runner_base import StrategyRunnerBase
 from .preset_runner_support import (
-    controller_transition_in_progress,
     ConfigFileWatcher,
     PreparedPresetArtifact,
     PresetRunnerState,
     PresetRunnerStateMachine,
     is_process_alive_with_expected_name,
     launch_args_from_preset_text,
-    notify_ui_launch_error,
-    publish_runner_failure,
     preset_cache_key,
     remember_cache_entry,
     wait_for_process_exit,
@@ -37,7 +35,6 @@ from .preset_runner_support import (
 from utils.circular_strategy_numbering import (
     strip_strategy_tags,
 )
-from profile.winws2_transport import normalize_winws2_action_lines
 from .constants import CREATE_NO_WINDOW
 from winws_runtime.health.process_health_check import (
     diagnose_startup_error
@@ -151,7 +148,7 @@ def _strip_outer_quotes(value: str) -> str:
     return v.strip()
 
 
-class StrategyRunnerV2(StrategyRunnerBase):
+class Winws2StrategyRunner(StrategyRunnerBase):
     """
     Runner for Zapret 2 (winws2.exe) with hot-reload support.
 
@@ -163,7 +160,7 @@ class StrategyRunnerV2(StrategyRunnerBase):
 
     def __init__(self, winws_exe_path: str):
         """
-        Initialize V2 strategy runner.
+        Initialize winws2 strategy runner.
 
         Args:
             winws_exe_path: Path to winws2.exe
@@ -179,16 +176,16 @@ class StrategyRunnerV2(StrategyRunnerBase):
         self._last_spawn_exit_code: Optional[int] = None
         self._last_spawn_stderr: str = ""
 
-        log(f"StrategyRunnerV2 initialized with hot-reload support", "INFO")
+        log(f"Winws2StrategyRunner initialized with hot-reload support", "INFO")
 
-    def _set_last_error(self, message: Optional[str]) -> None:
+    def _set_last_error(self, message: Optional[str], *, notify: bool = True) -> None:
         try:
             text = str(message or "").strip()
         except Exception:
             text = ""
         self.last_error = text or None
-        if text:
-            notify_ui_launch_error(text)
+        if text and notify:
+            self.notify_launch_error(text)
 
     def get_runner_state_snapshot(self):
         with self._state_lock:
@@ -204,6 +201,7 @@ class StrategyRunnerV2(StrategyRunnerBase):
         error: str = "",
         reason: str = "",
         allow_same: bool = False,
+        publish_failure: bool = True,
     ):
         snapshot = self._runner_state.transition(
             state,
@@ -219,9 +217,9 @@ class StrategyRunnerV2(StrategyRunnerBase):
             f"(gen={snapshot.generation}, reason={snapshot.reason}, preset={snapshot.preset_path})",
             "DEBUG",
         )
-        if state == PresetRunnerState.FAILED:
-            publish_runner_failure(
-                launch_method="zapret2_mode",
+        if state == PresetRunnerState.FAILED and publish_failure:
+            self.publish_runner_failure(
+                launch_method=ZAPRET2_MODE,
                 error=error,
             )
         return snapshot
@@ -433,52 +431,20 @@ class StrategyRunnerV2(StrategyRunnerBase):
     def _normalize_preset_text(self, source_content: str) -> str:
         normalized, lua_fixed = _ensure_lua_init_lines(source_content, self.work_dir)
         if lua_fixed:
-            log("Applying implicit lua-init lines for launch artifact", "DEBUG")
+            log("Applying implicit lua-init lines before launch", "DEBUG")
 
         source_is_circular = self._is_circular_preset_text(normalized)
         cleaned = normalized if source_is_circular else strip_strategy_tags(normalized)
         if (not source_is_circular) and cleaned != normalized:
-            log("Ignoring legacy :strategy=N tags in launch artifact", "DEBUG")
+            log("Ignoring service :strategy=N tags before launch", "DEBUG")
 
-        try:
-            from profile.parser import parse_preset_text
-            from profile.serializer import serialize_preset, with_profile_strategy_lines
+        from winws_runtime.preset_launch_text import prepare_winws2_preset_text_for_launch
 
-            source = parse_preset_text(cleaned, engine="winws2")
-            source_is_circular = self._is_circular_preset_text(cleaned)
-            repaired_profiles = 0
-            defaulted_profiles = 0
-            rewritten_profiles = 0
-
-            for profile in list(source.profiles or []):
-                current_action_lines = [
-                    str(line).strip()
-                    for line in getattr(profile.strategy, "strategy_lines", ()) or ()
-                    if str(line).strip()
-                ]
-                normalized_action_lines, fixes, _resolved = normalize_winws2_action_lines(
-                    current_action_lines,
-                    source_is_circular=source_is_circular,
-                )
-                if not fixes or normalized_action_lines == current_action_lines:
-                    continue
-                if "applied_default_out_range" in fixes:
-                    defaulted_profiles += 1
-                if any(flag in fixes for flag in ("canonicalized_out_range", "replaced_invalid_out_range", "lifted_inline_out_range", "removed_duplicate_out_range")):
-                    rewritten_profiles += 1
-                source = with_profile_strategy_lines(source, profile.index, normalized_action_lines)
-                repaired_profiles += 1
-
-            if repaired_profiles:
-                cleaned = serialize_preset(source)
-                log(
-                    "Normalized out-range in launch artifact "
-                    f"(profiles={repaired_profiles}, defaulted={defaulted_profiles}, rewritten={rewritten_profiles})",
-                    "WARNING",
-                )
-        except Exception as e:
-            log(f"Failed to normalize out-range in launch artifact: {e}", "DEBUG")
-        return cleaned
+        prepared = prepare_winws2_preset_text_for_launch(
+            cleaned,
+            source_is_circular=self._is_circular_preset_text(cleaned),
+        )
+        return prepared.text
 
     def _compile_preset_artifact(self, preset_path: str) -> PreparedPresetArtifact:
         p = str(preset_path or "").strip()
@@ -501,11 +467,21 @@ class StrategyRunnerV2(StrategyRunnerBase):
             except Exception:
                 return PreparedPresetArtifact(p, cache_key, "", tuple(), False, f"Preset файл не найден: {p}")
 
-            normalized_text = self._normalize_preset_text(source_content)
-            launch_args = tuple(launch_args_from_preset_text(normalized_text))
-            missing = self._collect_missing_preset_references_from_text(normalized_text)
-            validation_ok = not missing
-            validation_report = "" if validation_ok else self._build_validation_report(missing)
+            try:
+                normalized_text = self._normalize_preset_text(source_content)
+                launch_args = tuple(launch_args_from_preset_text(normalized_text))
+                missing = self._collect_missing_preset_references_from_text(normalized_text)
+                validation_ok = not missing
+                validation_report = "" if validation_ok else self._build_validation_report(missing)
+            except Exception as e:
+                return PreparedPresetArtifact(
+                    preset_path=p,
+                    cache_key=cache_key,
+                    normalized_text="",
+                    launch_args=tuple(),
+                    validation_ok=False,
+                    validation_report=f"Не удалось подготовить preset файл: {e}",
+                )
             artifact = PreparedPresetArtifact(
                 preset_path=p,
                 cache_key=cache_key,
@@ -538,20 +514,17 @@ class StrategyRunnerV2(StrategyRunnerBase):
 
     @staticmethod
     def _is_circular_preset_text(source_content: str) -> bool:
-        lowered = str(source_content or "").lower()
-        return (
-            "(circular)" in lowered
-            or "--lua-desync=circular" in lowered
-            or "--lua-desync=circular_quality" in lowered
-        )
+        from winws_runtime.preset_launch_text import is_winws2_circular_preset_text
+
+        return is_winws2_circular_preset_text(source_content)
 
     def _on_config_changed(self):
         """
         Called when config file changes.
         Restarts process with new config.
         """
-        if controller_transition_in_progress("zapret2_mode"):
-            log("Hot-reload пропущен: controller уже выполняет transition для zapret2_mode", "DEBUG")
+        if self.launch_transition_in_progress(ZAPRET2_MODE):
+            log(f"Hot-reload пропущен: runtime уже выполняет transition для {ZAPRET2_MODE}", "DEBUG")
             return
         log("Hot-reload triggered: config file changed", "INFO")
 
@@ -677,10 +650,11 @@ class StrategyRunnerV2(StrategyRunnerBase):
         strategy_name: str,
         *,
         hot_reload: bool,
+        notify_failure: bool = True,
     ) -> bool:
         if not artifact.launch_args:
             message = "Не удалось подготовить аргументы запуска из preset файла"
-            self._set_last_error(message)
+            self._set_last_error(message, notify=notify_failure)
             if hot_reload:
                 log("Cannot start from preset: no launch arguments produced", "ERROR")
             else:
@@ -736,16 +710,17 @@ class StrategyRunnerV2(StrategyRunnerBase):
                 return True
 
             exit_code = self.running_process.returncode
+            failure_log_level = "ERROR" if notify_failure else "WARNING"
             if hot_reload:
-                log(f"Hot-reload failed: process exited (code: {exit_code})", "ERROR")
+                log(f"Hot-reload failed: process exited (code: {exit_code})", failure_log_level)
             else:
-                log(f"Strategy '{strategy_name}' exited immediately (code: {exit_code})", "ERROR")
+                log(f"Strategy '{strategy_name}' exited immediately (code: {exit_code})", failure_log_level)
 
             stderr_output = ""
             try:
                 stderr_output = self.running_process.stderr.read().decode('utf-8', errors='ignore')
                 if stderr_output:
-                    log(f"Error: {stderr_output[:500]}", "ERROR")
+                    log(f"Error: {stderr_output[:500]}", failure_log_level)
             except Exception:
                 stderr_output = ""
 
@@ -757,6 +732,7 @@ class StrategyRunnerV2(StrategyRunnerBase):
                 strategy_name=strategy_name,
                 error=str(stderr_output or ""),
                 reason="process_exited_during_start",
+                publish_failure=notify_failure,
             )
 
             if not hot_reload:
@@ -774,9 +750,9 @@ class StrategyRunnerV2(StrategyRunnerBase):
                     except Exception:
                         first_line = ""
                     if first_line:
-                        self._set_last_error(f"winws2 завершился сразу (код {exit_code}): {first_line[:200]}")
+                        self._set_last_error(f"{ENGINE_WINWS2} завершился сразу (код {exit_code}): {first_line[:200]}")
                     else:
-                        self._set_last_error(f"winws2 завершился сразу (код {exit_code})")
+                        self._set_last_error(f"{ENGINE_WINWS2} завершился сразу (код {exit_code})")
             else:
                 first_line = ""
                 try:
@@ -784,9 +760,9 @@ class StrategyRunnerV2(StrategyRunnerBase):
                 except Exception:
                     first_line = ""
                 if first_line:
-                    self._set_last_error(f"Hot-reload failed: {first_line[:200]}")
+                    self._set_last_error(f"Hot-reload failed: {first_line[:200]}", notify=notify_failure)
                 else:
-                    self._set_last_error(f"Hot-reload failed (код {exit_code})")
+                    self._set_last_error(f"Hot-reload failed (код {exit_code})", notify=notify_failure)
 
             self._clear_process_state_locked()
             if artifact.preset_path and not hot_reload:
@@ -795,18 +771,20 @@ class StrategyRunnerV2(StrategyRunnerBase):
 
         except Exception as e:
             diagnosis = diagnose_startup_error(e, self.winws_exe)
+            failure_log_level = "ERROR" if notify_failure else "WARNING"
             for line in diagnosis.split('\n'):
-                log(line, "ERROR")
+                log(line, failure_log_level)
             try:
-                self._set_last_error(diagnosis.split("\n")[0].strip())
+                self._set_last_error(diagnosis.split("\n")[0].strip(), notify=notify_failure)
             except Exception:
-                self._set_last_error(None)
+                self._set_last_error(None, notify=notify_failure)
             self._set_runner_state_locked(
                 PresetRunnerState.FAILED,
                 preset_path=artifact.preset_path,
                 strategy_name=strategy_name,
                 error=diagnosis.split("\n")[0].strip(),
                 reason="spawn_exception",
+                publish_failure=notify_failure,
             )
             self._last_spawn_exit_code = None
             self._last_spawn_stderr = ""
@@ -821,7 +799,7 @@ class StrategyRunnerV2(StrategyRunnerBase):
         """Fast path for switching running preset mode using lightweight stop/start."""
         if not os.path.exists(preset_path):
             log(f"Fast switch preset file not found: {preset_path}", "ERROR")
-            self._set_last_error(f"Preset файл не найден: {preset_path}")
+            self._set_last_error(f"Preset файл не найден: {preset_path}", notify=False)
             return False
 
         self._set_last_error(None)
@@ -856,26 +834,34 @@ class StrategyRunnerV2(StrategyRunnerBase):
                     strategy_name=strategy_name,
                     error=artifact.validation_report,
                     reason="manual_switch_compile_failed",
+                    publish_failure=False,
                 )
                 for line in (artifact.validation_report or "").splitlines():
                     if line.strip():
                         log(line, "ERROR")
                 try:
-                    self._set_last_error((artifact.validation_report or "").splitlines()[0].strip())
+                    self._set_last_error((artifact.validation_report or "").splitlines()[0].strip(), notify=False)
                 except Exception:
-                    self._set_last_error("Preset содержит ссылки на отсутствующие файлы")
+                    self._set_last_error("Preset содержит ссылки на отсутствующие файлы", notify=False)
                 return False
 
             if self.running_process and self.is_running():
                 cleanup_required = self._stop_process_only_locked()
-                if cleanup_required:
-                    self._perform_standard_windivert_cleanup()
+            else:
+                try:
+                    cleanup_required = bool(get_all_winws_process_pids())
+                except Exception:
+                    cleanup_required = False
+
+            if cleanup_required:
+                self._perform_standard_windivert_cleanup()
 
             self._preset_file_path = preset_path
             success = self._spawn_process_locked(
                 artifact,
                 strategy_name,
                 hot_reload=True,
+                notify_failure=False,
             )
             if not success:
                 log(
@@ -900,7 +886,7 @@ class StrategyRunnerV2(StrategyRunnerBase):
         _retry_count: int = 0,
     ) -> bool:
         """
-        Запускает winws2 из выбранного preset-файла.
+        Запускает движок Zapret 2 из выбранного preset-файла.
 
         Это основной путь для обычного запуска zapret2_mode: берём готовый
         preset-файл, а не собираем аргументы из старых категорий.
@@ -1124,7 +1110,8 @@ class StrategyRunnerV2(StrategyRunnerBase):
         watcher = ConfigFileWatcher(
             preset_path,
             self._on_config_changed,
-            interval=1.0
+            interval=1.0,
+            content_changed_callback=self.publish_active_preset_content_changed,
         )
         with self._state_lock:
             self._config_watcher = watcher

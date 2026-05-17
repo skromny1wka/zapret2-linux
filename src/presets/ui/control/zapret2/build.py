@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from settings.mode import EXE_NAME_WINWS1
 from presets.ui.control.shared_builders import (
+    build_my_presets_card_common,
     build_mode_management_section_common,
     build_mode_status_section_common,
-    build_push_setting_card_common,
 )
-from ui.theme import get_cached_qta_pixmap
 
 
 @dataclass(slots=True)
@@ -41,21 +41,21 @@ class Zapret2PresetWidgets:
     presets_btn: object
 
 
-def build_z2_pages_status_section(
+def build_winws2_pages_status_section(
     *,
     add_section_title,
     tr_fn,
     strong_body_label_cls,
     caption_label_cls,
 ) -> Zapret2StatusWidgets:
-    section_label = add_section_title(return_widget=True, text_key="page.z2_control.section.status")
+    section_label = add_section_title(return_widget=True, text_key="page.winws2_control.section.status")
     status_card, status_dot, status_title, status_desc = build_mode_status_section_common(
         tr_fn=tr_fn,
         strong_body_label_cls=strong_body_label_cls,
         caption_label_cls=caption_label_cls,
-        checking_key="page.z2_control.status.checking",
+        checking_key="page.winws2_control.status.checking",
         checking_default="Проверка...",
-        detecting_key="page.z2_control.status.detecting",
+        detecting_key="page.winws2_control.status.detecting",
         detecting_default="Определение состояния процесса",
     )
 
@@ -68,7 +68,7 @@ def build_z2_pages_status_section(
     )
 
 
-def build_z2_pages_management_section(
+def build_winws2_pages_management_section(
     *,
     add_section_title,
     tr_fn,
@@ -81,7 +81,7 @@ def build_z2_pages_management_section(
     on_stop_and_exit,
     parent,
 ) -> Zapret2ManagementWidgets:
-    section_label = add_section_title(return_widget=True, text_key="page.z2_control.section.management")
+    section_label = add_section_title(return_widget=True, text_key="page.winws2_control.section.management")
     control_card, start_btn, stop_winws_btn, stop_and_exit_btn, progress_bar, loading_label = (
         build_mode_management_section_common(
             tr_fn=tr_fn,
@@ -89,11 +89,11 @@ def build_z2_pages_management_section(
             indeterminate_progress_bar_cls=indeterminate_progress_bar_cls,
             big_action_button_cls=big_action_button_cls,
             stop_button_cls=stop_button_cls,
-            start_key="page.z2_control.button.start",
+            start_key="page.winws2_control.button.start",
             start_default="Запустить Zapret",
-            stop_key="page.z2_control.button.stop_only_winws",
-            stop_default="Остановить только winws.exe",
-            stop_exit_key="page.z2_control.button.stop_and_exit",
+            stop_key="page.winws2_control.button.stop_only_winws",
+            stop_default=f"Остановить только {EXE_NAME_WINWS1}",
+            stop_exit_key="page.winws2_control.button.stop_and_exit",
             stop_exit_default="Остановить и закрыть программу",
             on_start=on_start,
             on_stop=on_stop,
@@ -113,27 +113,27 @@ def build_z2_pages_management_section(
     )
 
 
-def build_z2_presets_section(
+def build_winws2_presets_section(
     *,
     add_section_title,
     tr_fn,
     push_setting_card_cls,
     on_open_presets,
 ) -> Zapret2PresetWidgets:
-    section_label = add_section_title(return_widget=True, text_key="page.z2_control.section.preset_switch")
-    preset_card = build_push_setting_card_common(
+    section_label = add_section_title(return_widget=True, text_key="page.winws2_control.section.preset_switch")
+    preset_entry = build_my_presets_card_common(
+        tr_fn=tr_fn,
         push_setting_card_cls=push_setting_card_cls,
-        button_text=tr_fn("page.z2_control.button.my_presets", "Мои пресеты"),
-        icon=get_cached_qta_pixmap("fa5s.star", color="#ffc107", size=20),
-        title_text=tr_fn("page.z2_control.preset.not_selected", "Не выбран"),
-        content_text=tr_fn("page.z2_control.preset.current", "Текущий активный пресет"),
-        on_click=on_open_presets,
+        button_key="page.winws2_control.button.my_presets",
+        not_selected_key="page.winws2_control.preset.not_selected",
+        current_key="page.winws2_control.preset.current",
+        on_open_presets=on_open_presets,
     )
 
     return Zapret2PresetWidgets(
         section_label=section_label,
-        card=preset_card,
-        preset_name_label=preset_card.titleLabel,
-        current_preset_caption=preset_card.contentLabel,
-        presets_btn=preset_card.button,
+        card=preset_entry.card,
+        preset_name_label=preset_entry.title_label,
+        current_preset_caption=preset_entry.caption_label,
+        presets_btn=preset_entry.button,
     )

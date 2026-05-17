@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 
-from ui.compat_widgets import set_tooltip
+from ui.fluent_widgets import set_tooltip
 
 
 def handle_user_presets_ui_state_changed(*, cleanup_in_progress: bool, runtime_service, state, changed_fields: frozenset[str]) -> None:
@@ -28,19 +28,20 @@ def activate_user_presets_page(*, cleanup_in_progress: bool, resync_layout_metri
     schedule_layout_resync_fn(include_delayed=True)
 
 
-def after_user_presets_ui_built(*, apply_page_theme_fn, get_preset_store_fn, on_store_changed_fn, on_store_switched_fn, on_store_updated_fn, log_fn) -> None:
+def after_user_presets_ui_built(*, apply_page_theme_fn, connect_preset_signals_fn, on_store_changed_fn, on_store_switched_fn, on_store_content_changed_fn, log_fn) -> None:
     started_at = time.perf_counter()
     apply_page_theme_fn(force=True)
     try:
-        store = get_preset_store_fn()
-        store.presets_changed.connect(on_store_changed_fn)
-        store.preset_switched.connect(on_store_switched_fn)
-        store.preset_identity_changed.connect(on_store_switched_fn)
-        store.preset_updated.connect(on_store_updated_fn)
+        connect_preset_signals_fn(
+            on_changed=on_store_changed_fn,
+            on_switched=on_store_switched_fn,
+            on_identity_changed=on_store_switched_fn,
+            on_content_changed=on_store_content_changed_fn,
+        )
     except Exception:
         pass
     elapsed_ms = int((time.perf_counter() - started_at) * 1000)
-    log_fn(f"Z1UserPresetsPage: lazy ui init {elapsed_ms}ms", "DEBUG")
+    log_fn(f"Winws1UserPresetsPage: lazy ui init {elapsed_ms}ms", "DEBUG")
 
 
 def bind_user_presets_ui_state_store(*, current_store, store, current_unsubscribe, set_store_fn, set_unsubscribe_fn, on_ui_state_changed_fn) -> None:
@@ -121,47 +122,45 @@ def cleanup_user_presets_page(*, set_cleanup_in_progress_fn, layout_resync_timer
         pass
 
 
-def apply_user_presets_language(*, tr_fn, back_btn, configs_title_label, get_configs_btn, create_btn, import_btn, open_folder_btn, reset_all_btn, presets_info_btn, info_btn, preset_search_input, presets_delegate, ui_language: str, viewport, layout, toolbar_layout, refresh_presets_view_from_cache_fn) -> None:
-    if back_btn is not None:
-        back_btn.setText(tr_fn("page.z1_user_presets.back.control", "Управление"))
+def apply_user_presets_language(*, tr_fn, configs_title_label, get_configs_btn, create_btn, import_btn, open_folder_btn, reset_all_btn, presets_info_btn, info_btn, preset_search_input, presets_delegate, ui_language: str, viewport, layout, toolbar_layout, refresh_presets_view_from_cache_fn) -> None:
     if configs_title_label is not None:
         configs_title_label.setText(
             tr_fn(
-                "page.z1_user_presets.configs.title",
+                "page.winws1_user_presets.configs.title",
                 "Обменивайтесь пресетами и профилями в разделе GitHub Discussions",
             )
         )
     if get_configs_btn is not None:
-        get_configs_btn.setText(tr_fn("page.z1_user_presets.configs.button", "Получить конфиги"))
+        get_configs_btn.setText(tr_fn("page.winws1_user_presets.configs.button", "Получить конфиги"))
     if create_btn is not None:
-        set_tooltip(create_btn, tr_fn("page.z1_user_presets.tooltip.create", "Создать новый пресет"))
+        set_tooltip(create_btn, tr_fn("page.winws1_user_presets.tooltip.create", "Создать новый пресет"))
     if import_btn is not None:
-        import_btn.setText(tr_fn("page.z1_user_presets.button.import", "Импорт"))
-        set_tooltip(import_btn, tr_fn("page.z1_user_presets.tooltip.import", "Импорт пресета из файла"))
+        import_btn.setText(tr_fn("page.winws1_user_presets.button.import", "Импорт"))
+        set_tooltip(import_btn, tr_fn("page.winws1_user_presets.tooltip.import", "Импорт пресета из файла"))
     if open_folder_btn is not None:
-        open_folder_btn.setText(tr_fn("page.z1_user_presets.button.open_folder", "Открыть папку"))
+        open_folder_btn.setText(tr_fn("page.winws1_user_presets.button.open_folder", "Открыть папку"))
         set_tooltip(
             open_folder_btn,
-            tr_fn("page.z1_user_presets.tooltip.open_folder", "Открыть папку, где лежат ваши пресеты"),
+            tr_fn("page.winws1_user_presets.tooltip.open_folder", "Открыть папку, где лежат ваши пресеты"),
         )
     if reset_all_btn is not None:
         current_text = reset_all_btn.text() or ""
         if "/" not in current_text:
-            reset_all_btn.setText(tr_fn("page.z1_user_presets.button.reset_all", "Вернуть заводские"))
+            reset_all_btn.setText(tr_fn("page.winws1_user_presets.button.reset_all", "Вернуть встроенные"))
         set_tooltip(
             reset_all_btn,
             tr_fn(
-                "page.z1_user_presets.tooltip.reset_all",
-                "Восстанавливает стандартные пресеты. Ваши изменения в стандартных пресетах будут потеряны.",
+                "page.winws1_user_presets.tooltip.reset_all",
+                "Возвращает встроенные пресеты. Ваши изменения во встроенных пресетах будут потеряны.",
             ),
         )
     if presets_info_btn is not None:
-        presets_info_btn.setText(tr_fn("page.z1_user_presets.button.wiki", "Вики по пресетам"))
+        presets_info_btn.setText(tr_fn("page.winws1_user_presets.button.wiki", "Вики по пресетам"))
     if info_btn is not None:
-        info_btn.setText(tr_fn("page.z1_user_presets.button.what_is_this", "Что это такое?"))
+        info_btn.setText(tr_fn("page.winws1_user_presets.button.what_is_this", "Что это такое?"))
     if preset_search_input is not None:
         preset_search_input.setPlaceholderText(
-            tr_fn("page.z1_user_presets.search.placeholder", "Поиск пресетов по имени...")
+            tr_fn("page.winws1_user_presets.search.placeholder", "Поиск пресетов по имени...")
         )
     if presets_delegate is not None:
         presets_delegate.set_ui_language(ui_language)

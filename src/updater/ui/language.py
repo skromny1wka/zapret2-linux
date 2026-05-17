@@ -5,7 +5,7 @@ from __future__ import annotations
 from config.build_info import APP_VERSION, CHANNEL
 
 
-from updater.ui.table_workflow import apply_server_table_headers
+from updater.ui.table_view import apply_server_table_headers
 
 
 def apply_servers_page_language(
@@ -14,7 +14,7 @@ def apply_servers_page_language(
     ui_language: str,
     update_card,
     changelog_card,
-    back_button,
+    breadcrumb,
     page_title_label,
     servers_title_label,
     legend_active_label,
@@ -31,7 +31,13 @@ def apply_servers_page_language(
     update_card.set_ui_language(ui_language)
     changelog_card.set_ui_language(ui_language)
 
-    back_button.setText(tr_fn("page.servers.back.about", "О программе"))
+    breadcrumb.blockSignals(True)
+    try:
+        breadcrumb.clear()
+        breadcrumb.addItem("about", tr_fn("page.servers.breadcrumb.about", "О программе"))
+        breadcrumb.addItem("servers", tr_fn("page.servers.title", "Серверы"))
+    finally:
+        breadcrumb.blockSignals(False)
     page_title_label.setText(tr_fn("page.servers.title", "Серверы"))
     servers_title_label.setText(tr_fn("page.servers.section.update_servers", "Серверы обновлений"))
     legend_active_label.setText(tr_fn("page.servers.legend.active", "⭐ активный"))

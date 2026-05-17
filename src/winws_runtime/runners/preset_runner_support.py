@@ -9,7 +9,6 @@ import threading
 import time
 from typing import Callable, Optional
 
-from app_notifications import advisory_notification
 from log.log import log
 
 
@@ -80,9 +79,11 @@ class ConfigFileWatcher:
         interval: float = 1.0,
         *,
         thread_name: str = "ConfigFileWatcher",
+        content_changed_callback=None,
     ):
         self._file_path = file_path
         self._callback = callback
+        self._content_changed_callback = content_changed_callback
         self._interval = interval
         self._thread_name = str(thread_name or "ConfigFileWatcher")
         self._running = False
@@ -140,10 +141,12 @@ class ConfigFileWatcher:
                     if self._last_mtime is not None and current_mtime != self._last_mtime:
                         log(f"Config file changed: {self._file_path}", "INFO")
                         self._last_mtime = current_mtime
-                        try:
-                            publish_active_preset_content_changed(self._file_path)
-                        except Exception:
-                            pass
+                        content_changed_callback = self._content_changed_callback
+                        if callable(content_changed_callback):
+                            try:
+                                content_changed_callback(self._file_path)
+                            except Exception:
+                                pass
                         try:
                             self._callback()
                         except Exception as e:
@@ -240,66 +243,6 @@ class PresetRunnerStateMachine:
         return self._snapshot
 
 
-def publish_runner_failure(
-    *,
-    launch_method: str,
-    error: str = "",
-) -> None:
-    """Best-effort bridge for runner-side launch failures only."""
-    method = str(launch_method or "").strip().lower()
-    if method not in {"zapret1_mode", "zapret2_mode"}:
-        return
-
-    payload = {
-        "launch_method": method,
-        "error": str(error or "").strip(),
-    }
-
-    try:
-        from ui.app_window_locator import emit_window_signal
-
-        emit_window_signal("runner_failure_requested", dict(payload))
-    except Exception:
-        pass
-
-
-def publish_active_preset_content_changed(path: str) -> None:
-    """Best-effort bridge that reports active preset file content changes to the app."""
-    normalized_path = str(path or "").strip()
-    if not normalized_path:
-        return
-
-    try:
-        from ui.app_window_locator import emit_window_signal
-
-        emit_window_signal("active_preset_content_changed_requested", normalized_path)
-    except Exception:
-        pass
-
-
-def controller_transition_in_progress(launch_method: str) -> bool:
-    """Checks whether the main DPI controller is already applying a runtime transition."""
-    method = str(launch_method or "").strip().lower()
-    if method not in {"zapret1_mode", "zapret2_mode", "orchestra"}:
-        return False
-
-    try:
-        from ui.app_window_locator import find_app_window
-
-        target = find_app_window("launch_controller")
-        if target is None:
-            return False
-
-        controller = getattr(target, "launch_controller", None)
-        checker = getattr(controller, "transition_pipeline_in_progress", None)
-        if callable(checker):
-            return bool(checker(method))
-    except Exception:
-        return False
-
-    return False
-
-
 def preset_cache_key(path: str) -> tuple[str, int, int] | None:
     p = str(path or "").strip()
     if not p:
@@ -382,32 +325,3 @@ def is_process_alive_with_expected_name(pid: int, exe_path: str) -> bool:
         return False
     except Exception:
         return False
-
-
-def notify_ui_launch_error(message: str) -> None:
-    """Best-effort UI notification from any thread (queued to main Qt thread)."""
-    text = str(message or "").strip()
-    if not text:
-        return
-    try:
-        from ui.app_window_locator import find_app_window
-
-        target = find_app_window("window_notification_controller")
-        if target is not None and hasattr(target, "window_notification_controller"):
-            controller = getattr(target, "window_notification_controller", None)
-            if controller is None:
-                return
-            controller.notify_threadsafe(
-                advisory_notification(
-                    level="error",
-                    title="Ошибка",
-                    content=text,
-                    source="launch.runner_error",
-                    presentation="infobar",
-                    queue="immediate",
-                    duration=10000,
-                    dedupe_key=f"launch.runner_error:{' '.join(text.split()).lower()}",
-                )
-            )
-    except Exception:
-        pass

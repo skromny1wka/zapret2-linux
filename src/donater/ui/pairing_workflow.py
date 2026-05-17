@@ -2,155 +2,16 @@
 
 from __future__ import annotations
 
-import time
 from collections.abc import Callable
 
 from PyQt6.QtWidgets import QApplication
 
-from donater.premium_page_controller import PremiumPageController
-
-
-def _read_pairing_snapshot(storage, *, current_time: int | None = None):
-    return PremiumPageController.read_pairing_snapshot(
-        storage,
-        current_time=int(time.time()) if current_time is None else int(current_time),
-    )
-
-
-def build_pairing_autopoll_runtime_plan(
-    *,
-    checker_ready: bool,
-    storage,
-    page_visible: bool,
-    activation_in_progress: bool,
-    connection_test_in_progress: bool,
-    worker_running: bool,
-    current_time: int | None = None,
-):
-    snapshot = _read_pairing_snapshot(storage, current_time=current_time)
-    return PremiumPageController.build_pairing_autopoll_plan(
-        checker_ready=bool(checker_ready),
-        storage_ready=bool(storage),
-        page_visible=bool(page_visible),
-        activation_in_progress=bool(activation_in_progress),
-        connection_test_in_progress=bool(connection_test_in_progress),
-        worker_running=bool(worker_running),
-        has_device_token=snapshot.has_device_token,
-        has_pending_pair_code=snapshot.has_pending_pair_code,
-    )
-
-
-def has_pending_pair_code(storage, *, current_time: int | None = None) -> bool:
-    snapshot = _read_pairing_snapshot(storage, current_time=current_time)
-    return snapshot.has_pending_pair_code
-
-
-def can_poll_pairing_status(
-    *,
-    checker_ready: bool,
-    storage,
-    page_visible: bool,
-    activation_in_progress: bool,
-    connection_test_in_progress: bool,
-    worker_running: bool,
-    current_time: int | None = None,
-) -> bool:
-    plan = build_pairing_autopoll_runtime_plan(
-        checker_ready=checker_ready,
-        storage=storage,
-        page_visible=page_visible,
-        activation_in_progress=activation_in_progress,
-        connection_test_in_progress=connection_test_in_progress,
-        worker_running=worker_running,
-        current_time=current_time,
-    )
-    return plan.can_poll
-
-
-def start_pairing_status_autopoll(
-    timer,
-    *,
-    checker_ready: bool,
-    storage,
-    page_visible: bool,
-    activation_in_progress: bool,
-    connection_test_in_progress: bool,
-    worker_running: bool,
-    current_time: int | None = None,
-) -> None:
-    plan = build_pairing_autopoll_runtime_plan(
-        checker_ready=checker_ready,
-        storage=storage,
-        page_visible=page_visible,
-        activation_in_progress=activation_in_progress,
-        connection_test_in_progress=connection_test_in_progress,
-        worker_running=worker_running,
-        current_time=current_time,
-    )
-    if plan.start_timer and not timer.isActive():
-        timer.start()
-
-
-def stop_pairing_status_autopoll(timer) -> None:
-    if timer.isActive():
-        timer.stop()
-
-
-def sync_pairing_status_autopoll(
-    timer,
-    *,
-    checker_ready: bool,
-    storage,
-    page_visible: bool,
-    activation_in_progress: bool,
-    connection_test_in_progress: bool,
-    worker_running: bool,
-    current_time: int | None = None,
-) -> None:
-    plan = build_pairing_autopoll_runtime_plan(
-        checker_ready=checker_ready,
-        storage=storage,
-        page_visible=page_visible,
-        activation_in_progress=activation_in_progress,
-        connection_test_in_progress=connection_test_in_progress,
-        worker_running=worker_running,
-        current_time=current_time,
-    )
-    if plan.start_timer:
-        start_pairing_status_autopoll(
-            timer,
-            checker_ready=checker_ready,
-            storage=storage,
-            page_visible=page_visible,
-            activation_in_progress=activation_in_progress,
-            connection_test_in_progress=connection_test_in_progress,
-            worker_running=worker_running,
-            current_time=current_time,
-        )
-    if plan.stop_timer:
-        stop_pairing_status_autopoll(timer)
-
-
-def poll_pairing_status(
-    *,
-    can_poll: bool,
-    stop_autopoll: Callable[[], None],
-    check_status: Callable[[], None],
-) -> None:
-    plan = PremiumPageController.build_pairing_poll_plan(
-        can_poll=bool(can_poll),
-    )
-    if plan.should_stop_timer:
-        stop_autopoll()
-        return
-    if plan.should_check_status:
-        check_status()
+import donater.ui.page_plans as premium_page_plans
 
 
 def update_device_info_labels(
     *,
-    checker,
-    storage,
+    premium_feature,
     tr: Callable[[str, str], str],
     device_id_label,
     saved_key_label,
@@ -158,16 +19,15 @@ def update_device_info_labels(
     on_error: Callable[[Exception], None] | None = None,
     current_time: int | None = None,
 ) -> None:
-    if not checker:
+    if not premium_feature.is_checker_ready():
         return
 
     try:
-        snapshot = PremiumPageController.read_device_storage_snapshot(
-            storage,
-            current_time=int(time.time()) if current_time is None else int(current_time),
-        )
-        plan = PremiumPageController.build_device_info_plan(
-            device_id=checker.device_id,
+        snapshot = premium_feature.read_device_info_snapshot(current_time=current_time)
+        if not snapshot:
+            return
+        plan = premium_page_plans.build_device_info_plan(
+            device_id=snapshot.get("device_id"),
             device_token=snapshot.get("device_token"),
             pair_code=snapshot.get("pair_code"),
             last_check=snapshot.get("last_check"),
@@ -204,7 +64,7 @@ def apply_pair_code_start_ui(
     set_activation_status: Callable[..., None],
     stop_autopoll: Callable[[], None],
 ):
-    plan = PremiumPageController.build_pair_code_start_plan()
+    plan = premium_page_plans.build_pair_code_start_plan()
     if plan.stop_autopoll:
         stop_autopoll()
     if plan.clear_key_input:
@@ -233,7 +93,7 @@ def apply_pair_code_result_ui(
     start_autopoll: Callable[[], None],
     stop_autopoll: Callable[[], None],
 ):
-    plan = PremiumPageController.build_pair_code_result_plan(result)
+    plan = premium_page_plans.build_pair_code_result_plan(result)
     activate_btn.setEnabled(plan.activate_enabled)
     activate_btn.setText(tr(plan.activate_text_key, plan.activate_text_default))
     if plan.clear_key_input:
@@ -270,7 +130,7 @@ def apply_pair_code_error_ui(
     update_device_info: Callable[[], None],
     stop_autopoll: Callable[[], None],
 ):
-    plan = PremiumPageController.build_pair_code_error_plan(str(error or ""))
+    plan = premium_page_plans.build_pair_code_error_plan(str(error or ""))
     if plan.clear_key_input:
         key_input.clear()
     activate_btn.setEnabled(plan.activate_enabled)

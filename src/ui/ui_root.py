@@ -1,22 +1,25 @@
 from __future__ import annotations
 
 from ui.navigation.sidebar_builder import init_navigation
+from ui.window_ui_session import get_window_ui_session
 from ui.window_bootstrap_runtime import (
     create_preset_runtime_coordinator,
     ensure_session_memory_defaults,
-    finalize_page_signal_bootstrap,
+    finalize_page_stack_bootstrap,
     finish_ui_bootstrap,
     initialize_build_ui_state,
 )
 from ui.navigation.schema import get_eager_page_names_for_method
-from ui.page_names import PageName
+from app.page_names import PageName
 
 
 class WindowUiRoot:
     """Центральная точка сборки fluent UI-каркаса окна."""
 
-    def __init__(self, window):
+    def __init__(self, window, page_deps_context, runtime_bootstrap_deps):
         self._window = window
+        self._page_deps_context = page_deps_context
+        self._runtime_bootstrap_deps = runtime_bootstrap_deps
 
     def build(
         self,
@@ -25,7 +28,6 @@ class WindowUiRoot:
         height: int,
         nav_icons,
         nav_labels,
-        has_fluent: bool,
         default_nav_icon,
         nav_scroll_position,
         sidebar_search_widget_cls,
@@ -35,46 +37,48 @@ class WindowUiRoot:
 
         initialize_build_ui_state(
             self._window,
+            runtime_deps=self._runtime_bootstrap_deps,
+            page_deps_context=self._page_deps_context,
             nav_icons=nav_icons,
             nav_labels=nav_labels,
-            has_fluent=has_fluent,
             default_nav_icon=default_nav_icon,
             nav_scroll_position=nav_scroll_position,
             sidebar_search_widget_cls=sidebar_search_widget_cls,
         )
-        self._window._preset_runtime_coordinator = create_preset_runtime_coordinator(self._window)
-        self._window._page_signal_bootstrap_complete = False
+        session = get_window_ui_session(self._window)
+        if session is not None:
+            session.preset_runtime_coordinator = create_preset_runtime_coordinator(
+                self._window,
+                self._runtime_bootstrap_deps,
+            )
+            session.page_host.mark_stack_bootstrap_pending()
 
-        launch_method = ""
-        getter = getattr(self._window, "_get_launch_method", None)
-        if callable(getter):
-            try:
-                launch_method = getter()
-            except Exception:
-                launch_method = ""
+        try:
+            launch_method = self._window.get_launch_method()
+        except Exception:
+            launch_method = ""
 
-        page_host = getattr(self._window, "_page_host", None)
-        if page_host is not None:
-            page_host.create_eager_pages(get_eager_page_names_for_method(launch_method))
+        if session is not None:
+            session.page_host.create_eager_pages(get_eager_page_names_for_method(launch_method))
 
         init_navigation(self._window)
-        finalize_page_signal_bootstrap(self._window)
+        finalize_page_stack_bootstrap(self._window)
         ensure_session_memory_defaults(self._window)
 
     def finish_bootstrap(self) -> None:
-        finish_ui_bootstrap(self._window)
+        finish_ui_bootstrap(self._window, self._runtime_bootstrap_deps)
 
     def get_loaded_page(self, page_name: PageName):
-        page_host = getattr(self._window, "_page_host", None)
-        if page_host is None:
+        session = get_window_ui_session(self._window)
+        if session is None:
             return None
-        return page_host.get_loaded_page(page_name)
+        return session.page_host.get_loaded_page(page_name)
 
     def show_page(self, page_name: PageName) -> bool:
-        page_host = getattr(self._window, "_page_host", None)
-        if page_host is None:
+        session = get_window_ui_session(self._window)
+        if session is None:
             return False
-        return page_host.show_page(page_name)
+        return session.page_host.show_page(page_name)
 
 
 __all__ = ["WindowUiRoot"]

@@ -1,19 +1,20 @@
 from __future__ import annotations
 
-from typing import Dict
+from typing import Any, Dict
 
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
-from filters.ui.collapsible_group import CollapsibleGroup
-from filters.ui.filter_chip_button import FilterButtonGroup
-from filters.ui.profile_strategy_item import ProfileStrategyItem
+from profile.ui.profile_item import ProfileItem
+from profile.ui.widgets.profile_group import ProfileGroup
+from profile.ui.widgets.profile_type_selector import ProfileTypeSelector
 from profile.match_filters import is_voice_match, ports_label_from_match_lines, protocol_label_from_match_lines
-from profile.service import ProfileListItem
 
 
 class ProfilesList(QWidget):
-    profile_selected = pyqtSignal(str, str)
+    profile_selected = pyqtSignal(str)
+    profile_move_requested = pyqtSignal(str, str)
+    profile_move_to_end_requested = pyqtSignal(str)
 
     GROUP_NAMES = {
         "youtube": "YouTube",
@@ -27,10 +28,11 @@ class ProfilesList(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._items_by_key: Dict[str, ProfileStrategyItem] = {}
-        self._profile_items: Dict[str, ProfileListItem] = {}
-        self._groups: Dict[str, CollapsibleGroup] = {}
+        self._items_by_key: Dict[str, ProfileItem] = {}
+        self._profile_items: Dict[str, Any] = {}
+        self._groups: Dict[str, ProfileGroup] = {}
         self._profile_to_group: Dict[str, str] = {}
+        self.setAcceptDrops(True)
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -38,9 +40,9 @@ class ProfilesList(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
-        self._filter_group = FilterButtonGroup(self)
-        self._filter_group.filters_changed.connect(self._apply_filters)
-        layout.addWidget(self._filter_group)
+        self._profile_type_selector = ProfileTypeSelector(self)
+        self._profile_type_selector.profile_types_changed.connect(self._apply_profile_type_filter)
+        layout.addWidget(self._profile_type_selector)
 
         self._content = QWidget(self)
         self._content_layout = QVBoxLayout(self._content)
@@ -49,9 +51,9 @@ class ProfilesList(QWidget):
         self._content_layout.addStretch()
         layout.addWidget(self._content)
 
-    def build_profiles(self, items: tuple[ProfileListItem, ...]) -> None:
+    def build_profiles(self, items: tuple[Any, ...]) -> None:
         self.clear()
-        grouped: dict[str, list[ProfileListItem]] = {}
+        grouped: dict[str, list[Any]] = {}
         for item in items:
             grouped.setdefault(item.group or "default", []).append(item)
 
@@ -60,7 +62,7 @@ class ProfilesList(QWidget):
             if not rows:
                 continue
             rows.sort(key=lambda item: item.order)
-            group = CollapsibleGroup(group_key, self.GROUP_NAMES.get(group_key, group_key.title()), self)
+            group = ProfileGroup(group_key, self.GROUP_NAMES.get(group_key, group_key.title()), self)
             self._groups[group_key] = group
 
             for item in rows:
@@ -91,17 +93,17 @@ class ProfilesList(QWidget):
         for group in self._groups.values():
             group.set_expanded(False)
 
-    def _create_item(self, item: ProfileListItem) -> ProfileStrategyItem:
+    def _create_item(self, item: Any) -> ProfileItem:
         ports = ports_label_from_match_lines(item.match_lines)
         description_parts = [part for part in (protocol_label_from_match_lines(item.match_lines), f"порты: {ports}" if ports else "") if part]
         description = " | ".join(description_parts)
         tooltip = _match_summary(item)
         if not item.in_preset:
-            tooltip = f"{tooltip}\nШаблон ещё не добавлен в выбранный preset."
+            tooltip = f"{tooltip}\nПрофиля ещё нет в пресете. Включите его или выберите готовую стратегию."
         elif not item.enabled:
-            tooltip = f"{tooltip}\nProfile есть в preset, но выключен через --skip."
+            tooltip = f"{tooltip}\nПрофиль есть в пресете, но сейчас выключен. В файле это записано через --skip."
 
-        widget = ProfileStrategyItem(
+        widget = ProfileItem(
             item.key,
             item.display_name,
             description,
@@ -111,16 +113,29 @@ class ProfilesList(QWidget):
             item.list_type if item.list_type in {"hostlist", "ipset"} else None,
             self,
         )
+        widget.set_drag_enabled(bool(item.in_preset))
         widget.item_activated.connect(self._on_item_clicked)
+        widget.item_dropped.connect(self._on_item_dropped)
         widget.set_strategy(item.strategy_id, item.strategy_name)
+        widget.set_feedback_state(item.rating, item.favorite)
         return widget
 
     def _on_item_clicked(self, profile_key: str) -> None:
-        item = self._profile_items.get(profile_key)
-        self.profile_selected.emit(profile_key, item.strategy_id if item is not None else "none")
+        self.profile_selected.emit(profile_key)
 
-    def _apply_filters(self, active_filters: set[str]) -> None:
-        if "all" in active_filters:
+    def _on_item_dropped(self, source_key: str, destination_key: str) -> None:
+        source = self._profile_items.get(source_key)
+        destination = self._profile_items.get(destination_key)
+        if source is None or destination is None:
+            return
+        if not source.in_preset or not destination.in_preset:
+            return
+        if source_key == destination_key:
+            return
+        self.profile_move_requested.emit(source_key, destination_key)
+
+    def _apply_profile_type_filter(self, active_profile_types: set[str]) -> None:
+        if "all" in active_profile_types:
             for widget in self._items_by_key.values():
                 widget.setVisible(True)
             for group in self._groups.values():
@@ -132,15 +147,15 @@ class ProfilesList(QWidget):
             protocol = protocol_label_from_match_lines(item.match_lines).upper()
             summary = _match_summary(item)
             text = f"{item.display_name} {summary} {item.group}".lower()
-            if "tcp" in active_filters and "TCP" in protocol:
+            if "tcp" in active_profile_types and "TCP" in protocol:
                 visible.add(key)
-            if "udp" in active_filters and ("UDP" in protocol or "L7" in protocol):
+            if "udp" in active_profile_types and ("UDP" in protocol or "L7" in protocol):
                 visible.add(key)
-            if "discord" in active_filters and "discord" in text:
+            if "discord" in active_profile_types and "discord" in text:
                 visible.add(key)
-            if "voice" in active_filters and is_voice_match(item.match_lines):
+            if "voice" in active_profile_types and is_voice_match(item.match_lines):
                 visible.add(key)
-            if "games" in active_filters and "game" in text:
+            if "games" in active_profile_types and "game" in text:
                 visible.add(key)
 
         for key, widget in self._items_by_key.items():
@@ -152,6 +167,30 @@ class ProfilesList(QWidget):
                 for key, widget in self._items_by_key.items()
                 if self._profile_to_group.get(key) == group_key
             ))
-def _match_summary(item: ProfileListItem) -> str:
+
+    def dragEnterEvent(self, event):  # noqa: N802
+        if event.mimeData().hasFormat(ProfileItem.MIME_TYPE):
+            event.acceptProposedAction()
+            return
+        return super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event):  # noqa: N802
+        if event.mimeData().hasFormat(ProfileItem.MIME_TYPE):
+            event.acceptProposedAction()
+            return
+        return super().dragMoveEvent(event)
+
+    def dropEvent(self, event):  # noqa: N802
+        if not event.mimeData().hasFormat(ProfileItem.MIME_TYPE):
+            return super().dropEvent(event)
+        source_key = bytes(event.mimeData().data(ProfileItem.MIME_TYPE)).decode("utf-8", errors="replace").strip()
+        item = self._profile_items.get(source_key)
+        if source_key and item is not None and item.in_preset:
+            self.profile_move_to_end_requested.emit(source_key)
+            event.acceptProposedAction()
+            return
+        event.ignore()
+
+def _match_summary(item: Any) -> str:
     parts = [part for part in (protocol_label_from_match_lines(item.match_lines), ports_label_from_match_lines(item.match_lines), item.list_type) if part]
     return " • ".join(parts) or "без явных условий"

@@ -6,13 +6,14 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QTableWidgetItem
 
-from blockcheck.strategy_scan_page_controller import StrategyScanPageController
-from ui.compat_widgets import InfoBarHelper
-from ui.text_catalog import tr as tr_catalog
+from ui.fluent_widgets import InfoBarHelper
+from app.text_catalog import tr as tr_catalog
+import blockcheck.strategy_scan_run_workflow as strategy_scan_run_workflow
 
 
 def apply_strategy_started_progress(
     *,
+    blockcheck_feature,
     strategy_name: str,
     index: int,
     total: int,
@@ -21,7 +22,7 @@ def apply_strategy_started_progress(
     status_label,
     scan_cursor: int,
 ) -> None:
-    progress_plan = StrategyScanPageController.build_progress_plan(
+    progress_plan = blockcheck_feature.build_progress_plan(
         strategy_name=strategy_name,
         index=index,
         total=total,
@@ -34,18 +35,27 @@ def apply_strategy_started_progress(
     status_label.setText(progress_plan.status_text)
 
 
-def append_scan_log(*, log_edit, run_log_file, message: str) -> None:
+def append_scan_log(*, blockcheck_feature, log_edit, run_log_file, message: str) -> None:
     log_edit.append(message)
-    StrategyScanPageController.append_run_log(run_log_file, message)
+    strategy_scan_run_workflow.append_strategy_scan_log(
+        blockcheck_feature=blockcheck_feature,
+        run_log_file=run_log_file,
+        message=message,
+    )
 
 
-def apply_phase_change(*, status_label, run_log_file, phase: str) -> None:
+def apply_phase_change(*, blockcheck_feature, status_label, run_log_file, phase: str) -> None:
     status_label.setText(phase)
-    StrategyScanPageController.append_run_log(run_log_file, f"[PHASE] {phase}")
+    strategy_scan_run_workflow.record_strategy_scan_phase(
+        blockcheck_feature=blockcheck_feature,
+        run_log_file=run_log_file,
+        phase=phase,
+    )
 
 
 def add_strategy_result_row(
     *,
+    blockcheck_feature,
     table,
     result,
     scan_cursor: int,
@@ -53,7 +63,7 @@ def add_strategy_result_row(
     push_button_cls,
     on_apply_strategy,
 ) -> dict:
-    row_plan = StrategyScanPageController.build_result_presentation(
+    row_plan = blockcheck_feature.build_result_presentation(
         result,
         scan_cursor=scan_cursor,
     )
@@ -88,7 +98,7 @@ def add_strategy_result_row(
 
     if row_plan.can_apply:
         apply_btn = push_button_cls()
-        apply_btn.setText(tr_fn("page.strategy_scan.apply", "Применить"))
+        apply_btn.setText(tr_fn("page.blockcheck_public.apply", "Применить"))
         apply_btn.setFixedHeight(26)
         apply_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         apply_btn.clicked.connect(
@@ -103,6 +113,7 @@ def add_strategy_result_row(
 
 def apply_finished_scan(
     *,
+    blockcheck_feature,
     report,
     worker,
     reset_ui,
@@ -116,23 +127,20 @@ def apply_finished_scan(
     status_label,
     run_log_file,
     set_support_status,
-    window,
+    parent_widget,
 ) -> None:
-    if worker is not None:
-        try:
-            worker.deleteLater()
-        except Exception:
-            pass
-
+    strategy_scan_run_workflow.delete_strategy_scan_worker_later(worker)
     reset_ui()
-    finish_plan = StrategyScanPageController.finalize_scan_report(
-        report,
+    finish_plan = strategy_scan_run_workflow.finalize_strategy_scan(
+        blockcheck_feature=blockcheck_feature,
+        report=report,
         scan_target=scan_target,
         scan_protocol=scan_protocol,
         scan_udp_games_scope=scan_udp_games_scope,
         scan_mode=scan_mode,
         scan_cursor=scan_cursor,
         result_rows=result_rows,
+        run_log_file=run_log_file,
     )
 
     if finish_plan.total_available > 0:
@@ -140,13 +148,10 @@ def apply_finished_scan(
 
     status_label.setText(finish_plan.status_text)
     progress_bar.setValue(min(finish_plan.total_count, progress_bar.maximum()))
-    if finish_plan.log_message:
-        StrategyScanPageController.append_run_log(run_log_file, finish_plan.log_message)
-
     if finish_plan.support_status_code == "ready_after_error":
         set_support_status(
             tr_catalog(
-                "page.strategy_scan.support_ready_after_error",
+                "page.blockcheck_public.support_ready_after_error",
                 default="Можно подготовить обращение по логам ошибки",
             )
         )
@@ -155,7 +160,7 @@ def apply_finished_scan(
     if finish_plan.cancelled:
         set_support_status(
             tr_catalog(
-                "page.strategy_scan.support_ready_after_cancel",
+                "page.blockcheck_public.support_ready_after_cancel",
                 default="Можно подготовить обращение по частичным логам отменённого сканирования",
             )
         )
@@ -163,13 +168,13 @@ def apply_finished_scan(
 
     set_support_status(
         tr_catalog(
-            "page.strategy_scan.support_ready",
+            "page.blockcheck_public.support_ready",
             default="Можно подготовить обращение по этому сканированию",
         )
     )
 
     try:
-        notification_plan = StrategyScanPageController.build_finish_notification_plan(
+        notification_plan = blockcheck_feature.build_finish_notification_plan(
             finish_plan,
             scan_protocol=scan_protocol,
         )
@@ -185,10 +190,10 @@ def apply_finished_scan(
                     default=notification_plan.body_default,
                 )
             )
-            InfoBarHelper.warning(window, title_text, body_text)
+            InfoBarHelper.warning(parent_widget, title_text, body_text)
         elif notification_plan.kind == "success" and notification_plan.title_key:
             InfoBarHelper.success(
-                window,
+                parent_widget,
                 tr_catalog(
                     notification_plan.title_key,
                     default=notification_plan.title_default,
@@ -201,6 +206,7 @@ def apply_finished_scan(
 
 def apply_force_stop_status(
     *,
+    blockcheck_feature,
     worker,
     expected_worker,
     status_label,
@@ -211,14 +217,18 @@ def apply_force_stop_status(
         return
     if worker is expected_worker and worker.is_running:
         warning_text = tr_catalog(
-            "page.strategy_scan.stopping_slow",
+            "page.blockcheck_public.stopping_slow",
             default="Остановка занимает больше времени, ждём завершения фонового сканирования...",
         )
         status_label.setText(warning_text)
-        StrategyScanPageController.append_run_log(run_log_file, f"WARNING: {warning_text}")
+        strategy_scan_run_workflow.record_strategy_scan_force_stop_warning(
+            blockcheck_feature=blockcheck_feature,
+            run_log_file=run_log_file,
+            warning_text=warning_text,
+        )
         set_support_status(
             tr_catalog(
-                "page.strategy_scan.support_wait_stop",
+                "page.blockcheck_public.support_wait_stop",
                 default="Подождите завершения остановки перед новым запуском",
             )
         )

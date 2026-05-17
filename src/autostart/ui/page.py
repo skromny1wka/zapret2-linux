@@ -6,8 +6,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 )
 from ui.pages.base_page import BasePage
-from ui.page_dependencies import resolve_page_app_runtime_state
-from ui.compat_widgets import SettingsCard, ActionButton
+from ui.fluent_widgets import SettingsCard, ActionButton
 from ui.theme import (
     get_cached_qta_pixmap,
     get_theme_tokens,
@@ -18,23 +17,15 @@ from ui.theme import (
     get_neutral_card_border_qss,
 )
 from ui.theme_semantic import get_semantic_palette
-from app_state.main_window_state import AppUiState, MainWindowStateStore
-from ui.text_catalog import tr as tr_catalog
+from app.state_store import AppUiState, MainWindowStateStore
+from app.text_catalog import tr as tr_catalog
 from log.log import log
-
-
-try:
-    from qfluentwidgets import (
-        SimpleCardWidget,
-        StrongBodyLabel,
-        BodyLabel,
-        CaptionLabel,
-    )
-except ImportError:
-    SimpleCardWidget = QWidget  # type: ignore[misc,assignment]
-    StrongBodyLabel = QLabel    # type: ignore[misc,assignment]
-    BodyLabel = QLabel          # type: ignore[misc,assignment]
-    CaptionLabel = QLabel       # type: ignore[misc,assignment]
+from qfluentwidgets import (
+    SimpleCardWidget,
+    StrongBodyLabel,
+    BodyLabel,
+    CaptionLabel,
+)
 
 
 class AutostartOptionCard(SimpleCardWidget):
@@ -208,11 +199,7 @@ class ClickableModeCard(SimpleCardWidget):
 class AutostartPage(BasePage):
     """Страница настроек автозапуска."""
 
-    autostart_enabled = pyqtSignal()
-    autostart_disabled = pyqtSignal()
-    navigate_to_dpi_settings = pyqtSignal()
-
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, autostart_feature, open_dpi_settings, ui_state_store):
         super().__init__(
             "Автозапуск",
             "Настройка автоматического запуска Zapret",
@@ -221,6 +208,8 @@ class AutostartPage(BasePage):
             subtitle_key="page.autostart.subtitle",
         )
 
+        self._autostart = autostart_feature
+        self._open_dpi_settings_callback = open_dpi_settings
         self.strategy_name = None
         self._cleanup_in_progress = False
 
@@ -229,6 +218,7 @@ class AutostartPage(BasePage):
 
         self._build_ui()
         self._apply_page_theme(force=True)
+        self.bind_ui_state_store(ui_state_store)
 
     def _tr(self, key: str, default: str, **kwargs) -> str:
         text = tr_catalog(key, language=self._ui_language, default=default)
@@ -262,15 +252,11 @@ class AutostartPage(BasePage):
         enabled: bool,
         strategy_name: str | None = None,
     ) -> None:
-        app_runtime_state = resolve_page_app_runtime_state(self, parent=self.parent())
-        if self._ui_state_store is not None:
-            if strategy_name:
-                self._ui_state_store.set_current_strategy_summary(strategy_name)
-            if app_runtime_state is not None:
-                app_runtime_state.set_autostart(enabled)
-            else:
-                self._ui_state_store.set_autostart(enabled)
-            return
+        try:
+            self._autostart.set_autostart_enabled(bool(enabled))
+        except Exception as exc:
+            log(f"Не удалось сохранить состояние автозапуска GUI в settings.json: {exc}", "WARNING")
+
         self.update_status(enabled, strategy_name)
 
     def _on_ui_state_changed(self, state: AppUiState, _changed_fields: frozenset[str]) -> None:
@@ -417,12 +403,18 @@ class AutostartPage(BasePage):
 
     def _update_mode(self):
         try:
-            from settings.dpi.strategy_settings import get_strategy_launch_method
+            from settings.mode import (
+                is_orchestra_launch_method,
+                is_zapret1_launch_method,
+                is_zapret2_launch_method,
+            )
 
-            method = str(get_strategy_launch_method() or "").strip()
-            if method == "zapret2_mode":
+            method = str(self._autostart.get_current_launch_method() or "").strip()
+            if is_zapret2_launch_method(method):
                 mode_text = "Профили (Zapret 2)"
-            elif method == "orchestra":
+            elif is_zapret1_launch_method(method):
+                mode_text = "Профили (Zapret 1)"
+            elif is_orchestra_launch_method(method):
                 mode_text = "Оркестр (автообучение)"
             else:
                 mode_text = "Неизвестно"
@@ -433,7 +425,7 @@ class AutostartPage(BasePage):
 
     def _on_mode_card_clicked(self):
         log("AutostartPage: mode_card clicked, emitting navigate_to_dpi_settings", "DEBUG")
-        self.navigate_to_dpi_settings.emit()
+        self._open_dpi_settings_callback()
 
     def _update_arrow_color(self):
         if not hasattr(self, "mode_arrow"):
@@ -552,13 +544,10 @@ class AutostartPage(BasePage):
 
     def _on_disable_clicked(self):
         try:
-            from autostart.autostart_remove import clear_autostart_task
-
-            removed_count = int(clear_autostart_task() or 0)
+            result = self._autostart.disable_gui_autostart()
             self._push_autostart_state(False)
-            self.autostart_disabled.emit()
-            if removed_count > 0:
-                log(f"Автозапуск отключён, удалена задача: {removed_count}", "INFO")
+            if result.removed_count > 0:
+                log(f"Автозапуск отключён, удалена задача: {result.removed_count}", "INFO")
             else:
                 log("Автозапуск отключён", "INFO")
         except Exception as exc:
@@ -566,23 +555,18 @@ class AutostartPage(BasePage):
 
     def _on_gui_autostart(self):
         try:
-            from autostart.autostart_exe import request_admin_for_autostart, setup_autostart_for_exe
-            from startup.admin_check import is_admin
-
-            if not is_admin():
+            result = self._autostart.enable_gui_autostart(status_cb=lambda msg: log(msg, "INFO"))
+            if result.restart_requested:
                 log("Для включения автозапуска нужны права администратора", "WARNING")
-                if request_admin_for_autostart():
-                    from PyQt6.QtWidgets import QApplication
+                from PyQt6.QtWidgets import QApplication
 
-                    QApplication.quit()
+                QApplication.quit()
                 return
 
-            ok = bool(setup_autostart_for_exe(status_cb=lambda msg: log(msg, "INFO")))
-            if not ok:
+            if not result.success:
                 log("Не удалось настроить автозапуск GUI", "ERROR")
                 return
             self._push_autostart_state(True, self.strategy_name)
-            self.autostart_enabled.emit()
         except Exception as exc:
             log(f"Ошибка автозапуска GUI: {exc}", "ERROR")
 

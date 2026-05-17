@@ -19,9 +19,7 @@ def build_tools_card_ui(
     content_parent,
     tr_fn,
     add_section_title_fn,
-    has_fluent_labels: bool,
     setting_card_group_cls,
-    settings_card_cls,
     quick_actions_bar_cls,
     action_button_cls,
     qhbox_layout_cls,
@@ -42,43 +40,22 @@ def build_tools_card_ui(
         "Очистить локальный кэш DNS Windows, если ответы или домены застряли в старом состоянии.",
     )
 
-    if setting_card_group_cls is not None and has_fluent_labels:
-        section_label = None
-        tools_card = setting_card_group_cls(tools_title, content_parent)
-        actions_bar = quick_actions_bar_cls(content_parent)
+    _ = add_section_title_fn
+    _ = qhbox_layout_cls
+    section_label = None
+    tools_card = setting_card_group_cls(tools_title, content_parent)
+    actions_bar = quick_actions_bar_cls(content_parent)
 
-        test_btn = action_button_cls(test_text, "fa5s.wifi")
-        test_btn.clicked.connect(on_test)
-        set_tooltip_fn(test_btn, test_tooltip)
+    test_btn = action_button_cls(test_text, "fa5s.wifi")
+    test_btn.clicked.connect(on_test)
+    set_tooltip_fn(test_btn, test_tooltip)
 
-        flush_btn = action_button_cls(flush_text, "fa5s.eraser")
-        flush_btn.clicked.connect(on_flush_dns)
-        set_tooltip_fn(flush_btn, flush_tooltip)
+    flush_btn = action_button_cls(flush_text, "fa5s.eraser")
+    flush_btn.clicked.connect(on_flush_dns)
+    set_tooltip_fn(flush_btn, flush_tooltip)
 
-        actions_bar.add_buttons([test_btn, flush_btn])
-        insert_widget_into_setting_card_group_fn(tools_card, 1, actions_bar)
-    else:
-        section_label = add_section_title_fn(text_key="page.network.section.tools")
-        tools_card = settings_card_cls()
-        actions_bar = None
-        tools_layout = qhbox_layout_cls()
-        tools_layout.setContentsMargins(10, 8, 12, 8)
-        tools_layout.setSpacing(8)
-
-        test_btn = action_button_cls(test_text, "fa5s.wifi")
-        test_btn.setFixedHeight(28)
-        test_btn.clicked.connect(on_test)
-        set_tooltip_fn(test_btn, test_tooltip)
-        tools_layout.addWidget(test_btn)
-
-        flush_btn = action_button_cls(flush_text, "fa5s.eraser")
-        flush_btn.setFixedHeight(28)
-        flush_btn.clicked.connect(on_flush_dns)
-        set_tooltip_fn(flush_btn, flush_tooltip)
-        tools_layout.addWidget(flush_btn)
-
-        tools_layout.addStretch()
-        tools_card.add_layout(tools_layout)
+    actions_bar.add_buttons([test_btn, flush_btn])
+    insert_widget_into_setting_card_group_fn(tools_card, 1, actions_bar)
 
     return NetworkToolsWidgets(
         card=tools_card,

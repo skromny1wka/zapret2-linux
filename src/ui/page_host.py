@@ -5,19 +5,19 @@ from PyQt6.QtWidgets import QWidget
 from log.log import log
 
 from ui.navigation.text_sync import apply_ui_language_to_page
-from ui.page_dependencies import inject_page_dependencies
 from ui.navigation.schema import (
     get_page_route_key,
     is_page_allowed_for_method,
     is_page_mode_open_allowed,
 )
-from ui.page_names import PageName
+from app.page_names import PageName
 from ui.page_performance import log_page_metric
 from ui.page_registry import get_page_performance_profile
 from ui.startup_ui_metrics import (
     pump_startup_ui,
     record_startup_page_init_metric,
 )
+from ui.window_ui_session import get_window_ui_session
 
 
 class WindowPageHost:
@@ -27,10 +27,9 @@ class WindowPageHost:
     показом через stackedWidget/navigationInterface.
     """
 
-    def __init__(self, window, page_factory, *, connect_page_signals):
+    def __init__(self, window, page_factory):
         self._window = window
         self._page_factory = page_factory
-        self._connect_page_signals = connect_page_signals
         self.pages: dict[PageName, QWidget] = {}
 
     def create_eager_pages(self, page_names: tuple[PageName, ...]) -> None:
@@ -50,25 +49,46 @@ class WindowPageHost:
     def get_loaded_page(self, page_name: PageName) -> QWidget | None:
         return self.pages.get(page_name)
 
-    def has_nav_item(self, page_name: PageName) -> bool:
-        nav_items = getattr(self._window, "_nav_items", None)
-        if not isinstance(nav_items, dict):
+    def send_page_command(
+        self,
+        page_name: PageName,
+        command: str,
+        payload: dict | None = None,
+        *,
+        ensure: bool = True,
+    ) -> bool:
+        page = self.ensure_page(page_name) if ensure else self.get_loaded_page(page_name)
+        if page is None:
             return False
-        return page_name in nav_items
+        handler = getattr(page, "handle_page_command", None)
+        if not callable(handler):
+            log(f"[PAGE_HOST] page {page_name.name} не принимает команды", "WARNING")
+            return False
+        return bool(handler(str(command or ""), dict(payload or {})))
+
+    def current_page(self) -> QWidget | None:
+        try:
+            return self._window.stackedWidget.currentWidget()
+        except Exception:
+            return None
+
+    def has_nav_item(self, page_name: PageName) -> bool:
+        session = get_window_ui_session(self._window)
+        if session is None:
+            return False
+        return page_name in session.nav_items
 
     def set_stacked_widget_current_page(self, page: QWidget | None, *, animate: bool = True) -> bool:
-        stack = getattr(self._window, "stackedWidget", None)
-        if page is None or stack is None:
+        stack = self._window.stackedWidget
+        if page is None:
             return False
 
         if animate:
-            switch_to = getattr(self._window, "switchTo", None)
-            if callable(switch_to):
-                try:
-                    switch_to(page)
-                    return True
-                except Exception:
-                    pass
+            try:
+                self._window.switchTo(page)
+                return True
+            except Exception:
+                pass
 
         view = getattr(stack, "view", None)
         set_animation_enabled = getattr(view, "setAnimationEnabled", None)
@@ -97,8 +117,8 @@ class WindowPageHost:
                     pass
 
     def ensure_page_in_stacked_widget(self, page: QWidget | None) -> None:
-        stack = getattr(self._window, "stackedWidget", None)
-        if page is None or stack is None:
+        stack = self._window.stackedWidget
+        if page is None:
             return
         try:
             if stack.indexOf(page) < 0:
@@ -106,25 +126,24 @@ class WindowPageHost:
         except Exception:
             pass
 
-    def bind_page_ui_state(self, page: QWidget | None) -> None:
-        store = getattr(self._window, "ui_state_store", None)
-        binder = getattr(page, "bind_ui_state_store", None)
-        if store is None or page is None or not callable(binder):
-            return
+    def mark_stack_bootstrap_pending(self) -> None:
+        session = get_window_ui_session(self._window)
+        if session is not None:
+            session.page_stack_bootstrap_complete = False
 
-        try:
-            binder(store)
-        except Exception:
-            pass
+    def finalize_stack_bootstrap(self) -> None:
+        session = get_window_ui_session(self._window)
+        if session is None:
+            return
+        session.page_stack_bootstrap_complete = True
+        for page in list(self.pages.values()):
+            self.ensure_page_in_stacked_widget(page)
 
     def _current_launch_method(self) -> str:
-        getter = getattr(self._window, "_get_launch_method", None)
-        if callable(getter):
-            try:
-                return str(getter() or "").strip().lower()
-            except Exception:
-                return ""
-        return ""
+        try:
+            return str(self._window.get_launch_method() or "").strip().lower()
+        except Exception:
+            return ""
 
     def _is_page_allowed(self, page_name: PageName) -> bool:
         return is_page_allowed_for_method(page_name, self._current_launch_method())
@@ -136,10 +155,9 @@ class WindowPageHost:
 
         page = self.pages.get(page_name)
         if page is not None:
-            inject_page_dependencies(page, self._window)
             apply_ui_language_to_page(self._window, page)
-            self.bind_page_ui_state(page)
-            if bool(getattr(self._window, "_page_signal_bootstrap_complete", False)):
+            session = get_window_ui_session(self._window)
+            if session is not None and bool(session.page_stack_bootstrap_complete):
                 self.ensure_page_in_stacked_widget(page)
             return page
 
@@ -149,14 +167,11 @@ class WindowPageHost:
 
         page = created_page.page
         self.pages[page_name] = page
-        setattr(self._window, created_page.attr_name, page)
 
-        inject_page_dependencies(page, self._window)
         apply_ui_language_to_page(self._window, page)
-        self.bind_page_ui_state(page)
 
-        if bool(getattr(self._window, "_page_signal_bootstrap_complete", False)):
-            self._connect_page_signals(self._window, page_name, page)
+        session = get_window_ui_session(self._window)
+        if session is not None and bool(session.page_stack_bootstrap_complete):
             self.ensure_page_in_stacked_widget(page)
 
         record_startup_page_init_metric(self._window, page_name, created_page.elapsed_ms)
@@ -174,7 +189,7 @@ class WindowPageHost:
             return False
 
         if not allow_internal and not is_page_mode_open_allowed(page_name):
-            log(f"[PAGE_HOST] reject direct-open for internal/detail page {page_name.name}", "WARNING")
+            log(f"[PAGE_HOST] reject direct-open for inner page {page_name.name}", "WARNING")
             return False
 
         page = self.ensure_page(page_name)

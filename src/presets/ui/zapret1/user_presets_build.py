@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QListView, QSizePolicy
 
-from ui.compat_widgets import PrimaryActionButton, SettingsCard, set_tooltip
+from ui.fluent_widgets import PrimaryActionButton, SettingsCard, set_tooltip
 from ui.presets_menu.delegate import PresetListDelegate
 from ui.presets_menu.model import PresetListModel
 from ui.presets_menu.toolbar import PresetsToolbarLayout
@@ -69,7 +69,7 @@ def build_user_presets_page_shell(
 
     configs_title_label = strong_body_label_cls(
         tr_fn(
-            "page.z1_user_presets.configs.title",
+            "page.winws1_user_presets.configs.title",
             "Обменивайтесь пресетами и профилями в разделе GitHub Discussions",
         )
     )
@@ -79,7 +79,7 @@ def build_user_presets_page_shell(
     configs_layout.addWidget(configs_title_label, 1)
 
     get_configs_btn = PrimaryActionButton(
-        tr_fn("page.z1_user_presets.configs.button", "Получить конфиги"),
+        tr_fn("page.winws1_user_presets.configs.button", "Получить конфиги"),
         "fa5s.external-link-alt",
     )
     get_configs_btn.setFixedHeight(36)
@@ -92,47 +92,47 @@ def build_user_presets_page_shell(
         primary_tool_button_cls,
         fluent_icon.ADD if fluent_icon else None,
     )
-    set_tooltip(create_btn, tr_fn("page.z1_user_presets.tooltip.create", "Создать новый пресет"))
+    set_tooltip(create_btn, tr_fn("page.winws1_user_presets.tooltip.create", "Создать новый пресет"))
     create_btn.clicked.connect(on_create_clicked)
 
     import_btn = toolbar_layout.create_action_button(
-        tr_fn("page.z1_user_presets.button.import", "Импорт"),
+        tr_fn("page.winws1_user_presets.button.import", "Импорт"),
         "fa5s.file-import",
     )
-    set_tooltip(import_btn, tr_fn("page.z1_user_presets.tooltip.import", "Импорт пресета из файла"))
+    set_tooltip(import_btn, tr_fn("page.winws1_user_presets.tooltip.import", "Импорт пресета из файла"))
     import_btn.clicked.connect(on_import_clicked)
 
     open_folder_btn = toolbar_layout.create_action_button(
-        tr_fn("page.z1_user_presets.button.open_folder", "Открыть папку"),
+        tr_fn("page.winws1_user_presets.button.open_folder", "Открыть папку"),
         "fa5s.folder-open",
     )
     set_tooltip(
         open_folder_btn,
-        tr_fn("page.z1_user_presets.tooltip.open_folder", "Открыть папку, где лежат ваши пресеты"),
+        tr_fn("page.winws1_user_presets.tooltip.open_folder", "Открыть папку, где лежат ваши пресеты"),
     )
     open_folder_btn.clicked.connect(on_open_folder_clicked)
 
     reset_all_btn = toolbar_layout.create_action_button(
-        tr_fn("page.z1_user_presets.button.reset_all", "Вернуть заводские"),
+        tr_fn("page.winws1_user_presets.button.reset_all", "Вернуть встроенные"),
         "fa5s.undo",
     )
     set_tooltip(
         reset_all_btn,
         tr_fn(
-            "page.z1_user_presets.tooltip.reset_all",
-            "Восстанавливает стандартные пресеты. Ваши изменения в стандартных пресетах будут потеряны.",
+            "page.winws1_user_presets.tooltip.reset_all",
+            "Возвращает встроенные пресеты. Ваши изменения во встроенных пресетах будут потеряны.",
         ),
     )
     reset_all_btn.clicked.connect(on_reset_all_presets_clicked)
 
     presets_info_btn = toolbar_layout.create_action_button(
-        tr_fn("page.z1_user_presets.button.wiki", "Вики по пресетам"),
+        tr_fn("page.winws1_user_presets.button.wiki", "Вики по пресетам"),
         "fa5s.info-circle",
     )
     presets_info_btn.clicked.connect(on_open_presets_info)
 
     info_btn = toolbar_layout.create_action_button(
-        tr_fn("page.z1_user_presets.button.what_is_this", "Что это такое?"),
+        tr_fn("page.winws1_user_presets.button.what_is_this", "Что это такое?"),
         "fa5s.question-circle",
     )
     info_btn.clicked.connect(on_info_clicked)
@@ -149,7 +149,7 @@ def build_user_presets_page_shell(
 
     preset_search_input = line_edit_cls()
     preset_search_input.setPlaceholderText(
-        tr_fn("page.z1_user_presets.search.placeholder", "Поиск пресетов по имени...")
+        tr_fn("page.winws1_user_presets.search.placeholder", "Поиск пресетов по имени...")
     )
     preset_search_input.setClearButtonEnabled(True)
     preset_search_input.setFixedHeight(34)
@@ -180,7 +180,7 @@ def build_user_presets_page_shell(
     presets_list.setDragDropMode(QListView.DragDropMode.DragDrop)
 
     presets_model = PresetListModel(presets_list)
-    presets_delegate = PresetListDelegate(presets_list, language_scope="z1", help_name_role="file_name")
+    presets_delegate = PresetListDelegate(presets_list, language_scope="winws1", help_name_role="file_name")
     presets_delegate.set_ui_language(ui_language)
     presets_delegate.action_triggered.connect(on_preset_list_action)
     presets_list.setModel(presets_model)

@@ -23,9 +23,7 @@ def build_force_dns_card_ui(
     add_widget_fn,
     get_theme_tokens_fn,
     get_force_dns_status_fn,
-    has_fluent_labels: bool,
     setting_card_group_cls,
-    settings_card_cls,
     caption_label_cls,
     action_button_cls,
     win11_toggle_row_cls,
@@ -47,13 +45,10 @@ def build_force_dns_card_ui(
         "page.network.force_dns.card.title",
         "Принудительно прописывает Google DNS + OpenDNS для обхода блокировок",
     )
-    if setting_card_group_cls is not None and has_fluent_labels:
-        force_dns_card = setting_card_group_cls(title_text, content_parent)
-        dns_layout = None
-    else:
-        force_dns_card = settings_card_cls(title_text)
-        dns_layout = qvbox_layout_cls()
-        dns_layout.setSpacing(8)
+    _ = parent
+    _ = qvbox_layout_cls
+    force_dns_card = setting_card_group_cls(title_text, content_parent)
+    dns_layout = None
 
     force_dns_toggle = win11_toggle_row_cls(
         "fa5s.shield-alt",

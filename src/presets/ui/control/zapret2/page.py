@@ -1,51 +1,47 @@
 # dpi/ui/zapret2_mode/page.py
 """Zapret 2 mode management page (Strategies landing for zapret2_mode)."""
 
-import os
 import time as _time
-import webbrowser
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 
 from ui.pages.base_page import BasePage
-from ui.page_dependencies import require_page_app_context
+from settings.mode import ZAPRET2_MODE
 from presets.ui.control.zapret2.build import (
-    build_z2_pages_management_section,
-    build_z2_presets_section,
-    build_z2_pages_status_section,
+    build_winws2_pages_management_section,
+    build_winws2_presets_section,
+    build_winws2_pages_status_section,
 )
 from presets.ui.control.zapret2.deferred_build import (
-    build_z2_pages_deferred_sections,
+    build_winws2_pages_deferred_sections,
 )
 from presets.ui.control.zapret2.runtime_helpers import (
     apply_advanced_settings_plan,
     apply_profile_language,
     apply_program_settings_snapshot,
     apply_status_plan,
-    run_confirmation_dialog,
     set_toggle_checked,
-    show_action_result_plan,
     sync_profile_ui_mode_label,
 )
-from ui.compat_widgets import (
+from ui.fluent_widgets import (
     ActionButton,
     PrimaryActionButton,
     enable_setting_card_group_auto_height,
     set_tooltip,
 )
-from app_state.main_window_state import AppUiState, MainWindowStateStore
+from app.state_store import AppUiState, MainWindowStateStore
 from presets.ui.control.control_page_shared import (
     ControlPageActionMixin,
-    attach_program_settings_runtime,
     bind_control_ui_state_store,
     cleanup_control_page_subscriptions,
 )
-from ui.text_catalog import tr as tr_catalog
-from presets.ui.control.zapret2.controller import Zapret2ModeControlPageController
+from app.text_catalog import tr as tr_catalog
+from presets.ui.control.windows_features.runtime import ControlPageWindowsFeatureMixin
+import presets.ui.control.zapret2.page_runtime as zapret2_page_runtime
 
 from qfluentwidgets import (
     CaptionLabel, StrongBodyLabel, SubtitleLabel, BodyLabel,
-    IndeterminateProgressBar, MessageBox, InfoBar,
+    IndeterminateProgressBar, InfoBar,
     SegmentedWidget, MessageBoxBase,
     SettingCardGroup, PushSettingCard,
 )
@@ -58,51 +54,51 @@ class ProfileUiModeDialog(MessageBoxBase):
         super().__init__(parent)
         self.titleLabel = SubtitleLabel(
             tr_catalog(
-                "page.z2_control.mode.dialog.title",
+                "page.winws2_control.mode.dialog.title",
                 language=language,
-                default="Режим отображения profile",
+                default="Режим отображения профилей",
             ),
             self.widget,
         )
         self.mode_seg = SegmentedWidget(self.widget)
         self.mode_seg.addItem(
             "basic",
-            tr_catalog("page.z2_control.mode.basic", language=language, default="Basic"),
+            tr_catalog("page.winws2_control.mode.basic", language=language, default="Basic"),
         )
         self.mode_seg.addItem(
             "advanced",
-            tr_catalog("page.z2_control.mode.advanced", language=language, default="Advanced"),
+            tr_catalog("page.winws2_control.mode.advanced", language=language, default="Advanced"),
         )
         self.mode_seg.setCurrentItem(
             current_mode if current_mode in ("basic", "advanced") else "basic"
         )
         self.basic_desc = BodyLabel(
             tr_catalog(
-                "page.z2_control.mode.dialog.description",
+                "page.winws2_control.mode.dialog.description",
                 language=language,
                 default=(
-                    "Профили поддерживает несколько режимов: упрощенный и расширенный для профи. "
-                    "Настройки не сохраняются между режимами Вы можете выбрать любой. Рекомендуем начать с базового. "
-                    "Бывает что базовый из-за готовых стратегий плохо пробивает сайты, тогда рекомендуем попробовать "
-                    "продвинутый в котором можно более тонко настроить техники дурения."
+                    "Профили поддерживают несколько режимов: упрощённый и расширенный. "
+                    "Настройки не переносятся между режимами, поэтому можно выбрать любой. "
+                    "Рекомендуем начать с базового. Если базовый режим с готовыми стратегиями плохо открывает сайты, "
+                    "попробуйте продвинутый: там можно тоньше настроить техники дурения."
                 ),
             ),
             self.widget,
         )
         self.basic_desc = BodyLabel(
             tr_catalog(
-                "page.z2_control.mode.dialog.basic_description",
+                "page.winws2_control.mode.dialog.basic_description",
                 language=language,
                 default=(
-                    "Basic (базовый) — готовая таблица стратегий без понятия фаз. "
-                    "Собирать свои стратегии нельзя."
+                    "Basic (базовый) — выбор готовой стратегии без настройки фаз. "
+                    "Свой набор аргументов в этом режиме собрать нельзя."
                 ),
             ),
             self.widget,
         )
         self.adv_desc = BodyLabel(
             tr_catalog(
-                "page.z2_control.mode.dialog.advanced_description",
+                "page.winws2_control.mode.dialog.advanced_description",
                 language=language,
                 default=(
                     "Advanced (продвинутый) — каждая функция настраивается индивидуально, "
@@ -119,8 +115,8 @@ class ProfileUiModeDialog(MessageBoxBase):
         self.viewLayout.addSpacing(8)
         self.viewLayout.addWidget(self.basic_desc)
         self.viewLayout.addWidget(self.adv_desc)
-        self.yesButton.setText(tr_catalog("page.z2_control.mode.dialog.button.apply", language=language, default="Применить"))
-        self.cancelButton.setText(tr_catalog("page.z2_control.mode.dialog.button.cancel", language=language, default="Отмена"))
+        self.yesButton.setText(tr_catalog("page.winws2_control.mode.dialog.button.apply", language=language, default="Применить"))
+        self.cancelButton.setText(tr_catalog("page.winws2_control.mode.dialog.button.cancel", language=language, default="Отмена"))
         self.widget.setMinimumWidth(440)
 
     def get_mode(self) -> str:
@@ -136,7 +132,7 @@ def _accent_fg_for_tokens(tokens) -> str:
         return "rgba(0, 0, 0, 0.90)"
 
 
-def _log_startup_z2_control_metric(section: str, elapsed_ms: float) -> None:
+def _log_startup_winws2_control_metric(section: str, elapsed_ms: float) -> None:
     try:
         rounded = int(round(float(elapsed_ms)))
     except Exception:
@@ -161,28 +157,53 @@ class StopButton(ActionButton):
         super().__init__(text, icon_name, parent=parent)
 
 
-class Zapret2ModeControlPage(ControlPageActionMixin, BasePage):
-    """Страница управления для zapret2_mode (главная вкладка раздела "Стратегии")."""
+class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMixin, BasePage):
+    """Главная страница управления для Zapret 2."""
 
-    navigate_to_presets = pyqtSignal()        # → PageName.ZAPRET2_USER_PRESETS
-    navigate_to_profiles = pyqtSignal()  # → текущий Basic/Advanced page-flow
-    navigate_to_blobs = pyqtSignal()          # → PageName.BLOBS
-    profile_ui_mode_changed = pyqtSignal(str)     # "basic" | "advanced"
     deferred_show_requested = pyqtSignal()
 
-    def __init__(self, parent=None):
+    def __init__(
+        self,
+        parent=None,
+        *,
+        presets_feature,
+        profile_feature,
+        runtime_feature,
+        program_settings_feature,
+        set_status,
+        request_exit,
+        open_connection_test,
+        open_folder,
+        open_presets,
+        open_preset_setup,
+        open_blobs,
+        external_actions_feature,
+        ui_state_store,
+    ):
         _t_init = _time.perf_counter()
         _t_base = _time.perf_counter()
         super().__init__(
             "Управление",
-            "Настройка и запуск Zapret 2. Выберите готовые пресеты-конфиги, "
-            "а при необходимости выполните тонкую настройку для каждого фильтра в разделе «Профили».",
+            "Настройка и запуск Zapret 2. В «Мои пресеты» выбирается пресет, "
+            "а в «Настройка пресета» меняются профили и выбранные для них готовые стратегии.",
             parent,
-            title_key="page.z2_control.title",
-            subtitle_key="page.z2_control.subtitle",
+            title_key="page.winws2_control.title",
+            subtitle_key="page.winws2_control.subtitle",
         )
-        _log_startup_z2_control_metric("__init__.base_page", (_time.perf_counter() - _t_base) * 1000)
+        _log_startup_winws2_control_metric("__init__.base_page", (_time.perf_counter() - _t_base) * 1000)
 
+        self._presets = presets_feature
+        self._profile = profile_feature
+        self._runtime_feature = runtime_feature
+        self._program_settings = program_settings_feature
+        self._set_status_callback = set_status
+        self._request_exit_callback = request_exit
+        self._open_connection_test_callback = open_connection_test
+        self._open_folder_callback = open_folder
+        self._open_presets_callback = open_presets
+        self._open_preset_setup_callback = open_preset_setup
+        self._open_blobs_callback = open_blobs
+        self._external_actions = external_actions_feature
         self._ui_state_store = None
         self._ui_state_unsubscribe = None
         self._program_settings_runtime_unsubscribe = None
@@ -191,10 +212,10 @@ class Zapret2ModeControlPage(ControlPageActionMixin, BasePage):
         self._startup_showevent_profile_logged = False
         self._deferred_sections_built = False
         self._deferred_sections_hydrated = False
-        self._refresh_runtime = Zapret2ModeControlPageController.create_refresh_runtime()
+        self._refresh_runtime = zapret2_page_runtime.create_refresh_runtime()
         self.profile_ui_mode_label = None
         self.profile_ui_mode_caption = None
-        self.profiles_open_btn = None
+        self.preset_setup_open_btn = None
         self.profile_ui_mode_btn = None
         self.program_settings_card = None
         self.auto_dpi_toggle = None
@@ -221,8 +242,9 @@ class Zapret2ModeControlPage(ControlPageActionMixin, BasePage):
             Qt.ConnectionType.QueuedConnection,
         )
         self._build_ui()
+        self.bind_ui_state_store(ui_state_store)
         self._after_ui_built()
-        _log_startup_z2_control_metric("__init__.total", (_time.perf_counter() - _t_init) * 1000)
+        _log_startup_winws2_control_metric("__init__.total", (_time.perf_counter() - _t_init) * 1000)
 
     def _after_ui_built(self) -> None:
         try:
@@ -249,38 +271,19 @@ class Zapret2ModeControlPage(ControlPageActionMixin, BasePage):
             self.deferred_show_requested.emit()
         if not self._startup_showevent_profile_logged:
             self._startup_showevent_profile_logged = True
-            _log_startup_z2_control_metric("activation.total", (_time.perf_counter() - _t_show) * 1000)
+            _log_startup_winws2_control_metric("activation.total", (_time.perf_counter() - _t_show) * 1000)
 
     def _load_selected_preset_name(self) -> tuple[str, str]:
         try:
-            selected_manifest = self._require_app_context().preset_mode_coordinator.get_selected_source_manifest(
-                "zapret2_mode"
+            return self._presets.get_selected_source_preset_display(
+                ZAPRET2_MODE,
             )
         except Exception:
-            selected_manifest = None
-
-        file_name = str(getattr(selected_manifest, "file_name", "") or "").strip()
-        display_name = str(getattr(selected_manifest, "name", "") or "").strip()
-
-        if not file_name:
             return "", ""
-
-        display_name = display_name or os.path.splitext(os.path.basename(file_name))[0].strip() or file_name
-        return display_name, display_name
-
-    def _require_app_context(self):
-        return require_page_app_context(
-            self,
-            parent=self.parent(),
-            error_message="AppContext is required for Zapret2 mode control page",
-        )
-
-    def _get_selection_service(self):
-        return self._require_app_context().preset_selection_service
 
     def _apply_selected_preset_name_fast(self) -> None:
         default_text = tr_catalog(
-            "page.z2_control.preset.not_selected",
+            "page.winws2_control.preset.not_selected",
             language=self._ui_language,
             default="Не выбран",
         )
@@ -306,7 +309,7 @@ class Zapret2ModeControlPage(ControlPageActionMixin, BasePage):
             _t_build = _time.perf_counter()
             self._build_deferred_sections()
             self._deferred_sections_built = True
-            _log_startup_z2_control_metric(
+            _log_startup_winws2_control_metric(
                 "showEvent.build_deferred_sections",
                 (_time.perf_counter() - _t_build) * 1000,
             )
@@ -322,7 +325,7 @@ class Zapret2ModeControlPage(ControlPageActionMixin, BasePage):
                 pass
             self._deferred_sections_hydrated = True
             self._schedule_advanced_settings_reload(force=True)
-            _log_startup_z2_control_metric(
+            _log_startup_winws2_control_metric(
                 "showEvent.hydrate_deferred_sections",
                 (_time.perf_counter() - _t_hydrate) * 1000,
             )
@@ -330,19 +333,19 @@ class Zapret2ModeControlPage(ControlPageActionMixin, BasePage):
 
         _t_adv = _time.perf_counter()
         self._schedule_advanced_settings_reload()
-        _log_startup_z2_control_metric(
+        _log_startup_winws2_control_metric(
             "showEvent.load_advanced_settings",
             (_time.perf_counter() - _t_adv) * 1000,
         )
 
-    def _open_profiles_page(self) -> None:
-        self.navigate_to_profiles.emit()
+    def _open_preset_setup_page(self) -> None:
+        self._open_preset_setup_callback()
 
     def _build_ui(self):
         _t_total = _time.perf_counter()
         # Статус работы
         _t_status = _time.perf_counter()
-        status_widgets = build_z2_pages_status_section(
+        status_widgets = build_winws2_pages_status_section(
             add_section_title=self.add_section_title,
             tr_fn=lambda key, default: tr_catalog(key, language=self._ui_language, default=default),
             strong_body_label_cls=StrongBodyLabel,
@@ -354,13 +357,13 @@ class Zapret2ModeControlPage(ControlPageActionMixin, BasePage):
         self.status_title = status_widgets.status_title
         self.status_desc = status_widgets.status_desc
         self.add_widget(status_widgets.card)
-        _log_startup_z2_control_metric("_build_ui.status_card", (_time.perf_counter() - _t_status) * 1000)
+        _log_startup_winws2_control_metric("_build_ui.status_card", (_time.perf_counter() - _t_status) * 1000)
 
         self.add_spacing(16)
 
         # Управление
         _t_control = _time.perf_counter()
-        management_widgets = build_z2_pages_management_section(
+        management_widgets = build_winws2_pages_management_section(
             add_section_title=self.add_section_title,
             tr_fn=lambda key, default: tr_catalog(key, language=self._ui_language, default=default),
             caption_label_cls=CaptionLabel,
@@ -380,17 +383,17 @@ class Zapret2ModeControlPage(ControlPageActionMixin, BasePage):
         self.progress_bar = management_widgets.progress_bar
         self.loading_label = management_widgets.loading_label
         self.add_widget(management_widgets.card)
-        _log_startup_z2_control_metric("_build_ui.control_card", (_time.perf_counter() - _t_control) * 1000)
+        _log_startup_winws2_control_metric("_build_ui.control_card", (_time.perf_counter() - _t_control) * 1000)
 
         self.add_spacing(16)
 
-        # ── Запуск: две вертикальные WinUI-карточки ──────────────────────
+        # ── Ветка пресета: выбор пресета отдельно от настройки его профилей ──
         _t_preset = _time.perf_counter()
-        preset_widgets = build_z2_presets_section(
+        preset_widgets = build_winws2_presets_section(
             add_section_title=self.add_section_title,
             tr_fn=lambda key, default: tr_catalog(key, language=self._ui_language, default=default),
             push_setting_card_cls=PushSettingCard,
-            on_open_presets=self.navigate_to_presets.emit,
+            on_open_presets=self._open_presets_callback,
         )
         self.preset_section_label = preset_widgets.section_label
         self.preset_card = preset_widgets.card
@@ -398,26 +401,21 @@ class Zapret2ModeControlPage(ControlPageActionMixin, BasePage):
         self.current_preset_caption = preset_widgets.current_preset_caption
         self.presets_btn = preset_widgets.presets_btn
         self.add_widget(preset_widgets.card)
-        _log_startup_z2_control_metric("_build_ui.preset_card", (_time.perf_counter() - _t_preset) * 1000)
-        _log_startup_z2_control_metric("_build_ui.total", (_time.perf_counter() - _t_total) * 1000)
+        _log_startup_winws2_control_metric("_build_ui.preset_card", (_time.perf_counter() - _t_preset) * 1000)
+        _log_startup_winws2_control_metric("_build_ui.total", (_time.perf_counter() - _t_total) * 1000)
 
     def _build_deferred_sections(self) -> None:
         self.add_spacing(8)
-        try:
-            from ui.widgets.win11_controls import Win11ToggleRow
-        except Exception:
-            Win11ToggleRow = None  # type: ignore[assignment]
+        from ui.widgets.win11_controls import Win11ToggleRow
 
-        if Win11ToggleRow is None:
-            raise RuntimeError("Win11ToggleRow недоступен для страницы управления Zapret 2")
-        deferred_widgets = build_z2_pages_deferred_sections(
+        deferred_widgets = build_winws2_pages_deferred_sections(
             add_section_title=self.add_section_title,
             tr_fn=lambda key, default: tr_catalog(key, language=self._ui_language, default=default),
             content_parent=self.content,
             setting_card_group_cls=SettingCardGroup,
             push_setting_card_cls=PushSettingCard,
             win11_toggle_row_cls=Win11ToggleRow,
-            on_open_profiles_page=self._open_profiles_page,
+            on_open_preset_setup_page=self._open_preset_setup_page,
             on_open_profile_ui_mode_dialog=self._open_profile_ui_mode_dialog,
             on_auto_dpi_toggled=self._on_auto_dpi_toggled,
             on_defender_toggled=self._on_defender_toggled,
@@ -425,19 +423,19 @@ class Zapret2ModeControlPage(ControlPageActionMixin, BasePage):
             on_discord_restart_changed=self._on_discord_restart_changed,
             on_wssize_toggled=self._on_wssize_toggled,
             on_debug_log_toggled=self._on_debug_log_toggled,
-            on_navigate_to_blobs=self.navigate_to_blobs.emit,
+            on_navigate_to_blobs=self._open_blobs_callback,
             on_open_connection_test=self._open_connection_test,
             on_open_folder=self._open_folder,
             on_open_docs=self._open_docs,
         )
 
-        self.profile_section_label = deferred_widgets.profile_section_label
-        self.profile_card = deferred_widgets.profile_card
+        self.preset_setup_section_label = deferred_widgets.preset_setup_section_label
+        self.preset_setup_card = deferred_widgets.preset_setup_card
         self.profile_ui_mode_label = deferred_widgets.profile_ui_mode_label
         self.profile_ui_mode_caption = deferred_widgets.profile_ui_mode_caption
-        self.profiles_open_btn = deferred_widgets.profiles_open_btn
+        self.preset_setup_open_btn = deferred_widgets.preset_setup_open_btn
         self.profile_ui_mode_btn = deferred_widgets.profile_ui_mode_btn
-        self.add_widget(self.profile_card)
+        self.add_widget(self.preset_setup_card)
 
         self.program_settings_section_label = deferred_widgets.program_settings_section_label
         self.program_settings_card = deferred_widgets.program_settings_card
@@ -495,9 +493,9 @@ class Zapret2ModeControlPage(ControlPageActionMixin, BasePage):
                 pass
 
         request_id = runtime.next_advanced_settings_request_id()
-        worker = Zapret2ModeControlPageController.create_advanced_settings_worker(
+        worker = zapret2_page_runtime.create_advanced_settings_worker(
             request_id,
-            self._require_app_context(),
+            self._profile,
             self,
         )
         runtime.advanced_settings_worker = worker
@@ -508,25 +506,27 @@ class Zapret2ModeControlPage(ControlPageActionMixin, BasePage):
     def _on_advanced_settings_loaded(self, request_id: int, state: dict) -> None:
         if not self._refresh_runtime.accept_advanced_settings_result(request_id):
             return
-        plan = Zapret2ModeControlPageController.build_advanced_settings_apply_plan(state if isinstance(state, dict) else {})
+        plan = zapret2_page_runtime.build_advanced_settings_apply_plan(state if isinstance(state, dict) else {})
         self._apply_advanced_settings_plan(plan)
 
     def _on_discord_restart_changed(self, enabled: bool) -> None:
         self._refresh_runtime.mark_advanced_settings_written()
-        Zapret2ModeControlPageController.save_discord_restart_setting(enabled)
+        zapret2_page_runtime.save_discord_restart_setting(enabled)
 
     def _on_wssize_toggled(self, enabled: bool) -> None:
         self._refresh_runtime.mark_advanced_settings_written()
-        Zapret2ModeControlPageController.save_wssize_enabled(
+        zapret2_page_runtime.save_wssize_enabled(
             enabled,
-            app_context=self._require_app_context(),
+            profile_feature=self._profile,
+            runtime_feature=self._runtime_feature,
         )
 
     def _on_debug_log_toggled(self, enabled: bool) -> None:
         self._refresh_runtime.mark_advanced_settings_written()
-        Zapret2ModeControlPageController.save_debug_log_enabled(
+        zapret2_page_runtime.save_debug_log_enabled(
             enabled,
-            app_context=self._require_app_context(),
+            profile_feature=self._profile,
+            runtime_feature=self._runtime_feature,
         )
 
     # ==================== Profile UI mode: Basic/Advanced ====================
@@ -539,7 +539,7 @@ class Zapret2ModeControlPage(ControlPageActionMixin, BasePage):
 
     def _on_profile_ui_mode_selected(self, mode: str) -> None:
         _ = mode
-        plan = Zapret2ModeControlPageController.build_profile_ui_mode_change_plan(
+        plan = zapret2_page_runtime.build_profile_ui_mode_change_plan(
             wanted_mode="basic",
             current_mode="basic",
         )
@@ -547,15 +547,14 @@ class Zapret2ModeControlPage(ControlPageActionMixin, BasePage):
             self._sync_profile_ui_mode_from_settings()
 
     def _sync_program_settings(self) -> None:
-        snapshot = self._require_app_context().program_settings_runtime_service.refresh()
-        self._apply_program_settings_snapshot(snapshot)
+        snapshot = self._program_settings.refresh_program_settings_snapshot()
+        if snapshot is not None:
+            self._apply_program_settings_snapshot(snapshot)
 
     def _attach_program_settings_runtime(self) -> None:
-        attach_program_settings_runtime(
+        self._program_settings.attach_program_settings_runtime(
             self,
-            require_app_context_fn=self._require_app_context,
             apply_snapshot_fn=self._apply_program_settings_snapshot,
-            require_attr_name="auto_dpi_toggle",
         )
 
     def _apply_program_settings_snapshot(self, snapshot) -> None:
@@ -568,88 +567,16 @@ class Zapret2ModeControlPage(ControlPageActionMixin, BasePage):
             max_block_toggle=self.max_block_toggle,
         )
 
-    def _get_program_settings_runtime_service(self):
-        return self._require_app_context().program_settings_runtime_service
-
-    def _show_action_result_plan(self, plan, toggle=None) -> None:
-        show_action_result_plan(
-            plan,
-            window=self.window(),
-            set_status=self._set_status,
-            info_bar_cls=InfoBar,
-            toggle=toggle,
-        )
-
-    def _run_confirmation_dialog(self, dialog_plan, toggle=None) -> bool:
-        return run_confirmation_dialog(
-            dialog_plan,
-            message_box_cls=MessageBox,
-            window=self.window(),
-            toggle=toggle,
-        )
-
     def _on_auto_dpi_toggled(self, enabled: bool) -> None:
         try:
-            plan = Zapret2ModeControlPageController.save_auto_dpi(enabled)
+            plan = self._program_settings.set_auto_dpi_enabled(enabled)
             self._set_status(plan.message)
             InfoBar.success(title=plan.title, content=plan.message, parent=self.window())
         finally:
             self._sync_program_settings()
 
-    def _on_defender_toggled(self, disable: bool) -> None:
-        start_plan = Zapret2ModeControlPageController.build_defender_toggle_start_plan(
-            disable=disable,
-            language=self._ui_language,
-        )
-        if start_plan.blocked:
-            InfoBar.error(
-                title=start_plan.blocked_title,
-                content=start_plan.blocked_content,
-                parent=self.window(),
-            )
-            if start_plan.blocked_revert_checked is not None:
-                self._set_toggle_checked(self.defender_toggle, start_plan.blocked_revert_checked)
-            return
-
-        try:
-            for dialog_plan in start_plan.confirmations:
-                if not self._run_confirmation_dialog(dialog_plan, self.defender_toggle):
-                    return
-
-            if start_plan.start_status:
-                self._set_status(start_plan.start_status)
-
-            result_plan = Zapret2ModeControlPageController.run_defender_toggle(
-                disable=disable,
-                status_callback=self._set_status,
-            )
-            self._show_action_result_plan(result_plan, self.defender_toggle)
-        finally:
-            self._sync_program_settings()
-
-    def _on_max_blocker_toggled(self, enable: bool) -> None:
-        start_plan = Zapret2ModeControlPageController.build_max_block_toggle_start_plan(
-            enable=enable,
-            language=self._ui_language,
-        )
-        try:
-            for dialog_plan in start_plan.confirmations:
-                if not self._run_confirmation_dialog(dialog_plan, self.max_block_toggle):
-                    return
-
-            if start_plan.start_status:
-                self._set_status(start_plan.start_status)
-
-            result_plan = Zapret2ModeControlPageController.run_max_block_toggle(
-                enable=enable,
-                status_callback=self._set_status,
-            )
-            self._show_action_result_plan(result_plan, self.max_block_toggle)
-        finally:
-            self._sync_program_settings()
-
     def _update_stop_winws_button_text(self):
-        plan = Zapret2ModeControlPageController.build_stop_button_plan(language=self._ui_language)
+        plan = zapret2_page_runtime.build_stop_button_plan(language=self._ui_language)
         self.stop_winws_btn.setText(plan.text)
 
     def set_loading(self, loading: bool, text: str = ""):
@@ -707,7 +634,7 @@ class Zapret2ModeControlPage(ControlPageActionMixin, BasePage):
         self.update_strategy(str(state.current_strategy_summary or ""))
 
     def update_status(self, state: str | bool, last_error: str = ""):
-        plan = Zapret2ModeControlPageController.build_status_plan(
+        plan = zapret2_page_runtime.build_status_plan(
             state=state,
             last_error=last_error,
             language=self._ui_language,
@@ -734,7 +661,7 @@ class Zapret2ModeControlPage(ControlPageActionMixin, BasePage):
             start_btn=self.start_btn,
             stop_and_exit_btn=self.stop_and_exit_btn,
             presets_btn=self.presets_btn,
-            profiles_open_btn=self.profiles_open_btn,
+            preset_setup_open_btn=self.preset_setup_open_btn,
             profile_ui_mode_btn=self.profile_ui_mode_btn,
             blobs_open_btn=self.blobs_open_btn,
             test_card=self.test_card,
@@ -760,7 +687,9 @@ class Zapret2ModeControlPage(ControlPageActionMixin, BasePage):
         try:
             from config.urls import DOCS_URL
 
-            webbrowser.open(DOCS_URL)
+            result = self._external_actions.open_url(DOCS_URL)
+            if not result.ok:
+                raise RuntimeError(result.error)
         except Exception as e:
             InfoBar.warning(title="Документация", content=f"Не удалось открыть документацию: {e}", parent=self.window())
 

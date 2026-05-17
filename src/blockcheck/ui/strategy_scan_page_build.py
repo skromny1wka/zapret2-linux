@@ -6,9 +6,10 @@ from dataclasses import dataclass
 
 from ui.theme import get_themed_qta_icon
 from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QHeaderView
+from PyQt6.QtWidgets import QHBoxLayout, QHeaderView
+from qfluentwidgets import CaptionLabel
 
-from ui.compat_widgets import ActionButton, QuickActionsBar, SettingsCard
+from ui.fluent_widgets import ActionButton, QuickActionsBar, SettingsCard
 from ui.pages.base_page import ScrollBlockingTextEdit
 
 
@@ -49,7 +50,6 @@ class StrategyScanLogWidgets:
 def build_strategy_scan_control_section(
     *,
     tr_fn,
-    has_fluent: bool,
     combo_cls,
     caption_label_cls,
     body_label_cls,
@@ -72,7 +72,7 @@ def build_strategy_scan_control_section(
 
     protocol_label = caption_label_cls(
         tr_fn("page.strategy_scan.protocol", "Протокол:")
-    ) if has_fluent else QLabel(tr_fn("page.strategy_scan.protocol", "Протокол:"))
+    )
     settings_row.addWidget(protocol_label)
 
     protocol_combo = combo_cls()
@@ -95,7 +95,7 @@ def build_strategy_scan_control_section(
 
     games_scope_label = caption_label_cls(
         tr_fn("page.strategy_scan.udp_scope", "Охват UDP:")
-    ) if has_fluent else QLabel(tr_fn("page.strategy_scan.udp_scope", "Охват UDP:"))
+    )
     settings_row.addWidget(games_scope_label)
 
     games_scope_combo = combo_cls()
@@ -116,7 +116,7 @@ def build_strategy_scan_control_section(
 
     mode_label = caption_label_cls(
         tr_fn("page.strategy_scan.mode", "Режим:")
-    ) if has_fluent else QLabel(tr_fn("page.strategy_scan.mode", "Режим:"))
+    )
     settings_row.addWidget(mode_label)
 
     mode_combo = combo_cls()
@@ -131,7 +131,7 @@ def build_strategy_scan_control_section(
 
     target_label = caption_label_cls(
         tr_fn("page.strategy_scan.target", "Цель:")
-    ) if has_fluent else QLabel(tr_fn("page.strategy_scan.target", "Цель:"))
+    )
     settings_row.addWidget(target_label)
 
     target_input = line_edit_cls()
@@ -154,7 +154,7 @@ def build_strategy_scan_control_section(
     settings_row.addStretch()
     control_card.add_layout(settings_row)
 
-    udp_scope_hint_label = caption_label_cls("") if has_fluent else QLabel("")
+    udp_scope_hint_label = caption_label_cls("")
     udp_scope_hint_label.setWordWrap(True)
     control_card.add_widget(udp_scope_hint_label)
 
@@ -167,7 +167,7 @@ def build_strategy_scan_control_section(
 
     status_label = caption_label_cls(
         tr_fn("page.strategy_scan.ready", "Готово к сканированию")
-    ) if has_fluent else QLabel(tr_fn("page.strategy_scan.ready", "Готово к сканированию"))
+    )
     control_card.add_widget(status_label)
 
     actions_title_label = body_label_cls(
@@ -258,7 +258,7 @@ def build_strategy_scan_results_section(*, tr_fn, table_cls) -> StrategyScanResu
     )
 
 
-def build_strategy_scan_log_section(*, tr_fn, has_fluent: bool, push_button_cls, parent, on_toggle_log_expand, on_prepare_support) -> StrategyScanLogWidgets:
+def build_strategy_scan_log_section(*, tr_fn, push_button_cls, parent, on_toggle_log_expand, on_prepare_support) -> StrategyScanLogWidgets:
     log_card = SettingsCard(
         tr_fn("page.strategy_scan.log", "Подробный лог")
     )
@@ -269,11 +269,7 @@ def build_strategy_scan_log_section(*, tr_fn, has_fluent: bool, push_button_cls,
     expand_log_btn.clicked.connect(on_toggle_log_expand)
 
     log_header = QHBoxLayout()
-    support_status_label = QLabel("") if not has_fluent else None
-    if has_fluent:
-        from qfluentwidgets import CaptionLabel
-
-        support_status_label = CaptionLabel("")
+    support_status_label = CaptionLabel("")
     support_status_label.setWordWrap(True)
     log_header.addWidget(support_status_label, 1)
     log_header.addStretch()

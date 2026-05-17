@@ -5,10 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtWidgets import QLabel, QHBoxLayout, QTextEdit
+from PyQt6.QtWidgets import QLabel, QHBoxLayout
 
+from ui.pages.base_page import ScrollBlockingTextEdit
 from ui.theme import get_themed_qta_icon
-from ui.compat_widgets import set_tooltip
+from ui.fluent_widgets import set_tooltip
 
 
 @dataclass(slots=True)
@@ -88,7 +89,6 @@ def build_orchestra_log_card(
     *,
     create_card,
     tr_fn,
-    has_fluent: bool,
     line_edit_cls,
     combo_cls,
     body_label_cls,
@@ -105,7 +105,7 @@ def build_orchestra_log_card(
         tr_fn("page.orchestra.log", "Лог обучения")
     )
 
-    log_text = QTextEdit()
+    log_text = ScrollBlockingTextEdit()
     log_text.setReadOnly(True)
     log_text.setMinimumHeight(300)
     log_text.setPlaceholderText(
@@ -120,14 +120,14 @@ def build_orchestra_log_card(
     filter_label = body_label_cls(tr_fn("page.orchestra.filter.label", "Фильтр:"))
     filter_row.addWidget(filter_label)
 
-    log_filter_input = (line_edit_cls if has_fluent else line_edit_cls)()
+    log_filter_input = line_edit_cls()
     log_filter_input.setPlaceholderText(
         tr_fn("page.orchestra.filter.domain.placeholder", "Домен (например: youtube.com)")
     )
     log_filter_input.textChanged.connect(on_apply_log_filter)
     filter_row.addWidget(log_filter_input, 2)
 
-    log_protocol_filter = (combo_cls if has_fluent else combo_cls)()
+    log_protocol_filter = combo_cls()
     log_protocol_filter.currentTextChanged.connect(on_apply_log_filter)
     filter_row.addWidget(log_protocol_filter)
 
@@ -181,9 +181,7 @@ def build_orchestra_log_history_card(
     create_card,
     tr_fn,
     max_logs: int,
-    has_fluent: bool,
     list_widget_cls,
-    qlist_widget_cls,
     caption_label_cls,
     fluent_push_button_cls,
     on_view_log_history,
@@ -203,7 +201,7 @@ def build_orchestra_log_history_card(
     log_history_desc.setWordWrap(True)
     log_history_layout.addWidget(log_history_desc)
 
-    log_history_list = (list_widget_cls if has_fluent and list_widget_cls else qlist_widget_cls)()
+    log_history_list = list_widget_cls()
     log_history_list.setMaximumHeight(150)
     log_history_list.itemDoubleClicked.connect(on_view_log_history)
     log_history_layout.addWidget(log_history_list)

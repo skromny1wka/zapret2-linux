@@ -4,6 +4,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 from log.log import log
 from settings.dpi.strategy_settings import get_strategy_launch_method
+from settings.mode import is_orchestra_launch_method, is_preset_launch_method
 from winws_runtime.runtime.sync_shutdown import shutdown_runtime_sync
 
 
@@ -15,28 +16,31 @@ class PresetLaunchStopWorker(QObject):
 
     def __init__(
         self,
-        app_instance,
         launch_method,
         *,
+        runtime_feature,
+        runtime_api,
         force_cleanup: bool = False,
         cleanup_services: bool = True,
     ):
         super().__init__()
-        self.app_instance = app_instance
         self.launch_method = launch_method
+        self._runtime_feature = runtime_feature
+        self._runtime_api = runtime_api
         self.force_cleanup = bool(force_cleanup)
         self.cleanup_services = bool(cleanup_services)
 
     def _get_winws_exe(self) -> str:
-        from config.config import get_winws_exe_for_method
+        from settings.mode import exe_path_for_launch_method
 
-        return get_winws_exe_for_method(self.launch_method)
+        return exe_path_for_launch_method(self.launch_method)
 
     def run(self):
         try:
             self.progress.emit("Остановка DPI...")
 
-            process_running = self.app_instance.launch_runtime_api.has_residual_processes(silent=True)
+            runtime_api = self._runtime_api
+            process_running = runtime_api.has_residual_processes(silent=True)
             if (not process_running) and not self.force_cleanup:
                 self.progress.emit("DPI уже остановлен")
                 self.finished.emit(True, "DPI уже был остановлен")
@@ -46,9 +50,9 @@ class PresetLaunchStopWorker(QObject):
 
             self.progress.emit("Завершение процессов...")
 
-            if self.launch_method == "orchestra":
+            if is_orchestra_launch_method(self.launch_method):
                 success = self._stop_orchestra()
-            elif self.launch_method in ("zapret2_mode", "zapret1_mode"):
+            elif is_preset_launch_method(self.launch_method):
                 success = self._stop_preset_mode()
             else:
                 success = self._stop_preset_mode()
@@ -82,7 +86,7 @@ class PresetLaunchStopWorker(QObject):
 
     def _shutdown_runtime(self, *, reason: str) -> bool:
         result = shutdown_runtime_sync(
-            window=self.app_instance,
+            runtime_feature=self._runtime_feature,
             reason=reason,
             include_cleanup=self.cleanup_services,
             cleanup_services=self.cleanup_services,
@@ -97,21 +101,23 @@ class PresetSwitchWorker(QObject):
     finished = pyqtSignal(bool, str, int, str, bool)
     progress = pyqtSignal(str)
 
-    def __init__(self, app_instance, launch_method: str, generation: int, is_generation_current):
+    def __init__(self, presets_feature, launch_method: str, generation: int, is_generation_current):
         super().__init__()
-        self.app_instance = app_instance
-        self.launch_method = str(launch_method or "").strip().lower()
+        self._presets_feature = presets_feature
+        from settings.mode import normalize_launch_method
+
+        self.launch_method = normalize_launch_method(launch_method, default="")
         self.generation = int(generation)
         self._is_generation_current = is_generation_current
 
     def _get_winws_exe(self) -> str:
-        from config.config import get_winws_exe_for_method
+        from settings.mode import exe_path_for_launch_method
 
-        return get_winws_exe_for_method(self.launch_method)
+        return exe_path_for_launch_method(self.launch_method)
 
     def run(self):
         try:
-            if self.launch_method not in ("zapret1_mode", "zapret2_mode"):
+            if not is_preset_launch_method(self.launch_method):
                 self.finished.emit(
                     False,
                     f"Неподдерживаемый метод preset switch: {self.launch_method}",
@@ -125,10 +131,11 @@ class PresetSwitchWorker(QObject):
 
             from winws_runtime.runners.runner_factory import get_strategy_runner
 
-            preset = self.app_instance.app_context.preset_mode_coordinator.ensure_launch_preset(
+            snapshot = self._presets_feature.get_launch_snapshot(
                 self.launch_method,
                 require_filters=True,
             )
+            preset = snapshot.to_launch_preset()
 
             if not bool(self._is_generation_current(self.generation)):
                 self.finished.emit(True, "", self.generation, self.launch_method, True)
@@ -169,21 +176,21 @@ class StopAndExitWorker(QObject):
     finished = pyqtSignal()
     progress = pyqtSignal(str)
 
-    def __init__(self, app_instance):
+    def __init__(self, *, runtime_feature):
         super().__init__()
-        self.app_instance = app_instance
+        self._runtime_feature = runtime_feature
         self.launch_method = get_strategy_launch_method()
 
     def _get_winws_exe(self) -> str:
-        from config.config import get_winws_exe_for_method
+        from settings.mode import exe_path_for_launch_method
 
-        return get_winws_exe_for_method(self.launch_method)
+        return exe_path_for_launch_method(self.launch_method)
 
     def run(self):
         try:
             self.progress.emit("Остановка DPI перед закрытием...")
             shutdown_runtime_sync(
-                window=self.app_instance,
+                runtime_feature=self._runtime_feature,
                 reason=f"stop_and_exit_worker:{self.launch_method}",
                 include_cleanup=True,
                 update_runtime_state=True,

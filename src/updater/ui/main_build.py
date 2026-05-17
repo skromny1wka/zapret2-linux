@@ -4,57 +4,38 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from PyQt6.QtCore import QSize
 from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QHeaderView
 
-
-try:
-    from qfluentwidgets import (
-        StrongBodyLabel,
-        CaptionLabel,
-        TransparentPushButton,
-        TableWidget,
-        TitleLabel,
-    )
-except Exception:
-    from PyQt6.QtWidgets import QPushButton, QTableWidget as TableWidget
-
-    StrongBodyLabel = QLabel  # type: ignore[assignment]
-    CaptionLabel = QLabel  # type: ignore[assignment]
-    TransparentPushButton = QPushButton  # type: ignore[assignment]
-    TitleLabel = QLabel  # type: ignore[assignment]
-
-from ui.theme import get_themed_qta_icon
+from qfluentwidgets import (
+    BreadcrumbBar,
+    CaptionLabel,
+    StrongBodyLabel,
+    TableWidget,
+    TitleLabel,
+)
 
 
 @dataclass(slots=True)
 class ServersHeaderWidgets:
     header_widget: QWidget
-    back_button: object
+    breadcrumb: BreadcrumbBar
     page_title_label: object
     servers_header_widget: QWidget
     servers_title_label: object
     legend_active_label: object
 
 
-def build_servers_header_widgets(*, tr_fn, qta_module, parent, on_back_clicked) -> ServersHeaderWidgets:
+def build_servers_header_widgets(*, tr_fn, parent, on_about_clicked) -> ServersHeaderWidgets:
     header = QWidget()
     header_layout = QVBoxLayout(header)
     header_layout.setContentsMargins(0, 0, 0, 8)
     header_layout.setSpacing(4)
 
-    back_row = QHBoxLayout()
-    back_row.setContentsMargins(0, 0, 0, 0)
-    back_row.setSpacing(0)
-
-    back_btn = TransparentPushButton(parent=parent)
-    back_btn.setText(tr_fn("page.servers.back.about", "О программе"))
-    back_btn.setIcon(get_themed_qta_icon("fa5s.chevron-left", color="#888"))
-    back_btn.setIconSize(QSize(12, 12))
-    back_btn.clicked.connect(on_back_clicked)
-    back_row.addWidget(back_btn)
-    back_row.addStretch()
-    header_layout.addLayout(back_row)
+    breadcrumb = BreadcrumbBar(parent)
+    breadcrumb.addItem("about", tr_fn("page.servers.breadcrumb.about", "О программе"))
+    breadcrumb.addItem("servers", tr_fn("page.servers.title", "Серверы"))
+    breadcrumb.currentItemChanged.connect(lambda key: on_about_clicked() if key == "about" else None)
+    header_layout.addWidget(breadcrumb)
 
     page_title_label = TitleLabel(tr_fn("page.servers.title", "Серверы"))
     header_layout.addWidget(page_title_label)
@@ -74,7 +55,7 @@ def build_servers_header_widgets(*, tr_fn, qta_module, parent, on_back_clicked) 
 
     return ServersHeaderWidgets(
         header_widget=header,
-        back_button=back_btn,
+        breadcrumb=breadcrumb,
         page_title_label=page_title_label,
         servers_header_widget=servers_header_widget,
         servers_title_label=servers_title_label,

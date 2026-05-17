@@ -5,7 +5,7 @@ from PyQt6.QtCore import Qt, QThread, QTimer
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QApplication,
-    QTextEdit, QStackedWidget
+    QStackedWidget
 )
 from qfluentwidgets import (
     BodyLabel,
@@ -23,7 +23,7 @@ import qtawesome as qta
 import re
 
 from ui.pages.base_page import BasePage, ScrollBlockingTextEdit
-from ui.compat_widgets import QuickActionsBar, SettingsCard, set_tooltip
+from ui.fluent_widgets import QuickActionsBar, SettingsCard, set_tooltip
 from log.ui.logs_build import build_logs_tab_ui
 from log.ui.runtime_helpers import (
     append_error,
@@ -37,20 +37,12 @@ from log.ui.runtime_helpers import (
 from log.ui.send_build import build_logs_send_tab
 from log.ui.support_workflow import (
     apply_support_feedback,
-    get_orchestra_runner,
     update_orchestra_indicator,
 )
-from log.ui.worker_workflow import (
-    handle_thread_stop,
-    run_logs_runtime_init,
-    start_tail_worker,
-    start_winws_output_worker,
-)
-from ui.text_catalog import tr as tr_catalog
+from settings.mode import ORCHESTRA_MODE
+from app.text_catalog import tr as tr_catalog
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens, get_themed_qta_icon
 from log.log import log
-
-from log.logs_page_controller import LogsPageController
 
 # Паттерны для определения РЕАЛЬНЫХ ошибок (строгие)
 ERROR_PATTERNS = [
@@ -88,7 +80,7 @@ EXCLUDE_PATTERNS = [
 class LogsPage(BasePage):
     """Страница просмотра логов"""
     
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, logs_feature, orchestra_feature, runtime_feature):
         super().__init__(
             "Логи",
             "Просмотр логов приложения в реальном времени",
@@ -103,7 +95,10 @@ class LogsPage(BasePage):
         self._thread = None
         self._worker = None
         self._cleanup_in_progress = False
-        self.current_log_file = LogsPageController.get_current_log_file()
+        self._logs = logs_feature
+        self._orchestra = orchestra_feature
+        self._runtime = runtime_feature
+        self.current_log_file = self._logs.get_current_log_file()
         self._error_pattern = re.compile('|'.join(ERROR_PATTERNS))
         self._exclude_pattern = re.compile('|'.join(EXCLUDE_PATTERNS), re.IGNORECASE)
 
@@ -155,7 +150,7 @@ class LogsPage(BasePage):
             pass
 
     def _run_runtime_init_once(self) -> None:
-        self._runtime_initialized, self._runtime_started = run_logs_runtime_init(
+        self._runtime_initialized, self._runtime_started = self._logs.run_runtime_init(
             runtime_initialized=self._runtime_initialized,
             runtime_started=self._runtime_started,
             schedule_fn=QTimer.singleShot,
@@ -575,7 +570,6 @@ class LogsPage(BasePage):
             text_edit_cls=ScrollBlockingTextEdit,
             quick_actions_bar_cls=QuickActionsBar,
             qfont_cls=QFont,
-            qtextedit_cls=QTextEdit,
             qta_module=qta,
             get_theme_tokens_fn=get_theme_tokens,
             errors_text_min_height=self._errors_text_min_height,
@@ -670,22 +664,21 @@ class LogsPage(BasePage):
 
     def _is_orchestra_mode(self) -> bool:
         """Проверяет, активен ли режим оркестратора"""
-        return self._get_launch_method() == "orchestra"
+        from settings.mode import is_orchestra_launch_method
 
-    def _get_launch_method(self) -> str:
+        return is_orchestra_launch_method(self.get_launch_method())
+
+    def get_launch_method(self) -> str:
         """Возвращает текущий метод запуска"""
         try:
-            from settings.dpi.strategy_settings import get_strategy_launch_method
-            return (get_strategy_launch_method() or "").strip().lower()
+            from ui.workflows.common import get_current_launch_method
+
+            return get_current_launch_method(default="")
         except Exception:
             return ""
 
     def _get_orchestra_runner(self):
-        """Возвращает orchestra_runner из главного окна"""
-        return get_orchestra_runner(
-            window_getter=self.window,
-            qapp_instance_getter=QApplication.instance,
-        )
+        return self._orchestra.runner
 
     def _refresh_winws_title(self):
         """Обновляет заголовок панели вывода по текущему методу запуска"""
@@ -693,9 +686,11 @@ class LogsPage(BasePage):
             return
 
         try:
-            exe_name = LogsPageController.resolve_winws_exe_name(self._get_launch_method())
+            exe_name = self._logs.resolve_winws_exe_name(self.get_launch_method())
         except Exception:
-            exe_name = "winws.exe"
+            from settings.mode import EXE_NAME_WINWS1
+
+            exe_name = EXE_NAME_WINWS1
 
         self.winws_title_label.setText(
             tr_catalog(
@@ -715,14 +710,15 @@ class LogsPage(BasePage):
             - "direct" для StrategyRunner
             - None если процесс не запущен
         """
-        return LogsPageController.get_running_runner_source(
-            self._get_launch_method(),
+        return self._logs.get_running_runner_source(
+            self.get_launch_method(),
             self._get_orchestra_runner(),
+            self._runtime.current_strategy_runner(),
         )
 
     def _get_runner_pid(self, runner):
         """Возвращает PID для любого типа runner'а"""
-        return LogsPageController.get_runner_pid(runner)
+        return self._logs.get_runner_pid(runner)
 
     def _get_orchestra_log_path(self) -> str:
         """
@@ -732,7 +728,7 @@ class LogsPage(BasePage):
         1. Текущий активный лог (если оркестратор запущен)
         2. Последний сохранённый лог из истории
         """
-        return LogsPageController.get_orchestra_log_path(self._get_orchestra_runner())
+        return self._logs.get_orchestra_log_path(self._get_orchestra_runner())
 
     def _update_orchestra_indicator(self):
         """Обновляет видимость индикатора режима оркестратора"""
@@ -743,12 +739,12 @@ class LogsPage(BasePage):
 
     def _prepare_support_from_logs(self):
         try:
-            result = LogsPageController.prepare_support_bundle(
+            result = self._logs.prepare_support_bundle(
                 current_log_file=self.current_log_file,
                 orchestra_runner=self._get_orchestra_runner(),
             )
         except Exception as e:
-            feedback = LogsPageController.build_support_error_feedback(str(e))
+            feedback = self._logs.build_support_error_feedback(str(e))
             self._send_status_text = feedback.status_text
             self._send_status_tone = feedback.status_tone
             self._render_send_status_label()
@@ -763,8 +759,8 @@ class LogsPage(BasePage):
 
         apply_support_feedback(
             result=result,
-            build_feedback_fn=LogsPageController.build_support_feedback,
-            build_error_feedback_fn=LogsPageController.build_support_error_feedback,
+            build_feedback_fn=self._logs.build_support_feedback,
+            build_error_feedback_fn=self._logs.build_support_error_feedback,
             info_bar=InfoBar,
             parent=self.window(),
             log_fn=log,
@@ -786,7 +782,7 @@ class LogsPage(BasePage):
         self.log_combo.clear()
         
         try:
-            state = LogsPageController.list_logs(run_cleanup=run_cleanup)
+            state = self._logs.list_logs(run_cleanup=run_cleanup)
             if run_cleanup and state.cleanup_deleted > 0:
                 log(f"🗑️ Удалено старых логов: {state.cleanup_deleted} из {state.cleanup_total}", "INFO")
             if run_cleanup and state.cleanup_errors:
@@ -844,15 +840,15 @@ class LogsPage(BasePage):
             
     def _start_tail_worker(self):
         """Запускает worker для чтения лога"""
-        self._thread, self._worker = start_tail_worker(
+        self._thread, self._worker = self._logs.start_tail_worker(
             current_log_file=self.current_log_file,
             stop_worker_fn=self._stop_tail_worker,
-            build_tail_start_plan_fn=LogsPageController.build_tail_start_plan,
+            build_tail_start_plan_fn=self._logs.build_tail_start_plan,
             set_info_text_fn=self.info_label.setText,
             clear_log_view_fn=self.log_text.clear,
             thread_cls=QThread,
             parent=self,
-            create_worker_fn=LogsPageController.create_log_tail_worker,
+            create_worker_fn=self._logs.create_log_tail_worker,
             on_new_lines=self._append_text,
             on_thread_finished=self._on_tail_thread_finished,
             log_fn=log,
@@ -865,10 +861,10 @@ class LogsPage(BasePage):
             
     def _stop_tail_worker(self, blocking: bool = False):
         """Останавливает worker (неблокирующий по умолчанию)"""
-        self._worker, self._thread = handle_thread_stop(
+        self._worker, self._thread = self._logs.handle_thread_stop(
             worker=getattr(self, "_worker", None),
             thread=getattr(self, "_thread", None),
-            build_stop_plan_fn=LogsPageController.build_thread_stop_plan,
+            build_stop_plan_fn=self._logs.build_thread_stop_plan,
             blocking=blocking,
             log_fn=log,
             warning_prefix="Log tail worker",
@@ -876,17 +872,17 @@ class LogsPage(BasePage):
 
     def _start_winws_output_worker(self):
         """Запускает worker для чтения вывода winws"""
-        self._winws_thread, self._winws_worker = start_winws_output_worker(
+        self._winws_thread, self._winws_worker = self._logs.start_winws_output_worker(
             stop_worker_fn=self._stop_winws_output_worker,
             refresh_title_fn=self._refresh_winws_title,
-            build_output_plan_fn=LogsPageController.build_winws_output_plan,
-            launch_method=self._get_launch_method(),
+            build_output_plan_fn=self._logs.build_winws_output_plan,
+            launch_method=self.get_launch_method(),
             orchestra_runner=self._get_orchestra_runner(),
             language=self._ui_language,
             set_status_fn=self._set_winws_status,
             thread_cls=QThread,
             parent=self,
-            create_worker_fn=LogsPageController.create_winws_output_worker,
+            create_worker_fn=self._logs.create_winws_output_worker,
             on_new_output=self._append_winws_output,
             on_process_ended=self._on_winws_process_ended,
             on_thread_finished=self._on_winws_thread_finished,
@@ -900,10 +896,10 @@ class LogsPage(BasePage):
     def _stop_winws_output_worker(self, blocking: bool = False):
         """Останавливает worker чтения вывода winws (неблокирующий по умолчанию)"""
         try:
-            self._winws_worker, self._winws_thread = handle_thread_stop(
+            self._winws_worker, self._winws_thread = self._logs.handle_thread_stop(
                 worker=self._winws_worker,
                 thread=self._winws_thread,
-                build_stop_plan_fn=LogsPageController.build_thread_stop_plan,
+                build_stop_plan_fn=self._logs.build_thread_stop_plan,
                 blocking=blocking,
                 log_fn=log,
                 warning_prefix="Winws output worker",
@@ -960,7 +956,7 @@ class LogsPage(BasePage):
         self._refresh_winws_title()
         source, runner = self._get_running_runner_source()
 
-        if source == "orchestra" and runner:
+        if source == ORCHESTRA_MODE and runner:
             # Для оркестратора всегда останавливаем worker чтения stdout,
             # чтобы не конкурировать с внутренним reader'ом orchestra_runner.
             if self._winws_thread and self._winws_thread.isRunning():
@@ -1074,15 +1070,15 @@ class LogsPage(BasePage):
     def _open_folder(self):
         """Открывает папку с логами"""
         try:
-            LogsPageController.open_logs_folder()
+            self._logs.open_logs_folder()
         except Exception as e:
             log(f"Ошибка открытия папки: {e}", "ERROR")
             
     def _update_stats(self):
         """Обновляет статистику"""
         try:
-            stats = LogsPageController.build_stats()
-            plan = LogsPageController.build_stats_text_plan(stats, language=self._ui_language)
+            stats = self._logs.build_stats()
+            plan = self._logs.build_stats_text_plan(stats, language=self._ui_language)
             self.stats_label.setText(plan.text)
         except Exception as e:
             self.stats_label.setText(f"Ошибка статистики: {e}")

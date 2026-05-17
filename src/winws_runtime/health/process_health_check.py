@@ -9,6 +9,7 @@ import subprocess
 from dataclasses import dataclass, field
 from typing import Tuple, Optional, List, Dict
 from log.log import log
+from settings.mode import EXE_NAME_WINWS1
 from winws_runtime.runtime.system_ops import (
     aggressive_windivert_cleanup_runtime,
     force_kill_all_winws_processes,
@@ -149,13 +150,13 @@ def _is_windows_defender_active() -> bool:
         pass
 
     try:
-        from altmenu.defender_manager import WindowsDefenderManager
+        from windows_features.defender_manager import WindowsDefenderManager
 
         return not bool(WindowsDefenderManager().is_defender_disabled())
     except Exception:
         return False
 
-def check_process_health(process_name: str = "winws.exe", monitor_duration: int = 5, check_interval: float = 0.5) -> Tuple[bool, Optional[str]]:
+def check_process_health(process_name: str = EXE_NAME_WINWS1, monitor_duration: int = 5, check_interval: float = 0.5) -> Tuple[bool, Optional[str]]:
     """
     Мониторит процесс в течение указанного времени и проверяет его стабильность
     
@@ -261,7 +262,7 @@ def _get_crash_details(process_name: str) -> Optional[str]:
 
     return None
 
-def get_last_crash_info(process_name: str = "winws.exe", minutes_back: int = 5) -> Optional[str]:
+def get_last_crash_info(process_name: str = EXE_NAME_WINWS1, minutes_back: int = 5) -> Optional[str]:
     """
     Получает информацию о последних падениях процесса из журнала событий
     
@@ -323,7 +324,7 @@ def check_conflicting_processes() -> List[Dict[str, str]]:
 
     return found_conflicts
 
-def check_common_crash_causes(process_name: str = "winws.exe") -> Optional[str]:
+def check_common_crash_causes(process_name: str = EXE_NAME_WINWS1) -> Optional[str]:
     """
     Проверяет типичные причины падения winws.exe
     
@@ -403,7 +404,7 @@ def check_common_crash_causes(process_name: str = "winws.exe") -> Optional[str]:
         active_av = _detect_active_antivirus()
         if active_av:
             suggestions.append(f"  Обнаружен антивирус: {active_av}")
-            suggestions.append("     Добавьте winws.exe и WinDivert в исключения антивируса")
+            suggestions.append(f"     Добавьте {EXE_NAME_WINWS1} и WinDivert в исключения антивируса")
     except Exception:
         pass
     
@@ -704,8 +705,8 @@ def _check_antivirus_blocking(exe_path: str = None) -> Optional[str]:
         if antivirus_name:
             normalized = str(antivirus_name or "").casefold()
             if "defender" in normalized or "microsoft" in normalized:
-                return "Windows Defender может блокировать winws.exe"
-            return f"Антивирус ({antivirus_name}) может блокировать winws.exe"
+                return f"Windows Defender может блокировать {EXE_NAME_WINWS1}"
+            return f"Антивирус ({antivirus_name}) может блокировать {EXE_NAME_WINWS1}"
     except Exception:
         pass
 
@@ -727,7 +728,9 @@ def _check_file_locked(file_path: str) -> Optional[str]:
 def _check_winws_already_running() -> Optional[int]:
     """Проверяет, запущен ли уже winws"""
     try:
-        for candidate in ('winws.exe', 'winws2.exe'):
+        from settings.mode import ALL_WINWS_EXE_NAMES
+
+        for candidate in ALL_WINWS_EXE_NAMES:
             pid = _find_process_pid_by_name_winapi(candidate)
             if pid is not None:
                 return pid
@@ -1115,7 +1118,7 @@ def _probe_service_disabled_cause() -> Tuple[str, str, Optional[str]]:
 def _check_network_adapters() -> bool:
     """Return True if at least one network adapter is enabled/up."""
     try:
-        from dns.dns_core import get_adapters_info_native
+        from dns.public import get_adapters_info_native
 
         adapters = get_adapters_info_native()
         for adapter in adapters:

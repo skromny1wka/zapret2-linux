@@ -5,7 +5,7 @@ import sys
 from typing import Callable
 
 from PyQt6.QtCore import QEvent, QEventLoop, QObject, QPoint, QTimer, Qt
-from PyQt6.QtGui import QAction, QCursor
+from PyQt6.QtGui import QCursor
 from PyQt6.QtWidgets import QApplication, QWidget
 
 
@@ -115,14 +115,14 @@ def exec_popup_menu(
     owner: QWidget | None,
     capture_action: bool = False,
     monitor_global_mouse: bool = False,
-) -> QAction | None:
+) -> object | None:
     """Показывает popup-меню и закрывает его при потере активности."""
 
-    chosen_action: dict[str, QAction | None] = {"value": None}
+    chosen_action: dict[str, object | None] = {"value": None}
     finished = {"value": False}
     loop = QEventLoop(menu)
 
-    def _finish(action: QAction | None = None) -> None:
+    def _finish(action: object | None = None) -> None:
         if action is not None and chosen_action["value"] is None:
             chosen_action["value"] = action
         if finished["value"]:
@@ -147,11 +147,11 @@ def exec_popup_menu(
     if app is not None:
         app.installEventFilter(lifecycle_filter)
 
-        def _on_app_state_changed(state) -> None:
+        def _on_ui_state_changed(state) -> None:
             if state != Qt.ApplicationState.ApplicationActive:
                 _finish()
 
-        state_handler = _on_app_state_changed
+        state_handler = _on_ui_state_changed
         app.applicationStateChanged.connect(state_handler)
 
     if monitor_global_mouse and sys.platform == "win32":

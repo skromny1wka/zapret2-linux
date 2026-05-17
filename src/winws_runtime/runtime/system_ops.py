@@ -6,6 +6,7 @@ import time
 from dataclasses import dataclass
 
 from log.log import log
+from settings.mode import EXE_NAME_WINWS1, EXE_NAME_WINWS2
 
 
 _KNOWN_WINDIVERT_DRIVERS = ("WinDivert", "WinDivert14", "WinDivert64", "Monkey")
@@ -39,7 +40,7 @@ def get_process_pids_by_name(process_name: str) -> list[int]:
 
 
 def get_all_winws_process_pids() -> list[int]:
-    return get_process_pids_by_name("winws.exe") + get_process_pids_by_name("winws2.exe")
+    return get_process_pids_by_name(EXE_NAME_WINWS1) + get_process_pids_by_name(EXE_NAME_WINWS2)
 
 
 def has_any_winws_process() -> bool:

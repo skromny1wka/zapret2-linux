@@ -2,24 +2,26 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from core.paths import AppPaths
 from log.log import log
 
 from .models import EngineName, Profile
 from .parser import parse_preset_text
 
 
-def profile_template_root() -> Path:
-    return Path(__file__).resolve().parent / "templates"
+def profile_template_root(paths: AppPaths) -> Path:
+    """Каталог UI-шаблонов profile рядом с программой, подготовленный установщиком."""
+    return paths.user_root / "profile" / "templates"
 
 
-def load_profile_templates(engine: EngineName) -> dict[str, Profile]:
+def load_profile_templates(paths: AppPaths, engine: EngineName) -> dict[str, Profile]:
     """Читает UI-шаблоны profile.
 
     Это не runtime storage: шаблоны нужны только для создания нового profile
     внутри выбранного preset. После добавления в preset живёт обычный profile.
     """
     normalized_engine = str(engine or "").strip().lower()
-    path = profile_template_root() / "all_profiles.txt"
+    path = profile_template_root(paths) / "all_profiles.txt"
     templates: dict[str, Profile] = {}
     if not path.exists():
         return templates

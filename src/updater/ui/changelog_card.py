@@ -10,47 +10,21 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from config.build_info import APP_VERSION
 
-from ui.text_catalog import tr as tr_catalog
+from app.text_catalog import tr as tr_catalog
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens, get_themed_qta_icon
-from ui.theme_refresh import ThemeRefreshController
-from updater.update_page_view_controller import UpdatePageViewController
-
-try:
-    from qfluentwidgets import (
-        BodyLabel,
-        CaptionLabel,
-        CardWidget,
-        IndeterminateProgressBar,
-        ProgressBar,
-        PrimaryActionButton,
-        PushButton,
-        StrongBodyLabel,
-        TransparentToolButton,
-    )
-    HAS_FLUENT = True
-except ImportError:
-    from PyQt6.QtWidgets import QFrame as CardWidget, QProgressBar, QPushButton
-
-    BodyLabel = QLabel
-    CaptionLabel = QLabel
-    StrongBodyLabel = QLabel
-    ProgressBar = QProgressBar
-    IndeterminateProgressBar = QProgressBar
-    HAS_FLUENT = False
-
-    class PushButton(QPushButton):
-        def __init__(self, parent=None):
-            super().__init__(parent)
-
-    class TransparentToolButton(QPushButton):
-        def __init__(self, parent=None):
-            super().__init__(parent)
-
-    class PrimaryActionButton(QPushButton):
-        def __init__(self, text: str = "", icon_name: str | None = None, parent=None):
-            super().__init__(parent)
-            self.setText(text)
-            _ = icon_name
+from ui.theme_refresh import ThemeRefreshBinding
+from ui.fluent_widgets import PrimaryActionButton
+import updater.update_page_plans as update_page_plans
+from qfluentwidgets import (
+    BodyLabel,
+    CaptionLabel,
+    CardWidget,
+    IndeterminateProgressBar,
+    ProgressBar,
+    PushButton,
+    StrongBodyLabel,
+    TransparentToolButton,
+)
 
 
 class ChangelogCard(CardWidget):
@@ -59,7 +33,7 @@ class ChangelogCard(CardWidget):
     install_clicked = pyqtSignal()
     dismiss_clicked = pyqtSignal()
 
-    def __init__(self, parent=None, *, language: str = "ru"):
+    def __init__(self, parent=None, *, language: str = "ru", open_url=None):
         super().__init__(parent)
         self.setObjectName("changelogCard")
         self._ui_language = language
@@ -80,8 +54,9 @@ class ChangelogCard(CardWidget):
         self._raw_changelog = ""
         self._raw_version = ""
         self._mode = "idle"
+        self._open_url = open_url or (lambda _url: None)
         self._build_ui()
-        self._theme_refresh = ThemeRefreshController(self, self._apply_theme)
+        self._theme_refresh = ThemeRefreshBinding(self, self._apply_theme)
         self.hide()
 
     def _tr(self, key: str, default: str) -> str:
@@ -118,7 +93,7 @@ class ChangelogCard(CardWidget):
         self.changelog_text.setWordWrap(True)
         self.changelog_text.setTextFormat(Qt.TextFormat.RichText)
         self.changelog_text.setOpenExternalLinks(True)
-        self.changelog_text.linkActivated.connect(lambda url: __import__('webbrowser').open(url))
+        self.changelog_text.linkActivated.connect(self._open_url)
         layout.addWidget(self.changelog_text)
 
         self.progress_widget = QWidget()
@@ -126,22 +101,12 @@ class ChangelogCard(CardWidget):
         progress_layout.setContentsMargins(0, 4, 0, 4)
         progress_layout.setSpacing(6)
 
-        if HAS_FLUENT:
-            self._progress_indeterminate = IndeterminateProgressBar(start=False)
-            progress_layout.addWidget(self._progress_indeterminate)
-        else:
-            self._progress_indeterminate = None
+        self._progress_indeterminate = IndeterminateProgressBar(start=False)
+        progress_layout.addWidget(self._progress_indeterminate)
 
-        if HAS_FLUENT and ProgressBar is not None:
-            self.progress_bar = ProgressBar(useAni=False)
-            self.progress_bar.setRange(0, 100)
-            self.progress_bar.setValue(0)
-        else:
-            from PyQt6.QtWidgets import QProgressBar as _QProgressBar
-
-            self.progress_bar = _QProgressBar()
-            self.progress_bar.setRange(0, 100)
-            self.progress_bar.setFixedHeight(4)
+        self.progress_bar = ProgressBar(useAni=False)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
         self.progress_bar.hide()
         progress_layout.addWidget(self.progress_bar)
 
@@ -207,7 +172,7 @@ class ChangelogCard(CardWidget):
         if self._raw_changelog:
             try:
                 self.changelog_text.setText(
-                    UpdatePageViewController.make_links_clickable(self._raw_changelog, tokens.accent_hex)
+                    update_page_plans.make_links_clickable(self._raw_changelog, tokens.accent_hex)
                 )
             except Exception:
                 pass
@@ -215,7 +180,7 @@ class ChangelogCard(CardWidget):
     def show_update(self, version: str, changelog: str):
         if self._is_downloading:
             return
-        plan = UpdatePageViewController.build_changelog_update_plan(
+        plan = update_page_plans.build_changelog_update_plan(
             version=version,
             changelog=changelog,
             app_version=APP_VERSION,
@@ -240,7 +205,7 @@ class ChangelogCard(CardWidget):
         self._apply_theme()
 
     def start_download(self, version: str):
-        plan = UpdatePageViewController.build_changelog_download_start_plan(
+        plan = update_page_plans.build_changelog_download_start_plan(
             version=version,
             language=self._ui_language,
             now=time.time(),
@@ -277,7 +242,7 @@ class ChangelogCard(CardWidget):
         self.progress_widget.setVisible(plan.progress_visible)
 
     def update_progress(self, percent: int, done_bytes: int, total_bytes: int):
-        plan = UpdatePageViewController.build_changelog_progress_plan(
+        plan = update_page_plans.build_changelog_progress_plan(
             percent=percent,
             done_bytes=done_bytes,
             total_bytes=total_bytes,
@@ -313,7 +278,7 @@ class ChangelogCard(CardWidget):
         self.eta_label.setText(plan.eta_label_text)
 
     def download_complete(self):
-        plan = UpdatePageViewController.build_changelog_terminal_plan(
+        plan = update_page_plans.build_changelog_terminal_plan(
             kind="installing",
             language=self._ui_language,
             app_version=APP_VERSION,
@@ -336,7 +301,7 @@ class ChangelogCard(CardWidget):
         self.eta_label.setText(plan.eta_label_text)
 
     def download_failed(self, error: str):
-        plan = UpdatePageViewController.build_changelog_terminal_plan(
+        plan = update_page_plans.build_changelog_terminal_plan(
             kind="failed",
             language=self._ui_language,
             app_version=APP_VERSION,
@@ -366,7 +331,7 @@ class ChangelogCard(CardWidget):
     def set_ui_language(self, language: str) -> None:
         self._ui_language = language
         self.later_btn.setText(self._tr("page.servers.changelog.button.later", "Позже"))
-        plan = UpdatePageViewController.build_changelog_terminal_plan(
+        plan = update_page_plans.build_changelog_terminal_plan(
             kind=self._mode if self._mode in {"downloading", "installing", "failed"} else "update",
             language=self._ui_language,
             app_version=APP_VERSION,

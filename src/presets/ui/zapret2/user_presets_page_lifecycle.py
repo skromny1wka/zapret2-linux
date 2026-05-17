@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 
-from ui.compat_widgets import set_tooltip
+from ui.fluent_widgets import set_tooltip
 
 
 def handle_user_presets_ui_state_changed(
@@ -50,25 +50,26 @@ def activate_user_presets_page(
 def after_user_presets_ui_built(
     *,
     apply_page_theme_fn,
-    get_preset_store_fn,
+    connect_preset_signals_fn,
     on_store_changed_fn,
     on_store_switched_fn,
-    on_store_updated_fn,
+    on_store_content_changed_fn,
     log_fn,
 ) -> None:
     started_at = time.perf_counter()
     apply_page_theme_fn(force=True)
 
     try:
-        store = get_preset_store_fn()
-        store.presets_changed.connect(on_store_changed_fn)
-        store.preset_switched.connect(on_store_switched_fn)
-        store.preset_identity_changed.connect(on_store_switched_fn)
-        store.preset_updated.connect(on_store_updated_fn)
+        connect_preset_signals_fn(
+            on_changed=on_store_changed_fn,
+            on_switched=on_store_switched_fn,
+            on_identity_changed=on_store_switched_fn,
+            on_content_changed=on_store_content_changed_fn,
+        )
     except Exception:
         pass
     elapsed_ms = int((time.perf_counter() - started_at) * 1000)
-    log_fn(f"Z2UserPresetsPage: lazy ui init {elapsed_ms}ms", "DEBUG")
+    log_fn(f"Winws2UserPresetsPage: lazy ui init {elapsed_ms}ms", "DEBUG")
 
 
 def bind_user_presets_ui_state_store(
@@ -211,7 +212,6 @@ def apply_user_presets_language(
     *,
     tr_fn,
     rebuild_breadcrumb_fn,
-    back_btn,
     configs_title_label,
     get_configs_btn,
     create_btn,
@@ -233,53 +233,51 @@ def apply_user_presets_language(
 
     if rebuild_breadcrumb_fn is not None:
         rebuild_breadcrumb_fn()
-    elif back_btn is not None:
-        back_btn.setText(tr_fn("page.z2_user_presets.back.control", "Управление"))
 
     if configs_title_label is not None:
         configs_title_label.setText(
             tr_fn(
-                "page.z2_user_presets.configs.title",
-                "Обменивайтесь пресетами и категориями в разделе GitHub Discussions",
+                "page.winws2_user_presets.configs.title",
+                "Обменивайтесь пресетами и профилями в разделе GitHub Discussions",
             )
         )
     if get_configs_btn is not None:
-        get_configs_btn.setText(tr_fn("page.z2_user_presets.configs.button", "Получить конфиги"))
+        get_configs_btn.setText(tr_fn("page.winws2_user_presets.configs.button", "Получить конфиги"))
 
     if create_btn is not None:
-        set_tooltip(create_btn, tr_fn("page.z2_user_presets.tooltip.create", "Создать новый пресет"))
+        set_tooltip(create_btn, tr_fn("page.winws2_user_presets.tooltip.create", "Создать новый пресет"))
 
     if import_btn is not None:
-        import_btn.setText(tr_fn("page.z2_user_presets.button.import", "Импорт"))
-        set_tooltip(import_btn, tr_fn("page.z2_user_presets.tooltip.import", "Импорт пресета из файла"))
+        import_btn.setText(tr_fn("page.winws2_user_presets.button.import", "Импорт"))
+        set_tooltip(import_btn, tr_fn("page.winws2_user_presets.tooltip.import", "Импорт пресета из файла"))
 
     if open_folder_btn is not None:
-        open_folder_btn.setText(tr_fn("page.z2_user_presets.button.open_folder", "Открыть папку"))
+        open_folder_btn.setText(tr_fn("page.winws2_user_presets.button.open_folder", "Открыть папку"))
         set_tooltip(
             open_folder_btn,
-            tr_fn("page.z2_user_presets.tooltip.open_folder", "Открыть папку, где лежат ваши пресеты"),
+            tr_fn("page.winws2_user_presets.tooltip.open_folder", "Открыть папку, где лежат ваши пресеты"),
         )
 
     if reset_all_btn is not None:
         current_text = reset_all_btn.text() or ""
         if "/" not in current_text:
-            reset_all_btn.setText(tr_fn("page.z2_user_presets.button.reset_all", "Вернуть заводские"))
+            reset_all_btn.setText(tr_fn("page.winws2_user_presets.button.reset_all", "Вернуть встроенные"))
         set_tooltip(
             reset_all_btn,
             tr_fn(
-                "page.z2_user_presets.tooltip.reset_all",
-                "Восстанавливает стандартные пресеты. Ваши изменения в стандартных пресетах будут потеряны.",
+                "page.winws2_user_presets.tooltip.reset_all",
+                "Возвращает встроенные пресеты. Ваши изменения во встроенных пресетах будут потеряны.",
             ),
         )
 
     if presets_info_btn is not None:
-        presets_info_btn.setText(tr_fn("page.z2_user_presets.button.wiki", "Вики по пресетам"))
+        presets_info_btn.setText(tr_fn("page.winws2_user_presets.button.wiki", "Вики по пресетам"))
     if info_btn is not None:
-        info_btn.setText(tr_fn("page.z2_user_presets.button.what_is_this", "Что это такое?"))
+        info_btn.setText(tr_fn("page.winws2_user_presets.button.what_is_this", "Что это такое?"))
 
     if preset_search_input is not None:
         preset_search_input.setPlaceholderText(
-            tr_fn("page.z2_user_presets.search.placeholder", "Поиск пресетов по имени...")
+            tr_fn("page.winws2_user_presets.search.placeholder", "Поиск пресетов по имени...")
         )
 
     if presets_delegate is not None:

@@ -4,9 +4,10 @@ from dataclasses import dataclass
 import os
 import time
 
-from PyQt6.QtCore import QObject, QMetaObject, Qt, pyqtSignal
+from PyQt6.QtCore import QObject, pyqtSignal
 
 from log.log import log
+from settings.mode import ENGINE_WINWS2, is_orchestra_launch_method, is_preset_launch_method, is_zapret2_launch_method
 from winws_runtime.health.process_health_check import diagnose_startup_error
 from winws_runtime.runtime.sync_shutdown import shutdown_runtime_sync
 from winws_runtime.runtime.system_ops import force_kill_all_winws_processes
@@ -26,41 +27,75 @@ class PresetLaunchStartWorker(QObject):
     finished = pyqtSignal(bool, str)  # success, error_message
     progress = pyqtSignal(str)        # status_message
 
-    def __init__(self, app_instance, selected_mode, launch_method):
+    def __init__(self, selected_mode, launch_method, *, runtime_feature, runtime_api):
         super().__init__()
-        self.app_instance = app_instance
         self.selected_mode = selected_mode
         self.launch_method = launch_method
-        self.launch_runtime_api = app_instance.launch_runtime_api
+        self._runtime_feature = runtime_feature
+        self.launch_runtime_api = runtime_api
         self._last_error_message: str = ""
 
     def _get_winws_exe(self) -> str:
-        from config.config import get_winws_exe_for_method
+        from settings.mode import exe_path_for_launch_method
 
-        return get_winws_exe_for_method(self.launch_method)
+        return exe_path_for_launch_method(self.launch_method)
+
+    def _configure_runner_runtime_callbacks(self, runner) -> None:
+        configurator = getattr(runner, "configure_runtime_callbacks", None)
+        if not callable(configurator):
+            return
+
+        def _publish_runner_failure(*, launch_method: str, error: str = "") -> None:
+            try:
+                self._runtime_feature.events.publish_runner_failure(
+                    launch_method=launch_method,
+                    error=error,
+                )
+            except Exception:
+                return
+
+        def _notify_launch_error(message: str) -> None:
+            try:
+                self._runtime_feature.events.publish_launch_error(str(message or ""))
+            except Exception:
+                return
+
+        def _publish_active_preset_content_changed(path: str) -> None:
+            normalized_path = str(path or "").strip()
+            if not normalized_path:
+                return
+            try:
+                self._runtime_feature.events.publish_active_preset_content_changed(normalized_path)
+            except Exception:
+                return
+
+        configurator(
+            transition_in_progress=self._runtime_feature.objects.transition_pipeline_in_progress,
+            runner_failure=_publish_runner_failure,
+            launch_error=_notify_launch_error,
+            active_preset_content_changed=_publish_active_preset_content_changed,
+        )
 
     def _extract_preset_launch_input(self) -> tuple[bool, str]:
         mode_param = self.selected_mode
-        try:
-            if (
-                isinstance(mode_param, dict)
-                and mode_param.get("is_preset_file")
-                and self.launch_method in ("zapret2_mode", "zapret1_mode")
-            ):
-                return True, str(mode_param.get("preset_path") or "").strip()
-        except Exception:
-            pass
+        if (
+            isinstance(mode_param, dict)
+            and mode_param.get("is_preset_file")
+            and is_preset_launch_method(self.launch_method)
+        ):
+            return True, str(mode_param.get("preset_path") or "").strip()
         return False, ""
 
     def _can_reuse_running_process(self, *, is_preset_file: bool, preset_path: str) -> bool:
         if not is_preset_file or not preset_path:
             return False
-        if self.launch_method not in ("zapret2_mode",):
+        if not is_zapret2_launch_method(self.launch_method):
             return False
         try:
             from winws_runtime.runners.runner_factory import get_strategy_runner
 
             runner = get_strategy_runner(self._get_winws_exe())
+            self._configure_runner_runtime_callbacks(runner)
             if hasattr(runner, "find_running_preset_pid"):
                 pid = runner.find_running_preset_pid(preset_path)
                 if pid:
@@ -69,8 +104,8 @@ class PresetLaunchStartWorker(QObject):
                         "INFO",
                     )
                     return True
-        except Exception:
-            pass
+        except Exception as e:
+            log(f"Не удалось проверить уже запущенный preset: {e}", "DEBUG")
         return False
 
     def _validate_preset_before_stop(self, *, is_preset_file: bool, preset_path: str, skip_stop: bool) -> bool:
@@ -80,6 +115,7 @@ class PresetLaunchStartWorker(QObject):
             from winws_runtime.runners.runner_factory import get_strategy_runner
 
             runner = get_strategy_runner(self._get_winws_exe())
+            self._configure_runner_runtime_callbacks(runner)
             if hasattr(runner, "validate_preset_file"):
                 ok, report = runner.validate_preset_file(preset_path)
                 if ok:
@@ -99,8 +135,8 @@ class PresetLaunchStartWorker(QObject):
                 self.progress.emit(short)
                 self.finished.emit(False, short)
                 return False
-        except Exception:
-            pass
+        except Exception as e:
+            log(f"Не удалось проверить preset перед остановкой предыдущего процесса: {e}", "DEBUG")
         return True
 
     def _stop_previous_process_if_needed(self, *, skip_stop: bool) -> None:
@@ -110,7 +146,7 @@ class PresetLaunchStartWorker(QObject):
 
         self.progress.emit("Останавливаем предыдущий процесс...")
         shutdown_result = shutdown_runtime_sync(
-            window=self.app_instance,
+            runtime_feature=self._runtime_feature,
             reason=f"start_worker_prelaunch:{self.launch_method}",
             include_cleanup=False,
             cleanup_services=False,
@@ -137,9 +173,9 @@ class PresetLaunchStartWorker(QObject):
         time.sleep(0.5)
 
     def _run_launch_method(self) -> bool:
-        if self.launch_method == "orchestra":
+        if is_orchestra_launch_method(self.launch_method):
             return self._start_orchestra()
-        if self.launch_method in ("zapret2_mode", "zapret1_mode"):
+        if is_preset_launch_method(self.launch_method):
             return self._start_preset_mode()
         log(f"Неизвестный метод запуска: {self.launch_method}", "❌ ERROR")
         return False
@@ -175,17 +211,14 @@ class PresetLaunchStartWorker(QObject):
         from winws_runtime.runners.runner_factory import get_strategy_runner
 
         runner = get_strategy_runner(self._get_winws_exe())
+        self._configure_runner_runtime_callbacks(runner)
         success = runner.start_from_preset_file(preset_path, strategy_name)
 
         if success:
             log(f"Пресет '{strategy_name}' успешно запущен", "✅ SUCCESS")
             return True
 
-        details = ""
-        try:
-            details = str(getattr(runner, "last_error", "") or "").strip()
-        except Exception:
-            details = ""
+        details = str(getattr(runner, "last_error", "") or "").strip()
         short = (details.splitlines()[0].strip() if details else "")
         if short:
             log(f"Не удалось запустить пресет: {short}", "❌ ERROR")
@@ -225,24 +258,21 @@ class PresetLaunchStartWorker(QObject):
                 self.finished.emit(True, "")
             else:
                 fatal_reason = ""
-                try:
-                    mode_param = self.selected_mode
-                    if isinstance(mode_param, dict) and self.launch_method in ("zapret2_mode", "zapret1_mode"):
-                        if mode_param.get("is_preset_file"):
-                            preset_path = (mode_param.get("preset_path") or "").strip()
-                            if not preset_path:
-                                fatal_reason = "❌ Ошибка: не указан путь к preset файлу"
-                        else:
-                            fatal_reason = "❌ Для режима профилей нужен preset файл"
-                except Exception:
-                    fatal_reason = ""
+                mode_param = self.selected_mode
+                if isinstance(mode_param, dict) and is_preset_launch_method(self.launch_method):
+                    if mode_param.get("is_preset_file"):
+                        preset_path = str(mode_param.get("preset_path") or "").strip()
+                        if not preset_path:
+                            fatal_reason = "❌ Ошибка: не указан путь к preset файлу"
+                    else:
+                        fatal_reason = "❌ Для режима профилей нужен preset файл"
 
                 error_msg = fatal_reason or (self._last_error_message or "Не удалось запустить DPI. Проверьте логи")
                 self.progress.emit(error_msg)
                 self.finished.emit(False, error_msg)
 
         except Exception as e:
-            exe_path = getattr(self.launch_runtime_api, "expected_exe_path", None)
+            exe_path = self.launch_runtime_api.expected_exe_path
             diagnosis = diagnose_startup_error(e, exe_path)
             for line in diagnosis.split("\n"):
                 log(line, "❌ ERROR")
@@ -258,7 +288,7 @@ class PresetLaunchStartWorker(QObject):
             return self._start_presets_with_runner(preset_path, strategy_name)
 
         except Exception as e:
-            exe_path = self._get_winws_exe() if hasattr(self.app_instance, "launch_runtime_api") else None
+            exe_path = self._get_winws_exe()
             diagnosis = diagnose_startup_error(e, exe_path)
             for line in diagnosis.split("\n"):
                 log(line, "❌ ERROR")
@@ -268,34 +298,14 @@ class PresetLaunchStartWorker(QObject):
     def _start_orchestra(self):
         """Запуск через оркестратор автоматического обучения."""
         try:
-            from orchestra.orchestra_runner import OrchestraRunner
-
             log("Запуск оркестратора...", "INFO")
 
-            if not hasattr(self.app_instance, "orchestra_runner") or self.app_instance.orchestra_runner is None:
-                self.app_instance.orchestra_runner = OrchestraRunner()
-
-            runner = self.app_instance.orchestra_runner
-
-            has_attr = hasattr(self.app_instance, "orchestra_page")
-            page_exists = self.app_instance.orchestra_page if has_attr else None
-            if has_attr and page_exists:
-                runner.set_output_callback(self.app_instance.orchestra_page.emit_log)
-            else:
-                log("orchestra_page не существует при старте, callback будет установлен позже", "WARNING")
+            runner = self._runtime_feature.dependencies.orchestra_feature.ensure_runner()
 
             attempts = 2
             for attempt in range(1, attempts + 1):
                 if runner.start():
                     log("Оркестратор успешно запущен", "✅ SUCCESS")
-
-                    if hasattr(self.app_instance, "orchestra_page") and self.app_instance.orchestra_page:
-                        QMetaObject.invokeMethod(
-                            self.app_instance.orchestra_page,
-                            "start_monitoring",
-                            Qt.ConnectionType.QueuedConnection,
-                        )
-
                     return True
 
                 start_reason = str(getattr(runner, "last_start_error", "") or "").strip()
@@ -333,20 +343,20 @@ class PresetLaunchStartWorker(QObject):
                         log(f"Диагностика старта: команда={cmd_preview}", "INFO")
 
                     if recent_output:
-                        log("Диагностика старта: последние строки winws2:", "INFO")
+                        log(f"Диагностика старта: последние строки {ENGINE_WINWS2}:", "INFO")
                         for line in recent_output[-6:]:
                             clean = str(line or "").strip()
                             if clean:
                                 if len(clean) > 300:
                                     clean = clean[:300] + " ..."
                                 log(f"  {clean}", "INFO")
-                except Exception:
-                    pass
+                except Exception as e:
+                    log(f"Не удалось записать диагностику старта оркестратора: {e}", "DEBUG")
 
                 return False
 
         except Exception as e:
-            exe_path = self._get_winws_exe() if hasattr(self.app_instance, "launch_runtime_api") else None
+            exe_path = self._get_winws_exe()
             diagnosis = diagnose_startup_error(e, exe_path)
             for line in diagnosis.split("\n"):
                 log(line, "❌ ERROR")

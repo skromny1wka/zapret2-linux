@@ -29,12 +29,10 @@ class CustomDnsWidgets:
 def build_custom_dns_ui(
     *,
     tr_fn,
-    has_fluent_labels: bool,
     settings_card_cls,
     qhbox_layout_cls,
     qframe_cls,
     body_label_cls,
-    qlabel_cls,
     line_edit_cls,
     action_button_cls,
     on_apply,
@@ -52,10 +50,7 @@ def build_custom_dns_ui(
     custom_indicator.setStyleSheet(indicator_off_qss)
     custom_layout.addWidget(custom_indicator)
 
-    if has_fluent_labels:
-        custom_label = body_label_cls(tr_fn("page.network.custom.label", "Свой:"))
-    else:
-        custom_label = qlabel_cls(tr_fn("page.network.custom.label", "Свой:"))
+    custom_label = body_label_cls(tr_fn("page.network.custom.label", "Свой:"))
     custom_layout.addWidget(custom_label)
 
     custom_primary = line_edit_cls()
@@ -93,7 +88,6 @@ def build_custom_dns_ui(
 def build_auto_dns_ui(
     *,
     tr_fn,
-    has_fluent_labels: bool,
     settings_card_cls,
     qhbox_layout_cls,
     qframe_cls,
@@ -121,10 +115,7 @@ def build_auto_dns_ui(
     auto_icon.setPixmap(get_cached_qta_pixmap("fa5s.sync", color=icon_color, size=16))
     auto_layout.addWidget(auto_icon)
 
-    if has_fluent_labels:
-        auto_label = strong_body_label_cls(tr_fn("page.network.dns.auto", "Автоматически (DHCP)"))
-    else:
-        auto_label = qlabel_cls(tr_fn("page.network.dns.auto", "Автоматически (DHCP)"))
+    auto_label = strong_body_label_cls(tr_fn("page.network.dns.auto", "Автоматически (DHCP)"))
     auto_layout.addWidget(auto_label)
 
     auto_layout.addStretch()

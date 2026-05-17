@@ -33,6 +33,7 @@ from utils.circular_strategy_numbering import (
     strip_strategy_tags,
 )
 from config.config import MAIN_DIRECTORY, EXE_FOLDER, LUA_FOLDER, LOGS_FOLDER, BIN_FOLDER
+from settings.mode import ENGINE_WINWS2, EXE_NAME_WINWS2
 from lists.core.paths import get_lists_dir
 
 from settings.store import (
@@ -187,7 +188,7 @@ class OrchestraRunner:
             zapret_path = MAIN_DIRECTORY
 
         self.zapret_path = zapret_path
-        self.winws_exe = os.path.join(EXE_FOLDER, "winws2.exe")
+        self.winws_exe = os.path.join(EXE_FOLDER, EXE_NAME_WINWS2)
         self.lua_path = LUA_FOLDER
         self.logs_path = LOGS_FOLDER
         self.bin_path = BIN_FOLDER
@@ -233,7 +234,7 @@ class OrchestraRunner:
         self.ipset_networks: list[tuple[ipaddress._BaseNetwork, str]] = []
 
         # Белый список (exclude list) - домены которые НЕ обрабатываются
-        self.user_whitelist: list = []  # Только пользовательские (из реестра)
+        self.user_whitelist: list = []  # Только пользовательские (из settings.json)
         self.whitelist: set = set()     # Полный список (default + user) для генерации файла
 
         # Callbacks
@@ -336,7 +337,7 @@ class OrchestraRunner:
         lines = []
 
         if exit_code is not None:
-            lines.append(f"winws2 завершился с кодом {exit_code} через {uptime_sec:.1f}с")
+            lines.append(f"{ENGINE_WINWS2} завершился с кодом {exit_code} через {uptime_sec:.1f}с")
 
         if exit_code == 87:
             lines.append("Код 87 (ERROR_INVALID_PARAMETER): вероятна ошибка параметра в конфиге или командной строке")
@@ -358,14 +359,14 @@ class OrchestraRunner:
 
         tail = self._get_recent_output_tail(8)
         if tail:
-            lines.append("Последние строки winws2:")
+            lines.append(f"Последние строки {ENGINE_WINWS2}:")
             for line in tail:
                 clean = str(line).strip()
                 if len(clean) > 300:
                     clean = clean[:300] + " ..."
                 lines.append(f"  • {clean}")
         else:
-            lines.append("winws2 не успел вывести диагностические строки в stdout")
+            lines.append(f"{ENGINE_WINWS2} не успел вывести диагностические строки в stdout")
 
         if self.current_log_id:
             lines.append(f"Лог сессии: orchestra_{self.current_log_id}.log")
@@ -406,7 +407,7 @@ class OrchestraRunner:
         Удаляет старые lock/history/blocked записи для Telegram Proxy.
 
         Это нужно, чтобы отдельный модуль Telegram не возвращался в обучение
-        из старого реестра после того, как мы объявили его системно игнорируемым.
+        из старого состояния после того, как мы объявили его системно игнорируемым.
         """
         removed_locked = 0
         removed_user_locks = 0
@@ -459,7 +460,7 @@ class OrchestraRunner:
         total_removed = removed_locked + removed_user_locks + removed_history + removed_blocked + removed_user_blocked
         if total_removed:
             log(
-                "Очищены legacy-данные Telegram Proxy из оркестратора: "
+                "Очищены данные Telegram Proxy из оркестратора: "
                 f"locked={removed_locked}, user_locked={removed_user_locks}, "
                 f"history={removed_history}, blocked={removed_blocked}, "
                 f"user_blocked={removed_user_blocked}",
@@ -478,7 +479,7 @@ class OrchestraRunner:
 
         self._startup_forwarded_signatures.append(signature)
         msg = f"[{timestamp}] [WINWS2] {text}"
-        log(f"[winws2 startup] {text}", "INFO")
+        log(f"[{ENGINE_WINWS2} startup] {text}", "INFO")
         if self.output_callback:
             self.output_callback(msg)
 
@@ -487,7 +488,7 @@ class OrchestraRunner:
         tail = "\n".join(self._recent_output_lines).lower()
 
         if exit_code == 87:
-            return "некорректный параметр запуска (проверьте конфиг и параметры winws2)"
+            return f"некорректный параметр запуска (проверьте конфиг и параметры {ENGINE_WINWS2})"
 
         checks = (
             (("windivert", "filter driver", "wd_filter"), "ошибка WinDivert (драйвер/доступ/занято)"),
@@ -715,7 +716,7 @@ class OrchestraRunner:
         return startupinfo
 
     def load_existing_strategies(self) -> Dict[str, int]:
-        """Загружает ранее сохраненные стратегии и историю из реестра"""
+        """Загружает ранее сохраненные стратегии и историю из settings.json."""
         # Загружаем blocked сначала (нужен для проверки конфликтов в locked)
         self.blocked_manager.load()
 
@@ -723,7 +724,7 @@ class OrchestraRunner:
         self.locked_manager.load()
         self._purge_ignored_training_state()
 
-        # Возвращаем TLS стратегии для backward compatibility
+        # Основной экран оркестратора читает TLS-словарь как краткую сводку.
         return self.locked_manager.locked_by_askey["tls"]
 
     def _generate_learned_lua(self) -> Optional[str]:
@@ -756,7 +757,7 @@ class OrchestraRunner:
 
         try:
             with open(lua_path, 'w', encoding='utf-8') as f:
-                f.write("-- Auto-generated: preload strategies from registry\n")
+                f.write("-- Auto-generated: preload strategies from settings.json\n")
                 f.write(f"-- Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"-- {stats_str or 'empty'}, History: {total_history}\n\n")
 
@@ -1337,7 +1338,7 @@ class OrchestraRunner:
         """
         # Проверяем winws2.exe
         if not os.path.exists(self.winws_exe):
-            log(f"winws2.exe не найден: {self.winws_exe}", "ERROR")
+            log(f"{EXE_NAME_WINWS2} не найден: {self.winws_exe}", "ERROR")
             return False
 
         # Проверяем Lua файлы
@@ -1391,7 +1392,7 @@ class OrchestraRunner:
             try:
                 with open(self.config_path, "w", encoding="utf-8", newline="\n") as f:
                     f.write(cleaned_source)
-                log("circular-config.txt очищен от legacy :strategy=N тегов", "DEBUG")
+                log("circular-config.txt очищен от служебных :strategy=N тегов", "DEBUG")
             except Exception as e:
                 log(f"Не удалось очистить {self.config_path}: {e}", "DEBUG")
 
@@ -1432,7 +1433,7 @@ class OrchestraRunner:
         self.last_launch_command = []
         self._startup_forwarded_signatures.clear()
 
-        # Загружаем предыдущие стратегии и историю из реестра
+        # Загружаем предыдущие стратегии и историю из settings.json
         self.load_existing_strategies()
 
         # Инициализируем счётчики успехов из истории
@@ -1452,7 +1453,7 @@ class OrchestraRunner:
         total_history = len(self.locked_manager.strategy_history)
         if total_locked or total_history:
             stats_str = ", ".join(f"{askey.upper()}: {cnt}" for askey, cnt in counts.items() if cnt > 0)
-            log(f"Загружено из реестра: {stats_str or 'пусто'}, история для {total_history} доменов", "INFO")
+            log(f"Загружено из settings.json: {stats_str or 'пусто'}, история для {total_history} доменов", "INFO")
 
         # Генерируем уникальный ID для этой сессии логов
         self.current_log_id = self._generate_log_id()
@@ -1474,16 +1475,16 @@ class OrchestraRunner:
             # Запускаем winws2 с @config_file
             cmd = [self.winws_exe, f"@{launch_config_path}"]
 
-            # Добавляем предзагрузку стратегий из реестра
+            # Добавляем предзагрузку стратегий из settings.json
             if learned_lua:
                 cmd.append(f"--lua-init=@{learned_lua}")
 
             # Debug: выводим в stdout для парсинга, записываем в файл вручную в _read_output
             cmd.append("--debug=1")
 
-            log_msg = f"Запуск: winws2.exe @{os.path.basename(launch_config_path)}"
+            log_msg = f"Запуск: {EXE_NAME_WINWS2} @{os.path.basename(launch_config_path)}"
             if total_locked:
-                log_msg += f" ({total_locked} стратегий из реестра)"
+                log_msg += f" ({total_locked} стратегий из settings.json)"
             log(log_msg, "INFO")
             log(f"Командная строка: {' '.join(cmd)}", "DEBUG")
 
@@ -1873,7 +1874,7 @@ class OrchestraRunner:
 
             with open(self.whitelist_path, 'w', encoding='utf-8') as f:
                 f.write("# Orchestra whitelist - exclude these domains from DPI bypass\n")
-                f.write("# System domains (built-in) + User domains (from registry)\n\n")
+                f.write("# System domains (built-in) + User domains (from settings.json)\n\n")
                 for domain in sorted(self.whitelist):
                     f.write(f"{domain}\n")
 

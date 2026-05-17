@@ -345,12 +345,12 @@ def save_netrogat(domains: List[str]) -> bool:
 
 
 def ensure_netrogat_base_defaults() -> int:
-    """Возвращает число доменов системной базы для совместимости старых use-site'ов."""
+    """Возвращает число доменов системной базы netrogat."""
     return len(get_netrogat_base_entries())
 
 
 def add_missing_defaults(current: List[str]) -> Tuple[List[str], int]:
-    """Legacy helper: добавляет дефолтные домены к текущему списку."""
+    """Добавляет дефолтные домены к текущему списку."""
     current_set: set[str] = set()
     for item in current:
         norm = _normalize_domain(item)

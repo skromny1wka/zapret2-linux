@@ -6,41 +6,25 @@
 from PyQt6.QtCore import Qt, QSize, QEvent
 from PyQt6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QLabel,
-    QWidget, QLineEdit, QFrame, QPushButton
+    QWidget, QFrame,
+)
+from qfluentwidgets import (
+    LineEdit,
+    PushButton,
+    TransparentToolButton,
+    CardWidget,
+    StrongBodyLabel,
+    BodyLabel,
+    MessageBox,
+    InfoBar,
+    CaptionLabel,
 )
 
-try:
-    from qfluentwidgets import (
-        LineEdit,
-        PushButton,
-        TransparentToolButton,
-        CardWidget,
-        StrongBodyLabel,
-        BodyLabel,
-        MessageBox,
-        InfoBar,
-        CaptionLabel,
-    )
-    _HAS_FLUENT = True
-except ImportError:
-    LineEdit = QLineEdit
-    PushButton = QPushButton
-    TransparentToolButton = QPushButton
-    CardWidget = QFrame
-    StrongBodyLabel = QLabel
-    BodyLabel = QLabel
-    MessageBox = None
-    InfoBar = None
-    CaptionLabel = QLabel
-    _HAS_FLUENT = False
-
 from ui.pages.base_page import BasePage
-from ui.page_dependencies import require_page_app_context, resolve_page_orchestra_runner
-from ui.compat_widgets import set_tooltip
+from ui.fluent_widgets import set_tooltip
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens, get_themed_qta_icon
-from ui.theme_refresh import ThemeRefreshController
-from ui.text_catalog import tr as tr_catalog
-from log.log import log
+from ui.theme_refresh import ThemeRefreshBinding
+from app.text_catalog import tr as tr_catalog
 
 
 
@@ -69,7 +53,7 @@ class WhitelistDomainRow(QFrame):
         self._delete_btn = None
 
         self._setup_ui(domain, is_default)
-        self._theme_refresh = ThemeRefreshController(self, self._apply_theme)
+        self._theme_refresh = ThemeRefreshBinding(self, self._apply_theme)
 
     def _setup_ui(self, domain: str, is_default: bool):
         self.setFixedHeight(40)
@@ -156,7 +140,7 @@ class WhitelistDomainRow(QFrame):
 class OrchestraWhitelistPage(BasePage):
     """Страница управления белым списком оркестратора"""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, controller):
         super().__init__(
             "Белый список",
             "Домены, которые НЕ обрабатываются оркестратором. Эти сайты работают без DPI bypass.",
@@ -165,6 +149,7 @@ class OrchestraWhitelistPage(BasePage):
             subtitle_key="page.orchestra.whitelist.subtitle",
         )
         self.setObjectName("orchestraWhitelistPage")
+        self._controller = controller
         self._all_whitelist_data = []  # Кэш данных для фильтрации
         self._add_card = None
         self._domains_card = None
@@ -196,9 +181,7 @@ class OrchestraWhitelistPage(BasePage):
         card_layout.setContentsMargins(16, 16, 16, 16)
         card_layout.setSpacing(12)
 
-        title_label = StrongBodyLabel(title, card) if _HAS_FLUENT else QLabel(title)
-        if not _HAS_FLUENT:
-            title_label.setStyleSheet("font-size: 14px; font-weight: 600;")
+        title_label = StrongBodyLabel(title, card)
         card_layout.addWidget(title_label)
         card._title_label = title_label
 
@@ -399,17 +382,10 @@ class OrchestraWhitelistPage(BasePage):
 
     def _is_orchestra_running(self) -> bool:
         """Проверяет, запущен ли оркестратор"""
-        runner = resolve_page_orchestra_runner(self, parent=self.parent())
-        if runner is not None:
-            return runner.is_running()
-        return False
+        return self._controller.is_running()
 
     def _sync_whitelist_view(self, *, refresh: bool) -> None:
-        app_context = require_page_app_context(self, parent=self.parent(), error_message="AppContext is required for OrchestraWhitelistPage")
-        snapshot = app_context.orchestra_whitelist_runtime_service.get_snapshot(
-            self,
-            refresh=refresh,
-        )
+        snapshot = self._controller.snapshot(refresh=refresh)
         if not refresh and snapshot.revision == self._last_snapshot_revision:
             return
         self._last_snapshot_revision = snapshot.revision
@@ -550,12 +526,11 @@ class OrchestraWhitelistPage(BasePage):
         if not domain:
             return
 
-        app_context = require_page_app_context(self, parent=self.parent(), error_message="AppContext is required for OrchestraWhitelistPage")
-        if app_context.orchestra_whitelist_runtime_service.add_domain(self, domain):
+        result = self._controller.add_domain(domain=domain)
+        if result.changed:
             self.domain_input.clear()
             self._refresh_data()
             self._show_restart_warning()
-            log(f"Добавлен в белый список: {domain}", "INFO")
         else:
             if InfoBar:
                 InfoBar.info(
@@ -570,20 +545,14 @@ class OrchestraWhitelistPage(BasePage):
 
     def _on_row_delete_requested(self, domain: str):
         """Удаление при нажатии кнопки X в ряду"""
-        app_context = require_page_app_context(self, parent=self.parent(), error_message="AppContext is required for OrchestraWhitelistPage")
-        if app_context.orchestra_whitelist_runtime_service.remove_domain(self, domain):
+        result = self._controller.remove_domain(domain=domain)
+        if result.changed:
             self._refresh_data()
             self._show_restart_warning()
-            log(f"Удалён из белого списка: {domain}", "INFO")
 
     def _clear_user_domains(self):
         """Очищает все пользовательские домены из белого списка"""
-        app_context = require_page_app_context(self, parent=self.parent(), error_message="AppContext is required for OrchestraWhitelistPage")
-        snapshot = app_context.orchestra_whitelist_runtime_service.get_snapshot(
-            self,
-            refresh=True,
-        )
-        user_domains = [domain for domain, is_default in snapshot.entries if not is_default]
+        user_domains = self._controller.user_domains()
 
         if not user_domains:
             if InfoBar:
@@ -610,11 +579,7 @@ class OrchestraWhitelistPage(BasePage):
             )
             confirmed = bool(box.exec())
         if confirmed:
-            removed = app_context.orchestra_whitelist_runtime_service.clear_user_domains(
-                self,
-                user_domains,
-            )
-            if removed:
-                log(f"Очищены все пользовательские домены из белого списка ({removed})", "INFO")
+            result = self._controller.clear_user_domains(user_domains=user_domains)
+            if result.changed:
                 self._refresh_data()
                 self._show_restart_warning()

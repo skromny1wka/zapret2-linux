@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from ui.text_catalog import tr as tr_catalog
-from presets.ui.control.zapret2.controller import Zapret2ModeControlPageController
+from app.text_catalog import tr as tr_catalog
+import presets.ui.control.zapret2.page_runtime as zapret2_page_runtime
 from presets.ui.control.control_page_runtime_shared import (
     apply_program_settings_toggles,
     apply_status_plan as apply_status_plan_shared,
-    run_confirmation_dialog,
     set_toggle_checked,
-    show_action_result_plan,
 )
 
 
@@ -51,7 +49,7 @@ def apply_advanced_settings_plan(plan, *, discord_restart_toggle, wssize_toggle,
 def sync_profile_ui_mode_label(*, language: str, profile_ui_mode_label) -> None:
     if profile_ui_mode_label is None:
         return
-    plan = Zapret2ModeControlPageController.build_profile_ui_mode_label_plan(language=language)
+    plan = zapret2_page_runtime.build_profile_ui_mode_label_plan(language=language)
     profile_ui_mode_label.setText(plan.label_text)
 
 
@@ -74,7 +72,7 @@ def apply_profile_language(
     start_btn,
     stop_and_exit_btn,
     presets_btn,
-    profiles_open_btn,
+    preset_setup_open_btn,
     profile_ui_mode_btn,
     blobs_open_btn,
     test_card,
@@ -95,79 +93,79 @@ def apply_profile_language(
     update_stop_button_text,
     sync_profile_ui_mode_from_settings,
 ) -> None:
-    start_btn.setText(tr_catalog("page.z2_control.button.start", language=language, default="Запустить Zapret"))
-    stop_and_exit_btn.setText(tr_catalog("page.z2_control.button.stop_and_exit", language=language, default="Остановить и закрыть программу"))
-    presets_btn.setText(tr_catalog("page.z2_control.button.my_presets", language=language, default="Мои пресеты"))
-    if profiles_open_btn is not None:
-        profiles_open_btn.setText(tr_catalog("page.z2_control.button.open", language=language, default="Открыть"))
+    start_btn.setText(tr_catalog("page.winws2_control.button.start", language=language, default="Запустить Zapret"))
+    stop_and_exit_btn.setText(tr_catalog("page.winws2_control.button.stop_and_exit", language=language, default="Остановить и закрыть программу"))
+    presets_btn.setText(tr_catalog("page.winws2_control.button.my_presets", language=language, default="Мои пресеты"))
+    if preset_setup_open_btn is not None:
+        preset_setup_open_btn.setText(tr_catalog("page.winws2_control.button.open", language=language, default="Открыть"))
     if profile_ui_mode_btn is not None:
-        profile_ui_mode_btn.setText(tr_catalog("page.z2_control.button.change_mode", language=language, default="Изменить режим"))
+        profile_ui_mode_btn.setText(tr_catalog("page.winws2_control.button.change_mode", language=language, default="Изменить режим"))
     if blobs_open_btn is not None:
-        blobs_open_btn.setText(tr_catalog("page.z2_control.button.open", language=language, default="Открыть"))
+        blobs_open_btn.setText(tr_catalog("page.winws2_control.button.open", language=language, default="Открыть"))
 
-    current_preset_caption.setText(tr_catalog("page.z2_control.preset.current", language=language, default="Текущий активный пресет"))
+    current_preset_caption.setText(tr_catalog("page.winws2_control.preset.current", language=language, default="Текущий активный пресет"))
     if profile_ui_mode_caption is not None:
-        profile_ui_mode_caption.setText(tr_catalog("page.z2_control.profile_ui_mode.caption", language=language, default="Режим отображения profile"))
+        profile_ui_mode_caption.setText(tr_catalog("page.winws2_control.profile_ui_mode.caption", language=language, default="Режим отображения профилей"))
     if advanced_notice is not None:
         advanced_notice.setText(
-            tr_catalog("page.z2_control.advanced.warning", language=language, default="Изменяйте только если знаете что делаете")
+            tr_catalog("page.winws2_control.advanced.warning", language=language, default="Изменяйте только если знаете что делаете")
         )
 
     program_settings_card.titleLabel.setText(
-        tr_catalog("page.z2_control.section.program_settings", language=language, default="Настройки программы")
+        tr_catalog("page.winws2_control.section.program_settings", language=language, default="Настройки программы")
     )
 
     auto_dpi_toggle.set_texts(
-        tr_catalog("page.z2_control.setting.autostart.title", language=language, default="Автозапуск DPI после старта программы"),
-        tr_catalog("page.z2_control.setting.autostart.desc", language=language, default="После запуска ZapretGUI автоматически запускать текущий DPI-режим"),
+        tr_catalog("page.winws2_control.setting.autostart.title", language=language, default="Автозапуск DPI после старта программы"),
+        tr_catalog("page.winws2_control.setting.autostart.desc", language=language, default="После запуска ZapretGUI автоматически запускать текущий DPI-режим"),
     )
     defender_toggle.set_texts(
-        tr_catalog("page.z2_control.setting.defender.title", language=language, default="Отключить Windows Defender"),
-        tr_catalog("page.z2_control.setting.defender.desc", language=language, default="Требуются права администратора"),
+        tr_catalog("page.control.setting.defender.title", language=language, default="Отключить Windows Defender"),
+        tr_catalog("page.control.setting.defender.desc", language=language, default="Требуются права администратора"),
     )
     max_block_toggle.set_texts(
-        tr_catalog("page.z2_control.setting.max_block.title", language=language, default="Блокировать установку MAX"),
-        tr_catalog("page.z2_control.setting.max_block.desc", language=language, default="Блокирует запуск/установку MAX и домены в hosts"),
+        tr_catalog("page.control.setting.max_block.title", language=language, default="Блокировать установку MAX"),
+        tr_catalog("page.control.setting.max_block.desc", language=language, default="Блокирует запуск/установку MAX и домены в hosts"),
     )
     advanced_card.titleLabel.setText(
-        tr_catalog("page.z2_control.card.advanced", language=language, default="Дополнительные настройки")
+        tr_catalog("page.winws2_control.card.advanced", language=language, default="Дополнительные настройки")
     )
     if blobs_action_card is not None:
         blobs_action_card.setTitle(
-            tr_catalog("page.z2_control.blobs.title", language=language, default="Блобы")
+            tr_catalog("page.winws2_control.blobs.title", language=language, default="Блобы")
         )
         blobs_action_card.setContent(
-            tr_catalog("page.z2_control.blobs.desc", language=language, default="Бинарные данные (.bin / hex) для стратегий")
+            tr_catalog("page.winws2_control.blobs.desc", language=language, default="Бинарные данные (.bin / hex) для стратегий")
         )
         if blobs_open_btn is not None:
-            blobs_open_btn.setText(tr_catalog("page.z2_control.button.open", language=language, default="Открыть"))
+            blobs_open_btn.setText(tr_catalog("page.winws2_control.button.open", language=language, default="Открыть"))
 
     test_card.setTitle(
-        tr_catalog("page.z2_control.button.connection_test", language=language, default="Тест соединения")
+        tr_catalog("page.winws2_control.button.connection_test", language=language, default="Тест соединения")
     )
     test_card.setContent(
-        tr_catalog("page.z2_control.button.connection_test.desc", language=language, default="Проверить доступность сети и состояние обхода")
+        tr_catalog("page.winws2_control.button.connection_test.desc", language=language, default="Проверить доступность сети и состояние обхода")
     )
     test_card.button.setText(
-        tr_catalog("page.z2_control.button.open", language=language, default="Открыть")
+        tr_catalog("page.winws2_control.button.open", language=language, default="Открыть")
     )
     folder_card.setTitle(
-        tr_catalog("page.z2_control.button.open_folder", language=language, default="Открыть папку")
+        tr_catalog("page.winws2_control.button.open_folder", language=language, default="Открыть папку")
     )
     folder_card.setContent(
-        tr_catalog("page.z2_control.button.open_folder.desc", language=language, default="Перейти в папку программы и служебных файлов")
+        tr_catalog("page.winws2_control.button.open_folder.desc", language=language, default="Перейти в папку программы и служебных файлов")
     )
     folder_card.button.setText(
-        tr_catalog("page.z2_control.button.open", language=language, default="Открыть")
+        tr_catalog("page.winws2_control.button.open", language=language, default="Открыть")
     )
     docs_card.setTitle(
-        tr_catalog("page.z2_control.button.documentation", language=language, default="Документация")
+        tr_catalog("page.winws2_control.button.documentation", language=language, default="Документация")
     )
     docs_card.setContent(
-        tr_catalog("page.z2_control.button.documentation.desc", language=language, default="Открыть справку и описание возможностей")
+        tr_catalog("page.winws2_control.button.documentation.desc", language=language, default="Открыть справку и описание возможностей")
     )
     docs_card.button.setText(
-        tr_catalog("page.z2_control.button.open", language=language, default="Открыть")
+        tr_catalog("page.winws2_control.button.open", language=language, default="Открыть")
     )
 
     update_stop_button_text()

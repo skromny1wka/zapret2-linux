@@ -10,8 +10,9 @@ from log.log import log
 def _is_preset_mode_source_launch() -> bool:
     try:
         from settings.dpi.strategy_settings import get_strategy_launch_method
+        from settings.mode import is_preset_launch_method
 
-        return (get_strategy_launch_method() or "").strip().lower() in {"zapret1_mode", "zapret2_mode"}
+        return is_preset_launch_method(get_strategy_launch_method())
     except Exception:
         return False
 

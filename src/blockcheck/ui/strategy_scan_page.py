@@ -7,14 +7,11 @@ Tests strategies one by one through winws2 + HTTPS probe.
 import logging
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, pyqtSignal, QTimer
-from PyQt6.QtGui import QAction
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QMenu
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel
+from settings.mode import ENGINE_WINWS2
 
-from blockcheck.strategy_scan_page_controller import StrategyScanPageController
-from blockcheck.strategy_scan_worker import StrategyScanWorker
 from ui.pages.base_page import BasePage
-from ui.page_dependencies import require_page_app_context
 from blockcheck.ui.strategy_scan_page_build import (
     build_strategy_scan_control_section,
     build_strategy_scan_log_section,
@@ -28,6 +25,13 @@ from blockcheck.ui.strategy_scan_page_results_workflow import (
     apply_phase_change,
     apply_strategy_started_progress,
 )
+from blockcheck.strategy_scan_run_workflow import (
+    cleanup_strategy_scan_worker,
+    record_strategy_scan_result,
+    request_strategy_scan_stop,
+    start_strategy_scan_run,
+    start_strategy_scan_worker,
+)
 from blockcheck.ui.strategy_scan_page_runtime_helpers import (
     apply_language_plan_ui,
     apply_log_expand_state,
@@ -35,27 +39,20 @@ from blockcheck.ui.strategy_scan_page_runtime_helpers import (
     set_support_status,
 )
 from ui.popup_menu import exec_popup_menu
-from ui.text_catalog import tr as tr_catalog
+from app.text_catalog import tr as tr_catalog
+from qfluentwidgets import (
+    ComboBox,
+    CaptionLabel,
+    BodyLabel,
+    ProgressBar,
+    TableWidget,
+    PushButton,
+    LineEdit,
+    RoundMenu,
+    Action,
+)
 
-try:
-    from qfluentwidgets import (
-        ComboBox, CaptionLabel, BodyLabel,
-        ProgressBar,
-        TableWidget, PushButton, LineEdit, RoundMenu,
-    )
-    HAS_FLUENT = True
-except ImportError:
-    HAS_FLUENT = False
-    RoundMenu = None
-    from PyQt6.QtWidgets import (
-        QComboBox as ComboBox,
-        QTableWidget as TableWidget,
-        QPushButton as PushButton,
-        QLineEdit as LineEdit,
-        QProgressBar as ProgressBar,
-    )
-
-from ui.compat_widgets import (
+from ui.fluent_widgets import (
     SettingsCard, ActionButton, InfoBarHelper,
 )
 
@@ -69,21 +66,21 @@ logger = logging.getLogger(__name__)
 class StrategyScanPage(BasePage):
     """Strategy Scanner — brute-force DPI bypass strategy testing."""
 
-    back_clicked = pyqtSignal()
-
-    def __init__(self, parent=None, *, embedded: bool = False):
+    def __init__(self, parent=None, *, embedded: bool = False, blockcheck_feature, runtime_feature):
         self._embedded = bool(embedded)
         super().__init__(
-            title=tr_catalog("page.strategy_scan.title", default="Подбор стратегии"),
-            subtitle=tr_catalog("page.strategy_scan.subtitle",
+            title=tr_catalog("page.blockcheck_public.title", default="Подбор стратегии"),
+            subtitle=tr_catalog("page.blockcheck_public.subtitle",
                                 default="Автоматический перебор стратегий обхода DPI"),
             parent=parent,
-            title_key="page.strategy_scan.title",
-            subtitle_key="page.strategy_scan.subtitle",
+            title_key="page.blockcheck_public.title",
+            subtitle_key="page.blockcheck_public.subtitle",
         )
         self.setObjectName("StrategyScanPage")
 
-        self._worker: StrategyScanWorker | None = None
+        self._blockcheck = blockcheck_feature
+        self._runtime_feature = runtime_feature
+        self._worker = None
         self._result_rows: list[dict] = []
         self._scan_target: str = ""
         self._scan_protocol: str = "tcp_https"
@@ -121,22 +118,9 @@ class StrategyScanPage(BasePage):
     # ------------------------------------------------------------------
 
     def _build_ui(self):
-        if not self._embedded:
-            # ── Back button ──
-            back_row = QHBoxLayout()
-            back_btn = ActionButton(
-                tr_catalog("page.strategy_scan.back", default="Назад"),
-                icon_name="fa5s.arrow-left",
-            )
-            back_btn.clicked.connect(self._on_back)
-            back_row.addWidget(back_btn)
-            back_row.addStretch()
-            self.add_widget(self._wrap_layout(back_row))
-
         # ── Control Card ──
         control_widgets = build_strategy_scan_control_section(
             tr_fn=lambda key, default: tr_catalog(key, default=default),
-            has_fluent=HAS_FLUENT,
             combo_cls=ComboBox,
             caption_label_cls=CaptionLabel,
             body_label_cls=BodyLabel,
@@ -172,13 +156,13 @@ class StrategyScanPage(BasePage):
 
         # ── Warning Card ──
         self._warning_card = SettingsCard(
-            tr_catalog("page.strategy_scan.warning_title", default="Внимание")
+            tr_catalog("page.blockcheck_public.warning_title", default="Внимание")
         )
-        warning_text = BodyLabel() if HAS_FLUENT else QLabel()
+        warning_text = BodyLabel()
         warning_text.setText(tr_catalog(
-            "page.strategy_scan.warning_text",
+            "page.blockcheck_public.warning_text",
             default="Во время сканирования текущий обход DPI будет остановлен. "
-                    "Каждая стратегия тестируется отдельно через winws2. "
+                    f"Каждая стратегия тестируется отдельно через {ENGINE_WINWS2}. "
                     "После завершения можно перезапустить обход.",
         ))
         warning_text.setWordWrap(True)
@@ -198,7 +182,6 @@ class StrategyScanPage(BasePage):
         self._log_expanded = False
         log_widgets = build_strategy_scan_log_section(
             tr_fn=lambda key, default: tr_catalog(key, default=default),
-            has_fluent=HAS_FLUENT,
             push_button_cls=PushButton,
             parent=self.content,
             on_toggle_log_expand=self._toggle_log_expand,
@@ -221,6 +204,7 @@ class StrategyScanPage(BasePage):
         """Развернуть/свернуть лог на всю страницу."""
         self._log_expanded = not self._log_expanded
         apply_log_expand_state(
+            blockcheck_feature=self._blockcheck,
             expanded=self._log_expanded,
             language=self._ui_language,
             control_card=self._control_card,
@@ -244,12 +228,12 @@ class StrategyScanPage(BasePage):
 
     def _on_protocol_changed(self, _index: int) -> None:
         """Adjust target input defaults when protocol changes."""
-        selection = StrategyScanPageController.build_selection_state(
+        selection = self._blockcheck.build_selection_state(
             protocol_value=self._protocol_combo.currentData(),
             udp_scope_value=self._games_scope_combo.currentData() if self._games_scope_combo is not None else "all",
             mode_index=self._mode_combo.currentIndex() if self._mode_combo is not None else 0,
         )
-        plan = StrategyScanPageController.build_protocol_ui_plan(
+        plan = self._blockcheck.build_protocol_ui_plan(
             scan_protocol=selection.scan_protocol,
             current_value=self._target_input.text(),
         )
@@ -279,16 +263,16 @@ class StrategyScanPage(BasePage):
         if self._udp_scope_hint_label is None:
             return
 
-        selection = StrategyScanPageController.build_selection_state(
+        selection = self._blockcheck.build_selection_state(
             protocol_value=self._protocol_combo.currentData(),
             udp_scope_value=self._games_scope_combo.currentData() if self._games_scope_combo is not None else "all",
             mode_index=self._mode_combo.currentIndex() if self._mode_combo is not None else 0,
         )
-        hint_plan = StrategyScanPageController.build_udp_scope_hint_plan(
+        hint_plan = self._blockcheck.build_udp_scope_hint_plan(
             scan_protocol=selection.scan_protocol,
             udp_games_scope=selection.udp_games_scope,
-            scope_all_label=tr_catalog("page.strategy_scan.udp_scope_all", default="Все ipset (по умолчанию)"),
-            scope_games_only_label=tr_catalog("page.strategy_scan.udp_scope_games_only", default="Только игровые ipset"),
+            scope_all_label=tr_catalog("page.blockcheck_public.udp_scope_all", default="Все ipset (по умолчанию)"),
+            scope_games_only_label=tr_catalog("page.blockcheck_public.udp_scope_games_only", default="Только игровые ipset"),
         )
         self._udp_scope_hint_label.setText(hint_plan.text)
         self._udp_scope_hint_label.setToolTip(hint_plan.tooltip)
@@ -299,22 +283,19 @@ class StrategyScanPage(BasePage):
         if self._quick_domain_btn is None:
             return
 
-        if HAS_FLUENT and RoundMenu is not None:
-            menu = RoundMenu(parent=self)
-        else:
-            menu = QMenu(self)
-        selection = StrategyScanPageController.build_selection_state(
+        menu = RoundMenu(parent=self)
+        selection = self._blockcheck.build_selection_state(
             protocol_value=self._protocol_combo.currentData(),
             udp_scope_value=self._games_scope_combo.currentData() if self._games_scope_combo is not None else "all",
             mode_index=self._mode_combo.currentIndex() if self._mode_combo is not None else 0,
         )
-        menu_plan = StrategyScanPageController.build_quick_target_menu_plan(
+        menu_plan = self._blockcheck.build_quick_target_menu_plan(
             scan_protocol=selection.scan_protocol,
             current_value=self._target_input.text(),
         )
 
         for option in menu_plan.options:
-            action = QAction(option, menu)
+            action = Action(option, menu)
             action.setCheckable(True)
             action.setChecked(option == menu_plan.current_value)
             action.triggered.connect(
@@ -353,6 +334,7 @@ class StrategyScanPage(BasePage):
 
     def _apply_language_plan(self, language: str) -> None:
         apply_language_plan_ui(
+            blockcheck_feature=self._blockcheck,
             language=language,
             log_expanded=self._log_expanded,
             control_card=self._control_card,
@@ -371,14 +353,6 @@ class StrategyScanPage(BasePage):
         )
 
     # ------------------------------------------------------------------
-    # Navigation cleanup
-    # ------------------------------------------------------------------
-
-    def _on_back(self):
-        """Navigate back without interrupting background scan."""
-        self.back_clicked.emit()
-
-    # ------------------------------------------------------------------
     # Start / Stop
     # ------------------------------------------------------------------
 
@@ -387,81 +361,62 @@ class StrategyScanPage(BasePage):
             return
         self._cleanup_in_progress = False
 
-        selection = StrategyScanPageController.build_selection_state(
-            protocol_value=self._protocol_combo.currentData(),
-            udp_scope_value=self._games_scope_combo.currentData() if self._games_scope_combo is not None else "all",
-            mode_index=self._mode_combo.currentIndex(),
-        )
-
-        start_plan = StrategyScanPageController.plan_scan_start(
+        run_result = start_strategy_scan_run(
+            blockcheck_feature=self._blockcheck,
+            runtime_feature=self._runtime_feature,
             raw_target_input=self._target_input.text(),
-            scan_protocol=selection.scan_protocol,
-            udp_games_scope=selection.udp_games_scope,
-            mode=selection.mode,
+            raw_protocol_value=self._protocol_combo.currentData(),
+            raw_udp_scope_value=self._games_scope_combo.currentData() if self._games_scope_combo is not None else "all",
+            mode_index=self._mode_combo.currentIndex(),
             previous_target=self._scan_target,
             previous_protocol=self._scan_protocol,
             previous_scope=self._scan_udp_games_scope,
             result_rows_count=len(self._result_rows),
             table_row_count=self._table.rowCount(),
-            starting_status_text=tr_catalog("page.strategy_scan.starting", default="Запуск сканирования..."),
+            starting_status_text=tr_catalog("page.blockcheck_public.starting", default="Запуск сканирования..."),
+            parent=self,
+            on_strategy_started=self._on_strategy_started,
+            on_strategy_result=self._on_strategy_result,
+            on_log=self._on_log,
+            on_phase_changed=self._on_phase_changed,
+            on_finished=self._on_finished,
         )
-        self._target_input.setText(start_plan.target)
+        self._target_input.setText(run_result.target)
 
-        if not start_plan.keep_current_results:
+        if not run_result.keep_current_results:
             self._table.setRowCount(0)
             self._result_rows.clear()
             self._log_edit.clear()
         self._set_support_status("")
 
-        self._scan_target = start_plan.target
-        self._scan_protocol = start_plan.scan_protocol
-        self._scan_udp_games_scope = start_plan.udp_games_scope
-        self._scan_mode = start_plan.mode
-        self._scan_cursor = start_plan.scan_cursor
-        log_state = StrategyScanPageController.start_run_log(
-            target=start_plan.target,
-            mode=start_plan.mode,
-            scan_protocol=start_plan.scan_protocol,
-            resume_index=self._scan_cursor,
-            udp_games_scope=start_plan.udp_games_scope,
-        )
-        self._run_log_file = log_state.path
+        self._scan_target = run_result.target
+        self._scan_protocol = run_result.scan_protocol
+        self._scan_udp_games_scope = run_result.udp_games_scope
+        self._scan_mode = run_result.mode
+        self._scan_cursor = run_result.scan_cursor
+        self._run_log_file = run_result.run_log_file
+        self._worker = run_result.worker
 
-        self._apply_interaction_plan(StrategyScanPageController.build_running_interaction_plan())
+        self._apply_interaction_plan(self._blockcheck.build_running_interaction_plan())
         self._progress_bar.setVisible(True)
         self._progress_bar.setValue(self._scan_cursor)
-        self._status_label.setText(start_plan.status_text)
-
-        # Create and start worker
-        self._worker = StrategyScanWorker(
-            target=start_plan.target,
-            mode=start_plan.mode,
-            start_index=self._scan_cursor,
-            scan_protocol=start_plan.scan_protocol,
-            udp_games_scope=start_plan.udp_games_scope,
-            parent=self,
-        )
-        self._worker.strategy_started.connect(self._on_strategy_started)
-        self._worker.strategy_result.connect(self._on_strategy_result)
-        self._worker.scan_log.connect(self._on_log)
-        self._worker.phase_changed.connect(self._on_phase_changed)
-        self._worker.scan_finished.connect(self._on_finished)
-        self._worker.start()
+        self._status_label.setText(run_result.status_text)
+        start_strategy_scan_worker(self._worker)
 
     def _on_stop(self):
-        if self._worker:
-            self._worker.stop()
-            expected_worker = self._worker
-        else:
-            expected_worker = None
+        request_strategy_scan_stop(
+            worker=self._worker,
+            schedule_stop_check=lambda expected_worker:
+            QTimer.singleShot(5000, lambda worker=expected_worker: self._force_stop(worker)),
+        )
         self._stop_btn.setEnabled(False)
         self._status_label.setText(
-            tr_catalog("page.strategy_scan.stopping", default="Остановка...")
+            tr_catalog("page.blockcheck_public.stopping", default="Остановка...")
         )
-        QTimer.singleShot(5000, lambda worker=expected_worker: self._force_stop(worker))
 
     def _force_stop(self, expected_worker=None):
         apply_force_stop_status(
+            blockcheck_feature=self._blockcheck,
             worker=self._worker,
             expected_worker=expected_worker,
             status_label=self._status_label,
@@ -477,6 +432,7 @@ class StrategyScanPage(BasePage):
         if self._cleanup_in_progress:
             return
         apply_strategy_started_progress(
+            blockcheck_feature=self._blockcheck,
             strategy_name=name,
             index=index,
             total=total,
@@ -491,6 +447,7 @@ class StrategyScanPage(BasePage):
         if self._cleanup_in_progress:
             return
         stored_row = add_strategy_result_row(
+            blockcheck_feature=self._blockcheck,
             table=self._table,
             result=result,
             scan_cursor=self._scan_cursor,
@@ -499,19 +456,20 @@ class StrategyScanPage(BasePage):
             on_apply_strategy=self._on_apply_strategy,
         )
         self._result_rows.append(dict(stored_row))
-        self._scan_cursor += 1
-        self._progress_bar.setValue(self._scan_cursor)
-        StrategyScanPageController.save_resume_state(
-            self._scan_target,
-            self._scan_protocol,
-            self._scan_cursor,
-            self._scan_udp_games_scope,
+        self._scan_cursor = record_strategy_scan_result(
+            blockcheck_feature=self._blockcheck,
+            scan_target=self._scan_target,
+            scan_protocol=self._scan_protocol,
+            scan_udp_games_scope=self._scan_udp_games_scope,
+            scan_cursor=self._scan_cursor,
         )
+        self._progress_bar.setValue(self._scan_cursor)
 
     def _on_log(self, message: str):
         if self._cleanup_in_progress:
             return
         append_scan_log(
+            blockcheck_feature=self._blockcheck,
             log_edit=self._log_edit,
             run_log_file=self._run_log_file,
             message=message,
@@ -521,6 +479,7 @@ class StrategyScanPage(BasePage):
         if self._cleanup_in_progress:
             return
         apply_phase_change(
+            blockcheck_feature=self._blockcheck,
             status_label=self._status_label,
             run_log_file=self._run_log_file,
             phase=phase,
@@ -533,7 +492,8 @@ class StrategyScanPage(BasePage):
         worker = self._worker
         self._worker = None
         apply_finished_scan(
-            report,
+            blockcheck_feature=self._blockcheck,
+            report=report,
             worker=worker,
             reset_ui=self._reset_ui,
             scan_target=self._scan_target,
@@ -546,7 +506,7 @@ class StrategyScanPage(BasePage):
             status_label=self._status_label,
             run_log_file=self._run_log_file,
             set_support_status=self._set_support_status,
-            window=self.window(),
+            parent_widget=self.window(),
         )
 
     # ------------------------------------------------------------------
@@ -556,19 +516,14 @@ class StrategyScanPage(BasePage):
     def _on_apply_strategy(self, strategy_args: str, strategy_name: str):
         """Copy the working strategy into the selected source preset."""
         try:
-            result = StrategyScanPageController.apply_strategy(
-                app_context=require_page_app_context(
-                    self,
-                    parent=self.parent(),
-                    error_message="AppContext is required for StrategyScanPage",
-                ),
+            result = self._blockcheck.apply_strategy(
                 strategy_args=strategy_args,
                 strategy_name=strategy_name,
                 scan_target=self._scan_target,
                 scan_protocol=self._scan_protocol,
                 scan_udp_games_scope=self._scan_udp_games_scope,
             )
-            message_plan = StrategyScanPageController.build_apply_success_plan(result)
+            message_plan = self._blockcheck.build_apply_success_plan(result)
 
             InfoBarHelper.success(
                 self.window(),
@@ -578,7 +533,7 @@ class StrategyScanPage(BasePage):
         except Exception as e:
             logger.warning("Failed to apply strategy: %s", e)
             try:
-                message_plan = StrategyScanPageController.build_apply_error_plan(str(e))
+                message_plan = self._blockcheck.build_apply_error_plan(str(e))
                 InfoBarHelper.warning(
                     self.window(),
                     tr_catalog(message_plan.title_key, default=message_plan.title_default),
@@ -603,13 +558,13 @@ class StrategyScanPage(BasePage):
             self._quick_domain_btn.setEnabled(plan.quick_domain_enabled)
 
     def _reset_ui(self):
-        selection = StrategyScanPageController.build_selection_state(
+        selection = self._blockcheck.build_selection_state(
             protocol_value=self._protocol_combo.currentData(),
             udp_scope_value=self._games_scope_combo.currentData() if self._games_scope_combo is not None else "all",
             mode_index=self._mode_combo.currentIndex() if self._mode_combo is not None else 0,
         )
         self._apply_interaction_plan(
-            StrategyScanPageController.build_idle_interaction_plan(
+            self._blockcheck.build_idle_interaction_plan(
                 is_udp_games=selection.scan_protocol == "udp_games",
             )
         )
@@ -619,6 +574,7 @@ class StrategyScanPage(BasePage):
 
     def _prepare_support_from_strategy_scan(self) -> None:
         prepare_strategy_scan_support(
+            blockcheck_feature=self._blockcheck,
             cleanup_in_progress=self._cleanup_in_progress,
             run_log_file=self._run_log_file,
             stored_scan_protocol=self._scan_protocol,
@@ -628,7 +584,7 @@ class StrategyScanPage(BasePage):
             raw_protocol_label=self._protocol_combo.currentText() if self._protocol_combo is not None else "",
             raw_mode_label=self._mode_combo.currentText() if self._mode_combo is not None else "",
             stored_mode=self._scan_mode,
-            window=self.window(),
+            parent_widget=self.window(),
             support_status_label=self._support_status_label,
         )
 
@@ -646,14 +602,4 @@ class StrategyScanPage(BasePage):
 
     def cleanup(self) -> None:
         self._cleanup_in_progress = True
-        if self._worker is not None:
-            try:
-                self._worker.stop()
-            except Exception:
-                pass
-            if not self._worker.is_running:
-                try:
-                    self._worker.deleteLater()
-                except Exception:
-                    pass
-                self._worker = None
+        self._worker = cleanup_strategy_scan_worker(self._worker)

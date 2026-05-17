@@ -1,4 +1,4 @@
-"""Build-helper shell страницы profiles."""
+"""Build-helper shell страницы профилей."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout
 
-from ui.compat_widgets import QuickActionsBar, RefreshButton
+from ui.fluent_widgets import QuickActionsBar, RefreshButton
 from ui.theme import get_theme_tokens, get_themed_qta_icon
 from qfluentwidgets import BodyLabel, PushButton, PrimaryPushButton
 
@@ -46,7 +46,7 @@ def build_profile_shell(
     def _toolbar_key(name: str) -> str:
         if toolbar_key_prefix:
             return f"{toolbar_key_prefix}.{name}"
-        return f"page.z2_pages.toolbar.{name}"
+        return f"page.winws2_pages.toolbar.{name}"
 
     add_section_title(text_key=toolbar_title_key)
     toolbar_actions_bar = QuickActionsBar(content_parent)
@@ -70,7 +70,7 @@ def build_profile_shell(
     reload_btn.setToolTip(
         tr_fn(
             _toolbar_key("reload.description"),
-            "Обновить список profiles и выбранных стратегий.",
+            "Обновить список профилей и выбранных готовых стратегий.",
         )
     )
     toolbar_actions_bar.add_button(reload_btn)
@@ -82,7 +82,7 @@ def build_profile_shell(
     expand_btn.setToolTip(
         tr_fn(
             _toolbar_key("expand.description"),
-            "Развернуть все группы profiles в списке.",
+            "Развернуть все группы профилей в списке.",
         )
     )
     toolbar_actions_bar.add_button(expand_btn)
@@ -94,7 +94,7 @@ def build_profile_shell(
     collapse_btn.setToolTip(
         tr_fn(
             _toolbar_key("collapse.description"),
-            "Свернуть все группы profiles в списке.",
+            "Свернуть все группы профилей в списке.",
         )
     )
     toolbar_actions_bar.add_button(collapse_btn)
@@ -118,7 +118,7 @@ def build_profile_shell(
     content_host_layout.setSpacing(8)
 
     loading_label = BodyLabel(
-        tr_fn(loading_key, "Загрузка profiles выбранного preset...")
+        tr_fn(loading_key, "Загрузка профилей выбранного пресета...")
     )
     loading_label.setWordWrap(True)
     loading_label.hide()

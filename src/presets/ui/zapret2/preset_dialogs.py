@@ -2,18 +2,8 @@
 
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QLabel, QPushButton
-
-from ui.text_catalog import tr as tr_catalog
-
-try:
-    from qfluentwidgets import BodyLabel, CaptionLabel, LineEdit, MessageBoxBase, SubtitleLabel
-except ImportError:
-    from PyQt6.QtWidgets import QDialog as MessageBoxBase, QLineEdit as LineEdit
-
-    BodyLabel = QLabel
-    CaptionLabel = QLabel
-    SubtitleLabel = QLabel
+from app.text_catalog import tr as tr_catalog
+from qfluentwidgets import BodyLabel, CaptionLabel, LineEdit, MessageBoxBase, SubtitleLabel
 
 
 def _tr_dialog(language: str, key: str, default: str, **kwargs) -> str:
@@ -35,9 +25,9 @@ class PresetNameDialog(MessageBoxBase):
         self._ui_language = language
 
         title_text = (
-            _tr_dialog(self._ui_language, "page.z2_profile_detail.preset_dialog.create.title", "Создать пресет")
+            _tr_dialog(self._ui_language, "page.winws2_profile_setup.preset_dialog.create.title", "Создать пресет")
             if mode == "create"
-            else _tr_dialog(self._ui_language, "page.z2_profile_detail.preset_dialog.rename.title", "Переименовать пресет")
+            else _tr_dialog(self._ui_language, "page.winws2_profile_setup.preset_dialog.rename.title", "Переименовать пресет")
         )
         self.titleLabel = SubtitleLabel(title_text, self.widget)
 
@@ -45,7 +35,7 @@ class PresetNameDialog(MessageBoxBase):
             from_label = CaptionLabel(
                 _tr_dialog(
                     self._ui_language,
-                    "page.z2_profile_detail.preset_dialog.rename.current_name",
+                    "page.winws2_profile_setup.preset_dialog.rename.current_name",
                     "Текущее имя: {name}",
                     name=old_name,
                 ),
@@ -57,14 +47,14 @@ class PresetNameDialog(MessageBoxBase):
             self.viewLayout.addWidget(self.titleLabel)
 
         name_label = BodyLabel(
-            _tr_dialog(self._ui_language, "page.z2_profile_detail.preset_dialog.name_label", "Название"),
+            _tr_dialog(self._ui_language, "page.winws2_profile_setup.preset_dialog.name_label", "Название"),
             self.widget,
         )
         self.name_edit = LineEdit(self.widget)
         self.name_edit.setPlaceholderText(
             _tr_dialog(
                 self._ui_language,
-                "page.z2_profile_detail.preset_dialog.name_placeholder",
+                "page.winws2_profile_setup.preset_dialog.name_placeholder",
                 "Введите название пресета...",
             )
         )
@@ -87,12 +77,12 @@ class PresetNameDialog(MessageBoxBase):
         self.viewLayout.addWidget(self._error_label)
 
         self.yesButton.setText(
-            _tr_dialog(self._ui_language, "page.z2_profile_detail.preset_dialog.button.create", "Создать")
+            _tr_dialog(self._ui_language, "page.winws2_profile_setup.preset_dialog.button.create", "Создать")
             if mode == "create"
-            else _tr_dialog(self._ui_language, "page.z2_profile_detail.preset_dialog.button.rename", "Переименовать")
+            else _tr_dialog(self._ui_language, "page.winws2_profile_setup.preset_dialog.button.rename", "Переименовать")
         )
         self.cancelButton.setText(
-            _tr_dialog(self._ui_language, "page.z2_profile_detail.preset_dialog.button.cancel", "Отмена")
+            _tr_dialog(self._ui_language, "page.winws2_profile_setup.preset_dialog.button.cancel", "Отмена")
         )
         self.widget.setMinimumWidth(360)
 
@@ -104,7 +94,7 @@ class PresetNameDialog(MessageBoxBase):
         name = self.name_edit.text().strip()
         if not name:
             self._error_label.setText(
-                _tr_dialog(self._ui_language, "page.z2_profile_detail.preset_dialog.error.empty", "Введите название пресета")
+                _tr_dialog(self._ui_language, "page.winws2_profile_setup.preset_dialog.error.empty", "Введите название пресета")
             )
             self._error_label.show()
             return False

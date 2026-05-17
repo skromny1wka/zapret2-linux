@@ -5,13 +5,10 @@ from queue import Queue
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot
 from PyQt6.QtWidgets import (
     QVBoxLayout, QLabel,
-    QPushButton, QFrame,
-    QLineEdit, QListWidget, QComboBox
 )
-from PyQt6.QtGui import QAction
 
+import orchestra.page_runtime as orchestra_page_runtime
 from orchestra.page_controller import OrchestraPageController
-from ui.page_dependencies import resolve_page_orchestra_runner
 from ui.pages.base_page import BasePage
 from orchestra.ui.page_build import (
     build_orchestra_log_card,
@@ -27,47 +24,50 @@ from orchestra.ui.page_runtime_helpers import (
     set_protocol_filter_items,
     update_log_history_view,
 )
-from orchestra.ui.page_monitoring_workflow import (
+from orchestra.monitoring_workflow import (
     detect_state_transition_from_line,
     process_log_queue,
     run_update_cycle,
     start_monitoring as start_orchestra_monitoring,
     stop_monitoring as stop_orchestra_monitoring,
 )
-from ui.popup_menu import exec_popup_menu
+from orchestra.ui.page_log_context_workflow import (
+    add_to_whitelist_from_log,
+    block_strategy_from_log,
+    copy_line_to_clipboard,
+    lock_strategy_from_log,
+    parse_log_line_for_strategy,
+    show_log_context_menu,
+    unblock_strategy_from_log,
+)
+from orchestra.ui.page_log_history_workflow import (
+    clear_log_history_entries,
+    delete_log_history_entry,
+    view_log_history_entry,
+)
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens, get_themed_qta_icon
-from ui.text_catalog import tr as tr_catalog
-
-try:
-    from qfluentwidgets import (
-        BodyLabel, CaptionLabel, StrongBodyLabel, PushButton as FluentPushButton,
-        LineEdit, ComboBox, ListWidget, RoundMenu, CardWidget, TransparentToolButton,
-    )
-    _HAS_FLUENT = True
-except ImportError:
-    BodyLabel = QLabel
-    CaptionLabel = QLabel
-    StrongBodyLabel = QLabel
-    FluentPushButton = QPushButton
-    LineEdit = QLineEdit
-    ComboBox = QComboBox
-    ListWidget = QListWidget
-    RoundMenu = None
-    CardWidget = QFrame
-    TransparentToolButton = QPushButton
-    _HAS_FLUENT = False
+from app.text_catalog import tr as tr_catalog
+from qfluentwidgets import (
+    BodyLabel,
+    CaptionLabel,
+    StrongBodyLabel,
+    PushButton as FluentPushButton,
+    LineEdit,
+    ComboBox,
+    ListWidget,
+    CardWidget,
+    TransparentToolButton,
+)
 
 
 from log.log import log
 
 from orchestra.orchestra_runner import MAX_ORCHESTRA_LOGS
-from orchestra.ignored_targets import is_orchestra_ignored_target
 
 
 class OrchestraPage(BasePage):
     """Страница оркестратора с логами обучения"""
 
-    clear_learned_requested = pyqtSignal()  # Сигнал очистки данных обучения
     log_received = pyqtSignal(str)  # Сигнал для получения логов из потока runner'а
 
     # Состояния оркестратора
@@ -76,7 +76,7 @@ class OrchestraPage(BasePage):
     STATE_LEARNING = "learning"  # Перебирает стратегии (оранжевый)
     STATE_UNLOCKED = "unlocked"  # RST блокировка, переобучение (красный)
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, controller):
         super().__init__(
             "Оркестратор v0.9.6 (Beta)",
             "Автоматическое обучение стратегий DPI bypass. Система находит лучшую стратегию для каждого домена (TCP: TLS/HTTP, UDP: QUIC/Discord Voice/STUN).\nЧтобы начать обучение зайдите на сайт и через несколько секунд обновите вкладку. Продолжайте это пока стратегия не будет помечена как LOCKED",
@@ -84,6 +84,7 @@ class OrchestraPage(BasePage):
             title_key="page.orchestra.title",
             subtitle_key="page.orchestra.subtitle",
         )
+        self._controller = controller
 
         self._info_label = None
         self._filter_label = None
@@ -146,9 +147,7 @@ class OrchestraPage(BasePage):
         card_layout.setContentsMargins(16, 16, 16, 16)
         card_layout.setSpacing(12)
 
-        title_label = StrongBodyLabel(title, card) if _HAS_FLUENT else QLabel(title)
-        if not _HAS_FLUENT:
-            title_label.setStyleSheet("font-size: 14px; font-weight: 600;")
+        title_label = StrongBodyLabel(title, card)
         card_layout.addWidget(title_label)
 
         return card, card_layout, title_label
@@ -185,7 +184,6 @@ class OrchestraPage(BasePage):
         log_widgets = build_orchestra_log_card(
             create_card=self._create_card,
             tr_fn=self._tr,
-            has_fluent=_HAS_FLUENT,
             line_edit_cls=LineEdit,
             combo_cls=ComboBox,
             body_label_cls=BodyLabel,
@@ -214,9 +212,7 @@ class OrchestraPage(BasePage):
             create_card=self._create_card,
             tr_fn=self._tr,
             max_logs=MAX_ORCHESTRA_LOGS,
-            has_fluent=_HAS_FLUENT,
             list_widget_cls=ListWidget,
-            qlist_widget_cls=QListWidget,
             caption_label_cls=CaptionLabel,
             fluent_push_button_cls=FluentPushButton,
             on_view_log_history=self._view_log_history,
@@ -286,13 +282,13 @@ class OrchestraPage(BasePage):
         if self._delete_log_btn is not None:
             self._delete_log_btn.setIcon(get_themed_qta_icon("fa5s.trash-alt", color=tokens.fg))
 
-        self._update_status(getattr(self, "_current_state", self.STATE_IDLE))
+        self._update_status(self._current_state)
 
     def _update_status(self, state: str):
         """Обновляет статус на основе состояния"""
         self._current_state = state
         tokens = get_theme_tokens()
-        plan = OrchestraPageController.build_status_display_plan(
+        plan = orchestra_page_runtime.build_status_display_plan(
             state=state,
             idle_state=self.STATE_IDLE,
             learning_state=self.STATE_LEARNING,
@@ -319,7 +315,7 @@ class OrchestraPage(BasePage):
         if self.clear_learned_btn is None:
             return
         tokens = get_theme_tokens()
-        plan = OrchestraPageController.build_clear_learned_button_plan(
+        plan = orchestra_page_runtime.build_clear_learned_button_plan(
             pending=self._clear_learned_pending,
             default_text=self._tr("page.orchestra.button.clear_learning", "Сбросить обучение"),
             pending_text=self._tr("page.orchestra.button.clear_learning.pending", "Это всё сотрёт!"),
@@ -333,7 +329,7 @@ class OrchestraPage(BasePage):
             return
         self._clear_learned_pending = False
         if self.clear_learned_btn is not None:
-            plan = OrchestraPageController.build_clear_learned_button_plan(
+            plan = orchestra_page_runtime.build_clear_learned_button_plan(
                 pending=False,
                 default_text=self._tr("page.orchestra.button.clear_learning", "Сбросить обучение"),
                 pending_text=self._tr("page.orchestra.button.clear_learning.pending", "Это всё сотрёт!"),
@@ -350,7 +346,7 @@ class OrchestraPage(BasePage):
             self._clear_learned_reset_timer.stop()
             self._clear_learned_pending = False
             if self.clear_learned_btn is not None:
-                plan = OrchestraPageController.build_clear_learned_button_plan(
+                plan = orchestra_page_runtime.build_clear_learned_button_plan(
                     pending=False,
                     default_text=self._tr("page.orchestra.button.clear_learning", "Сбросить обучение"),
                     pending_text=self._tr("page.orchestra.button.clear_learning.pending", "Это всё сотрёт!"),
@@ -365,7 +361,7 @@ class OrchestraPage(BasePage):
 
         self._clear_learned_pending = True
         if self.clear_learned_btn is not None:
-            plan = OrchestraPageController.build_clear_learned_button_plan(
+            plan = orchestra_page_runtime.build_clear_learned_button_plan(
                 pending=True,
                 default_text=self._tr("page.orchestra.button.clear_learning", "Сбросить обучение"),
                 pending_text=self._tr("page.orchestra.button.clear_learning.pending", "Это всё сотрёт!"),
@@ -380,7 +376,9 @@ class OrchestraPage(BasePage):
         """Сбрасывает данные обучения"""
         if self._cleanup_in_progress:
             return
-        self.clear_learned_requested.emit()
+        log("Запрошена очистка данных обучения", "INFO")
+        if self._controller.clear_learned_data():
+            log("Данные обучения очищены", "INFO")
         self.append_log(
             self._tr("page.orchestra.log.learned_cleared", "[INFO] Данные обучения сброшены")
         )
@@ -391,9 +389,7 @@ class OrchestraPage(BasePage):
         if self._cleanup_in_progress:
             return
         run_update_cycle(
-            is_runner_alive=lambda: bool(
-                getattr(getattr(self, "launch_runtime_api", None), "is_any_running", lambda silent=True: False)(silent=True)
-            ),
+            is_runner_alive=self._controller.is_runtime_running,
             state_idle=self.STATE_IDLE,
             update_status=self._update_status,
             update_learned_domains=self._update_learned_domains,
@@ -449,12 +445,12 @@ class OrchestraPage(BasePage):
         )
 
     def _update_learned_domains(self):
-        """Обновляет данные обученных доменов из реестра через runner"""
+        """Обновляет данные обученных доменов из settings.json через runner."""
         if self._cleanup_in_progress:
             return
         try:
-            runner = getattr(self, "orchestra_runner", None)
-            plan = OrchestraPageController.build_learned_data_plan_from_runner(runner)
+            runner = self._get_runner()
+            plan = orchestra_page_runtime.build_learned_data_plan_from_runner(runner)
             self._update_domains(plan.data)
         except Exception as e:
             log(f"Ошибка чтения обученных доменов: {e}", "DEBUG")
@@ -479,7 +475,7 @@ class OrchestraPage(BasePage):
         """Проверяет, соответствует ли строка текущему фильтру"""
         domain_filter = self.log_filter_input.text().strip().lower()
         protocol_filter = self._current_protocol_filter_code()
-        return OrchestraPageController.matches_filter(
+        return orchestra_page_runtime.matches_filter(
             text=text,
             domain_filter=domain_filter,
             protocol_filter=protocol_filter,
@@ -509,7 +505,7 @@ class OrchestraPage(BasePage):
         """Запускает мониторинг"""
         if self._cleanup_in_progress:
             return
-        runner = getattr(self, "orchestra_runner", None)
+        runner = self._get_runner()
         start_orchestra_monitoring(
             runner=runner,
             emit_log_callback=self.emit_log,
@@ -545,7 +541,7 @@ class OrchestraPage(BasePage):
         super().set_ui_language(language)
         apply_orchestra_language(
             tr_fn=self._tr,
-            current_state=getattr(self, "_current_state", self.STATE_IDLE),
+            current_state=self._current_state,
             update_status=self._update_status,
             update_log_history=self._update_log_history,
             apply_log_filter=self._apply_log_filter,
@@ -589,78 +585,41 @@ class OrchestraPage(BasePage):
         """Просматривает выбранный лог из истории"""
         if self._cleanup_in_progress:
             return
-        current = self.log_history_list.currentItem()
-        if not current:
-            return
-
-        log_id = current.data(Qt.ItemDataRole.UserRole)
-        if not log_id:
-            return
-
-        try:
-            runner = self._get_runner()
-            if runner is not None:
-                content = runner.get_log_content(log_id)
-                plan = OrchestraPageController.build_log_history_view_plan(
-                    log_id=log_id,
-                    has_content=bool(content),
-                )
-                if content:
-                    # Очищаем текущий лог и показываем содержимое выбранного
-                    self.log_text.clear()
-                    self.log_text.setPlainText(content)
-                    self.append_log(plan.message_text)
-                else:
-                    self.append_log(plan.message_text)
-        except Exception as e:
-            log(f"Ошибка просмотра лога: {e}", "DEBUG")
+        view_log_history_entry(
+            runner=self._get_runner(),
+            current_item=self.log_history_list.currentItem(),
+            user_role=Qt.ItemDataRole.UserRole,
+            log_text=self.log_text,
+            append_log=self.append_log,
+            log_debug=lambda message: log(message, "DEBUG"),
+        )
 
     def _delete_log_history(self):
         """Удаляет выбранный лог из истории"""
         if self._cleanup_in_progress:
             return
-        current = self.log_history_list.currentItem()
-        if not current:
-            return
-
-        log_id = current.data(Qt.ItemDataRole.UserRole)
-        if not log_id:
-            return
-
-        try:
-            runner = self._get_runner()
-            if runner is not None:
-                deleted = bool(runner.delete_log(log_id))
-                plan = OrchestraPageController.build_log_history_delete_plan(
-                    log_id=log_id,
-                    deleted=deleted,
-                )
-                if deleted:
-                    self._update_log_history()
-                    self.append_log(plan.message_text)
-                else:
-                    self.append_log(plan.message_text)
-        except Exception as e:
-            log(f"Ошибка удаления лога: {e}", "DEBUG")
+        delete_log_history_entry(
+            runner=self._get_runner(),
+            current_item=self.log_history_list.currentItem(),
+            user_role=Qt.ItemDataRole.UserRole,
+            update_log_history=self._update_log_history,
+            append_log=self.append_log,
+            log_debug=lambda message: log(message, "DEBUG"),
+        )
 
     def _clear_all_log_history(self):
         """Удаляет все логи из истории"""
         if self._cleanup_in_progress:
             return
-        try:
-            runner = self._get_runner()
-            if runner is not None:
-                deleted = runner.clear_all_logs()
-                plan = OrchestraPageController.build_log_history_clear_all_plan(
-                    deleted_count=deleted,
-                )
-                self._update_log_history()
-                self.append_log(plan.message_text)
-        except Exception as e:
-            log(f"Ошибка очистки истории логов: {e}", "DEBUG")
+        clear_log_history_entries(
+            runner=self._get_runner(),
+            update_log_history=self._update_log_history,
+            append_log=self.append_log,
+            log_debug=lambda message: log(message, "DEBUG"),
+        )
 
     def _get_runner(self):
-        return resolve_page_orchestra_runner(self, parent=self.parent())
+        return self._controller.runner()
 
     def cleanup(self) -> None:
         self._cleanup_in_progress = True
@@ -694,99 +653,18 @@ class OrchestraPage(BasePage):
 
     def _show_log_context_menu(self, pos):
         """Показывает контекстное меню для строки лога"""
-        # Получаем текущую строку под курсором
-        cursor = self.log_text.cursorForPosition(pos)
-        cursor.select(cursor.SelectionType.LineUnderCursor)
-        line_text = cursor.selectedText().strip()
-
-        if not line_text:
-            return
-
-        # Парсим строку для извлечения домена и стратегии
-        parsed = self._parse_log_line_for_strategy(line_text)
-
-        # Создаём контекстное меню
-        if _HAS_FLUENT and RoundMenu:
-            menu = RoundMenu(parent=self)
-        else:
-            from PyQt6.QtWidgets import QMenu
-            menu = QMenu(self)
-
-        context_plan = None
-        if parsed:
-            domain, strategy, protocol = parsed
-            is_blocked = False
-            try:
-                runner = self._get_runner()
-                if runner is not None:
-                    is_blocked = runner.blocked_manager.is_blocked(domain, strategy)
-            except Exception:
-                pass
-
-            context_plan = OrchestraPageController.build_context_menu_plan(
-                domain=domain,
-                strategy=strategy,
-                is_blocked=is_blocked,
-                copy_label=self._tr("page.orchestra.context.copy_line", "📋 Копировать строку"),
-                lock_label=self._tr(
-                    "page.orchestra.context.lock_strategy",
-                    "🔒 Залочить стратегию #{strategy} для {domain}",
-                    strategy=strategy,
-                    domain=domain,
-                ) if strategy > 0 else None,
-                block_label=self._tr(
-                    "page.orchestra.context.block_strategy",
-                    "🚫 Заблокировать стратегию #{strategy} для {domain}",
-                    strategy=strategy,
-                    domain=domain,
-                ) if strategy > 0 else None,
-                unblock_label=self._tr(
-                    "page.orchestra.context.unblock_strategy",
-                    "✅ Разблокировать стратегию #{strategy} для {domain}",
-                    strategy=strategy,
-                    domain=domain,
-                ) if strategy > 0 else None,
-                whitelist_label=self._tr(
-                    "page.orchestra.context.add_whitelist",
-                    "⬚ Добавить {domain} в белый список",
-                    domain=domain,
-                ),
-            )
-        else:
-            context_plan = OrchestraPageController.build_context_menu_plan(
-                domain=None,
-                strategy=None,
-                is_blocked=False,
-                copy_label=self._tr("page.orchestra.context.copy_line", "📋 Копировать строку"),
-                lock_label=None,
-                block_label=None,
-                unblock_label=None,
-                whitelist_label=None,
-            )
-
-        actions_by_id: dict[str, QAction] = {}
-        for action_plan in context_plan.actions:
-            action = QAction(action_plan.label, self)
-            actions_by_id[action_plan.action_id] = action
-            menu.addAction(action)
-
-        copy_action = actions_by_id.get("copy")
-        if copy_action is not None:
-            copy_action.triggered.connect(lambda: self._copy_line_to_clipboard(line_text))
-
-        if parsed and context_plan.has_strategy_actions:
-            domain, strategy, protocol = parsed
-            menu.insertSeparator(actions_by_id.get("copy"))
-            if "lock" in actions_by_id:
-                actions_by_id["lock"].triggered.connect(lambda: self._lock_strategy_from_log(domain, strategy, protocol))
-            if "block" in actions_by_id:
-                actions_by_id["block"].triggered.connect(lambda: self._block_strategy_from_log(domain, strategy, protocol))
-            if "unblock" in actions_by_id:
-                actions_by_id["unblock"].triggered.connect(lambda: self._unblock_strategy_from_log(domain, strategy, protocol))
-            if "whitelist" in actions_by_id:
-                actions_by_id["whitelist"].triggered.connect(lambda: self._add_to_whitelist_from_log(domain))
-
-        exec_popup_menu(menu, self.log_text.mapToGlobal(pos), owner=self)
+        show_log_context_menu(
+            owner=self,
+            log_text=self.log_text,
+            pos=pos,
+            runner=self._get_runner(),
+            tr_fn=self._tr,
+            copy_line_fn=self._copy_line_to_clipboard,
+            lock_strategy_fn=self._lock_strategy_from_log,
+            block_strategy_fn=self._block_strategy_from_log,
+            unblock_strategy_fn=self._unblock_strategy_from_log,
+            add_to_whitelist_fn=self._add_to_whitelist_from_log,
+        )
 
     def _parse_log_line_for_strategy(self, line: str) -> tuple | None:
         """Парсит строку лога и извлекает домен, стратегию и протокол
@@ -799,84 +677,53 @@ class OrchestraPage(BasePage):
         - "[19:55:15] 🔓 UNLOCKED: youtube.com :443 - re-learning..."
         - "[HH:MM:SS] ✓ SUCCESS: domain UDP strategy=1"
         """
-        parsed = OrchestraPageController.parse_log_line_for_strategy(line)
-        if parsed is None:
-            return None
-        return (parsed.domain, parsed.strategy, parsed.protocol)
+        return parse_log_line_for_strategy(line)
 
     def _copy_line_to_clipboard(self, text: str):
         """Копирует текст в буфер обмена"""
-        from PyQt6.QtWidgets import QApplication
-        clipboard = QApplication.clipboard()
-        if clipboard is not None:
-            clipboard.setText(text)
-            self.append_log(
-                self._tr("page.orchestra.log.clipboard_copied", "[INFO] Строка скопирована в буфер обмена")
-            )
+        copy_line_to_clipboard(text=text, append_log=self.append_log, tr_fn=self._tr)
 
     def _lock_strategy_from_log(self, domain: str, strategy: int, protocol: str):
         """Залочивает стратегию из контекстного меню лога"""
-        try:
-            runner = self._get_runner()
-            plan = OrchestraPageController.lock_strategy(
-                runner,
-                domain=domain,
-                strategy=strategy,
-                protocol=protocol,
-                ignored_target=is_orchestra_ignored_target(domain),
-            )
-            for message in plan.messages:
-                self.append_log(message)
-            if plan.refresh_learned:
-                self._update_learned_domains()
-        except Exception as e:
-            log(f"Ошибка залочивания из контекстного меню: {e}", "ERROR")
-            self.append_log(self._tr("page.orchestra.log.error", "[ERROR] Ошибка: {error}", error=e))
+        lock_strategy_from_log(
+            runner=self._get_runner(),
+            domain=domain,
+            strategy=strategy,
+            protocol=protocol,
+            append_log=self.append_log,
+            refresh_learned=self._update_learned_domains,
+            tr_fn=self._tr,
+        )
 
     def _block_strategy_from_log(self, domain: str, strategy: int, protocol: str):
         """Блокирует стратегию из контекстного меню лога"""
-        try:
-            runner = self._get_runner()
-            plan = OrchestraPageController.block_strategy(
-                runner,
-                domain=domain,
-                strategy=strategy,
-                protocol=protocol,
-                ignored_target=is_orchestra_ignored_target(domain),
-            )
-            for message in plan.messages:
-                self.append_log(message)
-            if plan.refresh_learned:
-                self._update_learned_domains()
-        except Exception as e:
-            log(f"Ошибка блокировки из контекстного меню: {e}", "ERROR")
-            self.append_log(self._tr("page.orchestra.log.error", "[ERROR] Ошибка: {error}", error=e))
+        block_strategy_from_log(
+            runner=self._get_runner(),
+            domain=domain,
+            strategy=strategy,
+            protocol=protocol,
+            append_log=self.append_log,
+            refresh_learned=self._update_learned_domains,
+            tr_fn=self._tr,
+        )
 
     def _unblock_strategy_from_log(self, domain: str, strategy: int, protocol: str):
         """Разблокирует стратегию из контекстного меню лога"""
-        try:
-            runner = self._get_runner()
-            plan = OrchestraPageController.unblock_strategy(
-                runner,
-                domain=domain,
-                strategy=strategy,
-                protocol=protocol,
-            )
-            for message in plan.messages:
-                self.append_log(message)
-            if plan.refresh_learned:
-                self._update_learned_domains()
-        except Exception as e:
-            log(f"Ошибка разблокировки из контекстного меню: {e}", "ERROR")
-            self.append_log(self._tr("page.orchestra.log.error", "[ERROR] Ошибка: {error}", error=e))
+        unblock_strategy_from_log(
+            runner=self._get_runner(),
+            domain=domain,
+            strategy=strategy,
+            protocol=protocol,
+            append_log=self.append_log,
+            refresh_learned=self._update_learned_domains,
+            tr_fn=self._tr,
+        )
 
     def _add_to_whitelist_from_log(self, domain: str):
         """Добавляет домен в whitelist из контекстного меню лога"""
-        try:
-            runner = self._get_runner()
-            plan = OrchestraPageController.add_to_whitelist(runner, domain=domain)
-            for message in plan.messages:
-                self.append_log(message)
-        except Exception as e:
-            log(f"Ошибка добавления в whitelist из контекстного меню: {e}", "ERROR")
-            self.append_log(self._tr("page.orchestra.log.error", "[ERROR] Ошибка: {error}", error=e))
+        add_to_whitelist_from_log(
+            runner=self._get_runner(),
+            domain=domain,
+            append_log=self.append_log,
+            tr_fn=self._tr,
+        )

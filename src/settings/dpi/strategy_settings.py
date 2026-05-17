@@ -2,13 +2,11 @@ from __future__ import annotations
 
 from log.log import log
 from settings import store as settings_store
-
-_LAUNCH_METHOD_DEFAULT = "zapret2_mode"
-_SUPPORTED_LAUNCH_METHODS = {
-    "zapret2_mode",
-    "zapret1_mode",
-    "orchestra",
-}
+from settings.mode import (
+    DEFAULT_LAUNCH_METHOD,
+    is_known_launch_method,
+    normalize_launch_method,
+)
 
 PROFILE_UI_MODE_DEFAULT = "basic"
 _VALID_DIRECT_ZAPRET2_UI_MODES = frozenset({"basic"})
@@ -23,24 +21,22 @@ def normalize_profile_ui_mode(value: object) -> str:
 
 def get_strategy_launch_method() -> str:
     try:
-        normalized = str(settings_store.get_strategy_launch_method() or "").strip().lower()
-        if normalized in _SUPPORTED_LAUNCH_METHODS:
-            return normalized
+        return normalize_launch_method(settings_store.get_strategy_launch_method())
     except Exception as e:
         log(f"Ошибка чтения метода запуска из settings.json: {e}", "ERROR")
-    return _LAUNCH_METHOD_DEFAULT
+    return DEFAULT_LAUNCH_METHOD
 
 
 def set_strategy_launch_method(method: str) -> bool:
     try:
-        normalized = str(method or "").strip().lower()
-        if normalized not in _SUPPORTED_LAUNCH_METHODS:
+        normalized = normalize_launch_method(method, default="")
+        if not is_known_launch_method(normalized):
             log(
                 f"Попытка сохранить неподдерживаемый метод запуска: {normalized or 'empty'}. "
-                f"Используем {_LAUNCH_METHOD_DEFAULT}",
+                f"Используем {DEFAULT_LAUNCH_METHOD}",
                 "WARNING",
             )
-            normalized = _LAUNCH_METHOD_DEFAULT
+            normalized = DEFAULT_LAUNCH_METHOD
         settings_store.set_strategy_launch_method(normalized)
         log(f"Метод запуска стратегий изменен на: {normalized}", "INFO")
         return True
@@ -69,118 +65,38 @@ def set_profile_ui_mode(mode: str) -> bool:
         return False
 
 
-def _build_preset_runtime_reload_callback(*, launch_method: str, app_context, reason: str):
-    method = str(launch_method or "").strip().lower()
-    if method not in ("zapret2_mode", "zapret1_mode") or app_context is None:
-        return None
-
-    def _reload() -> None:
-        try:
-            from ui.app_window_locator import find_app_window
-            from winws_runtime.flow.apply_policy import request_preset_runtime_content_apply
-
-            host = find_app_window("launch_controller", "app_context")
-            if host is None:
-                return
-
-            host_context = getattr(host, "app_context", None)
-            if host_context is not None and host_context is not app_context:
-                return
-
-            request_preset_runtime_content_apply(
-                host,
-                launch_method=method,
-                reason=str(reason or "").strip() or "settings_changed",
-            )
-        except Exception:
-            return
-
-    return _reload
-
-
-def _is_profile_launch_method(method: str) -> bool:
-    return str(method or "").strip().lower() in {"zapret1_mode", "zapret2_mode"}
-
-
-def _request_profile_runtime_reload(*, app_context=None, launch_method: str, reason: str) -> None:
-    reload_callback = _build_preset_runtime_reload_callback(
-        launch_method=launch_method,
-        app_context=app_context,
-        reason=reason,
-    )
-    if callable(reload_callback):
-        reload_callback()
-
-
-def get_wssize_enabled(*, app_context=None, launch_method: str | None = None) -> bool:
-    method = str(launch_method or get_strategy_launch_method() or "").strip().lower()
-    if _is_profile_launch_method(method) and app_context is not None:
-        try:
-            from profile.settings import get_wssize_enabled as get_profile_wssize_enabled
-
-            return bool(get_profile_wssize_enabled(app_context, launch_method=method))
-        except Exception:
-            return False
+def get_wssize_enabled(*, launch_method: str | None = None) -> bool:
+    _ = launch_method
     return False
 
 
-def set_wssize_enabled(enabled: bool, *, app_context=None, launch_method: str | None = None) -> bool:
-    method = str(launch_method or get_strategy_launch_method() or "").strip().lower()
-    if _is_profile_launch_method(method) and app_context is not None:
-        try:
-            from profile.settings import set_wssize_enabled as set_profile_wssize_enabled
-
-            changed = bool(set_profile_wssize_enabled(app_context, bool(enabled), launch_method=method))
-            _request_profile_runtime_reload(
-                app_context=app_context,
-                launch_method=method,
-                reason="wssize_toggled",
-            )
-            return changed
-        except Exception:
-            return False
+def set_wssize_enabled(
+    enabled: bool,
+    *,
+    launch_method: str | None = None,
+    runtime_reload_callback=None,
+) -> bool:
+    _ = enabled, launch_method, runtime_reload_callback
     return False
 
 
-def get_debug_log_enabled(*, app_context=None, launch_method: str | None = None) -> bool:
-    method = str(launch_method or get_strategy_launch_method() or "").strip().lower()
-    if _is_profile_launch_method(method) and app_context is not None:
-        try:
-            from profile.settings import get_debug_log_enabled as get_profile_debug_log_enabled
-
-            return bool(get_profile_debug_log_enabled(app_context, launch_method=method))
-        except Exception:
-            return False
+def get_debug_log_enabled(*, launch_method: str | None = None) -> bool:
+    _ = launch_method
     return False
 
 
-def set_debug_log_enabled(enabled: bool, *, app_context=None, launch_method: str | None = None) -> bool:
-    method = str(launch_method or get_strategy_launch_method() or "").strip().lower()
-    if _is_profile_launch_method(method) and app_context is not None:
-        try:
-            from profile.settings import set_debug_log_enabled as set_profile_debug_log_enabled
-
-            changed = bool(set_profile_debug_log_enabled(app_context, bool(enabled), launch_method=method))
-            _request_profile_runtime_reload(
-                app_context=app_context,
-                launch_method=method,
-                reason="debug_log_toggled",
-            )
-            return changed
-        except Exception:
-            return False
+def set_debug_log_enabled(
+    enabled: bool,
+    *,
+    launch_method: str | None = None,
+    runtime_reload_callback=None,
+) -> bool:
+    _ = enabled, launch_method, runtime_reload_callback
     return False
 
 
-def get_debug_log_file(*, app_context=None, launch_method: str | None = None) -> str:
-    method = str(launch_method or get_strategy_launch_method() or "").strip().lower()
-    if _is_profile_launch_method(method) and app_context is not None:
-        try:
-            from profile.settings import get_debug_log_file as get_profile_debug_log_file
-
-            return str(get_profile_debug_log_file(app_context, launch_method=method) or "")
-        except Exception:
-            return ""
+def get_debug_log_file(*, launch_method: str | None = None) -> str:
+    _ = launch_method
     return ""
 
 

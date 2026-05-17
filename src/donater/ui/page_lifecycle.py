@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from donater.premium_page_tasks import is_premium_task_running, stop_premium_worker_task
+
 
 def apply_subscription_snapshot_ui(
     *,
@@ -50,7 +52,7 @@ def render_activation_status_label(
     activation_status_label.setText(activation_status_state.get("text") or "")
 
 
-def bind_premium_ui_state_store(
+def bind_premium_subscription_state_store(
     *,
     current_store,
     store,
@@ -133,16 +135,12 @@ def close_premium_page(
 ) -> None:
     set_cleanup_in_progress_fn(True)
     plan = build_close_plan_fn(
-        thread_running=bool(current_thread and current_thread.isRunning()),
+        thread_running=is_premium_task_running(current_thread),
     )
     if plan.stop_autopoll:
         stop_pairing_status_autopoll_fn()
-    if plan.should_quit_thread and current_thread and current_thread.isRunning():
-        current_thread.quit()
-        current_thread.wait(plan.wait_timeout_ms)
-        if current_thread.isRunning():
-            current_thread.terminate()
-            current_thread.wait(500)
+    if plan.should_quit_thread:
+        stop_premium_worker_task(current_thread, wait_timeout_ms=plan.wait_timeout_ms)
     set_current_thread_fn(None)
     event.accept()
 
@@ -156,12 +154,7 @@ def cleanup_premium_page(
 ) -> None:
     set_cleanup_in_progress_fn(True)
     stop_pairing_status_autopoll_fn()
-    if current_thread and current_thread.isRunning():
-        current_thread.quit()
-        current_thread.wait(1000)
-        if current_thread.isRunning():
-            current_thread.terminate()
-            current_thread.wait(500)
+    stop_premium_worker_task(current_thread, wait_timeout_ms=1000)
     set_current_thread_fn(None)
 
 

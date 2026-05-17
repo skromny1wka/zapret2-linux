@@ -5,10 +5,12 @@ from string import Template
 from PyQt6.QtCore import Qt, QEvent
 from PyQt6.QtWidgets import (
     QWidget, QLabel,
-    QPushButton, QLayout, QCheckBox
+    QLayout
 )
 
+import hosts.page_plans as hosts_page_plans
 from hosts.page_controller import HostsPageController
+from hosts.ui.page_runtime import create_page_hosts_runtime, create_runtime_cache
 from ui.pages.base_page import BasePage
 from hosts.ui.sections_build import (
     build_hosts_adobe_section,
@@ -27,7 +29,10 @@ from hosts.ui.selection_workflow import (
     apply_direct_toggle_ui,
     apply_profile_selection_ui,
 )
-from hosts.ui.catalog_workflow import (
+from hosts.state_sync_workflow import (
+    build_active_domains_read_plan,
+)
+from hosts.catalog_workflow import (
     ensure_catalog_watcher,
     reconcile_catalog_after_hidden_refresh,
     refresh_catalog_if_needed,
@@ -39,7 +44,7 @@ from hosts.ui.access_workflow import (
     restore_hosts_permissions_flow,
     show_hosts_access_error,
 )
-from hosts.ui.operation_workflow import (
+from hosts.operation_workflow import (
     complete_hosts_operation,
     reset_all_service_profiles_ui,
     start_hosts_operation,
@@ -53,35 +58,17 @@ from hosts.ui.page_lifecycle_helpers import (
     install_host_window_event_filter,
     run_hosts_runtime_init_once,
 )
-from ui.text_catalog import tr as tr_catalog
+from app.text_catalog import tr as tr_catalog
 
 from log.log import log
 
 from ui.theme import get_theme_tokens, get_themed_qta_icon
 from ui.theme_semantic import get_semantic_palette
 
-try:
-    from qfluentwidgets import (
-        BodyLabel, CaptionLabel, StrongBodyLabel,
-        PushButton, ComboBox, InfoBar, MessageBox, SwitchButton,
-    )
-    _HAS_FLUENT = True
-except ImportError:
-    _HAS_FLUENT = False
-    BodyLabel = QLabel  # type: ignore[misc,assignment]
-    CaptionLabel = QLabel  # type: ignore[misc,assignment]
-    StrongBodyLabel = QLabel  # type: ignore[misc,assignment]
-    PushButton = QPushButton  # type: ignore[misc,assignment]
-    ComboBox = None  # type: ignore[misc,assignment]
-    InfoBar = None  # type: ignore[misc,assignment]
-    MessageBox = None  # type: ignore[misc,assignment]
-    SwitchButton = None  # type: ignore[misc,assignment]
-
-try:
-    # Simple Win11 toggle without text (QCheckBox-based).
-    from ui.widgets.win11_controls import Win11ToggleSwitch as Win11ToggleSwitchNoText
-except Exception:
-    Win11ToggleSwitchNoText = QCheckBox  # type: ignore[misc,assignment]
+from qfluentwidgets import (
+    BodyLabel, CaptionLabel, ComboBox, InfoBar, MessageBox, PushButton,
+    StrongBodyLabel, SwitchButton,
+)
 
 
 _FLUENT_CHIP_STYLE_TEMPLATE = Template(
@@ -129,7 +116,7 @@ def _is_fluent_combo(obj) -> bool:
 class HostsPage(BasePage):
     """Страница управления Hosts файлом"""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, deps):
         super().__init__(
             "Hosts",
             "Управление разблокировкой сервисов через hosts файл",
@@ -138,7 +125,8 @@ class HostsPage(BasePage):
             subtitle_key="page.hosts.subtitle",
         )
 
-        self.hosts_manager = None
+        self._controller = HostsPageController(deps.hosts_feature)
+        self.hosts_runtime = None
         self.service_combos = {}
         self.service_icon_labels = {}
         self.service_icon_names = {}
@@ -161,18 +149,16 @@ class HostsPage(BasePage):
         self._catalog_dirty = False
         self._catalog_watch_timer = None
         self._host_window = None
-        self._app_parent = parent
         self._worker = None
         self._thread = None
         self._applying = False
         self._cleanup_in_progress = False
-        self._runtime_cache = HostsPageController.create_runtime_cache()
+        self._runtime_cache = create_runtime_cache()
         self._last_error = None  # Последняя ошибка
         self._current_operation = None
         self._startup_initialized = False
         self._runtime_initialized = False
-        self._service_dns_selection = HostsPageController.load_user_selection()
-        self._ipv6_infobar_shown = False
+        self._service_dns_selection = self._controller.load_user_selection()
 
         self._build_ui()
         self._apply_page_theme(force=True)
@@ -203,7 +189,7 @@ class HostsPage(BasePage):
         self._start_catalog_watcher()
         activate_hosts_page(
             install_host_window_event_filter_fn=self._install_host_window_event_filter,
-            build_activation_plan_fn=HostsPageController.build_activation_plan,
+            build_activation_plan_fn=hosts_page_plans.build_activation_plan,
             catalog_dirty=self._catalog_dirty,
             reconcile_hidden_refresh_fn=self._reconcile_catalog_after_hidden_refresh,
             invalidate_cache_fn=self._invalidate_cache,
@@ -215,10 +201,9 @@ class HostsPage(BasePage):
             runtime_initialized=self._runtime_initialized,
             set_runtime_initialized_fn=lambda value: setattr(self, "_runtime_initialized", value),
             install_host_window_event_filter_fn=self._install_host_window_event_filter,
-            ensure_ipv6_catalog_sections_fn=self._ensure_ipv6_catalog_sections,
-            build_page_init_plan_fn=HostsPageController.build_page_init_plan,
-            has_hosts_manager=self.hosts_manager is not None,
-            init_hosts_manager_fn=self._init_hosts_manager,
+            build_page_init_plan_fn=hosts_page_plans.build_page_init_plan,
+            has_hosts_runtime=self.hosts_runtime is not None,
+            init_hosts_runtime_fn=self._init_hosts_runtime,
             check_access_fn=self._check_hosts_access,
             rebuild_services_fn=self._rebuild_services_selectors,
             mark_startup_initialized_fn=lambda: setattr(self, "_startup_initialized", True),
@@ -273,105 +258,55 @@ class HostsPage(BasePage):
             update_ui_fn=self._update_ui,
         )
 
-    def _init_hosts_manager(self):
-        if self.hosts_manager is not None:
+    def _init_hosts_runtime(self):
+        if self.hosts_runtime is not None:
             return
 
-        self.hosts_manager = HostsPageController.resolve_hosts_manager(
-            getattr(self, "parent_app", None),
-            self._app_parent,
-        )
+        self.hosts_runtime = create_page_hosts_runtime(self._controller.create_hosts_runtime)
 
     def _invalidate_cache(self):
         """Сбрасывает кеш активных доменов"""
         self._runtime_cache.invalidate()
 
     def _get_hosts_runtime_state(self):
-        return self._runtime_cache.get_runtime_state(self.hosts_manager)
+        return self._runtime_cache.get_runtime_state(self.hosts_runtime, self._controller.get_hosts_state)
 
     def _get_hosts_path_str(self) -> str:
-        return HostsPageController.get_hosts_path_str()
-
-    def _sync_selections_from_hosts(self) -> None:
-        """
-        Делает UI «источником истины» = реальный hosts.
-        Сбрасывает combo/конфиг к тому, что реально присутствует в hosts сейчас.
-        """
-        if not self.hosts_manager:
-            return
-
-        active_domains_map = HostsPageController.read_active_domains_map(self.hosts_manager)
-        sync_plan = HostsPageController.build_selection_sync_plan(
-            service_names=list(self.service_combos.keys()),
-            active_domains_map=active_domains_map,
-        )
-
-        was_building = getattr(self, "_building_services_ui", False)
-        self._building_services_ui = True
-        try:
-            for service_name, combo in list(self.service_combos.items()):
-                entry = sync_plan.entries.get(service_name)
-                if entry is None:
-                    continue
-
-                if entry.direct_only:
-                    if isinstance(combo, QCheckBox):
-                        combo.setEnabled(entry.toggle_enabled)
-                        combo.setChecked(entry.toggle_checked)
-                        self._update_profile_row_visual(service_name)
-                        continue
-                    inferred = entry.selected_profile
-                else:
-                    inferred = entry.selected_profile
-
-                if inferred:
-                    if _is_fluent_combo(combo):
-                        idx = combo.findData(inferred)
-                        if idx >= 0:
-                            combo.blockSignals(True)
-                            combo.setCurrentIndex(idx)
-                            combo.blockSignals(False)
-                        else:
-                            combo.blockSignals(True)
-                            combo.setCurrentIndex(0)
-                            combo.blockSignals(False)
-                else:
-                    if _is_fluent_combo(combo):
-                        combo.blockSignals(True)
-                        combo.setCurrentIndex(0)
-                        combo.blockSignals(False)
-                    elif isinstance(combo, QCheckBox):
-                        combo.setChecked(False)
-
-                self._update_profile_row_visual(service_name)
-        finally:
-            self._building_services_ui = was_building
-
-        self._service_dns_selection = dict(sync_plan.new_selection)
-        HostsPageController.save_user_selection(self._service_dns_selection)
+        return self._controller.get_hosts_path_str()
 
     def _get_active_domains(self) -> set:
-        """Возвращает активные домены с кешированием (чтобы не читать hosts 28 раз)"""
-        state = self._get_hosts_runtime_state()
-        if state.error_message:
+        plan = build_active_domains_read_plan(
+            runtime_state=self._get_hosts_runtime_state(),
+            hosts_path=self._get_hosts_path_str(),
+            read_active_domains_fn=lambda: self._runtime_cache.get_active_domains(
+                self.hosts_runtime,
+                self._controller.get_hosts_state,
+            ),
+        )
+        if plan.error_kind == "read_error":
             self._show_error(
-                self._tr("page.hosts.error.read_hosts", "Ошибка чтения hosts: {error}", error=state.error_message)
+                self._tr(
+                    "page.hosts.error.read_hosts",
+                    "Ошибка чтения hosts: {error}",
+                    error=plan.error_message,
+                )
             )
             return set()
 
-        if not state.accessible:
-            hosts_path = self._get_hosts_path_str()
+        if plan.error_kind == "no_access":
             self._show_error(
                 self._tr(
                     "page.hosts.error.no_access.long",
                     "Нет доступа для изменения файла hosts.\nЕсли файл редактируется вручную, возможно защитник/антивирус блокирует запись.\nПуть: {path}",
-                    path=hosts_path,
+                    path=plan.hosts_path,
                 )
             )
-        else:
+            return set()
+
+        if plan.should_hide_error:
             self._hide_error()
 
-        return self._runtime_cache.get_active_domains(self.hosts_manager)
+        return plan.active_domains
 
     def _build_ui(self):
         # Информационная заметка
@@ -441,34 +376,14 @@ class HostsPage(BasePage):
         if handled:
             self._catalog_dirty = False
 
-    def _ensure_ipv6_catalog_sections(self) -> tuple[bool, bool]:
-        """Добавляет managed IPv6 секции в hosts.ini при доступном IPv6."""
-        try:
-            changed, ipv6_available = HostsPageController.ensure_ipv6_catalog_sections()
-            if changed:
-                log("Hosts: обнаружен IPv6, каталог hosts.ini дополнен IPv6 секциями", "INFO")
-                if InfoBar is not None and not self._ipv6_infobar_shown:
-                    self._ipv6_infobar_shown = True
-                    InfoBar.success(
-                        title=self._tr("page.hosts.ipv6.infobar.title", "IPv6"),
-                        content=self._tr(
-                            "page.hosts.ipv6.infobar.content",
-                            "У провайдера обнаружен IPv6. В hosts.ini добавлены IPv6 разделы DNS-провайдеров.",
-                        ),
-                        parent=self.window(),
-                    )
-            return (bool(changed), bool(ipv6_available))
-        except Exception as e:
-            log(f"Hosts: ошибка проверки IPv6 для hosts.ini: {e}", "DEBUG")
-            return (False, False)
-
     def _refresh_catalog_if_needed(self, trigger: str) -> None:
         result = refresh_catalog_if_needed(
             current_signature=self._catalog_sig,
             trigger=trigger,
             services_layout_exists=self._services_layout is not None,
             page_visible=self.isVisible(),
-            invalidate_catalog_cache=HostsPageController.invalidate_catalog_cache,
+            get_catalog_signature_fn=self._controller.get_catalog_signature,
+            invalidate_catalog_cache=self._controller.invalidate_catalog_cache,
             rebuild_services_selectors=self._rebuild_services_selectors,
             log_info=lambda message: log(message, "INFO"),
         )
@@ -504,6 +419,7 @@ class HostsPage(BasePage):
         if self._services_layout is None:
             return
         self._catalog_sig = rebuild_services_runtime_state(
+            get_catalog_signature_fn=self._controller.get_catalog_signature,
             clear_layout=lambda: (self._clear_layout(self._services_layout), self._reset_services_runtime_bindings()),
             build_services_selectors=self._build_services_selectors,
         )
@@ -541,12 +457,12 @@ class HostsPage(BasePage):
         self._hosts_error_bar = None
         self._last_error = None
         restore_hosts_permissions_flow(
+            restore_hosts_permissions_fn=self._controller.restore_hosts_permissions,
             info_bar_cls=InfoBar,
             window=self.window(),
             dismiss_error_bar=self._dismiss_hosts_error_bar,
             invalidate_cache=self._invalidate_cache,
             update_ui=self._update_ui,
-            sync_selections_from_hosts=self._sync_selections_from_hosts,
             show_error=self._show_error,
             log_error=lambda text: log(text, "ERROR"),
         )
@@ -586,8 +502,8 @@ class HostsPage(BasePage):
         self._open_hosts_button = widgets.open_hosts_button
         self.add_widget(widgets.card)
 
-    def _make_fluent_chip(self, label: str) -> QPushButton:
-        btn = QPushButton(label)
+    def _make_fluent_chip(self, label: str) -> PushButton:
+        btn = PushButton(label)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
         btn.setFixedHeight(24)
         btn.setStyleSheet(_get_fluent_chip_style())
@@ -603,7 +519,7 @@ class HostsPage(BasePage):
         if self._applying:
             return
 
-        plan = HostsPageController.build_bulk_profile_selection_plan(
+        plan = hosts_page_plans.build_bulk_profile_selection_plan(
             current_selection=self._service_dns_selection,
             service_names=service_names,
             profile_name=profile_name,
@@ -615,20 +531,22 @@ class HostsPage(BasePage):
             service_names=service_names,
             service_combos=self.service_combos,
             is_fluent_combo=_is_fluent_combo,
-            checkbox_cls=QCheckBox,
+            toggle_cls=SwitchButton,
             get_building_state=self._get_building_services_ui,
             set_building_state=self._set_building_services_ui,
             update_profile_visual=self._update_profile_row_visual,
-            apply_current_selection=self._apply_current_selection,
             log_debug=lambda message: log(message, "DEBUG"),
         )
         if new_selection is not None:
             self._service_dns_selection = new_selection
+            self._controller.save_user_selection(self._service_dns_selection)
+            if plan.apply_now:
+                self._apply_current_selection()
 
     def _build_services_selectors(self):
         OFF_LABEL = self._tr("page.hosts.services.off", "Откл.")
-        active_domains_map = HostsPageController.read_active_domains_map(self.hosts_manager)
-        catalog_plan = HostsPageController.build_services_catalog_plan(
+        active_domains_map = self._controller.read_active_domains_map(self.hosts_runtime)
+        catalog_plan = hosts_page_plans.build_services_catalog_plan(
             current_selection=self._service_dns_selection,
             active_domains_map=active_domains_map,
             direct_title=self._tr("page.hosts.group.direct", "Напрямую из hosts"),
@@ -661,8 +579,7 @@ class HostsPage(BasePage):
                         row_plan,
                         body_label_cls=BodyLabel,
                         combo_cls=ComboBox,
-                        has_fluent=_HAS_FLUENT,
-                        toggle_cls=Win11ToggleSwitchNoText,
+                        toggle_cls=SwitchButton,
                         off_label=OFF_LABEL,
                         on_direct_toggle=self._on_direct_toggle_changed,
                         on_profile_changed=self._on_profile_changed,
@@ -681,8 +598,8 @@ class HostsPage(BasePage):
             self._building_services_ui = False
 
         self._service_dns_selection = dict(catalog_plan.new_selection)
-        if catalog_plan.selection_migrated:
-            HostsPageController.save_user_selection(self._service_dns_selection)
+        if catalog_plan.selection_changed:
+            self._controller.save_user_selection(self._service_dns_selection)
 
     def _on_direct_toggle_changed(self, service_name: str, checked: bool) -> None:
         if getattr(self, "_building_services_ui", False):
@@ -692,31 +609,32 @@ class HostsPage(BasePage):
             self._update_profile_row_visual(service_name)
             return
 
-        plan = HostsPageController.build_mode_toggle_plan(
+        plan = hosts_page_plans.build_mode_toggle_plan(
             current_selection=self._service_dns_selection,
             service_name=service_name,
             checked=checked,
         )
-        self._service_dns_selection, _ = apply_direct_toggle_ui(
+        self._service_dns_selection, should_apply = apply_direct_toggle_ui(
             plan=plan,
             service_name=service_name,
             service_combos=self.service_combos,
-            checkbox_cls=QCheckBox,
+            toggle_cls=SwitchButton,
             get_building_state=self._get_building_services_ui,
             set_building_state=self._set_building_services_ui,
             update_profile_visual=self._update_profile_row_visual,
-            apply_current_selection=self._apply_current_selection,
         )
+        self._controller.save_user_selection(self._service_dns_selection)
+        if should_apply:
+            self._apply_current_selection()
 
     def _build_adobe_section(self):
         self.add_section_title(text_key="page.hosts.section.additional")
-        is_adobe_active = self.hosts_manager.is_adobe_domains_active() if self.hosts_manager else False
+        is_adobe_active = self.hosts_runtime.is_adobe_domains_active() if self.hosts_runtime else False
         widgets = build_hosts_adobe_section(
             tr_fn=self._tr,
             adobe_active=is_adobe_active,
             on_toggle_adobe=self._toggle_adobe,
             switch_button_cls=SwitchButton,
-            fallback_checkbox_cls=QCheckBox,
         )
         self._adobe_desc_label = widgets.description_label
         self._adobe_title_label = widgets.title_label
@@ -735,17 +653,19 @@ class HostsPage(BasePage):
             self._update_profile_row_visual(service_name)
             return
 
-        plan = HostsPageController.build_profile_selection_plan(
+        plan = hosts_page_plans.build_profile_selection_plan(
             current_selection=self._service_dns_selection,
             service_name=service_name,
             selected_profile=selected_profile,
         )
-        self._service_dns_selection, _ = apply_profile_selection_ui(
+        self._service_dns_selection, should_apply = apply_profile_selection_ui(
             plan=plan,
             service_name=service_name,
             update_profile_visual=self._update_profile_row_visual,
-            apply_current_selection=self._apply_current_selection,
         )
+        self._controller.save_user_selection(self._service_dns_selection)
+        if should_apply:
+            self._apply_current_selection()
 
     def _update_profile_row_visual(self, service_name: str):
         combo = self.service_combos.get(service_name)
@@ -760,7 +680,7 @@ class HostsPage(BasePage):
         enabled = False
         if _is_fluent_combo(combo):
             enabled = combo.currentData() is not None
-        elif isinstance(combo, QCheckBox):
+        elif isinstance(combo, SwitchButton):
             enabled = bool(combo.isChecked())
         color = base_color if enabled else tokens.fg_faint
         icon_name = self.service_icon_names.get(service_name)
@@ -773,6 +693,7 @@ class HostsPage(BasePage):
     def _apply_current_selection(self):
         if self._applying:
             return
+        self._controller.save_user_selection(self._service_dns_selection)
         self._run_operation('apply_selection', dict(self._service_dns_selection))
 
     def _on_clear_clicked(self):
@@ -780,10 +701,10 @@ class HostsPage(BasePage):
             return
         if MessageBox is not None:
             box = MessageBox(
-                self._tr("page.hosts.dialog.clear.title", "Очистить hosts?"),
+                self._tr("page.hosts.dialog.clear.title", "Очистить записи ZapretGUI?"),
                 self._tr(
                     "page.hosts.dialog.clear.body",
-                    "Это полностью сбросит файл hosts к стандартному содержимому Windows и удалит ВСЕ записи, включая добавленные вручную.",
+                    "Будет удалён только блок записей ZapretGUI. Ручные записи в файле hosts останутся на месте.",
                 ),
                 self.window(),
             )
@@ -799,7 +720,7 @@ class HostsPage(BasePage):
         self._run_operation('clear_all')
 
     def _open_hosts_file(self):
-        result = HostsPageController.open_hosts_file()
+        result = self._controller.open_hosts_file()
         if result.success:
             return
         if InfoBar:
@@ -821,10 +742,11 @@ class HostsPage(BasePage):
     def _run_operation(self, operation: str, payload=None):
         self._cleanup_in_progress = False
         runtime = start_hosts_operation(
-            hosts_manager=self.hosts_manager,
+            hosts_runtime=self.hosts_runtime,
             applying=self._applying,
             operation=operation,
             payload=payload,
+            execute_hosts_operation_fn=self._controller.execute_hosts_operation,
             on_operation_complete=self._on_operation_complete,
             on_thread_finished=self._on_hosts_thread_finished,
             parent=self,
@@ -852,7 +774,6 @@ class HostsPage(BasePage):
             hosts_path=self._get_hosts_path_str(),
             invalidate_cache=self._invalidate_cache,
             update_ui=self._update_ui,
-            sync_selections_from_hosts=self._sync_selections_from_hosts,
             reset_profiles_ui=self._reset_all_service_profiles,
             hide_error=self._hide_error,
             show_error=self._show_error,
@@ -861,20 +782,21 @@ class HostsPage(BasePage):
         self._applying = state["applying"]
 
     def _reset_all_service_profiles(self) -> None:
-        """Сбрасывает выбор профилей в UI и user_hosts.ini (после очистки hosts)."""
+        """Сбрасывает выбор профилей в UI и settings.json (после очистки hosts)."""
         self._service_dns_selection = reset_all_service_profiles_ui(
             service_combos=self.service_combos,
             is_fluent_combo=_is_fluent_combo,
-            checkbox_cls=QCheckBox,
+            toggle_cls=SwitchButton,
             get_building_state=self._get_building_services_ui,
             set_building_state=self._set_building_services_ui,
             update_profile_visual=self._update_profile_row_visual,
+            save_user_selection_fn=self._controller.save_user_selection,
         )
 
     def _update_ui(self):
         """Обновляет весь UI"""
         runtime_state = self._get_hosts_runtime_state()
-        status_display = HostsPageController.build_status_display_plan(
+        status_display = hosts_page_plans.build_status_display_plan(
             runtime_state,
             active_text=self._tr("page.hosts.status.active_domains", "Активно {count} доменов", count=len(runtime_state.active_domains)),
             none_text=self._tr("page.hosts.status.none_active", "Нет активных"),

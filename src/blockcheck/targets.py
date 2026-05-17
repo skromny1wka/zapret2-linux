@@ -9,21 +9,14 @@ from pathlib import Path
 
 from blockcheck.config import TCP_TARGET_MAX_COUNT, TCP_TARGETS_PER_PROVIDER
 from config.config import MAIN_DIRECTORY
+from settings import store as settings_store
 
 logger = logging.getLogger(__name__)
-
-# User domains file — stored next to the installed program
-USER_DOMAINS_FILE = "blockcheck_user_domains.txt"
 
 
 def _data_dir() -> Path:
     """Return path to blockcheck/data/ directory (bundled, read-only in PyInstaller)."""
     return Path(__file__).parent / "data"
-
-
-def _user_data_path() -> Path:
-    """Return path to user domains file (writable)."""
-    return Path(MAIN_DIRECTORY) / USER_DOMAINS_FILE
 
 
 def _iter_data_file_candidates(filename: str, filepath: str | Path | None = None) -> list[Path]:
@@ -94,24 +87,18 @@ def load_domains_with_source(filepath: str | Path | None = None) -> tuple[list[s
 # ---------------------------------------------------------------------------
 
 def load_user_domains() -> list[str]:
-    """Load user-added custom domains from file."""
-    path = _user_data_path()
-    if not path.exists():
-        return []
+    """Load user-added custom domains from settings.json."""
     try:
-        domains = []
-        for line in path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line and not line.startswith("#"):
-                domains.append(line)
-        return domains
-    except OSError:
+        domains = settings_store.get_blockcheck_settings().get("user_domains", [])
+        if not isinstance(domains, list):
+            return []
+        return [str(item).strip().lower() for item in domains if str(item).strip()]
+    except Exception:
         return []
 
 
 def save_user_domains(domains: list[str]) -> None:
-    """Save user custom domains to file."""
-    path = _user_data_path()
+    """Save user custom domains to settings.json."""
     try:
         # Deduplicate while preserving order
         seen = set()
@@ -121,8 +108,8 @@ def save_user_domains(domains: list[str]) -> None:
             if d and d not in seen:
                 seen.add(d)
                 unique.append(d)
-        path.write_text("\n".join(unique) + "\n", encoding="utf-8")
-    except OSError as e:
+        settings_store.set_blockcheck_settings({"user_domains": unique})
+    except Exception as e:
         logger.warning("Failed to save user domains: %s", e)
 
 

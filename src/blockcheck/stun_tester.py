@@ -56,7 +56,7 @@ def _parse_xor_mapped_address(value: bytes, magic_cookie: int, transaction_id: b
 
 
 def _parse_mapped_address(value: bytes) -> dict | None:
-    """Parse MAPPED-ADDRESS attr value (legacy fallback, IPv4/IPv6)."""
+    """Parse MAPPED-ADDRESS attr value for IPv4/IPv6."""
     if len(value) < 4:
         return None
 

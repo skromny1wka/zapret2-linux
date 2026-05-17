@@ -1,11 +1,9 @@
 import os
 import time
-from typing import Optional, Callable, TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from main.window import LupiDPIApp
+from typing import Optional, Callable
 
 from log.log import log
+from settings.mode import EXE_NAME_WINWS1, WINWS_ENGINE_FAMILY_LABEL
 
 from .process_probe import (
     get_canonical_winws_process_pids,
@@ -28,7 +26,6 @@ class PresetLaunchRuntimeApi:
         self,
         expected_exe_path: str,
         status_callback: Optional[Callable[[str], None]] = None,
-        app_instance: Optional["LupiDPIApp"] = None,
     ):
         """
         Инициализирует PresetLaunchRuntimeApi.
@@ -36,11 +33,9 @@ class PresetLaunchRuntimeApi:
         Args:
             expected_exe_path: Путь к ожидаемому winws.exe/winws2.exe
             status_callback: Функция обратного вызова для отображения статуса
-            app_instance: Ссылка на главное приложение
         """
         self.expected_exe_path = expected_exe_path
         self.status_callback = status_callback
-        self.app_instance = app_instance
 
     def _set_status(self, text: str) -> None:
         """Внутренний метод для установки статуса"""
@@ -67,7 +62,7 @@ class PresetLaunchRuntimeApi:
         try:
             is_running = bool(get_canonical_winws_process_pids())
             if not silent:
-                log(f"winws/winws2 state → {is_running} (WinAPI canonical)", "DEBUG")
+                log(f"{WINWS_ENGINE_FAMILY_LABEL} state → {is_running} (WinAPI canonical)", "DEBUG")
             return is_running
         except Exception as e:
             if not silent:
@@ -85,14 +80,14 @@ class PresetLaunchRuntimeApi:
         canonical_running = bool(self.is_any_running(silent=True))
         if canonical_running:
             if not silent:
-                log("Residual winws/winws2 detected via canonical probe", "DEBUG")
+                log(f"Residual {WINWS_ENGINE_FAMILY_LABEL} detected via canonical probe", "DEBUG")
             return True
 
         try:
             residual_running = bool(has_any_winws_process())
             if not silent:
                 log(
-                    f"winws/winws2 residual state → {residual_running} (name fallback)",
+                    f"{WINWS_ENGINE_FAMILY_LABEL} residual state → {residual_running} (name fallback)",
                     "DEBUG",
                 )
             return residual_running
@@ -111,7 +106,7 @@ class PresetLaunchRuntimeApi:
         try:
             is_running = bool(is_expected_winws_running(self.expected_exe_path))
             if not silent:
-                exe_name = os.path.basename(self.expected_exe_path) or "winws.exe"
+                exe_name = os.path.basename(self.expected_exe_path) or EXE_NAME_WINWS1
                 log(f"{exe_name} state → {is_running} (WinAPI canonical)", "DEBUG")
             return is_running
         except Exception as e:
@@ -152,6 +147,6 @@ class PresetLaunchRuntimeApi:
 
         time.sleep(0.3)
         ok = not self.has_residual_processes(silent=True)
-        log("Все процессы остановлены" if ok else "winws/winws2 ещё работает",
+        log("Все процессы остановлены" if ok else f"{WINWS_ENGINE_FAMILY_LABEL} ещё работает",
             "✅ SUCCESS" if ok else "⚠ WARNING")
         return ok

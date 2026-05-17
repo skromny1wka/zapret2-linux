@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Optional
 
 from core.paths import AppPaths
-from core.presets.strategy_catalog_sanitizer import sanitize_strategy_catalog_dir
 
 
 @dataclass(frozen=True)
@@ -21,16 +20,9 @@ _STRATEGY_CATALOGS_CACHE: dict[
     tuple[tuple[tuple[str, int, int], ...], dict[str, dict[str, StrategyEntry]]],
 ] = {}
 
-def _catalog_root(paths: AppPaths) -> Path:
-    return paths.user_root / "presets" / "catalogs"
-
-
-def ensure_user_catalogs(paths: AppPaths) -> Path:
-    catalog_root = _catalog_root(paths)
-    catalog_root.mkdir(parents=True, exist_ok=True)
-    sanitize_strategy_catalog_dir(catalog_root / "winws1")
-    sanitize_strategy_catalog_dir(catalog_root / "winws2")
-    return catalog_root
+def strategy_catalog_root(paths: AppPaths) -> Path:
+    """Каталог готовых стратегий рядом с программой, подготовленный установщиком."""
+    return paths.user_root / "profile" / "strategy_catalogs"
 
 
 def _tree_signature(root: Path, pattern: str = "*.txt") -> tuple[tuple[str, int, int], ...]:
@@ -126,9 +118,9 @@ def _has_profile_scoped_lines(lines: list[str]) -> bool:
 
 
 def load_strategy_catalogs(paths: AppPaths, engine: str) -> dict[str, dict[str, StrategyEntry]]:
-    root = ensure_user_catalogs(paths)
-    engine_root = root / engine
-    cache_key = (str(engine_root.resolve()), str(engine or "").strip().lower())
+    engine_key = str(engine or "").strip().lower()
+    engine_root = strategy_catalog_root(paths) / engine_key
+    cache_key = (str(engine_root.resolve()), engine_key)
     signature = _tree_signature(engine_root)
     cached = _STRATEGY_CATALOGS_CACHE.get(cache_key)
     if cached is not None and cached[0] == signature:

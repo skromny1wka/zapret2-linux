@@ -46,6 +46,9 @@ Desktop.ini
 # Logs
 *.log
 
+# Runtime user state
+/settings/
+
 # Local config
 .env.local
 
@@ -63,3 +66,4 @@ docs/gui_preset_profile_architecture_plan.md
 www_youtube_com.txt
 /.codex
 /docs
+/logs

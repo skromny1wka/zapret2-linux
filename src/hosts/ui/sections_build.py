@@ -5,20 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QLabel, QHBoxLayout, QCheckBox
+from PyQt6.QtWidgets import QLabel, QHBoxLayout
 
-from ui.compat_widgets import SettingsCard, SemanticNotice
+from ui.fluent_widgets import SettingsCard, SemanticNotice
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens, get_themed_qta_icon
 from ui.theme_semantic import get_semantic_palette
-
-try:
-    from qfluentwidgets import CaptionLabel, BodyLabel, StrongBodyLabel, PushButton, SwitchButton
-except Exception:
-    CaptionLabel = QLabel  # type: ignore[assignment]
-    BodyLabel = QLabel  # type: ignore[assignment]
-    StrongBodyLabel = QLabel  # type: ignore[assignment]
-    from PyQt6.QtWidgets import QPushButton
-    SwitchButton = None  # type: ignore[assignment]
+from qfluentwidgets import BodyLabel, CaptionLabel, PushButton, StrongBodyLabel, SwitchButton
 
 
 @dataclass(slots=True)
@@ -143,7 +135,6 @@ def build_hosts_adobe_section(
     adobe_active: bool,
     on_toggle_adobe,
     switch_button_cls=SwitchButton,
-    fallback_checkbox_cls=QCheckBox,
 ) -> HostsAdobeWidgets:
     adobe_card = SettingsCard()
 
@@ -167,14 +158,9 @@ def build_hosts_adobe_section(
     adobe_title_label = StrongBodyLabel(tr_fn("page.hosts.adobe.title", "Блокировка Adobe"))
     adobe_layout.addWidget(adobe_title_label, 1)
 
-    if switch_button_cls is not None:
-        adobe_switch = switch_button_cls()
-        adobe_switch.setChecked(adobe_active)
-        adobe_switch.checkedChanged.connect(on_toggle_adobe)
-    else:
-        adobe_switch = fallback_checkbox_cls()
-        adobe_switch.setChecked(adobe_active)
-        adobe_switch.toggled.connect(on_toggle_adobe)
+    adobe_switch = switch_button_cls()
+    adobe_switch.setChecked(adobe_active)
+    adobe_switch.checkedChanged.connect(on_toggle_adobe)
     adobe_layout.addWidget(adobe_switch)
 
     adobe_card.add_layout(adobe_layout)

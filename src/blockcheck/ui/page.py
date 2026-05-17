@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import logging
+
 import qtawesome as qta
 
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel
 
-from blockcheck.page_controller import BlockcheckPageController
+import blockcheck.page_runtime as blockcheck_page_runtime
 from blockcheck.ui.domain_chip import DomainChip
 from blockcheck.ui.domains_build import build_blockcheck_domains_ui
 from blockcheck.ui.sections_build import build_actions_section, build_results_section
@@ -19,18 +21,21 @@ from blockcheck.ui.summary_content import (
 from blockcheck.ui.summary_build import build_dpi_summary_section
 from blockcheck.ui.helpers import (
     add_domain_chip,
-    build_family_tooltip,
-    build_target_detail_text,
     collect_extra_domains,
-    format_result_detail,
     load_domain_chips,
     remove_domain_chip,
-    sort_results_by_family,
-    truncate_detail,
 )
-from blockcheck.ui.worker import BlockcheckWorker
+from blockcheck.ui.page_results_workflow import (
+    update_target_result_table,
+)
+from blockcheck.page_run_workflow import (
+    cleanup_blockcheck_worker,
+    request_blockcheck_stop,
+    reset_blockcheck_running_ui,
+    start_blockcheck_page_run,
+)
 from ui.pages.base_page import BasePage, ScrollBlockingTextEdit
-from ui.text_catalog import tr as tr_catalog
+from app.text_catalog import tr as tr_catalog
 
 from qfluentwidgets import (
     ComboBox,
@@ -47,37 +52,9 @@ from qfluentwidgets import (
     SegmentedWidget,
 )
 
-from ui.compat_widgets import SettingsCard, InfoBarHelper, QuickActionsBar
+from ui.fluent_widgets import SettingsCard, InfoBarHelper, QuickActionsBar
 
-# ---------------------------------------------------------------------------
-# DPI badge colors
-# ---------------------------------------------------------------------------
-
-_DPI_BADGE_COLORS = {
-    "none": ("#52c477", "#1a3a24"),
-    "dns_fake": ("#e0a854", "#3a2e1a"),
-    "http_inject": ("#e07854", "#3a221a"),
-    "isp_page": ("#e05454", "#3a1a1a"),
-    "tls_dpi": ("#e05454", "#3a1a1a"),
-    "tls_mitm": ("#e05454", "#3a1a1a"),
-    "tcp_reset": ("#e07854", "#3a221a"),
-    "tcp_16_20": ("#e0a854", "#3a2e1a"),
-    "stun_block": ("#e0a854", "#3a2e1a"),
-    "full_block": ("#e05454", "#3a1a1a"),
-}
-
-_DPI_LABELS_RU = {
-    "none": "DPI не обнаружен",
-    "dns_fake": "DNS подмена",
-    "http_inject": "HTTP инъекция",
-    "isp_page": "Страница-заглушка ISP",
-    "tls_dpi": "TLS DPI (RST/EOF)",
-    "tls_mitm": "TLS MITM прокси",
-    "tcp_reset": "TCP RST",
-    "tcp_16_20": "TCP блок 16-20KB",
-    "stun_block": "STUN/UDP блокировка",
-    "full_block": "Полная блокировка",
-}
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Page
@@ -101,7 +78,7 @@ class BlockcheckPage(BasePage):
         "dns": TAB_DNS_SPOOFING,
     }
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, blockcheck_feature, diagnostics_feature, dns_feature, runtime_feature):
         super().__init__(
             title=tr_catalog("page.blockcheck.title", default="BlockCheck"),
             subtitle=tr_catalog("page.blockcheck.subtitle",
@@ -112,7 +89,11 @@ class BlockcheckPage(BasePage):
         )
         self.setObjectName("BlockcheckPage")
 
-        self._worker: BlockcheckWorker | None = None
+        self._blockcheck = blockcheck_feature
+        self._diagnostics = diagnostics_feature
+        self._dns = dns_feature
+        self._runtime_feature = runtime_feature
+        self._worker = None
         self._last_report = None
         self._run_log_file: str | None = None
         self._tab_widgets: list[QWidget] = []
@@ -364,7 +345,12 @@ class BlockcheckPage(BasePage):
             return
         try:
             from blockcheck.ui.strategy_scan_page import StrategyScanPage
-            self._strategy_tab_page = StrategyScanPage(parent=self, embedded=True)
+            self._strategy_tab_page = StrategyScanPage(
+                parent=self,
+                embedded=True,
+                blockcheck_feature=self._blockcheck,
+                runtime_feature=self._runtime_feature,
+            )
             self._strategy_tab_page.setVisible(False)
             self.add_widget(self._strategy_tab_page)
             try:
@@ -381,7 +367,10 @@ class BlockcheckPage(BasePage):
         try:
             from diagnostics.ui.page import ConnectionTestPage
 
-            self._diagnostics_tab_page = ConnectionTestPage(parent=self.parent_app)
+            self._diagnostics_tab_page = ConnectionTestPage(
+                parent=self,
+                diagnostics_feature=self._diagnostics,
+            )
             self._diagnostics_tab_page.setVisible(False)
             self.add_widget(self._diagnostics_tab_page)
 
@@ -399,7 +388,10 @@ class BlockcheckPage(BasePage):
         try:
             from dns.ui.dns_check_page import DNSCheckPage
 
-            self._dns_spoofing_tab_page = DNSCheckPage(parent=self.parent_app)
+            self._dns_spoofing_tab_page = DNSCheckPage(
+                parent=self,
+                dns_feature=self._dns,
+            )
             self._dns_spoofing_tab_page.setVisible(False)
             self.add_widget(self._dns_spoofing_tab_page)
 
@@ -490,79 +482,64 @@ class BlockcheckPage(BasePage):
 
     def _start_run_log(self, mode: str, extra_domains: list[str]) -> None:
         """Create a dedicated history log for current blockcheck run."""
-        state = BlockcheckPageController.start_run_log(mode, extra_domains)
+        state = blockcheck_page_runtime.start_run_log(mode, extra_domains)
         self._run_log_file = state.path
         if not state.created:
             logger.warning("Failed to create blockcheck run log")
 
     def _append_run_log(self, message: str) -> None:
         """Append line(s) to current blockcheck run log."""
-        BlockcheckPageController.append_run_log(self._run_log_file, message)
+        blockcheck_page_runtime.append_run_log(self._run_log_file, message)
 
     def _on_start(self):
         if self._worker and self._worker.is_running:
             return
         self._cleanup_in_progress = False
 
-        # Get mode from combo
         mode = self._mode_combo.currentData()
         if mode is None:
             mode = "full"
-
-        # Clear previous results
-        self._table.setRowCount(0)
-        if self._tcp_table is not None:
-            self._tcp_table.setRowCount(0)
-            self._tcp_table.setVisible(False)
-        if self._tcp_section_label is not None:
-            self._tcp_section_label.setVisible(False)
-        self._dpi_card.setVisible(False)
-        self._log_edit.clear()
         self._last_report = None
-        self._runtime_warnings_seen.clear()
-        self._set_support_status("")
-
-        # UI state
-        self._start_btn.setEnabled(False)
-        self._stop_btn.setEnabled(True)
-        self._mode_combo.setEnabled(False)
-        self._skip_failed_cb.setEnabled(False)
-        self._progress_bar.setVisible(True)
-        if hasattr(self._progress_bar, 'start'):
-            self._progress_bar.start()
-        self._status_label.setText(
-            tr_catalog("page.blockcheck.running", default="Запуск тестов...")
-        )
-
         extra = self._get_extra_domains()
-        self._start_run_log(mode, extra)
 
-        # Create worker (QObject on main thread) — work runs in daemon thread
-        skip_failed = self._skip_failed_cb.isChecked()
-        self._worker = BlockcheckWorker(
-            mode=mode, extra_domains=extra or None,
-            skip_preflight_failed=skip_failed, parent=self,
+        run_state = start_blockcheck_page_run(
+            blockcheck_feature=self._blockcheck,
+            mode=mode,
+            extra_domains=extra,
+            skip_preflight_failed=self._skip_failed_cb.isChecked(),
+            parent=self,
+            table=self._table,
+            tcp_table=self._tcp_table,
+            tcp_section_label=self._tcp_section_label,
+            dpi_card=self._dpi_card,
+            log_edit=self._log_edit,
+            start_button=self._start_btn,
+            stop_button=self._stop_btn,
+            mode_combo=self._mode_combo,
+            skip_failed_checkbox=self._skip_failed_cb,
+            progress_bar=self._progress_bar,
+            status_label=self._status_label,
+            runtime_warnings_seen=self._runtime_warnings_seen,
+            set_support_status=self._set_support_status,
+            tr_fn=tr_catalog,
+            on_phase_changed=self._on_phase_changed,
+            on_test_result=self._on_test_result,
+            on_target_complete=self._on_target_complete,
+            on_log=self._on_log,
+            on_finished=self._on_finished,
+            logger_warning=logger.warning,
         )
-        self._worker.phase_changed.connect(self._on_phase_changed)
-        self._worker.test_result.connect(self._on_test_result)
-        self._worker.target_complete.connect(self._on_target_complete)
-        self._worker.log_message.connect(self._on_log)
-        self._worker.finished.connect(self._on_finished)
-        self._worker.start()
+        self._worker = run_state.worker
+        self._run_log_file = run_state.run_log_file
 
     def _on_stop(self):
-        if self._worker:
-            self._worker.stop()
-            expected_worker = self._worker
-        else:
-            expected_worker = None
-        self._stop_btn.setEnabled(False)
-        self._status_label.setText(
-            tr_catalog("page.blockcheck.stopping", default="Остановка...")
+        request_blockcheck_stop(
+            worker=self._worker,
+            stop_button=self._stop_btn,
+            status_label=self._status_label,
+            force_stop=self._force_stop,
+            tr_fn=tr_catalog,
         )
-
-        # Если остановка затянулась, честно показываем ожидание, не притворяясь что всё уже завершилось.
-        QTimer.singleShot(5000, lambda worker=expected_worker: self._force_stop(worker))
 
     def _force_stop(self, expected_worker=None):
         if expected_worker is None:
@@ -601,86 +578,12 @@ class BlockcheckPage(BasePage):
         """Add/update a row in the results table for a completed target."""
         if self._cleanup_in_progress:
             return
-        from blockcheck.models import TestStatus, TestType
-
-        name = target_result.name
-        tests = target_result.tests
-
-        if str(target_result.value).startswith("TCP:"):
-            self._update_tcp_table(target_result)
-            return
-
-        # Find or create row
-        row = self._find_row(name)
-        if row == -1:
-            row = self._table.rowCount()
-            self._table.insertRow(row)
-            self._table.setItem(row, 0, self._make_item(name))
-
-        # HTTP
-        http_tests = [t for t in tests if t.test_type == TestType.HTTP]
-        if http_tests:
-            self._set_dualstack_status_cell(row, 1, http_tests)
-
-        # TLS 1.2
-        tls12 = [t for t in tests if t.test_type == TestType.TLS_12]
-        tls13 = [t for t in tests if t.test_type == TestType.TLS_13]
-        if tls12:
-            # If TLS 1.2 fails but TLS 1.3 works — it's DPI blocking SNI (not an error)
-            tls13_ok = any(r.status == TestStatus.OK for r in tls13)
-            tls12_all_fail = all(r.status != TestStatus.OK for r in tls12)
-            if tls12_all_fail and tls13_ok:
-                r12_detail = build_family_tooltip(tls12)
-                r12_detail += "\nDPI блокирует SNI в TLS 1.2; сайт работает через TLS 1.3"
-                item = self._make_item("DPI 1.2")
-                item.setForeground(QColor("#e0a854"))
-                item.setToolTip(r12_detail)
-                self._table.setItem(row, 2, item)
-            else:
-                self._set_dualstack_status_cell(row, 2, tls12)
-
-        # TLS 1.3
-        if tls13:
-            self._set_dualstack_status_cell(row, 3, tls13)
-
-        # DNS / ISP evidence
-        dns_tests = [
-            t for t in tests
-            if t.test_type in (TestType.DNS_UDP, TestType.DNS_DOH)
-        ]
-        isp_tests = [t for t in tests if t.test_type == TestType.ISP_PAGE]
-        if dns_tests:
-            self._set_status_cell(row, 4, dns_tests[0])
-        elif isp_tests:
-            self._set_status_cell(row, 4, isp_tests[0])
-
-        # DPI classification
-        from blockcheck.models import DPIClassification
-        cls = target_result.classification
-        if cls != DPIClassification.NONE:
-            label = _DPI_LABELS_RU.get(cls.value, cls.value)
-            item = self._make_item(label)
-            color = _DPI_BADGE_COLORS.get(cls.value, ("#e0a854", "#3a2e1a"))
-            item.setForeground(QColor(color[0]))
-            self._table.setItem(row, 5, item)
-        else:
-            self._table.setItem(row, 5, self._make_item("—"))
-
-        # Ping
-        ping = [t for t in tests if t.test_type == TestType.PING]
-        if ping:
-            self._set_dualstack_status_cell(row, 6, ping)
-
-        # STUN (show in HTTP column for STUN targets)
-        stun = [t for t in tests if t.test_type == TestType.STUN]
-        if stun and not http_tests:
-            self._set_status_cell(row, 1, stun[0])
-
-        detail_text = build_target_detail_text(tests)
-        detail_cell = self._make_item(truncate_detail(detail_text))
-        detail_cell.setForeground(QColor("#9aa0a6"))
-        detail_cell.setToolTip(detail_text)
-        self._table.setItem(row, 7, detail_cell)
+        update_target_result_table(
+            target_result=target_result,
+            table=self._table,
+            tcp_table=self._tcp_table,
+            tcp_section_label=self._tcp_section_label,
+        )
 
     def _on_log(self, message: str):
         if self._cleanup_in_progress:
@@ -789,13 +692,13 @@ class BlockcheckPage(BasePage):
     # ------------------------------------------------------------------
 
     def _reset_ui(self):
-        self._start_btn.setEnabled(True)
-        self._stop_btn.setEnabled(False)
-        self._mode_combo.setEnabled(True)
-        self._skip_failed_cb.setEnabled(True)
-        self._progress_bar.setVisible(False)
-        if hasattr(self._progress_bar, 'stop'):
-            self._progress_bar.stop()
+        reset_blockcheck_running_ui(
+            start_button=self._start_btn,
+            stop_button=self._stop_btn,
+            mode_combo=self._mode_combo,
+            skip_failed_checkbox=self._skip_failed_cb,
+            progress_bar=self._progress_bar,
+        )
 
     def _set_support_status(self, text: str) -> None:
         if self._support_status_label is None:
@@ -807,7 +710,7 @@ class BlockcheckPage(BasePage):
         extra_domains = self._get_extra_domains()
 
         try:
-            feedback = BlockcheckPageController.prepare_support(
+            feedback = blockcheck_page_runtime.prepare_support(
                 run_log_file=self._run_log_file,
                 mode_label=mode_label,
                 extra_domains=extra_domains,
@@ -864,172 +767,6 @@ class BlockcheckPage(BasePage):
             self._log_edit.setMaximumHeight(300)
             self._expand_log_btn.setText("Развернуть")
 
-    def _find_row(self, name: str) -> int:
-        for row in range(self._table.rowCount()):
-            item = self._table.item(row, 0)
-            if item and item.text() == name:
-                return row
-        return -1
-
-    def _find_tcp_row(self, target_id: str) -> int:
-        if self._tcp_table is None:
-            return -1
-        for row in range(self._tcp_table.rowCount()):
-            item = self._tcp_table.item(row, 0)
-            if item and item.text() == target_id:
-                return row
-        return -1
-
-    @staticmethod
-    def _result_display_rank(result) -> int:
-        from blockcheck.models import TestStatus
-
-        if result.status == TestStatus.FAIL:
-            return 0
-        if result.status == TestStatus.ERROR:
-            return 1
-        if result.status == TestStatus.TIMEOUT:
-            return 2
-        if result.status == TestStatus.UNSUPPORTED:
-            return 3
-        return 4
-
-    def _set_dualstack_status_cell(self, row: int, col: int, results: list) -> None:
-        from blockcheck.models import TestStatus
-
-        if not results:
-            return
-
-        if len(results) == 1:
-            self._set_status_cell(row, col, results[0])
-            return
-
-        sorted_results = sort_results_by_family(results)
-        ok_results = [r for r in sorted_results if r.status == TestStatus.OK]
-        non_ok_results = [r for r in sorted_results if r.status != TestStatus.OK]
-
-        if ok_results and non_ok_results:
-            item = self._make_item("MIXED")
-            item.setForeground(QColor("#e0a854"))
-        elif ok_results:
-            best_ok = min(ok_results, key=lambda r: r.time_ms or 999999.0)
-            text = "OK"
-            if best_ok.time_ms:
-                text += f" ({best_ok.time_ms:.0f}ms)"
-            item = self._make_item(text)
-            item.setForeground(QColor("#52c477"))
-        elif all(r.status == TestStatus.TIMEOUT for r in sorted_results):
-            item = self._make_item("TIMEOUT")
-            item.setForeground(QColor("#e0a854"))
-        elif all(r.status == TestStatus.UNSUPPORTED for r in sorted_results):
-            item = self._make_item("UNSUP")
-            item.setForeground(QColor("#e0a854"))
-        else:
-            primary = sorted(non_ok_results, key=self._result_display_rank)[0] if non_ok_results else sorted_results[0]
-            text = primary.error_code or "FAIL"
-            item = self._make_item(text)
-            item.setForeground(QColor("#e05454"))
-
-        item.setToolTip(build_family_tooltip(sorted_results))
-        self._table.setItem(row, col, item)
-
-    @staticmethod
-    def _tcp_status_text_and_color(result) -> tuple[str, str]:
-        from blockcheck.models import TestStatus
-
-        if result.status == TestStatus.OK:
-            return "OK", "#52c477"
-        if result.status == TestStatus.TIMEOUT:
-            return "TIMEOUT", "#e0a854"
-        if result.error_code == "TCP_16_20":
-            return "DETECTED", "#e05454"
-        if result.status == TestStatus.UNSUPPORTED:
-            return "UNSUP", "#e0a854"
-        if result.status == TestStatus.ERROR:
-            return "ERROR", "#e05454"
-        return (result.error_code or "FAIL"), "#e05454"
-
-    def _update_tcp_table(self, target_result) -> None:
-        from blockcheck.models import TestType
-
-        if self._tcp_table is None:
-            return
-
-        tcp_tests = sorted(
-            [t for t in target_result.tests if t.test_type == TestType.TCP_16_20],
-            key=lambda t: (t.raw_data or {}).get("target_id") or t.target_name or "",
-        )
-        if not tcp_tests:
-            return
-
-        if self._tcp_section_label is not None:
-            self._tcp_section_label.setVisible(True)
-        self._tcp_table.setVisible(True)
-
-        for test in tcp_tests:
-            raw = test.raw_data or {}
-            target_id = str(raw.get("target_id") or test.target_name or "-")
-            asn_raw = str(raw.get("asn") or "").strip()
-            provider = str(raw.get("provider") or "-")
-
-            if asn_raw:
-                asn_text = asn_raw.upper() if asn_raw.upper().startswith("AS") else f"AS{asn_raw}"
-            else:
-                asn_text = "-"
-
-            row = self._find_tcp_row(target_id)
-            if row == -1:
-                row = self._tcp_table.rowCount()
-                self._tcp_table.insertRow(row)
-
-            self._tcp_table.setItem(row, 0, self._make_item(target_id))
-            self._tcp_table.setItem(row, 1, self._make_item(asn_text))
-            self._tcp_table.setItem(row, 2, self._make_item(provider))
-
-            status_text, color = self._tcp_status_text_and_color(test)
-            status_item = self._make_item(status_text)
-            status_item.setForeground(QColor(color))
-            status_item.setToolTip(format_result_detail(test))
-            self._tcp_table.setItem(row, 3, status_item)
-
-            detail_text = format_result_detail(test)
-            bytes_received = raw.get("bytes_received")
-            if isinstance(bytes_received, int) and bytes_received > 0:
-                detail_text += f" | {bytes_received}B"
-            detail_item = self._make_item(truncate_detail(detail_text))
-            detail_item.setForeground(QColor("#9aa0a6"))
-            detail_item.setToolTip(detail_text)
-            self._tcp_table.setItem(row, 4, detail_item)
-
-    def _make_item(self, text: str):
-        from PyQt6.QtWidgets import QTableWidgetItem
-        item = QTableWidgetItem(text)
-        item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-        return item
-
-    def _set_status_cell(self, row: int, col: int, result):
-        from blockcheck.models import TestStatus
-
-        if result.status == TestStatus.OK:
-            text = "OK"
-            if result.time_ms:
-                text += f" ({result.time_ms:.0f}ms)"
-            item = self._make_item(text)
-            item.setForeground(QColor("#52c477"))
-        elif result.status == TestStatus.UNSUPPORTED:
-            item = self._make_item("UNSUP")
-            item.setForeground(QColor("#e0a854"))
-        elif result.status == TestStatus.TIMEOUT:
-            item = self._make_item("TIMEOUT")
-            item.setForeground(QColor("#e0a854"))
-        else:
-            text = result.error_code or "FAIL"
-            item = self._make_item(text)
-            item.setForeground(QColor("#e05454"))
-
-        item.setToolTip(result.detail)
-        self._table.setItem(row, col, item)
-
     def _update_dpi_summary(self, report):
         """Show DPI summary card after tests complete."""
         self._dpi_card.setVisible(True)
@@ -1054,7 +791,7 @@ class BlockcheckPage(BasePage):
     def _load_domain_chips(self):
         """Load persisted user domains and create chips."""
         load_domain_chips(
-            load_domains_fn=BlockcheckPageController.load_user_domains,
+            load_domains_fn=blockcheck_page_runtime.load_user_domains,
             add_chip_fn=self._add_chip,
         )
 
@@ -1064,7 +801,7 @@ class BlockcheckPage(BasePage):
         if not text:
             return
         try:
-            normalized = BlockcheckPageController.add_user_domain(text)
+            normalized = blockcheck_page_runtime.add_user_domain(text)
             if normalized:
                 self._add_chip(normalized)
                 self._domain_input.clear()
@@ -1085,7 +822,7 @@ class BlockcheckPage(BasePage):
     def _on_remove_domain(self, domain: str):
         """Remove a domain chip and delete from persistence."""
         try:
-            BlockcheckPageController.remove_user_domain(domain)
+            blockcheck_page_runtime.remove_user_domain(domain)
         except Exception:
             pass
         remove_domain_chip(
@@ -1117,17 +854,7 @@ class BlockcheckPage(BasePage):
 
     def cleanup(self) -> None:
         self._cleanup_in_progress = True
-        if self._worker and self._worker.is_running:
-            try:
-                self._worker.stop()
-            except Exception:
-                pass
-        elif self._worker is not None:
-            try:
-                self._worker.deleteLater()
-            except Exception:
-                pass
-            self._worker = None
+        self._worker = cleanup_blockcheck_worker(self._worker)
 
         for page in (self._strategy_tab_page, self._diagnostics_tab_page, self._dns_spoofing_tab_page):
             if page is None:

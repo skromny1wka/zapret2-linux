@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from settings.mode import RELATIVE_EXE_PATH_WINWS2
+
 # ---------------------------------------------------------------------------
 # Timeouts (seconds)
 # ---------------------------------------------------------------------------
@@ -119,7 +121,7 @@ STRATEGY_PROBE_TIMEOUT = 5        # seconds per HTTPS connect + TLS handshake
 STRATEGY_RESPONSE_TIMEOUT = 3     # seconds to read HTTP response after TLS ok
 STRATEGY_STARTUP_WAIT = 1.0       # seconds to wait for winws2 startup
 STRATEGY_KILL_TIMEOUT = 4         # seconds to wait for winws2 shutdown
-WINWS2_EXE_RELATIVE = "exe/winws2.exe"
+WINWS2_EXE_RELATIVE = RELATIVE_EXE_PATH_WINWS2
 PROBE_TEMP_PRESET = "blockcheck_probe.txt"
 PROBE_TEMP_HOSTLIST = "blockcheck_probe_hosts.txt"
 

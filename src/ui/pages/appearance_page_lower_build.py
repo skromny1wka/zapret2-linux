@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QHBoxLayout
 
-from ui.compat_widgets import SettingsCard, build_premium_badge
-from ui.text_catalog import tr as tr_catalog
+from ui.fluent_widgets import SettingsCard, build_premium_badge
+from app.text_catalog import tr as tr_catalog
 
 
 @dataclass(slots=True)
@@ -171,12 +171,12 @@ def build_opacity_section(
         )
     else:
         opacity_title_text = tr_catalog(
-            "page.appearance.opacity.legacy.title",
+            "page.appearance.opacity.standard.title",
             language=tr_language,
             default="Прозрачность окна",
         )
         opacity_desc_text = tr_catalog(
-            "page.appearance.opacity.legacy.description",
+            "page.appearance.opacity.standard.description",
             language=tr_language,
             default=(
                 "Настройка прозрачности всего окна приложения. "
@@ -230,27 +230,16 @@ def build_performance_section(
     page,
     tr_language: str,
     settings_card_group_cls,
-    has_fluent_labels: bool,
-    settings_card_cls,
-    qvbox_layout_cls,
     toggle_row_cls,
     on_animations_changed,
     on_smooth_scroll_changed,
     on_editor_smooth_scroll_changed,
 ):
-    if settings_card_group_cls is not None and has_fluent_labels:
-        performance_group = settings_card_group_cls(
-            tr_catalog("page.appearance.section.performance", language=tr_language, default="Производительность"),
-            page.content,
-        )
-        perf_card = performance_group
-        perf_layout = None
-    else:
-        page.add_section_title(text_key="page.appearance.section.performance")
-        performance_group = None
-        perf_card = settings_card_cls()
-        perf_layout = qvbox_layout_cls()
-        perf_layout.setSpacing(12)
+    performance_group = settings_card_group_cls(
+        tr_catalog("page.appearance.section.performance", language=tr_language, default="Производительность"),
+        page.content,
+    )
+    perf_card = performance_group
 
     animations_switch = toggle_row_cls(
         "fa5s.film",
@@ -262,10 +251,7 @@ def build_performance_section(
         ),
     )
     animations_switch.toggled.connect(on_animations_changed)
-    if perf_layout is not None:
-        perf_layout.addWidget(animations_switch)
-    else:
-        perf_card.addSettingCard(animations_switch)
+    perf_card.addSettingCard(animations_switch)
 
     smooth_scroll_switch = toggle_row_cls(
         "fa5s.mouse",
@@ -277,10 +263,7 @@ def build_performance_section(
         ),
     )
     smooth_scroll_switch.toggled.connect(on_smooth_scroll_changed)
-    if perf_layout is not None:
-        perf_layout.addWidget(smooth_scroll_switch)
-    else:
-        perf_card.addSettingCard(smooth_scroll_switch)
+    perf_card.addSettingCard(smooth_scroll_switch)
 
     editor_smooth_scroll_switch = toggle_row_cls(
         "fa5s.file-alt",
@@ -296,13 +279,7 @@ def build_performance_section(
         ),
     )
     editor_smooth_scroll_switch.toggled.connect(on_editor_smooth_scroll_changed)
-    if perf_layout is not None:
-        perf_layout.addWidget(editor_smooth_scroll_switch)
-    else:
-        perf_card.addSettingCard(editor_smooth_scroll_switch)
-
-    if perf_layout is not None:
-        perf_card.add_layout(perf_layout)
+    perf_card.addSettingCard(editor_smooth_scroll_switch)
 
     page.add_widget(perf_card)
     page.add_spacing(16)
