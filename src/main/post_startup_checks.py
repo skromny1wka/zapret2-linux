@@ -1,16 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from log.log import is_verbose_logging_enabled, log
-from main.post_startup_gate import bind_startup_gate, is_window_alive
+from main.post_startup_gate import bind_startup_gate, is_startup_host_alive
 from main.post_startup_check_workers import collect_startup_checks_payload
 from main.post_startup_threading import start_daemon_thread
-
-if TYPE_CHECKING:
-    from main.window import LupiDPIApp
 
 
 class _StartupChecksBridge(QObject):
@@ -18,7 +13,7 @@ class _StartupChecksBridge(QObject):
 
 
 def install_startup_checks(
-    window: "LupiDPIApp",
+    startup_host,
     *,
     notify_many,
     set_status,
@@ -27,7 +22,7 @@ def install_startup_checks(
     startup_bridge = _StartupChecksBridge()
 
     def _on_startup_checks_finished(payload: dict) -> None:
-        if not is_window_alive(window):
+        if not is_startup_host_alive(startup_host):
             return
         try:
             notifications = payload.get("notifications") or []
@@ -68,7 +63,7 @@ def install_startup_checks(
         start_daemon_thread("StartupChecksWorker", _startup_checks_worker)
 
     bind_startup_gate(
-        window.startup_interactive_ready,
+        startup_host.startup_interactive_ready,
         _start_startup_checks,
-        is_ready=lambda: bool(window.startup_state.interactive_logged),
+        is_ready=lambda: bool(startup_host.startup_state.interactive_logged),
     )

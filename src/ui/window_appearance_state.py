@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from log.log import log
+
 from ui.animation_policy import (
     apply_window_animation_policy,
     apply_window_editor_smooth_scroll_policy,
@@ -59,3 +61,51 @@ def on_smooth_scroll_changed(window, enabled: bool) -> None:
 def on_editor_smooth_scroll_changed(window, enabled: bool) -> None:
     """Переключает плавную прокрутку только у текстовых редакторов."""
     apply_window_editor_smooth_scroll_policy(window, enabled)
+
+
+def ensure_holiday_effects_manager(window):
+    effects = window.visual_state.holiday_effects
+    if effects is not None:
+        return effects
+
+    try:
+        from ui.holiday_effects import HolidayEffectsManager
+
+        effects = HolidayEffectsManager(window)
+        window.visual_state.holiday_effects = effects
+        return effects
+    except Exception as e:
+        log(f"❌ Ошибка создания праздничных эффектов: {e}", "DEBUG")
+        return None
+
+
+def apply_garland_enabled(window, enabled: bool) -> None:
+    """Применяет готовое состояние гирлянды к окну."""
+    effects = ensure_holiday_effects_manager(window)
+    if effects is not None:
+        effects.set_garland_enabled(bool(enabled))
+
+
+def apply_snowflakes_enabled(window, enabled: bool) -> None:
+    """Применяет готовое состояние снежинок к окну."""
+    effects = ensure_holiday_effects_manager(window)
+    if effects is not None:
+        effects.set_snowflakes_enabled(bool(enabled))
+
+
+def apply_window_opacity_value(window, value: int) -> None:
+    """Применяет готовое значение прозрачности к окну."""
+    from settings.appearance import load_background_preset
+
+    if load_background_preset().preset != "standard":
+        log("Transparent effect проигнорирован (не standard пресет)", "DEBUG")
+        return
+
+    from settings.appearance import load_mica_enabled
+    from ui.theme import apply_aero_effect, apply_window_background
+
+    if load_mica_enabled().enabled:
+        apply_aero_effect(window, value)
+    else:
+        apply_window_background(window)
+    log(f"Прозрачность обновлена: {value}%", "DEBUG")

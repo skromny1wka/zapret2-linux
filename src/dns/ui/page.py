@@ -7,24 +7,13 @@ from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QFrame,
-    QLineEdit, QCheckBox, QProgressBar, QPushButton,
 )
+import qtawesome as qta
 
-try:
-    from qfluentwidgets import (
-        BodyLabel, CaptionLabel, StrongBodyLabel,
-        CheckBox, IndeterminateProgressBar, LineEdit, InfoBar, MessageBox,
-        SettingCardGroup,
-    )
-    _HAS_FLUENT_LABELS = True
-except ImportError:
-    CheckBox = QCheckBox
-    IndeterminateProgressBar = QProgressBar
-    LineEdit = QLineEdit
-    InfoBar = None
-    MessageBox = None  # type: ignore[assignment]
-    SettingCardGroup = None
-    _HAS_FLUENT_LABELS = False
+from qfluentwidgets import (
+    BodyLabel, CaptionLabel, CheckBox, IndeterminateProgressBar, InfoBar,
+    LineEdit, MessageBox, PushButton, SettingCardGroup, StrongBodyLabel,
+)
 
 from ui.pages.base_page import BasePage
 from ui.widgets.win11_controls import Win11ToggleRow
@@ -55,11 +44,16 @@ from dns.ui.force_dns_ui import (
     update_force_dns_status_label,
 )
 from dns.ui.force_dns_build import build_force_dns_card_ui
-from dns.ui.page_force_dns_workflow import (
+from dns.page_force_dns_workflow import (
     apply_force_dns_status_state,
     flush_dns_cache_action,
     handle_force_dns_toggled_action,
     reset_dns_to_dhcp_action,
+)
+from dns.page_apply_workflow import (
+    apply_auto_dns_quick,
+    apply_custom_dns_quick,
+    apply_provider_dns_quick,
 )
 from dns.ui.isp_warning import (
     build_isp_warning_ui,
@@ -67,7 +61,7 @@ from dns.ui.isp_warning import (
     insert_isp_warning_widget,
     render_isp_warning_styles,
 )
-from dns.ui.page_diagnostics_warning_workflow import (
+from dns.page_diagnostics_warning_workflow import (
     accept_isp_dns_recommendation,
     apply_connectivity_test_result,
     cleanup_network_page,
@@ -76,7 +70,7 @@ from dns.ui.page_diagnostics_warning_workflow import (
     show_isp_dns_warning,
     start_connectivity_test,
 )
-from dns.ui.load_workflow import (
+from dns.page_load_workflow import (
     apply_loaded_page_state,
     handle_loaded_adapters,
     handle_loaded_dns_info,
@@ -98,11 +92,6 @@ from dns.ui.selection import (
     select_provider_dns_ui,
     set_dns_card_selected,
 )
-
-try:
-    import qtawesome as qta
-except ImportError:
-    qta = None  # type: ignore[assignment]
 
 class NetworkPage(BasePage):
     """Страница сетевых настроек с интегрированным DNS"""
@@ -344,9 +333,7 @@ class NetworkPage(BasePage):
             content_parent=self.content,
             tr_fn=self._tr,
             add_section_title_fn=self.add_section_title,
-            has_fluent_labels=_HAS_FLUENT_LABELS,
-            body_label_cls=BodyLabel if _HAS_FLUENT_LABELS else QLabel,
-            qlabel_cls=QLabel,
+            body_label_cls=BodyLabel,
             settings_card_cls=SettingsCard,
             qvbox_layout_cls=QVBoxLayout,
             qhbox_layout_cls=QHBoxLayout,
@@ -462,12 +449,11 @@ class NetworkPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
             ui_built=self._ui_built,
             tr_fn=self._tr,
-            has_fluent_labels=_HAS_FLUENT_LABELS,
             settings_card_cls=SettingsCard,
             qhbox_layout_cls=QHBoxLayout,
             qframe_cls=QFrame,
-            strong_body_label_cls=StrongBodyLabel if _HAS_FLUENT_LABELS else QLabel,
-            caption_label_cls=CaptionLabel if _HAS_FLUENT_LABELS else QLabel,
+            strong_body_label_cls=StrongBodyLabel,
+            caption_label_cls=CaptionLabel,
             qlabel_cls=QLabel,
             dns_provider_card_cls=DNSProviderCard,
             adapter_card_cls=AdapterCard,
@@ -577,53 +563,27 @@ class NetworkPage(BasePage):
     
     def _apply_auto_dns_quick(self):
         """Быстрое применение автоматического DNS (IPv4 + IPv6)"""
-        adapters = self._get_selected_adapters()
-        if not adapters:
-            return
-
-        result = self._dns_feature().apply_auto_dns(adapters)
-        plan = dns_page_plans.build_auto_dns_apply_result_plan(
-            adapter_count=len(adapters),
-            success_count=result.affected_count,
+        apply_auto_dns_quick(
+            dns_feature=self._dns_feature(),
+            adapters=self._get_selected_adapters(),
+            build_result_plan_fn=dns_page_plans.build_auto_dns_apply_result_plan,
+            refresh_adapters_dns_fn=self._refresh_adapters_dns,
+            log_fn=log,
         )
-        if plan.log_message:
-            log(plan.log_message, plan.log_level or "INFO")
-        if plan.should_refresh:
-            self._refresh_adapters_dns()
     
     def _apply_provider_dns_quick(self, name: str, data: dict):
         """Быстрое применение DNS провайдера"""
-        adapters = self._get_selected_adapters()
-        if not adapters:
-            return
-
-        provider_plan = dns_page_plans.build_provider_dns_plan(
+        apply_provider_dns_quick(
+            dns_feature=self._dns_feature(),
+            adapters=self._get_selected_adapters(),
             name=name,
             data=data,
             ipv6_available=self._ipv6_available,
+            build_provider_plan_fn=dns_page_plans.build_provider_dns_plan,
+            build_result_plan_fn=dns_page_plans.build_provider_dns_apply_result_plan,
+            refresh_adapters_dns_fn=self._refresh_adapters_dns,
+            log_fn=log,
         )
-        if not provider_plan.valid:
-            if provider_plan.log_message:
-                log(provider_plan.log_message, provider_plan.log_level or "WARNING")
-            return
-
-        result = self._dns_feature().apply_provider_dns(
-            adapters,
-            provider_plan.ipv4,
-            provider_plan.ipv6,
-            ipv6_available=self._ipv6_available,
-        )
-        result_plan = dns_page_plans.build_provider_dns_apply_result_plan(
-            name=name,
-            adapter_count=len(adapters),
-            success_count=result.affected_count,
-            ipv6_available=self._ipv6_available,
-            ipv6=provider_plan.ipv6,
-        )
-        if result_plan.log_message:
-            log(result_plan.log_message, result_plan.log_level or "INFO")
-        if result_plan.should_refresh:
-            self._refresh_adapters_dns()
     
     def _apply_custom_dns_quick(self):
         """Быстрое применение пользовательского DNS"""
@@ -649,20 +609,15 @@ class NetworkPage(BasePage):
             set_card_selected_fn=self._set_dns_card_selected,
         )
         
-        adapters = self._get_selected_adapters()
-        if not adapters:
-            return
-
-        result = self._dns_feature().apply_custom_dns(adapters, primary, secondary)
-        plan = dns_page_plans.build_custom_dns_apply_result_plan(
+        apply_custom_dns_quick(
+            dns_feature=self._dns_feature(),
+            adapters=self._get_selected_adapters(),
             primary=primary,
-            adapter_count=len(adapters),
-            success_count=result.affected_count,
+            secondary=secondary,
+            build_result_plan_fn=dns_page_plans.build_custom_dns_apply_result_plan,
+            refresh_adapters_dns_fn=self._refresh_adapters_dns,
+            log_fn=log,
         )
-        if plan.log_message:
-            log(plan.log_message, plan.log_level or "INFO")
-        if plan.should_refresh:
-            self._refresh_adapters_dns()
     
     def _refresh_adapters_dns(self):
         """Обновляет отображение DNS у всех адаптеров"""
@@ -706,10 +661,8 @@ class NetworkPage(BasePage):
             add_widget_fn=self.add_widget,
             get_theme_tokens_fn=get_theme_tokens,
             get_force_dns_status_fn=dns_feature.get_force_dns_status,
-            has_fluent_labels=_HAS_FLUENT_LABELS,
             setting_card_group_cls=SettingCardGroup,
-            settings_card_cls=SettingsCard,
-            caption_label_cls=CaptionLabel if _HAS_FLUENT_LABELS else QLabel,
+            caption_label_cls=CaptionLabel,
             action_button_cls=ActionButton,
             win11_toggle_row_cls=Win11ToggleRow,
             qwidget_cls=QWidget,
@@ -732,26 +685,6 @@ class NetworkPage(BasePage):
 
     def _apply_inline_theme_styles(self, tokens=None) -> None:
         theme_tokens = tokens or get_theme_tokens()
-        try:
-            if hasattr(self, "loading_label") and self.loading_label is not None and not _HAS_FLUENT_LABELS:
-                self.loading_label.setStyleSheet(f"color: {theme_tokens.fg_muted}; font-size: 12px;")
-        except Exception:
-            pass
-        try:
-            if hasattr(self, "custom_label") and self.custom_label is not None and not _HAS_FLUENT_LABELS:
-                self.custom_label.setStyleSheet(f"color: {theme_tokens.fg_muted}; font-size: 12px;")
-        except Exception:
-            pass
-        try:
-            if hasattr(self, "auto_label") and self.auto_label is not None and not _HAS_FLUENT_LABELS:
-                self.auto_label.setStyleSheet(f"color: {theme_tokens.fg}; font-size: 12px; font-weight: 500;")
-        except Exception:
-            pass
-        try:
-            if hasattr(self, "force_dns_status_label") and self.force_dns_status_label is not None and not _HAS_FLUENT_LABELS:
-                self.force_dns_status_label.setStyleSheet(f"color: {theme_tokens.fg_muted}; font-size: 11px;")
-        except Exception:
-            pass
         try:
             for label in list(getattr(self, "_dns_category_labels", [])):
                 if label is None:
@@ -970,7 +903,7 @@ class NetworkPage(BasePage):
         """Показывает предупреждение если у пользователя DNS от провайдера (DHCP).
 
         Показывается ОДИН раз за всё время установки. Как только баннер
-        отрисован — в реестр пишется ISPDNSInfoShown=1 и повторно он
+        отрисован — в settings.json пишется ISPDNSInfoShown=1 и повторно он
         больше никогда не появится.
         """
         show_isp_dns_warning(
@@ -995,7 +928,7 @@ class NetworkPage(BasePage):
             qvbox_layout_cls=QVBoxLayout,
             qhbox_layout_cls=QHBoxLayout,
             qlabel_cls=QLabel,
-            qpush_button_cls=QPushButton,
+            qpush_button_cls=PushButton,
             qt_namespace=Qt,
             add_widget_fn=self.add_widget,
             before_widget=self.dns_cards_container,
@@ -1039,7 +972,7 @@ class NetworkPage(BasePage):
         )
 
     def _dismiss_isp_dns_warning(self):
-        """Скрывает баннер (реестр уже записан при показе)"""
+        """Скрывает баннер (settings.json уже записан при показе)."""
         dismiss_isp_dns_warning(
             cleanup_in_progress=self._cleanup_in_progress,
             build_dismiss_plan_fn=dns_page_plans.build_dismiss_isp_dns_warning_plan,

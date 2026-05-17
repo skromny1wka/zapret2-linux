@@ -49,6 +49,23 @@ class WindowPageHost:
     def get_loaded_page(self, page_name: PageName) -> QWidget | None:
         return self.pages.get(page_name)
 
+    def send_page_command(
+        self,
+        page_name: PageName,
+        command: str,
+        payload: dict | None = None,
+        *,
+        ensure: bool = True,
+    ) -> bool:
+        page = self.ensure_page(page_name) if ensure else self.get_loaded_page(page_name)
+        if page is None:
+            return False
+        handler = getattr(page, "handle_page_command", None)
+        if not callable(handler):
+            log(f"[PAGE_HOST] page {page_name.name} не принимает команды", "WARNING")
+            return False
+        return bool(handler(str(command or ""), dict(payload or {})))
+
     def current_page(self) -> QWidget | None:
         try:
             return self._window.stackedWidget.currentWidget()

@@ -21,12 +21,6 @@ class ServerRowPlan:
 
 
 @dataclass(slots=True)
-class UpdateChannelActionResult:
-    ok: bool
-    message: str
-
-
-@dataclass(slots=True)
 class UpdateStatusTransitionPlan:
     is_checking: bool
     state: str
@@ -320,17 +314,6 @@ def build_server_row_plan(
         time_text=time_text,
         extra_text=extra_text,
     )
-
-def open_update_channel(channel: str) -> UpdateChannelActionResult:
-    from config.telegram_links import open_telegram_link
-    from updater.channel_utils import is_dev_update_channel
-
-    try:
-        domain = "zapretguidev" if is_dev_update_channel(channel) else "zapretnetdiscordyoutube"
-        open_telegram_link(domain)
-        return UpdateChannelActionResult(True, domain)
-    except Exception as e:
-        return UpdateChannelActionResult(False, str(e))
 
 def build_update_status_transition_plan(
     *,

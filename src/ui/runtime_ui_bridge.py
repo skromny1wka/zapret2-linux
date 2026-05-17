@@ -5,11 +5,9 @@ import time
 from app_notifications import advisory_notification, notification_action
 from log.log import log
 
-from ui.window_ui_session import get_window_ui_session
-
 
 class RuntimeUiBridge:
-    """Единый runtime -> UI bridge без знания runtime-кода о main_window."""
+    """Единый runtime -> UI bridge без знания главного окна."""
 
     def __init__(self, *, notify, set_status, mark_content_changed):
         self._notify = notify
@@ -115,26 +113,4 @@ class RuntimeUiBridge:
             pass
 
 
-def ensure_runtime_ui_bridge(window, *, notify=None, set_status=None, mark_content_changed=None) -> RuntimeUiBridge:
-    session = get_window_ui_session(window)
-    if session is None:
-        raise RuntimeError("WindowUiSession is required for RuntimeUiBridge")
-
-    bridge = session.runtime_ui_bridge
-    if bridge is None:
-        if notify is None:
-            raise RuntimeError("notify callback is required to create RuntimeUiBridge")
-        if set_status is None:
-            raise RuntimeError("set_status callback is required to create RuntimeUiBridge")
-        if mark_content_changed is None:
-            raise RuntimeError("mark_content_changed callback is required to create RuntimeUiBridge")
-        bridge = RuntimeUiBridge(
-            notify=notify,
-            set_status=set_status,
-            mark_content_changed=mark_content_changed,
-        )
-        session.runtime_ui_bridge = bridge
-    return bridge
-
-
-__all__ = ["RuntimeUiBridge", "ensure_runtime_ui_bridge"]
+__all__ = ["RuntimeUiBridge"]

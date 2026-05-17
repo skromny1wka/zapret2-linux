@@ -27,10 +27,7 @@ def _no_proxy_get(url: str, **kwargs) -> requests.Response:
 # ────────────────────────────────────────────────────────────────
 #  ТОКЕН TELEGRAM BOT API (только из generated runtime config)
 # ────────────────────────────────────────────────────────────────
-try:
-    from config._build_secrets import TG_UPDATE_BOT_TOKEN as _BUILD_TOKEN
-except ImportError:
-    _BUILD_TOKEN = ""
+from config._build_secrets import TG_UPDATE_BOT_TOKEN as _BUILD_TOKEN
 
 _TOKEN_CACHE = ""
 

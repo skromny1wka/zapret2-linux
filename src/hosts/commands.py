@@ -72,7 +72,7 @@ def apply_service_profiles(hosts_manager, service_dns: dict[str, str]) -> HostsC
 
 def clear_hosts(hosts_manager) -> HostsCommandResult:
     success = bool(hosts_manager.clear_hosts_file())
-    message = "Hosts очищен" if success else getattr(hosts_manager, "last_status", None) or "Ошибка"
+    message = "Записи ZapretGUI очищены" if success else getattr(hosts_manager, "last_status", None) or "Ошибка"
     return HostsCommandResult(success=success, message=message)
 
 
@@ -116,15 +116,6 @@ def save_user_selection(selection: dict[str, str]) -> bool:
         return bool(save_user_hosts_selection(dict(selection)))
     except Exception:
         return False
-
-
-def ensure_ipv6_catalog_sections() -> tuple[bool, bool]:
-    from hosts.proxy_domains import ensure_ipv6_catalog_sections_if_available
-
-    try:
-        return ensure_ipv6_catalog_sections_if_available()
-    except Exception:
-        return (False, False)
 
 
 def get_catalog_signature():

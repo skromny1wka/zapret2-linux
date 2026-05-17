@@ -105,7 +105,6 @@ def restore_hosts_permissions_flow(
     dismiss_error_bar,
     invalidate_cache,
     update_ui,
-    sync_selections_from_hosts,
     show_error,
     log_error,
 ) -> tuple[bool, str | None]:
@@ -120,7 +119,6 @@ def restore_hosts_permissions_flow(
             dismiss_error_bar()
             invalidate_cache()
             update_ui()
-            sync_selections_from_hosts()
             if info_bar_cls and restore_plan.message_plan is not None:
                 from qfluentwidgets import InfoBarPosition
 

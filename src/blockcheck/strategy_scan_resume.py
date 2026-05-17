@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
-from config.config import MAIN_DIRECTORY
+from settings import store as settings_store
 
 def resume_state_path() -> Path:
-    return Path(MAIN_DIRECTORY) / "strategy_scan_resume.json"
+    return settings_store.get_settings_path()
 
 
 def scan_key(
@@ -29,11 +28,9 @@ def scan_key(
 
 
 def load_resume_state() -> dict:
-    path = resume_state_path()
     empty_state = {"domains": {}}
     try:
-        raw = path.read_text(encoding="utf-8")
-        data = json.loads(raw)
+        data = settings_store.get_blockcheck_settings().get("scan_resume", {})
         if not isinstance(data, dict):
             return empty_state
 
@@ -78,10 +75,8 @@ def load_resume_state() -> dict:
 
 
 def write_resume_state(state: dict) -> None:
-    path = resume_state_path()
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        settings_store.set_blockcheck_settings({"scan_resume": state})
     except Exception:
         pass
 
@@ -127,9 +122,4 @@ def clear_resume_state(target: str, scan_protocol: str, udp_games_scope: str = "
         state["domains"] = domains
         write_resume_state(state)
     else:
-        path = resume_state_path()
-        try:
-            if path.exists():
-                path.unlink()
-        except Exception:
-            pass
+        write_resume_state({"domains": {}})

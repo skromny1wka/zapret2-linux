@@ -8,7 +8,7 @@ import tray_commands
 
 @dataclass(slots=True)
 class TrayFeature:
-    _host: Any
+    _deps: Any
     _runtime_feature: Any
     _telegram_proxy_feature: Any
     _notify: Any = None
@@ -26,7 +26,8 @@ class TrayFeature:
 
     def _init_manager(self):
         self._tray_manager = tray_commands.init_tray(
-            self._host,
+            window_port=self._deps.window_port,
+            startup_state=self._deps.startup_state,
             tray_feature=self,
             notify=self._notify,
             log_startup_metric=self._log_startup_metric,
@@ -55,12 +56,17 @@ class TrayFeature:
         self._log_startup_metric(marker, details)
 
     def install_post_startup(self) -> None:
-        tray_commands.install_post_startup_tray(self._host, tray_feature=self)
+        tray_commands.install_post_startup_tray(
+            startup_state=self._deps.startup_state,
+            close_state=self._deps.close_state,
+            start_in_tray=self._deps.start_in_tray,
+            startup_post_init_ready=self._deps.startup_post_init_ready,
+            tray_feature=self,
+        )
 
     def show_notification_if_available(self, title: str, content: str) -> bool:
         return bool(
             tray_commands.show_tray_notification_if_available(
-                self._host,
                 tray_manager=self._manager(),
                 title=title,
                 content=content,
@@ -108,15 +114,18 @@ class TrayFeature:
         return bool(tray_commands.toggle_github_api_removal(status_callback=status_callback))
 
     def toggle_discord_restart(self, *, status_callback=None) -> None:
-        tray_commands.toggle_discord_restart(self._host, status_callback=status_callback)
+        tray_commands.toggle_discord_restart(status_callback=status_callback)
 
     def apply_window_opacity(self, value: int) -> None:
-        tray_commands.apply_window_opacity(self._host, int(value))
+        tray_commands.apply_window_opacity(
+            set_window_opacity=self._deps.set_window_opacity,
+            value=int(value),
+        )
 
 
-def build_tray_feature(*, host, runtime_feature, telegram_proxy_feature) -> TrayFeature:
+def build_tray_feature(*, deps, runtime_feature, telegram_proxy_feature) -> TrayFeature:
     return TrayFeature(
-        _host=host,
+        _deps=deps,
         _runtime_feature=runtime_feature,
         _telegram_proxy_feature=telegram_proxy_feature,
     )

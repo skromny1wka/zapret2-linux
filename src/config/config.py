@@ -7,14 +7,15 @@ import os, sys
 # ═══════════════════════════════════════════════════════════════════
 # ОСНОВНАЯ ПАПКА ПРОГРАММЫ
 # ═══════════════════════════════════════════════════════════════════
-# Путь определяется автоматически по расположению exe файла.
-MAIN_DIRECTORY = os.path.dirname(sys.executable)
+# В exe-сборке папка программы определяется по exe-файлу.
+# В source-режиме это корень репозитория public_zapretgui.
+if getattr(sys, "frozen", False):
+    MAIN_DIRECTORY = os.path.dirname(sys.executable)
+else:
+    MAIN_DIRECTORY = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Канал сборки (для информации)
-try:
-    from config.build_info import CHANNEL
-except ImportError:
-    CHANNEL = "stable"
+from config.build_info import CHANNEL
 
 CHANNEL_STABLE = "stable"
 CHANNEL_DEV = "dev"

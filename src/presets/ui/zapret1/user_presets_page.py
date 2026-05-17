@@ -7,7 +7,6 @@ import re
 from typing import Optional
 from PyQt6.QtCore import (
     Qt,
-    QSize,
     QTimer,
     QPoint,
 )
@@ -15,10 +14,7 @@ from PyQt6.QtWidgets import (
     QWidget,
     QHBoxLayout,
     QLabel,
-    QPushButton,
-    QLineEdit,
     QFileDialog,
-    QListView,
 )
 from ui.pages.base_page import BasePage
 from settings.mode import PRESETS_SCOPE_WINWS1, ZAPRET1_MODE
@@ -38,6 +34,10 @@ from presets.ui.common.user_presets_page_runtime import (
     update_presets_view_height,
 )
 from presets.ui.common.user_presets_page_actions import open_presets_folder_action
+from presets.ui.common.user_presets_action_dispatch import (
+    UserPresetListActionHandlers,
+    dispatch_user_preset_list_action,
+)
 from presets.ui.common.user_presets_actions_workflow import (
     import_preset_action,
     restore_reset_all_button_label,
@@ -80,33 +80,12 @@ from presets.ui.zapret1.user_presets_page_lifecycle import (
 )
 from app.state_store import MainWindowStateStore
 
-try:
-    from qfluentwidgets import (
-        BodyLabel, CaptionLabel, StrongBodyLabel, SubtitleLabel,
-        PushButton as FluentPushButton, PrimaryPushButton, ToolButton, PrimaryToolButton,
-        MessageBox, InfoBar, TransparentToolButton, TransparentPushButton, FluentIcon,
-        RoundMenu, Action, ListView, LineEdit,
-    )
-    _HAS_FLUENT_LABELS = True
-except ImportError:
-    BodyLabel = QLabel
-    CaptionLabel = QLabel
-    StrongBodyLabel = QLabel
-    SubtitleLabel = QLabel
-    FluentPushButton = QPushButton
-    PrimaryPushButton = QPushButton
-    ToolButton = QPushButton
-    PrimaryToolButton = QPushButton
-    TransparentPushButton = QPushButton
-    MessageBox = None
-    InfoBar = None
-    TransparentToolButton = None
-    FluentIcon = None
-    RoundMenu = None
-    Action = None
-    ListView = QListView
-    LineEdit = QLineEdit
-    _HAS_FLUENT_LABELS = False
+from qfluentwidgets import (
+    Action, BodyLabel, BreadcrumbBar, CaptionLabel, FluentIcon, InfoBar,
+    LineEdit, ListView, MessageBox, PrimaryPushButton, PrimaryToolButton,
+    PushButton as FluentPushButton, RoundMenu, StrongBodyLabel, SubtitleLabel,
+    ToolButton, TransparentPushButton, TransparentToolButton,
+)
 
 
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens, get_themed_qta_icon
@@ -159,29 +138,14 @@ class Zapret1UserPresetsPage(BasePage):
         self._runtime_service = self._build_runtime_service()
         self._runtime_service.attach_page(self, self._build_runtime_adapter())
 
-        self._back_btn = None
+        self._breadcrumb = None
         self._configs_title_label = None
         self._get_configs_btn = None
 
-        # Back navigation (breadcrumb — to Zapret1ModeControlPage)
-        try:
-            tokens = get_theme_tokens()
-            _back_btn = TransparentPushButton()
-            _back_btn.setText(self._tr("page.winws1_user_presets.back.control", "Управление"))
-            _back_btn.setIcon(get_themed_qta_icon("fa5s.chevron-left", color=tokens.fg_muted))
-            _back_btn.setIconSize(QSize(12, 12))
-            _back_btn.clicked.connect(self._open_control_callback)
-            self._back_btn = _back_btn
-            _back_row_layout = QHBoxLayout()
-            _back_row_layout.setContentsMargins(0, 0, 0, 0)
-            _back_row_layout.setSpacing(0)
-            _back_row_layout.addWidget(_back_btn)
-            _back_row_layout.addStretch()
-            _back_row_widget = QWidget()
-            _back_row_widget.setLayout(_back_row_layout)
-            self.layout.insertWidget(0, _back_row_widget)
-        except Exception:
-            pass
+        self._breadcrumb = BreadcrumbBar()
+        self._rebuild_breadcrumb()
+        self._breadcrumb.currentItemChanged.connect(self._on_breadcrumb_item_changed)
+        self.layout.insertWidget(0, self._breadcrumb)
 
         self._presets_model: Optional[PresetListModel] = None
         self._presets_delegate: Optional[PresetListDelegate] = None
@@ -198,7 +162,7 @@ class Zapret1UserPresetsPage(BasePage):
         self._preset_search_timer = QTimer(self)
         self._preset_search_timer.setSingleShot(True)
         self._preset_search_timer.timeout.connect(self._apply_preset_search)
-        self._preset_search_input: Optional[QLineEdit] = None
+        self._preset_search_input: Optional[LineEdit] = None
         self._toolbar_layout: Optional[PresetsToolbarLayout] = None
         self.open_folder_btn = None
 
@@ -246,6 +210,31 @@ class Zapret1UserPresetsPage(BasePage):
             ),
             delete_preset_meta=lambda name: self._get_hierarchy_store().delete_preset_meta(name),
         )
+
+    def _current_breadcrumb_title(self) -> str:
+        return self._tr("page.winws1_user_presets.title", "Мои пресеты")
+
+    def _rebuild_breadcrumb(self) -> None:
+        if self._breadcrumb is None:
+            return
+        self._breadcrumb.blockSignals(True)
+        try:
+            self._breadcrumb.clear()
+            self._breadcrumb.addItem(
+                "control",
+                self._tr("page.winws1_user_presets.back.control", "Управление"),
+            )
+            self._breadcrumb.addItem(
+                "presets",
+                self._current_breadcrumb_title(),
+            )
+        finally:
+            self._breadcrumb.blockSignals(False)
+
+    def _on_breadcrumb_item_changed(self, key: str) -> None:
+        self._rebuild_breadcrumb()
+        if key == "control":
+            self._open_control_callback()
 
     def _on_store_changed(self):
         self._runtime_service.on_store_changed()
@@ -640,23 +629,23 @@ class Zapret1UserPresetsPage(BasePage):
         )
 
     def _on_preset_list_action(self, action: str, name: str):
-        handlers = {
-            "activate": self._on_activate_preset,
-            "open": self._open_preset_subpage,
-            "pin": self._on_toggle_pin_preset,
-            "rating": self._on_rate_preset,
-            "move_up": lambda preset_name: self._move_preset_by_step(preset_name, -1),
-            "move_down": lambda preset_name: self._move_preset_by_step(preset_name, 1),
-            "edit": self._on_edit_preset,
-            "rename": self._on_rename_preset,
-            "duplicate": self._on_duplicate_preset,
-            "reset": self._on_reset_preset,
-            "delete": self._on_delete_preset,
-            "export": self._on_export_preset,
-        }
-        handler = handlers.get(action)
-        if handler:
-            handler(name)
+        dispatch_user_preset_list_action(
+            action=action,
+            name=name,
+            handlers=UserPresetListActionHandlers(
+                activate=self._on_activate_preset,
+                open=self._open_preset_subpage,
+                pin=self._on_toggle_pin_preset,
+                rating=self._on_rate_preset,
+                move_by_step=self._move_preset_by_step,
+                edit=self._on_edit_preset,
+                rename=self._on_rename_preset,
+                duplicate=self._on_duplicate_preset,
+                reset=self._on_reset_preset,
+                delete=self._on_delete_preset,
+                export=self._on_export_preset,
+            ),
+        )
 
     def _open_preset_subpage(self, name: str):
         self._open_preset_raw_editor_callback(name)
@@ -719,7 +708,7 @@ class Zapret1UserPresetsPage(BasePage):
             tr_fn=self._tr,
             make_menu_action=make_menu_action,
             fluent_icon=fluent_icon,
-            round_menu_cls=RoundMenu if RoundMenu is not None and Action is not None else None,
+            round_menu_cls=RoundMenu,
             on_preset_list_action_fn=self._on_preset_list_action,
             show_preset_actions_menu_fn=show_preset_actions_menu,
             tr_prefix=_TR_PREFIX,
@@ -833,7 +822,6 @@ class Zapret1UserPresetsPage(BasePage):
         super().set_ui_language(language)
         apply_user_presets_language(
             tr_fn=self._tr,
-            back_btn=self._back_btn,
             configs_title_label=self._configs_title_label,
             get_configs_btn=self._get_configs_btn,
             create_btn=self.create_btn,
@@ -850,6 +838,7 @@ class Zapret1UserPresetsPage(BasePage):
             toolbar_layout=getattr(self, "_toolbar_layout", None),
             refresh_presets_view_from_cache_fn=self._refresh_presets_view_from_cache,
         )
+        self._rebuild_breadcrumb()
 
     def cleanup(self) -> None:
         cleanup_user_presets_page(

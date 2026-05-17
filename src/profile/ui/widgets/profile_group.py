@@ -10,14 +10,7 @@ from PyQt6.QtGui import QCursor
 
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens
 from ui.theme_refresh import ThemeRefreshBinding
-
-try:
-    from qfluentwidgets import StrongBodyLabel, HorizontalSeparator
-    _HAS_FLUENT = True
-except ImportError:
-    StrongBodyLabel = None   # type: ignore[assignment,misc]
-    HorizontalSeparator = None  # type: ignore[assignment,misc]
-    _HAS_FLUENT = False
+from qfluentwidgets import HorizontalSeparator, StrongBodyLabel
 
 
 class ProfileGroupHeader(QFrame):
@@ -80,20 +73,11 @@ class ProfileGroupHeader(QFrame):
         layout.addWidget(self._chevron)
 
         # Название группы
-        if _HAS_FLUENT and StrongBodyLabel is not None:
-            self._title_label = StrongBodyLabel(self._title)
-        else:
-            from PyQt6.QtGui import QFont
-            self._title_label = QLabel(self._title)
-            self._title_label.setFont(QFont("Segoe UI Semibold", 10))
+        self._title_label = StrongBodyLabel(self._title)
         layout.addWidget(self._title_label)
 
         # Линия-разделитель (растягивается)
-        if _HAS_FLUENT and HorizontalSeparator is not None:
-            self._line = HorizontalSeparator()
-        else:
-            self._line = QFrame()
-            self._line.setFrameShape(QFrame.Shape.HLine)
+        self._line = HorizontalSeparator()
         layout.addWidget(self._line, 1)
         self._theme_refresh = ThemeRefreshBinding(self, self._update_chevron)
 

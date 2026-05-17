@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 
-def _set_checkbox_state_silently(
+def _set_toggle_state_silently(
     control,
     *,
     checked: bool | None = None,
@@ -31,11 +31,10 @@ def apply_bulk_profile_selection_ui(
     service_names: list[str],
     service_combos: dict,
     is_fluent_combo: Callable[[object], bool],
-    checkbox_cls,
+    toggle_cls,
     get_building_state: Callable[[], bool],
     set_building_state: Callable[[bool], None],
     update_profile_visual: Callable[[str], None],
-    apply_current_selection: Callable[[], None],
     log_debug: Callable[[str], None],
 ) -> dict[str, str] | None:
     if not plan.changed:
@@ -59,10 +58,10 @@ def apply_bulk_profile_selection_ui(
                 control.blockSignals(True)
                 control.setCurrentIndex(target_idx)
                 control.blockSignals(False)
-        elif isinstance(control, checkbox_cls):
+        elif isinstance(control, toggle_cls):
             desired = bool(target_profile)
             if control.isChecked() != desired:
-                _set_checkbox_state_silently(
+                _set_toggle_state_silently(
                     control,
                     checked=desired,
                     get_building_state=get_building_state,
@@ -71,8 +70,6 @@ def apply_bulk_profile_selection_ui(
 
         update_profile_visual(service_name)
 
-    if plan.apply_now:
-        apply_current_selection()
     return dict(plan.new_selection)
 
 
@@ -81,16 +78,15 @@ def apply_direct_toggle_ui(
     plan,
     service_name: str,
     service_combos: dict,
-    checkbox_cls,
+    toggle_cls,
     get_building_state: Callable[[], bool],
     set_building_state: Callable[[bool], None],
     update_profile_visual: Callable[[str], None],
-    apply_current_selection: Callable[[], None],
 ) -> tuple[dict[str, str], bool]:
     if plan.force_checked is not None or plan.force_enabled is not None:
         control = service_combos.get(service_name)
-        if isinstance(control, checkbox_cls):
-            _set_checkbox_state_silently(
+        if isinstance(control, toggle_cls):
+            _set_toggle_state_silently(
                 control,
                 checked=plan.force_checked,
                 enabled=plan.force_enabled,
@@ -100,8 +96,6 @@ def apply_direct_toggle_ui(
         return dict(plan.new_selection), False
 
     update_profile_visual(service_name)
-    if plan.apply_now:
-        apply_current_selection()
     return dict(plan.new_selection), bool(plan.apply_now)
 
 
@@ -110,9 +104,6 @@ def apply_profile_selection_ui(
     plan,
     service_name: str,
     update_profile_visual: Callable[[str], None],
-    apply_current_selection: Callable[[], None],
 ) -> tuple[dict[str, str], bool]:
     update_profile_visual(service_name)
-    if plan.apply_now:
-        apply_current_selection()
     return dict(plan.new_selection), bool(plan.apply_now)

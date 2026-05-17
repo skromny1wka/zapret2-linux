@@ -9,10 +9,7 @@ server_config.py
 # СПИСОК VPS СЕРВЕРОВ (из _build_secrets при сборке, иначе пуст)
 # ═══════════════════════════════════════════════════════════════
 
-try:
-    from config._build_secrets import UPDATE_SERVERS as VPS_SERVERS
-except ImportError:
-    VPS_SERVERS = []
+from config._build_secrets import UPDATE_SERVERS as VPS_SERVERS
 
 # ═══════════════════════════════════════════════════════════════
 # НАСТРОЙКИ БАЛАНСИРОВКИ

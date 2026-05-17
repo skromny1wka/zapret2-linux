@@ -35,7 +35,6 @@ from .preset_runner_support import (
 from utils.circular_strategy_numbering import (
     strip_strategy_tags,
 )
-from profile.winws2_transport import normalize_winws2_action_lines
 from .constants import CREATE_NO_WINDOW
 from winws_runtime.health.process_health_check import (
     diagnose_startup_error
@@ -432,52 +431,20 @@ class Winws2StrategyRunner(StrategyRunnerBase):
     def _normalize_preset_text(self, source_content: str) -> str:
         normalized, lua_fixed = _ensure_lua_init_lines(source_content, self.work_dir)
         if lua_fixed:
-            log("Applying implicit lua-init lines for launch artifact", "DEBUG")
+            log("Applying implicit lua-init lines before launch", "DEBUG")
 
         source_is_circular = self._is_circular_preset_text(normalized)
         cleaned = normalized if source_is_circular else strip_strategy_tags(normalized)
         if (not source_is_circular) and cleaned != normalized:
-            log("Ignoring service :strategy=N tags in launch artifact", "DEBUG")
+            log("Ignoring service :strategy=N tags before launch", "DEBUG")
 
-        try:
-            from profile.parser import parse_preset_text
-            from profile.serializer import serialize_preset, with_profile_strategy_lines
+        from winws_runtime.preset_launch_text import prepare_winws2_preset_text_for_launch
 
-            source = parse_preset_text(cleaned, engine=ENGINE_WINWS2)
-            source_is_circular = self._is_circular_preset_text(cleaned)
-            repaired_profiles = 0
-            defaulted_profiles = 0
-            rewritten_profiles = 0
-
-            for profile in list(source.profiles or []):
-                current_action_lines = [
-                    str(line).strip()
-                    for line in getattr(profile.strategy, "strategy_lines", ()) or ()
-                    if str(line).strip()
-                ]
-                normalized_action_lines, fixes, _resolved = normalize_winws2_action_lines(
-                    current_action_lines,
-                    source_is_circular=source_is_circular,
-                )
-                if not fixes or normalized_action_lines == current_action_lines:
-                    continue
-                if "applied_default_out_range" in fixes:
-                    defaulted_profiles += 1
-                if any(flag in fixes for flag in ("canonicalized_out_range", "replaced_invalid_out_range", "lifted_inline_out_range", "removed_duplicate_out_range")):
-                    rewritten_profiles += 1
-                source = with_profile_strategy_lines(source, profile.index, normalized_action_lines)
-                repaired_profiles += 1
-
-            if repaired_profiles:
-                cleaned = serialize_preset(source)
-                log(
-                    "Normalized out-range in launch artifact "
-                    f"(profiles={repaired_profiles}, defaulted={defaulted_profiles}, rewritten={rewritten_profiles})",
-                    "WARNING",
-                )
-        except Exception as e:
-            log(f"Failed to normalize out-range in launch artifact: {e}", "DEBUG")
-        return cleaned
+        prepared = prepare_winws2_preset_text_for_launch(
+            cleaned,
+            source_is_circular=self._is_circular_preset_text(cleaned),
+        )
+        return prepared.text
 
     def _compile_preset_artifact(self, preset_path: str) -> PreparedPresetArtifact:
         p = str(preset_path or "").strip()
@@ -500,11 +467,21 @@ class Winws2StrategyRunner(StrategyRunnerBase):
             except Exception:
                 return PreparedPresetArtifact(p, cache_key, "", tuple(), False, f"Preset файл не найден: {p}")
 
-            normalized_text = self._normalize_preset_text(source_content)
-            launch_args = tuple(launch_args_from_preset_text(normalized_text))
-            missing = self._collect_missing_preset_references_from_text(normalized_text)
-            validation_ok = not missing
-            validation_report = "" if validation_ok else self._build_validation_report(missing)
+            try:
+                normalized_text = self._normalize_preset_text(source_content)
+                launch_args = tuple(launch_args_from_preset_text(normalized_text))
+                missing = self._collect_missing_preset_references_from_text(normalized_text)
+                validation_ok = not missing
+                validation_report = "" if validation_ok else self._build_validation_report(missing)
+            except Exception as e:
+                return PreparedPresetArtifact(
+                    preset_path=p,
+                    cache_key=cache_key,
+                    normalized_text="",
+                    launch_args=tuple(),
+                    validation_ok=False,
+                    validation_report=f"Не удалось подготовить preset файл: {e}",
+                )
             artifact = PreparedPresetArtifact(
                 preset_path=p,
                 cache_key=cache_key,
@@ -537,12 +514,9 @@ class Winws2StrategyRunner(StrategyRunnerBase):
 
     @staticmethod
     def _is_circular_preset_text(source_content: str) -> bool:
-        lowered = str(source_content or "").lower()
-        return (
-            "(circular)" in lowered
-            or "--lua-desync=circular" in lowered
-            or "--lua-desync=circular_quality" in lowered
-        )
+        from winws_runtime.preset_launch_text import is_winws2_circular_preset_text
+
+        return is_winws2_circular_preset_text(source_content)
 
     def _on_config_changed(self):
         """
@@ -873,8 +847,14 @@ class Winws2StrategyRunner(StrategyRunnerBase):
 
             if self.running_process and self.is_running():
                 cleanup_required = self._stop_process_only_locked()
-                if cleanup_required:
-                    self._perform_standard_windivert_cleanup()
+            else:
+                try:
+                    cleanup_required = bool(get_all_winws_process_pids())
+                except Exception:
+                    cleanup_required = False
+
+            if cleanup_required:
+                self._perform_standard_windivert_cleanup()
 
             self._preset_file_path = preset_path
             success = self._spawn_process_locked(

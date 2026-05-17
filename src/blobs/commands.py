@@ -32,9 +32,9 @@ def open_bin_folder() -> None:
 
 
 def open_blobs_json() -> None:
-    from config.config import INDEXJSON_FOLDER
+    from settings.store import get_settings_path
 
-    os.startfile(os.path.join(INDEXJSON_FOLDER, "blobs.json"))
+    os.startfile(str(get_settings_path()))
 
 
 def get_bin_folder() -> str:

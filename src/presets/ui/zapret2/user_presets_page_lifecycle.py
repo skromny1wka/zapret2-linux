@@ -212,7 +212,6 @@ def apply_user_presets_language(
     *,
     tr_fn,
     rebuild_breadcrumb_fn,
-    back_btn,
     configs_title_label,
     get_configs_btn,
     create_btn,
@@ -234,8 +233,6 @@ def apply_user_presets_language(
 
     if rebuild_breadcrumb_fn is not None:
         rebuild_breadcrumb_fn()
-    elif back_btn is not None:
-        back_btn.setText(tr_fn("page.winws2_user_presets.back.control", "Управление"))
 
     if configs_title_label is not None:
         configs_title_label.setText(

@@ -7,44 +7,21 @@ SettingsCard, ActionButton, SettingsRow, PulsingDot и похожие элеме
 """
 from PyQt6.QtCore import Qt, QSize, QEvent, QTimer, QObject
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QFrame, QSizePolicy, QPushButton,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy,
 )
 from PyQt6.QtGui import QIcon, QFont, QColor, QPainter, QPixmap, QTransform
 import qtawesome as qta
 
 from ui.theme import get_cached_qta_pixmap, get_themed_qta_icon, get_theme_tokens
 from ui.theme_refresh import ThemeRefreshBinding
-
-try:
-    from qfluentwidgets import (
-        CardWidget, SimpleCardWidget, HeaderCardWidget, PrimaryPushButton, PushButton,
-        TransparentPushButton, BodyLabel, StrongBodyLabel, CaptionLabel,
-        SubtitleLabel, TitleLabel, IndeterminateProgressBar, FluentIcon,
-        ProgressBar, InfoBar, InfoBarPosition, SwitchButton, isDarkTheme, themeColor,
-        LineEdit, ComboBox, CheckBox, SettingCard as FluentSettingCard,
-        ToolTipFilter, ToolTipPosition, FlowLayout,
-    )
-    HAS_FLUENT = True
-except ImportError:
-    HAS_FLUENT = False
-    HeaderCardWidget = QFrame  # type: ignore[assignment,misc]
-    SimpleCardWidget = QFrame  # type: ignore[assignment,misc]
-    FluentSettingCard = QFrame  # type: ignore[assignment,misc]
-    ToolTipFilter = None    # type: ignore[assignment,misc]
-    ToolTipPosition = None  # type: ignore[assignment,misc]
-    FlowLayout = None  # type: ignore[assignment,misc]
-
-
-# ---------------------------------------------------------------------------
-# Re-export native qfluentwidgets inputs so pages can import from one place
-# ---------------------------------------------------------------------------
-if not HAS_FLUENT:
-    # Минимальные Qt-замены для среды разработки без qfluentwidgets.
-    from PyQt6.QtWidgets import QLineEdit as LineEdit       # type: ignore[assignment]
-    from PyQt6.QtWidgets import QComboBox as ComboBox       # type: ignore[assignment]
-    from PyQt6.QtWidgets import QCheckBox as CheckBox       # type: ignore[assignment]
-    SwitchButton = None  # type: ignore[assignment,misc]
+from qfluentwidgets import (
+    BodyLabel, CaptionLabel, CardWidget, CheckBox, ComboBox, FlowLayout,
+    FluentIcon, HeaderCardWidget, IndeterminateProgressBar, InfoBar,
+    InfoBarPosition, LineEdit, PrimaryPushButton, ProgressBar, PushButton,
+    SettingCard as FluentSettingCard, SimpleCardWidget, StrongBodyLabel,
+    SubtitleLabel, SwitchButton, TitleLabel, ToolTipFilter, ToolTipPosition,
+    TransparentPushButton, isDarkTheme, themeColor,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -55,8 +32,7 @@ def set_tooltip(widget, text: str, *, position=None, delay: int = 300) -> None:
     """Set a Fluent-styled tooltip on *widget*.
 
     Installs ``ToolTipFilter`` exactly once per widget (safe to call multiple
-    times — subsequent calls only update the text). Falls back to the native
-    Qt tooltip when qfluentwidgets is not available.
+    times — subsequent calls only update the text).
 
     Args:
         widget:   Any QWidget.
@@ -65,8 +41,6 @@ def set_tooltip(widget, text: str, *, position=None, delay: int = 300) -> None:
         delay:    Hover-to-show delay in milliseconds (default 300).
     """
     widget.setToolTip(text)
-    if ToolTipFilter is None:
-        return
     # Install only once — skip if already done for this widget.
     if getattr(widget, "_fluent_tooltip_filter", None) is None:
         pos = position if position is not None else ToolTipPosition.TOP
@@ -76,10 +50,10 @@ def set_tooltip(widget, text: str, *, position=None, delay: int = 300) -> None:
 
 
 # ---------------------------------------------------------------------------
-# SettingsCard — wraps qfluentwidgets CardWidget (or falls back to QFrame)
+# SettingsCard — wraps qfluentwidgets CardWidget
 # ---------------------------------------------------------------------------
 
-class SettingsCard(QWidget if HAS_FLUENT else QFrame):
+class SettingsCard(QWidget):
     """Контейнер для строк настроек в общем стиле страниц."""
 
     def __init__(self, title: str = "", parent=None):
@@ -91,44 +65,33 @@ class SettingsCard(QWidget if HAS_FLUENT else QFrame):
         self._header_label = None
         self._content_host = None
 
-        if HAS_FLUENT:
-            outer_layout = QVBoxLayout(self)
-            outer_layout.setContentsMargins(0, 0, 0, 0)
-            outer_layout.setSpacing(0)
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(0, 0, 0, 0)
+        outer_layout.setSpacing(0)
 
-            if title:
-                card_root = HeaderCardWidget(title, self)
-                content_host = QWidget(card_root)
-                content_layout = QVBoxLayout(content_host)
-                content_layout.setContentsMargins(0, 0, 0, 0)
-                content_layout.setSpacing(12)
-                try:
-                    card_root.viewLayout.addWidget(content_host)
-                except Exception:
-                    pass
-                self._header_label = getattr(card_root, "headerLabel", None)
-                self._title_label = self._header_label
-                self.main_layout = content_layout
-                self._content_host = content_host
-            else:
-                card_root = CardWidget(self)
-                content_layout = QVBoxLayout(card_root)
-                content_layout.setContentsMargins(16, 16, 16, 16)
-                content_layout.setSpacing(12)
-                self.main_layout = content_layout
-
-            self._card_root = card_root
-            outer_layout.addWidget(card_root)
+        if title:
+            card_root = HeaderCardWidget(title, self)
+            content_host = QWidget(card_root)
+            content_layout = QVBoxLayout(content_host)
+            content_layout.setContentsMargins(0, 0, 0, 0)
+            content_layout.setSpacing(12)
+            try:
+                card_root.viewLayout.addWidget(content_host)
+            except Exception:
+                pass
+            self._header_label = getattr(card_root, "headerLabel", None)
+            self._title_label = self._header_label
+            self.main_layout = content_layout
+            self._content_host = content_host
         else:
-            self.main_layout = QVBoxLayout(self)
-            self.main_layout.setContentsMargins(16, 16, 16, 16)
-            self.main_layout.setSpacing(12)
+            card_root = CardWidget(self)
+            content_layout = QVBoxLayout(card_root)
+            content_layout.setContentsMargins(16, 16, 16, 16)
+            content_layout.setSpacing(12)
+            self.main_layout = content_layout
 
-            if title:
-                title_lbl = QLabel(title)
-                title_lbl.setStyleSheet("font-size: 14px; font-weight: 600;")
-                self._title_label = title_lbl
-                self.main_layout.addWidget(title_lbl)
+        self._card_root = card_root
+        outer_layout.addWidget(card_root)
 
     def add_widget(self, widget: QWidget):
         self.main_layout.addWidget(widget)
@@ -138,32 +101,23 @@ class SettingsCard(QWidget if HAS_FLUENT else QFrame):
 
     def set_title(self, text: str) -> None:
         try:
-            if HAS_FLUENT:
-                if self._title_label is None:
-                    title_lbl = StrongBodyLabel(text, self)
-                    self._title_label = title_lbl
-                    self.main_layout.insertWidget(0, title_lbl)
-                else:
-                    self._title_label.setText(text)
+            if self._title_label is None:
+                title_lbl = StrongBodyLabel(text, self)
+                self._title_label = title_lbl
+                self.main_layout.insertWidget(0, title_lbl)
             else:
-                if self._title_label is None:
-                    title_lbl = QLabel(text)
-                    title_lbl.setStyleSheet("font-size: 14px; font-weight: 600;")
-                    self._title_label = title_lbl
-                    self.main_layout.insertWidget(0, title_lbl)
-                else:
-                    self._title_label.setText(text)
+                self._title_label.setText(text)
         except Exception:
             pass
 
     def setStyleSheet(self, style: str) -> None:  # noqa: N802
-        if HAS_FLUENT and self._card_root is not None:
+        if self._card_root is not None:
             self._card_root.setStyleSheet(style)
             return
         super().setStyleSheet(style)
 
     def styleSheet(self) -> str:  # noqa: N802
-        if HAS_FLUENT and self._card_root is not None:
+        if self._card_root is not None:
             try:
                 return self._card_root.styleSheet()
             except Exception:
@@ -243,7 +197,7 @@ def insert_widget_into_setting_card_group(group, index: int, widget) -> None:
     refresh_setting_card_group_height(group)
 
 
-class QuickActionsBar(SimpleCardWidget if HAS_FLUENT else QFrame):
+class QuickActionsBar(SimpleCardWidget):
     """Компактная fluent-панель быстрых действий без описаний.
 
     Это канонический паттерн для случаев, когда на странице нужны именно
@@ -255,15 +209,10 @@ class QuickActionsBar(SimpleCardWidget if HAS_FLUENT else QFrame):
         super().__init__(parent)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
 
-        if HAS_FLUENT and FlowLayout is not None:
-            layout = FlowLayout(self, needAni=False, isTight=True)
-            layout.setContentsMargins(16, 14, 16, 14)
-            layout.setHorizontalSpacing(8)
-            layout.setVerticalSpacing(8)
-        else:
-            layout = QHBoxLayout(self)
-            layout.setContentsMargins(16, 14, 16, 14)
-            layout.setSpacing(8)
+        layout = FlowLayout(self, needAni=False, isTight=True)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setHorizontalSpacing(8)
+        layout.setVerticalSpacing(8)
 
         self.actions_layout = layout
 
@@ -294,7 +243,7 @@ class SemanticNotice(QWidget):
         self._tone = str(tone or "warning").strip().lower() or "warning"
         self._text = str(text or "")
         self._icon_label = QLabel(self)
-        self._text_label = CaptionLabel(self) if HAS_FLUENT else QLabel(self)
+        self._text_label = CaptionLabel(self)
         self._text_label.setWordWrap(True)
         self._text_label.setText(self._text)
 
@@ -418,40 +367,22 @@ def build_advanced_settings_section(
     toggle_rows=None,
     action_rows=None,
 ):
-    """Собирает единый блок «Дополнительные настройки» для fluent/fallback UI."""
+    """Собирает единый блок «Дополнительные настройки» для Fluent UI."""
 
     toggle_rows = [row for row in (toggle_rows or ()) if row is not None]
     action_rows = [row for row in (action_rows or ()) if row is not None]
 
     warning = SemanticNotice(warning_text, tone="warning", parent=parent)
 
-    if HAS_FLUENT:
-        try:
-            from qfluentwidgets import SettingCardGroup
-        except Exception:
-            SettingCardGroup = None  # type: ignore[assignment]
-    else:
-        SettingCardGroup = None  # type: ignore[assignment]
+    from qfluentwidgets import SettingCardGroup
 
-    if SettingCardGroup is not None:
-        group = SettingCardGroup(title, parent)
-        insert_widget_into_setting_card_group(group, 1, warning)
-        for row in toggle_rows:
-            group.addSettingCard(row)
-        for row in action_rows:
-            group.addSettingCard(row)
-        enable_setting_card_group_auto_height(group)
-        return group, warning
-
-    group = SettingsCard(title, parent)
-    layout = QVBoxLayout()
-    layout.setSpacing(6)
-    layout.addWidget(warning)
+    group = SettingCardGroup(title, parent)
+    insert_widget_into_setting_card_group(group, 1, warning)
     for row in toggle_rows:
-        layout.addWidget(row)
+        group.addSettingCard(row)
     for row in action_rows:
-        layout.addWidget(row)
-    group.add_layout(layout)
+        group.addSettingCard(row)
+    enable_setting_card_group_auto_height(group)
     return group, warning
 
 
@@ -475,7 +406,7 @@ def _set_qta_button_icon(button, icon_name: str | None, *, color: str, size: int
         except Exception:
             pass
 
-class ActionButton(PushButton if HAS_FLUENT else QPushButton):
+class ActionButton(PushButton):
     """Non-accent action button using qfluentwidgets PushButton.
 
     For accent (primary) buttons, use PrimaryActionButton instead.
@@ -614,7 +545,7 @@ class RefreshButton(ActionButton):
 # PrimaryActionButton — accent PrimaryPushButton (start/confirm actions)
 # ---------------------------------------------------------------------------
 
-class PrimaryActionButton(PrimaryPushButton if HAS_FLUENT else QPushButton):
+class PrimaryActionButton(PrimaryPushButton):
     """Accent action button using qfluentwidgets PrimaryPushButton.
 
     Use this for primary / confirm actions (e.g. «Запустить», «Применить»).
@@ -641,7 +572,7 @@ class PrimaryActionButton(PrimaryPushButton if HAS_FLUENT else QPushButton):
 # SettingsRow — icon + title/description left, control right
 # ---------------------------------------------------------------------------
 
-class SettingsRow(FluentSettingCard if HAS_FLUENT else QWidget):
+class SettingsRow(FluentSettingCard):
     """Settings row (icon + text on the left, control widget on the right)."""
 
     def __init__(self, icon_name: str, title: str, description: str = "", parent=None):
@@ -649,71 +580,32 @@ class SettingsRow(FluentSettingCard if HAS_FLUENT else QWidget):
         self._icon_label = None
         self._title_label = None
         self._desc_label = None
-        if HAS_FLUENT:
-            try:
-                import qtawesome as qta
-                icon = get_themed_qta_icon(icon_name, color=themeColor().name())
-            except Exception:
-                icon = QIcon()
-            super().__init__(icon, title, description or None, parent)
-            self._icon_label = getattr(self, "iconLabel", None)
-            self._title_label = getattr(self, "titleLabel", None)
-            self._desc_label = getattr(self, "contentLabel", None)
-            try:
-                self.setIconSize(20, 20)
-            except Exception:
-                pass
-            self.control_container = QHBoxLayout()
-            self.control_container.setSpacing(8)
-            try:
-                stretch_index = max(0, self.hBoxLayout.count() - 1)
-                self.hBoxLayout.insertSpacing(stretch_index, 16)
-                self.hBoxLayout.insertLayout(stretch_index, self.control_container)
-            except Exception:
-                self.hBoxLayout.addLayout(self.control_container)
-        else:
-            super().__init__(parent)
-
-            layout = QHBoxLayout(self)
-            layout.setContentsMargins(0, 4, 0, 4)
-            layout.setSpacing(12)
-
-            # Icon
-            icon_label = QLabel()
-            self._icon_label = icon_label
-            self._refresh_icon()
-            icon_label.setFixedSize(24, 24)
-            layout.addWidget(icon_label)
-
-            # Text
-            text_layout = QVBoxLayout()
-            text_layout.setSpacing(2)
-
-            title_label = QLabel(title)
-            title_label.setStyleSheet("font-size: 13px; font-weight: 500;")
-            self._title_label = title_label
-            text_layout.addWidget(title_label)
-
-            if description:
-                desc_label = QLabel(description)
-                desc_label.setStyleSheet("font-size: 11px;")
-                desc_label.setWordWrap(True)
-                self._desc_label = desc_label
-                text_layout.addWidget(desc_label)
-
-            layout.addLayout(text_layout, 1)
-
-            # Control container (populated externally via set_control)
-            self.control_container = QHBoxLayout()
-            self.control_container.setSpacing(8)
-            layout.addLayout(self.control_container)
+        try:
+            icon = get_themed_qta_icon(icon_name, color=themeColor().name())
+        except Exception:
+            icon = QIcon()
+        super().__init__(icon, title, description or None, parent)
+        self._icon_label = getattr(self, "iconLabel", None)
+        self._title_label = getattr(self, "titleLabel", None)
+        self._desc_label = getattr(self, "contentLabel", None)
+        try:
+            self.setIconSize(20, 20)
+        except Exception:
+            pass
+        self.control_container = QHBoxLayout()
+        self.control_container.setSpacing(8)
+        try:
+            stretch_index = max(0, self.hBoxLayout.count() - 1)
+            self.hBoxLayout.insertSpacing(stretch_index, 16)
+            self.hBoxLayout.insertLayout(stretch_index, self.control_container)
+        except Exception:
+            self.hBoxLayout.addLayout(self.control_container)
 
     def _refresh_icon(self) -> None:
         if self._icon_label is None:
             return
         try:
-            import qtawesome as qta
-            color = themeColor().name() if HAS_FLUENT else "#5fcffe"
+            color = themeColor().name()
             self._icon_label.setPixmap(get_cached_qta_pixmap(self._icon_name, color=color, size=20))
         except Exception:
             pass
@@ -724,19 +616,13 @@ class SettingsRow(FluentSettingCard if HAS_FLUENT else QWidget):
 
     def set_title(self, text: str) -> None:
         try:
-            if HAS_FLUENT:
-                self.setTitle(text)
-            elif self._title_label is not None:
-                self._title_label.setText(text)
+            self.setTitle(text)
         except Exception:
             pass
 
     def set_description(self, text: str) -> None:
         try:
-            if HAS_FLUENT:
-                self.setContent(text)
-            elif self._desc_label is not None:
-                self._desc_label.setText(text)
+            self.setContent(text)
         except Exception:
             pass
 
@@ -865,24 +751,20 @@ class InfoBarHelper:
 
     @staticmethod
     def success(parent: QWidget, title: str, content: str = "", duration: int = 3000):
-        if HAS_FLUENT:
-            InfoBar.success(title, content, duration=duration,
-                            position=InfoBarPosition.TOP_RIGHT, parent=parent)
+        InfoBar.success(title, content, duration=duration,
+                        position=InfoBarPosition.TOP_RIGHT, parent=parent)
 
     @staticmethod
     def warning(parent: QWidget, title: str, content: str = "", duration: int = 4000):
-        if HAS_FLUENT:
-            InfoBar.warning(title, content, duration=duration,
-                            position=InfoBarPosition.TOP_RIGHT, parent=parent)
+        InfoBar.warning(title, content, duration=duration,
+                        position=InfoBarPosition.TOP_RIGHT, parent=parent)
 
     @staticmethod
     def error(parent: QWidget, title: str, content: str = "", duration: int = 5000):
-        if HAS_FLUENT:
-            InfoBar.error(title, content, duration=duration,
-                          position=InfoBarPosition.TOP_RIGHT, parent=parent)
+        InfoBar.error(title, content, duration=duration,
+                      position=InfoBarPosition.TOP_RIGHT, parent=parent)
 
     @staticmethod
     def info(parent: QWidget, title: str, content: str = "", duration: int = 3000):
-        if HAS_FLUENT:
-            InfoBar.info(title, content, duration=duration,
-                         position=InfoBarPosition.TOP_RIGHT, parent=parent)
+        InfoBar.info(title, content, duration=duration,
+                     position=InfoBarPosition.TOP_RIGHT, parent=parent)

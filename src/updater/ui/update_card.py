@@ -11,24 +11,13 @@ from app.text_catalog import tr as tr_catalog
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens
 from ui.theme_refresh import ThemeRefreshBinding
 import updater.update_page_plans as update_page_plans
-
-try:
-    from qfluentwidgets import (
-        CaptionLabel,
-        CardWidget,
-        IndeterminateProgressRing,
-        PushButton,
-        StrongBodyLabel,
-    )
-    HAS_FLUENT = True
-except ImportError:
-    from PyQt6.QtWidgets import QFrame as CardWidget, QPushButton as _QPushButton
-
-    CaptionLabel = QLabel
-    StrongBodyLabel = QLabel
-    IndeterminateProgressRing = None
-    PushButton = _QPushButton
-    HAS_FLUENT = False
+from qfluentwidgets import (
+    CaptionLabel,
+    CardWidget,
+    IndeterminateProgressRing,
+    PushButton,
+    StrongBodyLabel,
+)
 
 
 class IndeterminateProgressPushButton(PushButton):
@@ -37,12 +26,10 @@ class IndeterminateProgressPushButton(PushButton):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._stored_text = ""
-        self._ring = None
-        if HAS_FLUENT and IndeterminateProgressRing is not None:
-            self._ring = IndeterminateProgressRing(start=False, parent=self)
-            self._ring.setFixedSize(20, 20)
-            self._ring.setStrokeWidth(2)
-            self._ring.hide()
+        self._ring = IndeterminateProgressRing(start=False, parent=self)
+        self._ring.setFixedSize(20, 20)
+        self._ring.setStrokeWidth(2)
+        self._ring.hide()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)

@@ -279,14 +279,14 @@ class LockedStrategiesManager:
                 self.output_callback(f"[INFO] Пропущен lock для proxy-цели {hostname}")
             return
 
-        # Получаем словари и пути реестра для данного askey
+        # Получаем словари settings.json для данного askey
         target_dict = self.locked_by_askey[askey]
         user_set = self.user_locked_by_askey[askey]
         # Сохраняем стратегию
         target_dict[hostname] = strategy
         set_orchestra_locked_strategy(askey, hostname, strategy)
 
-        # Если user_lock - добавляем в user set и сохраняем в реестр
+        # Если user_lock - добавляем в user set и сохраняем в settings.json
         if user_lock:
             user_set.add(hostname)
             set_orchestra_user_locked(askey, sorted(user_set))
@@ -314,7 +314,7 @@ class LockedStrategiesManager:
         hostname = hostname.lower()
         askey = self._normalize_askey(proto)
 
-        # Получаем словари и пути реестра для данного askey
+        # Получаем словари settings.json для данного askey
         target_dict = self.locked_by_askey[askey]
         user_set = self.user_locked_by_askey[askey]
         if hostname in target_dict:

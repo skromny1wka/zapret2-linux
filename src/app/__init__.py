@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from app.features import AppFeatures, DnsFeature, build_app_features
+from app.feature_assembly import build_app_features
+from app.features import AppFeatures, DnsFeature
 from app.runtime import AppRuntime, build_app_runtime
 from app.state_access import AppStateAccess, build_app_state_access
 from app.state_store import AppRuntimeState, AppUiState, MainWindowStateStore

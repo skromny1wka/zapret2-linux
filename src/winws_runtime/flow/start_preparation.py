@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 from log.log import log
 from settings.mode import (
-    ENGINE_WINWS2,
     is_orchestra_launch_method,
     is_preset_launch_method,
     is_zapret1_launch_method,
@@ -72,34 +70,11 @@ def preset_filter_flags(launch_method: str) -> tuple[str, ...]:
     return ("--wf-tcp-out", "--wf-udp-out", "--wf-raw-part")
 
 
-def _preset_selected_mode_validated_for_method(selected_mode, launch_method: str) -> bool:
-    if not isinstance(selected_mode, dict):
-        return False
-    validated = bool(selected_mode.get("_preset_mode_filters_validated"))
-    validated_method = normalize_launch_method(selected_mode.get("_preset_mode_filters_validated_method"), default="")
-    method = normalize_launch_method(launch_method, default="")
-    return validated and validated_method == method
-
-
-def _preset_selected_mode_has_placeholder_unknown(selected_mode) -> bool:
-    if not isinstance(selected_mode, dict):
-        return False
-    return bool(selected_mode.get("_preset_mode_has_placeholder_unknown"))
-
-
-def validate_preset_selected_mode(selected_mode, launch_method: str) -> None:
+def validate_preset_selected_mode(selected_mode, launch_method: str, *, prepared_text: str | None = None) -> None:
     method = normalize_launch_method(launch_method, default="")
     if not is_preset_launch_method(method):
         return
     if not isinstance(selected_mode, dict) or not bool(selected_mode.get("is_preset_file")):
-        return
-    if is_zapret1_launch_method(method) and _preset_selected_mode_validated_for_method(selected_mode, method):
-        return
-    if (
-        is_zapret2_launch_method(method)
-        and _preset_selected_mode_validated_for_method(selected_mode, method)
-        and not _preset_selected_mode_has_placeholder_unknown(selected_mode)
-    ):
         return
 
     preset_path = Path(str(selected_mode.get("preset_path") or "").strip())
@@ -107,28 +82,11 @@ def validate_preset_selected_mode(selected_mode, launch_method: str) -> None:
         raise RuntimeError("Preset файл не найден. Создайте пресет в настройках")
 
     try:
-        content = preset_path.read_text(encoding="utf-8").strip()
-
-        if is_zapret2_launch_method(method):
-            content_lower = content.lower()
-            if ("unknown.txt" in content_lower) or ("ipset-unknown.txt" in content_lower):
-                try:
-                    from profile.parser import parse_preset_text
-                    from profile.serializer import serialize_preset
-
-                    source = parse_preset_text(content, engine=ENGINE_WINWS2, source_name=preset_path.name)
-                    kept = [
-                        profile for profile in source.profiles
-                        if "unknown.txt" not in "\n".join(profile.match.all_lines()).lower()
-                        and "ipset-unknown.txt" not in "\n".join(profile.match.all_lines()).lower()
-                    ]
-                    if len(kept) != len(source.profiles):
-                        source.profiles = kept
-                        preset_path.write_text(serialize_preset(source), encoding="utf-8")
-                        content = preset_path.read_text(encoding="utf-8").strip()
-                except Exception as e:
-                    log(f"Ошибка очистки preset файла от unknown.txt: {e}", "DEBUG")
-
+        content = (
+            str(prepared_text or "").strip()
+            if prepared_text is not None
+            else preset_path.read_text(encoding="utf-8").strip()
+        )
         if not any(flag in content for flag in preset_filter_flags(method)):
             raise RuntimeError("Выберите хотя бы одну категорию для запуска")
     except RuntimeError:
@@ -140,67 +98,33 @@ def validate_preset_selected_mode(selected_mode, launch_method: str) -> None:
 def sanitize_presets_before_launch(
     selected_mode,
     launch_method: str,
-) -> tuple[list[str], str | None]:
+) -> tuple[object, list[str], str | None, str | None]:
     method = normalize_launch_method(launch_method, default="")
     if not is_zapret2_launch_method(method):
-        return [], None
+        return selected_mode, [], None, None
     if not isinstance(selected_mode, dict) or not bool(selected_mode.get("is_preset_file")):
-        return [], None
+        return selected_mode, [], None, None
 
     preset_path = Path(str(selected_mode.get("preset_path") or "").strip())
     if not preset_path.exists():
-        return [], "Preset файл не найден. Создайте пресет в настройках"
+        return selected_mode, [], "Preset файл не найден. Создайте пресет в настройках", None
 
     try:
-        from profile.parser import parse_preset_text
-        from profile.serializer import serialize_preset, with_profile_strategy_lines
-        from profile.winws2_transport import normalize_winws2_action_lines
+        from winws_runtime.preset_launch_text import (
+            is_winws2_circular_preset_text,
+            prepare_winws2_preset_text_for_launch,
+        )
 
-        source = parse_preset_text(preset_path.read_text(encoding="utf-8", errors="replace"), engine=ENGINE_WINWS2, source_name=preset_path.name)
-        changed = False
-        warnings: list[str] = []
-
-        kept = [
-            profile for profile in source.profiles
-            if "unknown.txt" not in "\n".join(profile.match.all_lines()).lower()
-            and "ipset-unknown.txt" not in "\n".join(profile.match.all_lines()).lower()
-        ]
-        if len(kept) != len(source.profiles):
-            source.profiles = kept
-            source = parse_preset_text(serialize_preset(source), engine=ENGINE_WINWS2, source_name=preset_path.name)
-            changed = True
-            warnings.append("Из source-пресета автоматически убраны placeholder-фильтры unknown.txt.")
-
-        repaired_labels: list[str] = []
-        for profile in list(source.profiles):
-            current_lines = [str(line).strip() for line in getattr(profile.strategy, "strategy_lines", ()) or () if str(line).strip()]
-            normalized_lines, fixes, _resolved = normalize_winws2_action_lines(
-                current_lines,
-                source_is_circular=False,
-            )
-            if fixes and normalized_lines != current_lines:
-                source = with_profile_strategy_lines(source, profile.index, normalized_lines)
-                repaired_labels.append(profile.display_name)
-        if repaired_labels:
-            changed = True
-            max_show = 5
-            shown = repaired_labels[:max_show]
-            hidden = len(repaired_labels) - len(shown)
-            message = (
-                "В source-пресете автоматически исправлен out-range. "
-                f"Для этих фильтров записан канонический формат или подставлен --out-range=-d8: {', '.join(shown)}"
-            )
-            if hidden > 0:
-                message += f" (+{hidden} ещё)"
-            warnings.append(message)
-
-        if changed:
-            preset_path.write_text(serialize_preset(source), encoding="utf-8")
-
-        return warnings, None
+        source_text = preset_path.read_text(encoding="utf-8", errors="replace")
+        prepared = prepare_winws2_preset_text_for_launch(
+            source_text,
+            source_name=preset_path.name,
+            source_is_circular=is_winws2_circular_preset_text(source_text),
+        )
+        return selected_mode, list(prepared.warnings), None, None
     except Exception as e:
         log(f"Не удалось подготовить preset mode перед запуском: {e}", "DEBUG")
-        return [], None
+        return selected_mode, [], f"Не удалось подготовить preset для запуска: {e}", None
 
 
 def prepare_start_request(
@@ -217,17 +141,19 @@ def prepare_start_request(
         resolved_method,
         presets_feature=presets_feature,
     )
-    validate_preset_selected_mode(
-        prepared_selected_mode,
-        resolved_method,
-    )
 
-    prelaunch_warnings, prelaunch_error = sanitize_presets_before_launch(
+    prepared_selected_mode, prelaunch_warnings, prelaunch_error, prepared_text = sanitize_presets_before_launch(
         prepared_selected_mode,
         resolved_method,
     )
     if prelaunch_error:
         raise RuntimeError(prelaunch_error)
+
+    validate_preset_selected_mode(
+        prepared_selected_mode,
+        resolved_method,
+        prepared_text=prepared_text,
+    )
 
     warnings = list(prelaunch_warnings)
 

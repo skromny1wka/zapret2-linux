@@ -4,7 +4,8 @@ from typing import Callable
 
 from PyQt6.QtCore import QPoint
 from PyQt6.QtGui import QCursor
-from PyQt6.QtWidgets import QWidget, QMenu
+from PyQt6.QtWidgets import QWidget
+from qfluentwidgets import Action, RoundMenu
 
 from ui.popup_menu import exec_popup_menu
 
@@ -21,19 +22,21 @@ def show_preset_rating_menu(
 ) -> None:
     """Show shared preset rating menu and persist the selected rating."""
 
-    menu = QMenu(parent)
+    menu = RoundMenu(parent=parent)
     current_rating = int(
         hierarchy_store.get_preset_meta(preset_file_name).get("rating", 0) or 0
     )
 
-    clear_action = menu.addAction(str(clear_label or "Сбросить рейтинг"))
+    clear_action = Action(str(clear_label or "Сбросить рейтинг"), menu)
+    menu.addAction(clear_action)
     clear_action.setCheckable(True)
     clear_action.setChecked(current_rating == 0)
     menu.addSeparator()
 
     actions = {}
     for value in range(1, 11):
-        action = menu.addAction(f"{value}/10")
+        action = Action(f"{value}/10", menu)
+        menu.addAction(action)
         action.setCheckable(True)
         action.setChecked(current_rating == value)
         actions[action] = value

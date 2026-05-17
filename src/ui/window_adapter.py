@@ -26,6 +26,25 @@ def get_loaded_page(window, page_name: PageName):
     return session.page_host.get_loaded_page(page_name)
 
 
+def send_page_command(
+    window,
+    page_name: PageName,
+    command: str,
+    payload: dict | None = None,
+    *,
+    ensure: bool = True,
+) -> bool:
+    session = get_window_ui_session(window)
+    if session is None:
+        return False
+    return session.page_host.send_page_command(
+        page_name,
+        command,
+        payload,
+        ensure=ensure,
+    )
+
+
 def get_current_page(window):
     session = get_window_ui_session(window)
     if session is None:
@@ -76,6 +95,7 @@ __all__ = [
     "release_input_interaction_states",
     "request_exit",
     "route_window_search_result",
+    "send_page_command",
     "show_page",
     "show_window",
     "sync_titlebar_search_width",

@@ -85,7 +85,7 @@ def add_nav_item(
     insert_index: int | None = None,
 ) -> None:
     session = get_window_ui_session(window)
-    if session is None or not session.has_fluent_nav:
+    if session is None:
         return
 
     if page_name in session.nav_items:
@@ -163,7 +163,7 @@ def add_nav_item(
 
 def init_navigation(window) -> None:
     session = get_window_ui_session(window)
-    if session is None or not session.has_fluent_nav:
+    if session is None:
         return
 
     from ui.navigation.search import (
@@ -197,19 +197,18 @@ def init_navigation(window) -> None:
 
     nav = window.navigationInterface
 
-    if session.has_fluent_nav:
-        widget_cls = session.sidebar_search_widget_cls
-        if widget_cls is not None:
-            session.sidebar_search_nav_widget = widget_cls()
-            session.sidebar_search_nav_widget.textChanged.connect(
-                lambda text, current_window=window: on_sidebar_search_changed(current_window, text)
-            )
-            session.sidebar_search_nav_widget.set_placeholder_text(
-                tr_catalog("sidebar.search.placeholder", language=session.ui_language)
-            )
-            setup_sidebar_search_completer(window)
-            attach_sidebar_search_to_titlebar(window)
-            update_titlebar_search_width(window)
+    widget_cls = session.sidebar_search_widget_cls
+    if widget_cls is not None:
+        session.sidebar_search_nav_widget = widget_cls()
+        session.sidebar_search_nav_widget.textChanged.connect(
+            lambda text, current_window=window: on_sidebar_search_changed(current_window, text)
+        )
+        session.sidebar_search_nav_widget.set_placeholder_text(
+            tr_catalog("sidebar.search.placeholder", language=session.ui_language)
+        )
+        setup_sidebar_search_completer(window)
+        attach_sidebar_search_to_titlebar(window)
+        update_titlebar_search_width(window)
 
     for group_plan in build_sidebar_group_plans(current_method):
         if group_plan.header_key:

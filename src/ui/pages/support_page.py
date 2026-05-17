@@ -3,22 +3,7 @@
 
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QLabel
-
-try:
-    from qfluentwidgets import (
-        InfoBar,
-        PushSettingCard,
-        PrimaryPushSettingCard,
-        SettingCardGroup,
-    )
-except ImportError:
-    StrongBodyLabel = QLabel
-    CaptionLabel = QLabel
-    InfoBar = None
-    PushSettingCard = None  # type: ignore[assignment]
-    PrimaryPushSettingCard = None  # type: ignore[assignment]
-    SettingCardGroup = None  # type: ignore[assignment]
+from qfluentwidgets import InfoBar, PrimaryPushSettingCard, PushSettingCard, SettingCardGroup
 
 from app.text_catalog import tr as tr_catalog
 from ui.theme import get_theme_tokens, get_themed_qta_icon

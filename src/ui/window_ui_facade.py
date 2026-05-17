@@ -6,24 +6,8 @@
 Бизнес-логика (сигналы, обработчики) сохранена без изменений.
 """
 from PyQt6.QtCore import QTimer, pyqtSignal
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLineEdit, QCompleter
-from typing import Any, cast
-
-
-try:
-    from qfluentwidgets import (
-        NavigationItemPosition, FluentIcon,
-    )
-    try:
-        from qfluentwidgets import SearchLineEdit
-    except ImportError:
-        SearchLineEdit = QLineEdit
-    HAS_FLUENT = True
-except ImportError:
-    HAS_FLUENT = False
-    NavigationItemPosition = cast(Any, None)
-    FluentIcon = cast(Any, None)
-    SearchLineEdit = QLineEdit
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QCompleter
+from qfluentwidgets import FluentIcon, NavigationItemPosition, SearchLineEdit
 
 from app.page_names import PageName
 from app.text_catalog import tr as tr_catalog
@@ -33,31 +17,31 @@ from ui.ui_root import WindowUiRoot
 # Navigation icon mapping (PageName -> FluentIcon)
 # ---------------------------------------------------------------------------
 _NAV_ICONS = {
-    PageName.ZAPRET2_MODE_CONTROL: FluentIcon.GAME if HAS_FLUENT else None,
-    PageName.AUTOSTART: FluentIcon.POWER_BUTTON if HAS_FLUENT else None,
-    PageName.NETWORK: FluentIcon.WIFI if HAS_FLUENT else None,
-    PageName.HOSTS: FluentIcon.GLOBE if HAS_FLUENT else None,
-    PageName.BLOCKCHECK: FluentIcon.CODE if HAS_FLUENT else None,
-    PageName.APPEARANCE: FluentIcon.PALETTE if HAS_FLUENT else None,
-    PageName.PREMIUM: FluentIcon.HEART if HAS_FLUENT else None,
-    PageName.LOGS: FluentIcon.HISTORY if HAS_FLUENT else None,
-    PageName.ABOUT: FluentIcon.INFO if HAS_FLUENT else None,
-    PageName.DPI_SETTINGS: FluentIcon.SETTING if HAS_FLUENT else None,
-    PageName.HOSTLIST: FluentIcon.BOOK_SHELF if HAS_FLUENT else None,
-    PageName.BLOBS: FluentIcon.CLOUD if HAS_FLUENT else None,
-    PageName.NETROGAT: FluentIcon.REMOVE_FROM if HAS_FLUENT else None,
-    PageName.CUSTOM_DOMAINS: FluentIcon.ADD if HAS_FLUENT else None,
-    PageName.CUSTOM_IPSET: FluentIcon.ADD if HAS_FLUENT else None,
-    PageName.ZAPRET2_USER_PRESETS: FluentIcon.FOLDER if HAS_FLUENT else None,
-    PageName.SERVERS: FluentIcon.UPDATE if HAS_FLUENT else None,
-    PageName.SUPPORT: FluentIcon.CHAT if HAS_FLUENT else None,
-    PageName.ORCHESTRA: FluentIcon.MUSIC if HAS_FLUENT else None,
-    PageName.ORCHESTRA_SETTINGS: FluentIcon.SETTING if HAS_FLUENT else None,
-    PageName.ZAPRET2_PRESET_SETUP: FluentIcon.PLAY if HAS_FLUENT else None,
-    PageName.ZAPRET1_MODE_CONTROL: FluentIcon.GAME if HAS_FLUENT else None,
-    PageName.ZAPRET1_PRESET_SETUP: FluentIcon.PLAY if HAS_FLUENT else None,
-    PageName.ZAPRET1_USER_PRESETS: FluentIcon.FOLDER if HAS_FLUENT else None,
-    PageName.TELEGRAM_PROXY: FluentIcon.SEND if HAS_FLUENT else None,
+    PageName.ZAPRET2_MODE_CONTROL: FluentIcon.GAME,
+    PageName.AUTOSTART: FluentIcon.POWER_BUTTON,
+    PageName.NETWORK: FluentIcon.WIFI,
+    PageName.HOSTS: FluentIcon.GLOBE,
+    PageName.BLOCKCHECK: FluentIcon.CODE,
+    PageName.APPEARANCE: FluentIcon.PALETTE,
+    PageName.PREMIUM: FluentIcon.HEART,
+    PageName.LOGS: FluentIcon.HISTORY,
+    PageName.ABOUT: FluentIcon.INFO,
+    PageName.DPI_SETTINGS: FluentIcon.SETTING,
+    PageName.HOSTLIST: FluentIcon.BOOK_SHELF,
+    PageName.BLOBS: FluentIcon.CLOUD,
+    PageName.NETROGAT: FluentIcon.REMOVE_FROM,
+    PageName.CUSTOM_DOMAINS: FluentIcon.ADD,
+    PageName.CUSTOM_IPSET: FluentIcon.ADD,
+    PageName.ZAPRET2_USER_PRESETS: FluentIcon.FOLDER,
+    PageName.SERVERS: FluentIcon.UPDATE,
+    PageName.SUPPORT: FluentIcon.CHAT,
+    PageName.ORCHESTRA: FluentIcon.MUSIC,
+    PageName.ORCHESTRA_SETTINGS: FluentIcon.SETTING,
+    PageName.ZAPRET2_PRESET_SETUP: FluentIcon.PLAY,
+    PageName.ZAPRET1_MODE_CONTROL: FluentIcon.GAME,
+    PageName.ZAPRET1_PRESET_SETUP: FluentIcon.PLAY,
+    PageName.ZAPRET1_USER_PRESETS: FluentIcon.FOLDER,
+    PageName.TELEGRAM_PROXY: FluentIcon.SEND,
 }
 
 # Russian labels for navigation
@@ -94,66 +78,65 @@ _NAV_LABELS = {
 }
 
 
-if HAS_FLUENT:
-    class _SidebarSearchNavWidget(QWidget):
-        textChanged = pyqtSignal(str)
+class _SidebarSearchNavWidget(QWidget):
+    textChanged = pyqtSignal(str)
 
-        def __init__(self, parent: QWidget | None = None):
-            super().__init__(parent)
-            self._search = SearchLineEdit(self)
-            self._completion_timer = QTimer(self)
-            self._completion_timer.setSingleShot(True)
-            self._completion_timer.timeout.connect(self._show_completions_deferred)
-            self._search.setPlaceholderText(tr_catalog("sidebar.search.placeholder"))
-            try:
-                self._search.setClearButtonEnabled(True)
-            except Exception:
-                pass
-            self._search.textChanged.connect(self.textChanged.emit)
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self._search = SearchLineEdit(self)
+        self._completion_timer = QTimer(self)
+        self._completion_timer.setSingleShot(True)
+        self._completion_timer.timeout.connect(self._show_completions_deferred)
+        self._search.setPlaceholderText(tr_catalog("sidebar.search.placeholder"))
+        try:
+            self._search.setClearButtonEnabled(True)
+        except Exception:
+            pass
+        self._search.textChanged.connect(self.textChanged.emit)
 
-            layout = QHBoxLayout(self)
-            layout.setContentsMargins(0, 4, 0, 4)
-            layout.setSpacing(0)
-            layout.addWidget(self._search)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 4, 0, 4)
+        layout.setSpacing(0)
+        layout.addWidget(self._search)
 
-            self.setFixedHeight(40)
+        self.setFixedHeight(40)
 
-        def clear(self) -> None:
-            self._search.clear()
+    def clear(self) -> None:
+        self._search.clear()
 
-        def text(self) -> str:
-            return self._search.text()
+    def text(self) -> str:
+        return self._search.text()
 
-        def set_placeholder_text(self, text: str) -> None:
-            self._search.setPlaceholderText(text or "")
+    def set_placeholder_text(self, text: str) -> None:
+        self._search.setPlaceholderText(text or "")
 
-        def set_completer(self, completer: QCompleter) -> None:
-            self._search.setCompleter(completer)
+    def set_completer(self, completer: QCompleter) -> None:
+        self._search.setCompleter(completer)
 
-        def show_completions(self) -> None:
-            # Defer popup interaction to avoid re-entrant completer/model updates
-            # from textChanged handlers, which can crash native Qt on Windows.
-            if not self.isVisible() or not self._search.isVisible() or not self._search.hasFocus():
+    def show_completions(self) -> None:
+        # Defer popup interaction to avoid re-entrant completer/model updates
+        # from textChanged handlers, which can crash native Qt on Windows.
+        if not self.isVisible() or not self._search.isVisible() or not self._search.hasFocus():
+            return
+        self._completion_timer.start(0)
+
+    def _show_completions_deferred(self) -> None:
+        completer = self._search.completer()
+        if completer is None:
+            return
+        if not self._search.text().strip():
+            return
+
+        try:
+            completion_model = completer.completionModel()
+            if completion_model is not None and completion_model.rowCount() <= 0:
                 return
-            self._completion_timer.start(0)
+        except Exception:
+            pass
 
-        def _show_completions_deferred(self) -> None:
-            completer = self._search.completer()
-            if completer is None:
-                return
-            if not self._search.text().strip():
-                return
-
-            try:
-                completion_model = completer.completionModel()
-                if completion_model is not None and completion_model.rowCount() <= 0:
-                    return
-            except Exception:
-                pass
-
-            completer.setCompletionPrefix(self._search.text())
-            # Avoid direct popup forcing here: on some Windows/Qt stacks it can
-            # crash natively during re-entrant completer/model updates.
+        completer.setCompletionPrefix(self._search.text())
+        # Avoid direct popup forcing here: on some Windows/Qt stacks it can
+        # crash natively during re-entrant completer/model updates.
 
 
 class MainWindowUI:
@@ -164,8 +147,7 @@ class MainWindowUI:
     def _get_ui_root(self) -> WindowUiRoot:
         ui_root = getattr(self, "_ui_root", None)
         if ui_root is None:
-            ui_root = WindowUiRoot(self)
-            self._ui_root = ui_root
+            raise RuntimeError("WindowUiRoot не подключён. Сначала выполните attach_app_runtime_to_window().")
         return ui_root
 
     def build_ui(self, width: int, height: int):
@@ -180,10 +162,9 @@ class MainWindowUI:
             height=height,
             nav_icons=_NAV_ICONS,
             nav_labels=_NAV_LABELS,
-            has_fluent=HAS_FLUENT,
-            default_nav_icon=FluentIcon.APPLICATION if HAS_FLUENT else None,
-            nav_scroll_position=NavigationItemPosition.SCROLL if HAS_FLUENT else None,
-            sidebar_search_widget_cls=_SidebarSearchNavWidget if HAS_FLUENT else None,
+            default_nav_icon=FluentIcon.APPLICATION,
+            nav_scroll_position=NavigationItemPosition.SCROLL,
+            sidebar_search_widget_cls=_SidebarSearchNavWidget,
         )
 
     def finish_ui_bootstrap(self) -> None:

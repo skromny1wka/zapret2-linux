@@ -3,17 +3,14 @@ updater/update_cache.py
 ────────────────────────────────────────────────────────────────
 Кэширование результатов проверки обновлений для снижения нагрузки на сервер
 """
-import json
-import os
 import time
 from typing import Optional, Dict, Any
-from config.config import LOGS_FOLDER
 
 from log.log import log
+from settings import store as settings_store
 
 from .channel_utils import normalize_update_channel
 
-CACHE_FILE = os.path.join(LOGS_FOLDER, '.update_cache.json')
 CACHE_DURATION = 3600  # 1 час (3600 секунд)
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -75,11 +72,7 @@ class UpdateCache:
         """
         try:
             channel = normalize_update_channel(channel)
-            if not os.path.exists(CACHE_FILE):
-                return None
-            
-            with open(CACHE_FILE, 'r', encoding='utf-8') as f:
-                cache = json.load(f)
+            cache = settings_store.get_updater_settings().get("release_cache", {})
             
             if channel not in cache:
                 return None
@@ -112,14 +105,9 @@ class UpdateCache:
         """
         try:
             channel = normalize_update_channel(channel)
-            # Загружаем существующий кэш
-            cache = {}
-            if os.path.exists(CACHE_FILE):
-                try:
-                    with open(CACHE_FILE, 'r', encoding='utf-8') as f:
-                        cache = json.load(f)
-                except:
-                    pass
+            cache = settings_store.get_updater_settings().get("release_cache", {})
+            if not isinstance(cache, dict):
+                cache = {}
             
             # Добавляем новую запись
             cache[channel] = {
@@ -127,9 +115,7 @@ class UpdateCache:
                 'cached_at': time.time()
             }
             
-            # Сохраняем
-            with open(CACHE_FILE, 'w', encoding='utf-8') as f:
-                json.dump(cache, f, indent=2)
+            settings_store.set_updater_settings({"release_cache": cache})
             
             log(f"💾 Кэш обновлений сохранен (TTL: {CACHE_DURATION/60:.0f} мин)", "🔄 CACHE")
             
@@ -145,25 +131,18 @@ class UpdateCache:
             channel: Конкретный канал или None для очистки всего
         """
         try:
+            cache = settings_store.get_updater_settings().get("release_cache", {})
+            if not isinstance(cache, dict):
+                cache = {}
             if channel is None:
-                # Удаляем весь файл кэша
-                if os.path.exists(CACHE_FILE):
-                    os.remove(CACHE_FILE)
-                    log("🗑️ Весь кэш обновлений очищен", "🔄 CACHE")
+                settings_store.set_updater_settings({"release_cache": {}})
+                log("🗑️ Весь кэш обновлений очищен", "🔄 CACHE")
             else:
                 channel = normalize_update_channel(channel)
-                # Удаляем конкретный канал
-                if os.path.exists(CACHE_FILE):
-                    with open(CACHE_FILE, 'r', encoding='utf-8') as f:
-                        cache = json.load(f)
-                    
-                    if channel in cache:
-                        del cache[channel]
-                        
-                        with open(CACHE_FILE, 'w', encoding='utf-8') as f:
-                            json.dump(cache, f, indent=2)
-                        
-                        log(f"🗑️ Кэш для канала {channel} очищен", "🔄 CACHE")
+                if channel in cache:
+                    del cache[channel]
+                    settings_store.set_updater_settings({"release_cache": cache})
+                    log(f"🗑️ Кэш для канала {channel} очищен", "🔄 CACHE")
                         
         except Exception as e:
             log(f"⚠️ Ошибка очистки кэша: {e}", "🔄 CACHE")
@@ -181,11 +160,7 @@ class UpdateCache:
         """
         try:
             channel = normalize_update_channel(channel)
-            if not os.path.exists(CACHE_FILE):
-                return None
-            
-            with open(CACHE_FILE, 'r', encoding='utf-8') as f:
-                cache = json.load(f)
+            cache = settings_store.get_updater_settings().get("release_cache", {})
             
             if channel not in cache:
                 return None
@@ -209,11 +184,7 @@ class UpdateCache:
         """
         try:
             channel = normalize_update_channel(channel)
-            if not os.path.exists(CACHE_FILE):
-                return None
-            
-            with open(CACHE_FILE, 'r', encoding='utf-8') as f:
-                cache = json.load(f)
+            cache = settings_store.get_updater_settings().get("release_cache", {})
             
             if channel not in cache:
                 return None

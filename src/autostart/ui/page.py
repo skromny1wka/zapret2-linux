@@ -20,20 +20,12 @@ from ui.theme_semantic import get_semantic_palette
 from app.state_store import AppUiState, MainWindowStateStore
 from app.text_catalog import tr as tr_catalog
 from log.log import log
-
-
-try:
-    from qfluentwidgets import (
-        SimpleCardWidget,
-        StrongBodyLabel,
-        BodyLabel,
-        CaptionLabel,
-    )
-except ImportError:
-    SimpleCardWidget = QWidget  # type: ignore[misc,assignment]
-    StrongBodyLabel = QLabel    # type: ignore[misc,assignment]
-    BodyLabel = QLabel          # type: ignore[misc,assignment]
-    CaptionLabel = QLabel       # type: ignore[misc,assignment]
+from qfluentwidgets import (
+    SimpleCardWidget,
+    StrongBodyLabel,
+    BodyLabel,
+    CaptionLabel,
+)
 
 
 class AutostartOptionCard(SimpleCardWidget):

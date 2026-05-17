@@ -4,14 +4,10 @@ import json
 
 from PyQt6.QtCore import QPoint, Qt, pyqtSignal
 from PyQt6.QtGui import QDrag
-from PyQt6.QtWidgets import QApplication, QListView
+from PyQt6.QtWidgets import QApplication
 
 from .model import PresetListModel
-
-try:
-    from qfluentwidgets import ListView
-except ImportError:
-    ListView = QListView
+from qfluentwidgets import ListView
 
 
 class LinkedWheelListView(ListView):

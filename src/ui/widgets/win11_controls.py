@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, pyqtProperty, QRectF, pyqtSignal
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QCheckBox, QSpinBox, QComboBox
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
 from PyQt6.QtGui import QPainter, QColor, QPainterPath, QIcon
 import qtawesome as qta
 
@@ -15,132 +15,25 @@ from ui.theme import (
 )
 from ui.animation_policy import register_managed_animation, start_managed_animation
 from ui.theme_refresh import ThemeRefreshBinding
-
-try:
-    from qfluentwidgets import (
-        ComboBox,
-        SpinBox,
-        InfoBadge,
-        InfoLevel as _InfoLevel,
-        SettingCard as FluentSettingCard,
-        SwitchSettingCard,
-        SwitchButton,
-        IndicatorPosition,
-        StrongBodyLabel,
-        BodyLabel as _BodyLabel,
-        CaptionLabel as _CaptionLabel,
-    )
-
-    _HAS_FLUENT = True
-    _HAS_INFO_BADGE = True
-except ImportError:
-    _HAS_FLUENT = False
-    _HAS_INFO_BADGE = False
-    ComboBox = QComboBox  # type: ignore[assignment,misc]
-    SpinBox = QSpinBox  # type: ignore[assignment,misc]
-    FluentSettingCard = None  # type: ignore[assignment,misc]
-    SwitchSettingCard = None  # type: ignore[assignment,misc]
-    SwitchButton = None  # type: ignore[assignment,misc]
-    IndicatorPosition = None  # type: ignore[assignment,misc]
-    StrongBodyLabel = QLabel  # type: ignore[assignment,misc]
-    _BodyLabel = QLabel  # type: ignore[assignment,misc]
-    _CaptionLabel = QLabel  # type: ignore[assignment,misc]
+from qfluentwidgets import (
+    ComboBox,
+    SpinBox,
+    InfoBadge,
+    InfoLevel as _InfoLevel,
+    SettingCard as FluentSettingCard,
+    SwitchSettingCard,
+    SwitchButton,
+    IndicatorPosition,
+    StrongBodyLabel,
+    BodyLabel as _BodyLabel,
+    CaptionLabel as _CaptionLabel,
+)
 
 def _build_theme_refresh_key(tokens) -> tuple[str, str, str]:
     return (str(tokens.theme_name), str(tokens.accent_hex), str(tokens.font_family_qss))
 
 
-class Win11ToggleSwitch(QCheckBox):
-    """Toggle Switch в стиле Windows 11."""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setFixedSize(44, 22)
-        self.setCursor(Qt.CursorShape.PointingHandCursor)
-
-        self._circle_position = 4.0
-        self._color_blend = 0.0
-
-        self._animation = register_managed_animation(QPropertyAnimation(self, b"circle_position", self), 150)
-        self._animation.setEasingCurve(QEasingCurve.Type.OutCubic)
-
-        self.stateChanged.connect(self._animate)
-
-    def _get_circle_position(self):
-        return self._circle_position
-
-    def _set_circle_position(self, pos):
-        self._circle_position = pos
-        self.update()
-
-    circle_position = pyqtProperty(float, _get_circle_position, _set_circle_position)
-
-    def _get_color_blend(self):
-        return self._color_blend
-
-    def _set_color_blend(self, value):
-        self._color_blend = value
-        self.update()
-
-    color_blend = pyqtProperty(float, _get_color_blend, _set_color_blend)
-
-    def _animate(self, state):
-        if not self._animation:
-            return
-        self._animation.stop()
-        if state:
-            self._animation.setStartValue(self._circle_position)
-            self._animation.setEndValue(self.width() - 18)
-        else:
-            self._animation.setStartValue(self._circle_position)
-            self._animation.setEndValue(4.0)
-        start_managed_animation(self._animation)
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        tokens = get_theme_tokens()
-
-        if self.isChecked():
-            bg_color = to_qcolor(tokens.accent_hex, "#5caee8")
-        else:
-            if self.isEnabled():
-                bg_color = to_qcolor(
-                    tokens.toggle_off_bg_hover if self.underMouse() else tokens.toggle_off_bg,
-                    "#8f97a4",
-                )
-            else:
-                bg_color = to_qcolor(tokens.toggle_off_disabled_bg, "#7c8594")
-
-        path = QPainterPath()
-        path.addRoundedRect(QRectF(0, 0, self.width(), self.height()), 11, 11)
-        painter.fillPath(path, bg_color)
-
-        if self.isChecked():
-            painter.setPen(Qt.GlobalColor.transparent)
-        else:
-            border_color = tokens.toggle_off_border if self.isEnabled() else tokens.toggle_off_disabled_border
-            painter.setPen(to_qcolor(border_color, "#9fa8b7"))
-        painter.drawPath(path)
-
-        if self.isChecked():
-            circle_color = to_qcolor(tokens.accent_hex, "#5caee8").lighter(230 if tokens.is_light else 260)
-        else:
-            circle_color = QColor(250, 250, 250) if tokens.is_light else QColor(236, 241, 247)
-        if not self.isEnabled():
-            circle_color.setAlpha(200 if tokens.is_light else 185)
-        painter.setBrush(circle_color)
-        painter.setPen(Qt.PenStyle.NoPen)
-        painter.drawEllipse(QRectF(self._circle_position, 4, 14, 14))
-
-        painter.end()
-
-    def hitButton(self, pos):
-        return self.rect().contains(pos)
-
-
-class Win11ToggleRow(FluentSettingCard if _HAS_FLUENT else QWidget):
+class Win11ToggleRow(FluentSettingCard):
     """Строка с toggle switch в стиле Windows 11."""
 
     toggled = pyqtSignal(bool)
@@ -153,72 +46,38 @@ class Win11ToggleRow(FluentSettingCard if _HAS_FLUENT else QWidget):
         self._icon_label = None
         self._switch_button = None
 
-        if _HAS_FLUENT:
-            initial_tokens = get_theme_tokens()
-            FluentSettingCard.__init__(
-                self,
-                self._build_icon(initial_tokens),
-                title,
-                description or None,
-                parent=parent,
-            )
+        initial_tokens = get_theme_tokens()
+        FluentSettingCard.__init__(
+            self,
+            self._build_icon(initial_tokens),
+            title,
+            description or None,
+            parent=parent,
+        )
+        try:
+            self.setIconSize(18, 18)
+        except Exception:
+            pass
+        self._icon_label = getattr(self, "iconLabel", None)
+        self._title_label = getattr(self, "titleLabel", None)
+        self._desc_label = getattr(self, "contentLabel", None)
+
+        self._switch_button = SwitchButton(self)
+
+        if self._switch_button is not None:
             try:
-                self.setIconSize(18, 18)
+                self.hBoxLayout.addWidget(self._switch_button, 0, Qt.AlignmentFlag.AlignRight)
+                self.hBoxLayout.addSpacing(16)
             except Exception:
                 pass
-            self._icon_label = getattr(self, "iconLabel", None)
-            self._title_label = getattr(self, "titleLabel", None)
-            self._desc_label = getattr(self, "contentLabel", None)
 
+        if self._switch_button is not None:
             try:
-                self._switch_button = Win11ToggleSwitch(self)
+                signal = getattr(self._switch_button, "toggled", None) or getattr(self._switch_button, "checkedChanged", None)
+                if signal is not None:
+                    signal.connect(self.toggled.emit)
             except Exception:
-                self._switch_button = None
-
-            if self._switch_button is not None:
-                try:
-                    self.hBoxLayout.addWidget(self._switch_button, 0, Qt.AlignmentFlag.AlignRight)
-                    self.hBoxLayout.addSpacing(16)
-                except Exception:
-                    pass
-
-            if self._switch_button is not None:
-                try:
-                    signal = getattr(self._switch_button, "toggled", None) or getattr(self._switch_button, "checkedChanged", None)
-                    if signal is not None:
-                        signal.connect(self.toggled.emit)
-                except Exception:
-                    pass
-        else:
-            super().__init__(parent)
-            layout = QHBoxLayout(self)
-            layout.setContentsMargins(0, 6, 0, 6)
-            layout.setSpacing(12)
-
-            self._icon_label = QLabel()
-            self._icon_label.setFixedSize(22, 22)
-            layout.addWidget(self._icon_label)
-            self._refresh_icon(get_theme_tokens())
-
-            text_layout = QVBoxLayout()
-            text_layout.setSpacing(1)
-            text_layout.setContentsMargins(0, 0, 0, 0)
-
-            title_label = _BodyLabel(title)
-            self._title_label = title_label
-            text_layout.addWidget(title_label)
-
-            if description:
-                desc_label = _CaptionLabel(description)
-                desc_label.setWordWrap(True)
-                self._desc_label = desc_label
-                text_layout.addWidget(desc_label)
-
-            layout.addLayout(text_layout, 1)
-
-            self._switch_button = Win11ToggleSwitch()
-            self._switch_button.toggled.connect(self.toggled.emit)
-            layout.addWidget(self._switch_button)
+                pass
         self._theme_refresh = ThemeRefreshBinding(
             self,
             self._apply_theme_refresh,
@@ -266,9 +125,6 @@ class Win11ToggleRow(FluentSettingCard if _HAS_FLUENT else QWidget):
         toggle.setChecked(bool(checked))
         if block_signals:
             toggle.blockSignals(False)
-            if hasattr(toggle, "_circle_position"):
-                toggle._circle_position = (toggle.width() - 18) if checked else 4.0
-                toggle.update()
 
     def isChecked(self) -> bool:
         toggle = getattr(self, "_switch_button", None)
@@ -278,14 +134,8 @@ class Win11ToggleRow(FluentSettingCard if _HAS_FLUENT else QWidget):
 
     def set_texts(self, title: str, description: str = "") -> None:
         try:
-            if _HAS_FLUENT:
-                self.setTitle(title)
-                self.setContent(description)
-            else:
-                if self._title_label is not None:
-                    self._title_label.setText(title)
-                if self._desc_label is not None:
-                    self._desc_label.setText(description)
+            self.setTitle(title)
+            self.setContent(description)
         except Exception:
             pass
 
@@ -513,7 +363,7 @@ class Win11RadioOption(QWidget):
         painter.end()
 
 
-class Win11NumberRow(FluentSettingCard if _HAS_FLUENT else QWidget):
+class Win11NumberRow(FluentSettingCard):
     """Строка с числовым вводом в стиле Windows 11."""
 
     valueChanged = pyqtSignal(int)
@@ -538,44 +388,17 @@ class Win11NumberRow(FluentSettingCard if _HAS_FLUENT else QWidget):
         self._applying_theme_styles = False
         initial_tokens = get_theme_tokens()
 
-        if _HAS_FLUENT:
-            super().__init__(
-                self._build_icon(initial_tokens),
-                title,
-                description or None,
-                parent=parent,
-            )
-            self.setIconSize(18, 18)
-            self._icon_label = getattr(self, "iconLabel", None)
-            self._title_label = getattr(self, "titleLabel", None)
-            self._desc_label = getattr(self, "contentLabel", None)
-            layout = getattr(self, "hBoxLayout", None)
-        else:
-            super().__init__(parent)
-            layout = QHBoxLayout(self)
-            layout.setContentsMargins(0, 6, 0, 6)
-            layout.setSpacing(12)
-
-            self._icon_label = QLabel()
-            self._icon_label.setFixedSize(22, 22)
-            layout.addWidget(self._icon_label)
-            self._refresh_icon(initial_tokens)
-
-            text_layout = QVBoxLayout()
-            text_layout.setSpacing(1)
-            text_layout.setContentsMargins(0, 0, 0, 0)
-
-            title_label = _BodyLabel(title)
-            self._title_label = title_label
-            text_layout.addWidget(title_label)
-
-            if description:
-                desc_label = _CaptionLabel(description)
-                desc_label.setWordWrap(True)
-                self._desc_label = desc_label
-                text_layout.addWidget(desc_label)
-
-            layout.addLayout(text_layout, 1)
+        super().__init__(
+            self._build_icon(initial_tokens),
+            title,
+            description or None,
+            parent=parent,
+        )
+        self.setIconSize(18, 18)
+        self._icon_label = getattr(self, "iconLabel", None)
+        self._title_label = getattr(self, "titleLabel", None)
+        self._desc_label = getattr(self, "contentLabel", None)
+        layout = getattr(self, "hBoxLayout", None)
 
         self.spinbox = SpinBox()
         self.spinbox.setMinimum(min_val)
@@ -583,15 +406,10 @@ class Win11NumberRow(FluentSettingCard if _HAS_FLUENT else QWidget):
         self.spinbox.setValue(default_val)
         self.spinbox.setSuffix(suffix)
         self.spinbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        if _HAS_FLUENT:
-            self.spinbox.setFixedWidth(160)
-        else:
-            self.spinbox.setFixedHeight(28)
-            self._apply_theme_styles(initial_tokens)
+        self.spinbox.setFixedWidth(160)
         self.spinbox.valueChanged.connect(self.valueChanged.emit)
         layout.addWidget(self.spinbox)
-        if _HAS_FLUENT:
-            layout.addSpacing(16)
+        layout.addSpacing(16)
         self._theme_refresh = ThemeRefreshBinding(
             self,
             self._apply_theme_refresh,
@@ -632,46 +450,13 @@ class Win11NumberRow(FluentSettingCard if _HAS_FLUENT else QWidget):
             return QIcon()
 
     def _apply_theme_styles(self, tokens=None) -> None:
-        if _HAS_FLUENT:
-            return
-        theme_tokens = tokens or get_theme_tokens()
-        self.spinbox.setStyleSheet(
-            f"""
-            QSpinBox {{
-                background-color: {theme_tokens.surface_bg};
-                border: 1px solid {theme_tokens.surface_border};
-                border-radius: 4px;
-                padding: 2px 10px;
-                color: {theme_tokens.fg};
-                font-size: 12px;
-            }}
-            QSpinBox:hover {{
-                background-color: {theme_tokens.surface_bg_hover};
-                border: 1px solid {theme_tokens.surface_border_hover};
-            }}
-            QSpinBox:focus {{
-                border: 1px solid {theme_tokens.accent_hex};
-            }}
-            QSpinBox::up-button, QSpinBox::down-button {{
-                width: 0px;
-                height: 0px;
-                border: none;
-                background: none;
-            }}
-            QSpinBox::up-arrow, QSpinBox::down-arrow {{
-                width: 0px;
-                height: 0px;
-            }}
-            """
-        )
+        return None
 
     def _apply_theme_refresh(self, tokens=None, force: bool = False) -> None:
         _ = force
         self._applying_theme_styles = True
         try:
             self._refresh_icon(tokens)
-            if not _HAS_FLUENT:
-                self._apply_theme_styles(tokens)
         finally:
             self._applying_theme_styles = False
 
@@ -687,19 +472,13 @@ class Win11NumberRow(FluentSettingCard if _HAS_FLUENT else QWidget):
 
     def set_texts(self, title: str, description: str = "") -> None:
         try:
-            if _HAS_FLUENT:
-                self.setTitle(title)
-                self.setContent(description)
-            else:
-                if self._title_label is not None:
-                    self._title_label.setText(title)
-                if self._desc_label is not None:
-                    self._desc_label.setText(description)
+            self.setTitle(title)
+            self.setContent(description)
         except Exception:
             pass
 
 
-class Win11ComboRow(FluentSettingCard if _HAS_FLUENT else QWidget):
+class Win11ComboRow(FluentSettingCard):
     """Строка с выпадающим списком в стиле Windows 11."""
 
     currentIndexChanged = pyqtSignal(int)
@@ -722,50 +501,20 @@ class Win11ComboRow(FluentSettingCard if _HAS_FLUENT else QWidget):
         self._applying_theme_styles = False
         initial_tokens = get_theme_tokens()
 
-        if _HAS_FLUENT:
-            super().__init__(
-                self._build_icon(initial_tokens),
-                title,
-                description or None,
-                parent=parent,
-            )
-            self.setIconSize(18, 18)
-            self._icon_label = getattr(self, "iconLabel", None)
-            self._title_label = getattr(self, "titleLabel", None)
-            self._desc_label = getattr(self, "contentLabel", None)
-            layout = getattr(self, "hBoxLayout", None)
-        else:
-            super().__init__(parent)
-            layout = QHBoxLayout(self)
-            layout.setContentsMargins(0, 6, 0, 6)
-            layout.setSpacing(12)
-
-            self._icon_label = QLabel()
-            self._icon_label.setFixedSize(22, 22)
-            layout.addWidget(self._icon_label)
-            self._refresh_icon(initial_tokens)
-
-            text_layout = QVBoxLayout()
-            text_layout.setSpacing(1)
-            text_layout.setContentsMargins(0, 0, 0, 0)
-
-            title_label = _BodyLabel(title)
-            self._title_label = title_label
-            text_layout.addWidget(title_label)
-
-            if description:
-                desc_label = _CaptionLabel(description)
-                desc_label.setWordWrap(True)
-                self._desc_label = desc_label
-                text_layout.addWidget(desc_label)
-
-            layout.addLayout(text_layout, 1)
+        super().__init__(
+            self._build_icon(initial_tokens),
+            title,
+            description or None,
+            parent=parent,
+        )
+        self.setIconSize(18, 18)
+        self._icon_label = getattr(self, "iconLabel", None)
+        self._title_label = getattr(self, "titleLabel", None)
+        self._desc_label = getattr(self, "contentLabel", None)
+        layout = getattr(self, "hBoxLayout", None)
 
         self.combo = ComboBox()
         self.combo.setFixedWidth(160)
-        if not _HAS_FLUENT:
-            self.combo.setFixedHeight(28)
-            self._apply_theme_styles(initial_tokens)
 
         if items:
             for text, data in items:
@@ -774,8 +523,7 @@ class Win11ComboRow(FluentSettingCard if _HAS_FLUENT else QWidget):
         self.combo.currentIndexChanged.connect(self.currentIndexChanged.emit)
         self.combo.currentTextChanged.connect(self.currentTextChanged.emit)
         layout.addWidget(self.combo)
-        if _HAS_FLUENT:
-            layout.addSpacing(16)
+        layout.addSpacing(16)
         self._theme_refresh = ThemeRefreshBinding(
             self,
             self._apply_theme_refresh,
@@ -816,76 +564,13 @@ class Win11ComboRow(FluentSettingCard if _HAS_FLUENT else QWidget):
             return QIcon()
 
     def _apply_theme_styles(self, tokens=None) -> None:
-        if _HAS_FLUENT:
-            return
-        theme_tokens = tokens or get_theme_tokens()
-        popup_bg = theme_tokens.surface_bg_hover
-        popup_fg = theme_tokens.fg
-        self.combo.setStyleSheet(
-            f"""
-            QComboBox {{
-                background-color: {theme_tokens.surface_bg};
-                border: 1px solid {theme_tokens.surface_border};
-                border-radius: 4px;
-                padding: 2px 10px;
-                color: {theme_tokens.fg};
-                font-size: 12px;
-            }}
-            QComboBox:hover {{
-                background-color: {theme_tokens.surface_bg_hover};
-                border: 1px solid {theme_tokens.surface_border_hover};
-            }}
-            QComboBox:focus {{
-                border: 1px solid {theme_tokens.accent_hex};
-            }}
-            QComboBox::drop-down {{
-                border: none;
-                width: 20px;
-            }}
-            QComboBox::down-arrow {{
-                image: none;
-                border-left: 4px solid transparent;
-                border-right: 4px solid transparent;
-                border-top: 5px solid {theme_tokens.fg};
-                margin-right: 5px;
-            }}
-            QComboBox QAbstractItemView {{
-                background-color: {popup_bg};
-                border: 1px solid {theme_tokens.surface_border};
-                selection-background-color: {theme_tokens.accent_soft_bg};
-                color: {popup_fg};
-                outline: none;
-            }}
-            QComboBox QAbstractItemView::item {{
-                background-color: transparent;
-                padding: 4px 8px;
-            }}
-            QComboBox QAbstractItemView::item:hover {{
-                background-color: {theme_tokens.surface_bg_hover};
-            }}
-            QComboBox QAbstractItemView::item:selected {{
-                background-color: {theme_tokens.accent_soft_bg_hover};
-            }}
-            QScrollBar:vertical {{
-                width: 0px;
-            }}
-            QScrollBar:horizontal {{
-                height: 0px;
-            }}
-            QComboBox::indicator {{
-                width: 0px;
-                height: 0px;
-            }}
-            """
-        )
+        return None
 
     def _apply_theme_refresh(self, tokens=None, force: bool = False) -> None:
         _ = force
         self._applying_theme_styles = True
         try:
             self._refresh_icon(tokens)
-            if not _HAS_FLUENT:
-                self._apply_theme_styles(tokens)
         finally:
             self._applying_theme_styles = False
 
@@ -913,20 +598,13 @@ class Win11ComboRow(FluentSettingCard if _HAS_FLUENT else QWidget):
 
     def set_texts(self, title: str, description: str = "") -> None:
         try:
-            if _HAS_FLUENT:
-                self.setTitle(title)
-                self.setContent(description)
-            else:
-                if self._title_label is not None:
-                    self._title_label.setText(title)
-                if self._desc_label is not None:
-                    self._desc_label.setText(description)
+            self.setTitle(title)
+            self.setContent(description)
         except Exception:
             pass
 
 
 __all__ = [
-    "Win11ToggleSwitch",
     "Win11ToggleRow",
     "Win11RadioOption",
     "Win11NumberRow",

@@ -1,4 +1,4 @@
-"""Helper-слой таблицы серверов для Servers page."""
+"""Helper-слой отрисовки таблицы серверов для Servers page."""
 
 from __future__ import annotations
 

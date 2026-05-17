@@ -4,23 +4,21 @@
 from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
-    QVBoxLayout, QHBoxLayout, QLabel,
+    QHBoxLayout,
 )
-import qtawesome as qta
 
 from ui.pages.base_page import BasePage
-from ui.fluent_widgets import SettingsCard, ActionButton
+from ui.fluent_widgets import SettingsCard
 from ui.theme import get_theme_tokens
 from app.text_catalog import tr as tr_catalog
 from updater.update_page_runtime import UpdatePageRuntime
 from updater.server_status_table_state import ServerStatusTableState
-import updater.update_page_plans as update_page_plans
 from updater.ui.main_build import (
     build_servers_header_widgets,
     build_servers_table_widget,
 )
 from updater.ui.language import apply_servers_page_language
-from updater.ui.table_workflow import (
+from updater.ui.table_view import (
     refresh_server_rows,
     render_server_row,
     reset_server_rows as reset_servers_table_rows,
@@ -31,24 +29,9 @@ from updater.ui.settings_build import (
     build_servers_telegram_section,
 )
 from ui.widgets.win11_controls import Win11ToggleRow
-
-try:
-    from qfluentwidgets import (
-        BodyLabel, CaptionLabel,
-        PushButton,
-        SwitchButton,
-        PushSettingCard, SettingCardGroup,
-    )
-    _HAS_FLUENT = True
-except ImportError:
-    from PyQt6.QtWidgets import QPushButton, QCheckBox
-    BodyLabel = QLabel
-    CaptionLabel = QLabel
-    PushButton = QPushButton
-    SwitchButton = QCheckBox  # type: ignore[assignment]
-    PushSettingCard = None  # type: ignore[assignment]
-    SettingCardGroup = None  # type: ignore[assignment]
-    _HAS_FLUENT = False
+from qfluentwidgets import (
+    CaptionLabel, PushSettingCard, SettingCardGroup, InfoBar,
+)
 
 from config.build_info import APP_VERSION, CHANNEL
 
@@ -149,7 +132,7 @@ class ServersPage(BasePage):
             ui_language=self._ui_language,
             update_card=self.update_card,
             changelog_card=self.changelog_card,
-            back_button=self._back_btn,
+            breadcrumb=self._breadcrumb,
             page_title_label=self._page_title_label,
             servers_title_label=self._servers_title_label,
             legend_active_label=self._legend_active_label,
@@ -179,11 +162,10 @@ class ServersPage(BasePage):
 
         header_widgets = build_servers_header_widgets(
             tr_fn=self._tr,
-            qta_module=qta,
             parent=self,
-            on_back_clicked=self._on_back_to_about,
+            on_about_clicked=self._on_back_to_about,
         )
-        self._back_btn = header_widgets.back_button
+        self._breadcrumb = header_widgets.breadcrumb
         self._page_title_label = header_widgets.page_title_label
         self._servers_title_label = header_widgets.servers_title_label
         self._legend_active_label = header_widgets.legend_active_label
@@ -219,15 +201,11 @@ class ServersPage(BasePage):
             auto_check_enabled=self._update_runtime.auto_check_enabled,
             app_version=APP_VERSION,
             channel=CHANNEL,
-            has_fluent=_HAS_FLUENT,
             setting_card_group_cls=SettingCardGroup,
             settings_card_cls=SettingsCard,
             win11_toggle_row_cls=Win11ToggleRow,
-            switch_button_cls=SwitchButton,
-            body_label_cls=BodyLabel,
             caption_label_cls=CaptionLabel,
             qhbox_layout_cls=QHBoxLayout,
-            qvbox_layout_cls=QVBoxLayout,
             on_auto_check_toggled=self._on_auto_check_toggled,
         )
         self._settings_card = settings_widgets.card
@@ -241,14 +219,7 @@ class ServersPage(BasePage):
         telegram_widgets = build_servers_telegram_section(
             tr_fn=self._tr,
             accent_hex=self._tokens.accent_hex,
-            has_fluent=_HAS_FLUENT,
             push_setting_card_cls=PushSettingCard,
-            settings_card_cls=SettingsCard,
-            body_label_cls=BodyLabel,
-            action_button_cls=ActionButton,
-            qta_module=qta,
-            qhbox_layout_cls=QHBoxLayout,
-            qvbox_layout_cls=QVBoxLayout,
             on_open_channel=self._open_telegram_channel,
         )
         self._tg_card = telegram_widgets.card
@@ -349,21 +320,16 @@ class ServersPage(BasePage):
         self._update_runtime.dismiss_update()
 
     def _open_telegram_channel(self):
-        result = update_page_plans.open_update_channel(CHANNEL)
+        result = self._update_runtime.open_update_channel(CHANNEL)
         if not result.ok:
-            try:
-                from qfluentwidgets import InfoBar
-            except Exception:
-                InfoBar = None
-            if InfoBar is not None:
-                InfoBar.warning(
-                    title=self._tr("page.servers.telegram.error.title", "Ошибка"),
-                    content=self._tr(
-                        "page.servers.telegram.error.open_channel",
-                        "Не удалось открыть Telegram канал:\n{error}",
-                    ).format(error=result.message),
-                    parent=self.window(),
-                )
+            InfoBar.warning(
+                title=self._tr("page.servers.telegram.error.title", "Ошибка"),
+                content=self._tr(
+                    "page.servers.telegram.error.open_channel",
+                    "Не удалось открыть Telegram канал:\n{error}",
+                ).format(error=result.message),
+                parent=self.window(),
+            )
 
     def _on_back_to_about(self):
         try:

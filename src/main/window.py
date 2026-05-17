@@ -5,11 +5,7 @@ from PyQt6.QtCore import pyqtSignal
 from main.runtime_state import log_startup_metric as emit_startup_metric
 from main.window_actions import WindowActionsMixin
 from main.window_lifecycle import WindowLifecycleMixin
-from main.window_startup import (
-    WindowStartupMixin,
-    startup_bootstrap_for,
-    window_bootstrap_for,
-)
+from main.window_startup import WindowStartupMixin
 from main.window_state_sync import WindowStateSyncMixin
 from ui.fluent_app_window import ZapretFluentWindow
 from ui.theme_subscription_manager import ThemeSubscriptionManager
@@ -35,13 +31,4 @@ class LupiDPIApp(
     def log_startup_metric(self, marker: str, details: str = "") -> None:
         emit_startup_metric(marker, details)
 
-
-def window_bootstrap(*, start_in_tray: bool) -> "LupiDPIApp":
-    return window_bootstrap_for(LupiDPIApp, start_in_tray=start_in_tray)
-
-
-def startup_bootstrap(window: "LupiDPIApp") -> None:
-    startup_bootstrap_for(window)
-
-
-__all__ = ["LupiDPIApp", "window_bootstrap", "startup_bootstrap"]
+__all__ = ["LupiDPIApp"]

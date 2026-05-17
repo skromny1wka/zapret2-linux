@@ -16,6 +16,9 @@ class UpdaterFeature:
     def run_startup_update_check(self) -> dict:
         return updater_commands.run_startup_update_check()
 
+    def open_update_channel(self, channel: str):
+        return updater_commands.open_update_channel(channel)
+
 
 def build_updater_feature() -> UpdaterFeature:
     return UpdaterFeature()

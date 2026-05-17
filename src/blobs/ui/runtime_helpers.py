@@ -211,7 +211,7 @@ def open_json_action(*, tr_fn, info_bar_cls, window, open_blobs_json_fn, log_err
 def apply_blobs_language(
     *,
     tr_fn,
-    back_btn,
+    breadcrumb,
     desc_label,
     actions_group,
     add_btn,
@@ -221,8 +221,14 @@ def apply_blobs_language(
     filter_edit,
     reload_callback,
 ) -> None:
-    if back_btn is not None:
-        back_btn.setText(tr_fn("page.blobs.button.back", "Управление"))
+    if breadcrumb is not None:
+        breadcrumb.blockSignals(True)
+        try:
+            breadcrumb.clear()
+            breadcrumb.addItem("control", tr_fn("page.blobs.breadcrumb.control", "Управление"))
+            breadcrumb.addItem("blobs", tr_fn("page.blobs.title", "Блобы"))
+        finally:
+            breadcrumb.blockSignals(False)
     if desc_label is not None:
         desc_label.setText(
             tr_fn(
@@ -240,7 +246,7 @@ def apply_blobs_language(
 
     add_btn.setText(tr_fn("page.blobs.button.add", "Добавить блоб"))
     open_folder_btn.setText(tr_fn("page.blobs.button.bin_folder", "Папка bin"))
-    open_json_btn.setText(tr_fn("page.blobs.button.open_json", "Открыть JSON"))
+    open_json_btn.setText(tr_fn("page.blobs.button.open_json", "Открыть settings.json"))
     set_tooltip(
         add_btn,
         tr_fn(
@@ -260,7 +266,7 @@ def apply_blobs_language(
         open_json_btn,
         tr_fn(
             "page.blobs.action.open_json.description",
-            "Открыть blobs.json с индексом blob-описаний.",
+            "Открыть settings.json с пользовательскими blob-описаниями.",
         ),
     )
     filter_edit.setPlaceholderText(tr_fn("page.blobs.filter.placeholder", "Фильтр по имени..."))

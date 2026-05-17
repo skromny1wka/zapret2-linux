@@ -121,6 +121,25 @@ def check_no_app_context(files: list[Path]) -> list[Problem]:
     )
 
 
+def check_no_app_runtime_context(files: list[Path]) -> list[Problem]:
+    return _scan_lines(
+        files,
+        re.compile(r"\b(?:app_runtime|AppRuntime|window\.app_runtime|page\.window\(\)\.app_runtime)\.context\b"),
+        "AppRuntime.context нельзя добавлять как новый общий app_context",
+    )
+
+
+def check_app_features_is_registry_only() -> list[Problem]:
+    path = SRC_ROOT / "app" / "features.py"
+    if not path.exists():
+        return [Problem(path, 1, "app/features.py не найден")]
+    return _scan_lines(
+        [path],
+        re.compile(r"\b(?:def\s+build_app_features|build_[a-z_]+feature|build_[a-z_]+_feature)\b"),
+        "app/features.py должен быть registry dataclass; сборка feature живёт в app/feature_assembly.py",
+    )
+
+
 def check_no_page_signal_layer(files: list[Path]) -> list[Problem]:
     return _scan_lines(
         files,
@@ -172,7 +191,11 @@ def check_runtime_ui_bridge_is_feature_neutral() -> list[Problem]:
         return [Problem(path, 1, "runtime_ui_bridge.py не найден")]
     return _scan_lines(
         [path],
-        re.compile(r"\b(?:premium|dns|hosts|presets|preset_)\b", re.IGNORECASE),
+        re.compile(
+            r"\b(?:premium|dns|hosts|presets|preset_|WindowUiSession|"
+            r"get_window_ui_session|app_runtime|window\.)\b",
+            re.IGNORECASE,
+        ),
         "runtime_ui_bridge должен быть нейтральным runtime -> UI мостом без feature-логики",
     )
 
@@ -202,7 +225,11 @@ def check_window_state_sync_is_window_only() -> list[Problem]:
         return [Problem(path, 1, "main/window_state_sync.py не найден")]
     return _scan_lines(
         [path],
-        re.compile(r"\b(?:app_runtime\.features|features\.|get_premium_state|subscription_manager)\b"),
+        re.compile(
+            r"\b(?:app_runtime\.features|features\.|get_premium_state|subscription_manager|"
+            r"load_premium_effects|init_holiday_effects_from_settings|load_background_preset|"
+            r"load_mica_enabled|HolidayEffectsManager|apply_aero_effect|apply_window_background)\b"
+        ),
         "window_state_sync.py должен применять состояние окна, а не ходить в feature-сервисы",
     )
 
@@ -236,11 +263,366 @@ def check_main_window_not_business_container(files: list[Path]) -> list[Problem]
         scopes,
         re.compile(
             r"\b(?:window|self|app)\."
-            r"(?:app_context|ui_state_store|app_runtime_state|launch_controller|"
+            r"(?:app_context|app_runtime_state|launch_controller|"
             r"launch_runtime|launch_runtime_api|process_monitor_manager|"
             r"subscription_manager|tray_manager)\b"
         ),
         "MainWindow/UI не должны хранить бизнес-сервис или старое состояние",
+    )
+
+
+def check_window_not_store_access_point(files: list[Path]) -> list[Problem]:
+    scopes = []
+    for path in files:
+        rel = path.relative_to(REPO_ROOT).as_posix()
+        if rel.startswith("src/main/window") or (
+            rel.startswith("src/ui/window_") and rel.endswith(".py")
+        ):
+            scopes.append(path)
+
+    return _scan_lines(
+        scopes,
+        re.compile(
+            r"(?:\b(?:window|self|app)\._app_runtime_state\b|"
+            r"\bdef\s+_?app_runtime_state\b)"
+        ),
+        "окно не должно возвращать старый app_runtime_state access point",
+    )
+
+
+def check_window_does_not_build_app_runtime() -> list[Problem]:
+    scopes = [
+        SRC_ROOT / "main" / "window.py",
+        SRC_ROOT / "main" / "window_startup.py",
+    ]
+    return _scan_lines(
+        [path for path in scopes if path.exists()],
+        re.compile(r"\b(?:from app\.runtime import build_app_runtime|build_app_runtime\s*\()"),
+        "главное окно не должно собирать AppRuntime; это делает ApplicationController",
+    )
+
+
+def check_window_has_no_bootstrap_wrapper() -> list[Problem]:
+    scopes = [
+        SRC_ROOT / "main" / "window.py",
+        SRC_ROOT / "main" / "window_startup.py",
+    ]
+    return _scan_lines(
+        [path for path in scopes if path.exists()],
+        re.compile(r"\bdef\s+window_bootstrap"),
+        "создание окна должно идти напрямую через ApplicationController",
+    )
+
+
+def check_app_runtime_access_is_narrow(files: list[Path]) -> list[Problem]:
+    scopes = [
+        path for path in files
+        if _under(path, "src/main/", "src/ui/")
+    ]
+    return _scan_lines(
+        scopes,
+        re.compile(r"\b(?:self|window)\.app_runtime\b"),
+        "окно не должно хранить AppRuntime; передавайте нужные зависимости явно",
+    )
+
+
+def check_window_feature_aliases_not_used(files: list[Path]) -> list[Problem]:
+    scopes = []
+    for path in files:
+        rel = path.relative_to(REPO_ROOT).as_posix()
+        if rel.startswith("src/main/window") or rel.startswith("src/ui/window_"):
+            scopes.append(path)
+
+    return _scan_lines(
+        scopes,
+        re.compile(
+            r"\b(?:self|window)\."
+            r"(?:runtime_feature|premium_feature|presets_feature|profile_feature|"
+            r"dns_feature|hosts_feature|lists_feature|telegram_proxy_feature|"
+            r"tray_feature|updater_feature|orchestra_feature)\b"
+        ),
+        "окно не должно хранить feature как свои поля; используйте явные deps",
+    )
+
+
+def check_window_hidden_dependency_bags_not_used(files: list[Path]) -> list[Problem]:
+    scopes = [
+        path for path in files
+        if _under(path, "src/main/window", "src/ui/window_")
+    ]
+    return _scan_lines(
+        scopes,
+        re.compile(
+            r"\b(?:WindowStartupDeps|WindowStateSyncDeps|"
+            r"attach_window_[a-z_]+deps|_window_[a-z_]+deps)\b"
+        ),
+        "окно не должно хранить скрытые deps-контейнеры; подключайте явные callbacks/объекты из сборочного слоя",
+    )
+
+
+def check_tray_uses_window_port() -> list[Problem]:
+    scopes = [
+        SRC_ROOT / "tray.py",
+        SRC_ROOT / "tray_commands.py",
+        SRC_ROOT / "main" / "tray_window_port.py",
+    ]
+    existing_scopes = [path for path in scopes if path.exists()]
+    if not existing_scopes:
+        return []
+    return _scan_lines(
+        existing_scopes,
+        re.compile(
+            r"\b(?:def __init__\(self,\s*parent|self\.parent|"
+            r"parent\s*=\s*(?:host|qt_parent|window)|"
+            r"window_port\.qt_parent\s*\(|def\s+qt_parent\s*\()\b"
+        ),
+        "SystemTrayManager должен работать через методы TrayWindowPort, а не получать главное окно/qt_parent наружу",
+    )
+
+
+def check_window_runtime_setup_is_thin() -> list[Problem]:
+    path = SRC_ROOT / "main" / "window_runtime_setup.py"
+    if not path.exists():
+        return []
+    return _scan_lines(
+        [path],
+        re.compile(
+            r"\b(?:"
+            r"WindowNotificationCenter|WindowGeometryRuntime|WindowCloseFlow|"
+            r"ApplicationLifecycle|PageDepsContext|WindowUiRoot|"
+            r"on_open_profile_setup|on_background_refresh_needed|show_active_mode_control_page"
+            r")\b"
+        ),
+        "window_runtime_setup.py должен быть тонким координатором; подробная сборка живёт в отдельных setup-файлах",
+    )
+
+
+def check_window_feature_deps_use_explicit_port() -> list[Problem]:
+    path = SRC_ROOT / "main" / "window_feature_deps.py"
+    if not path.exists():
+        return [Problem(path, 1, "window_feature_deps.py не найден")]
+    return _scan_lines(
+        [path],
+        re.compile(
+            r"(?:def\s+build_window_feature_deps\s*\(\s*window\s*(?:,|\))|"
+            r"\bwindow\.|getattr\(\s*window\b)"
+        ),
+        "window_feature_deps.py должен строиться из FeatureWindowDeps, а не вытаскивать зависимости из полного окна",
+    )
+
+
+def check_application_controller_uses_port_builders() -> list[Problem]:
+    path = SRC_ROOT / "main" / "application_controller.py"
+    if not path.exists():
+        return [Problem(path, 1, "application_controller.py не найден")]
+    return _scan_lines(
+        [path],
+        re.compile(r"\bFeatureWindowDeps\s*\("),
+        "ApplicationController не должен вручную собирать FeatureWindowDeps из window; используйте отдельный port builder",
+    )
+
+
+def check_window_page_actions_is_callback_bag() -> list[Problem]:
+    path = SRC_ROOT / "main" / "window_page_actions.py"
+    if not path.exists():
+        return [Problem(path, 1, "window_page_actions.py не найден")]
+    return _scan_lines(
+        [path],
+        re.compile(r"(?:^\s*window\s*:|\bself\.window\b|\bpage_actions\.window\b|\bpage_actions\.appearance_actions\b)"),
+        "WindowPageActions не должен хранить полное окно; он должен быть набором явных callback-ов",
+    )
+
+
+def check_application_lifecycle_uses_window_port() -> list[Problem]:
+    path = SRC_ROOT / "main" / "application_lifecycle.py"
+    if not path.exists():
+        return [Problem(path, 1, "application_lifecycle.py не найден")]
+    return _scan_lines(
+        [path],
+        re.compile(r"(?:^\s*window\s*,|\bself\._window\s*=|\bself\._window\b)"),
+        "ApplicationLifecycle не должен хранить главное окно напрямую; используйте lifecycle window port",
+    )
+
+
+def check_window_page_deps_setup_uses_actions() -> list[Problem]:
+    path = SRC_ROOT / "main" / "window_page_deps_setup.py"
+    if not path.exists():
+        return [Problem(path, 1, "window_page_deps_setup.py не найден")]
+    return _scan_lines(
+        [path],
+        re.compile(
+            r"(?:build_window_page_deps_context\s*\(\s*window\s*(?:,|\))|"
+            r"\bwindow\.(?:set_status|window_notification_center|app_runtime|ui_state_store|"
+            r"runtime_feature|premium_feature|presets_feature|profile_feature|dns_feature|"
+            r"hosts_feature|lists_feature|telegram_proxy_feature|tray_feature|updater_feature|"
+            r"orchestra_feature)\b|"
+            r"from ui\.(?:workflows|profile_setup_workflow|window_appearance_state))"
+        ),
+        "window_page_deps_setup.py должен получать callbacks через WindowPageActions, а не доставать их из окна",
+    )
+
+
+def check_post_startup_uses_explicit_host(files: list[Path]) -> list[Problem]:
+    scopes = [
+        path for path in files
+        if path.relative_to(REPO_ROOT).as_posix().startswith("src/main/post_startup")
+        or path.relative_to(REPO_ROOT).as_posix() == "src/main/application_post_startup.py"
+    ]
+    return _scan_lines(
+        scopes,
+        re.compile(
+            r"(?:startup_host\s*=\s*window\b|"
+            r"\bis_window_alive\b|"
+            r"\bstartup_host\.qt_parent\s*\(|"
+            r"\bdef\s+qt_parent\s*\(|"
+            r"\b(?:window|startup_host)\.[a-z_]+_feature\b)"
+        ),
+        "post-startup задачи должны получать PostStartupHost и явные deps, а не окно как контейнер feature",
+    )
+
+
+def check_discord_tray_command_does_not_receive_window() -> list[Problem]:
+    scopes = [
+        SRC_ROOT / "tray.py",
+        SRC_ROOT / "tray_commands.py",
+        SRC_ROOT / "discord" / "discord_restart.py",
+        SRC_ROOT / "app" / "feature_facades" / "tray.py",
+    ]
+    return _scan_lines(
+        [path for path in scopes if path.exists()],
+        re.compile(r"toggle_discord_restart\s*\([^)]*(?:qt_parent|window_port|window|host|parent)"),
+        "Discord tray command не должен получать главное окно/Qt-parent; это отдельная команда настройки",
+    )
+
+
+def check_post_startup_does_not_use_window_as_feature_container() -> list[Problem]:
+    path = SRC_ROOT / "main" / "post_startup.py"
+    if not path.exists():
+        return []
+    return _scan_lines(
+        [path],
+        re.compile(r"\b(?:window|startup_host)\.[a-z_]+_feature\b|def\s+build_post_startup_deps\s*\("),
+        "post_startup.py должен получать готовые PostStartupDeps, а не доставать feature из окна",
+    )
+
+
+def check_page_deps_context_not_stored_on_window(files: list[Path]) -> list[Problem]:
+    scopes = [
+        path for path in files
+        if _under(path, "src/main/", "src/ui/")
+    ]
+    return _scan_lines(
+        scopes,
+        re.compile(
+            r"(?:\bwindow\.page_deps_context\b|"
+            r"\bself\.page_deps_context\b|"
+            r"getattr\([^)]*page_deps_context)"
+        ),
+        "PageDepsContext должен передаваться в UiPageFactory/WindowUiRoot явно, а не храниться на окне",
+    )
+
+
+def check_no_qfluentwidgets_fallbacks(files: list[Path]) -> list[Problem]:
+    ui_roots = (
+        "src/ui/",
+        "src/presets/ui/",
+        "src/profile/ui/",
+        "src/updater/ui/",
+        "src/hosts/ui/",
+        "src/dns/ui/",
+        "src/donater/ui/",
+        "src/lists/ui/",
+        "src/blockcheck/ui/",
+        "src/blobs/ui/",
+        "src/autostart/ui/",
+        "src/settings/dpi/",
+        "src/orchestra/ui/",
+    )
+    scopes = [
+        path for path in files
+        if _under(path, *ui_roots) or path.relative_to(REPO_ROOT).as_posix() == "src/tray.py"
+    ]
+    fluent_flags = "|".join(
+        re.escape(value)
+        for value in (
+            "HAS_" + "FLUENT",
+            "_HAS_" + "FLUENT",
+            "_USE_" + "FLUENT",
+        )
+    )
+    return _scan_lines(
+        scopes,
+        re.compile(
+            rf"\b(?:{fluent_flags})\b|"
+            r"BreadcrumbBar\s*=\s*None|"
+            r"except\s+ImportError\s*:"
+        ),
+        "production UI должен требовать qfluentwidgets, а не уходить в обычный Qt fallback",
+    )
+
+
+def check_no_legacy_toggle_widgets_in_production_ui(files: list[Path]) -> list[Problem]:
+    ui_roots = (
+        "src/ui/",
+        "src/presets/ui/",
+        "src/profile/ui/",
+        "src/updater/ui/",
+        "src/hosts/ui/",
+        "src/dns/ui/",
+        "src/donater/ui/",
+        "src/lists/ui/",
+        "src/blockcheck/ui/",
+        "src/blobs/ui/",
+        "src/autostart/ui/",
+        "src/settings/dpi/",
+        "src/orchestra/ui/",
+    )
+    scopes = [
+        path for path in files
+        if _under(path, *ui_roots)
+    ]
+    return _scan_lines(
+        scopes,
+        re.compile(
+            r"(?:from\s+PyQt6\.QtWidgets\s+import[^\n]*\bQCheckBox\b|"
+            r"\bQCheckBox\b|"
+            r"\bWin11ToggleSwitch\b|"
+            r"\bcheckbox_cls\s*=\s*QCheckBox\b)"
+        ),
+        "production UI должен использовать stock qfluentwidgets toggle/check widgets, а не QCheckBox/Win11ToggleSwitch",
+    )
+
+
+def check_no_raw_text_edit_in_production_ui(files: list[Path]) -> list[Problem]:
+    ui_roots = (
+        "src/ui/",
+        "src/presets/ui/",
+        "src/profile/ui/",
+        "src/updater/ui/",
+        "src/hosts/ui/",
+        "src/dns/ui/",
+        "src/donater/ui/",
+        "src/lists/ui/",
+        "src/blockcheck/ui/",
+        "src/blobs/ui/",
+        "src/autostart/ui/",
+        "src/settings/dpi/",
+        "src/orchestra/ui/",
+        "src/log/ui/",
+        "src/telegram_proxy/ui/",
+    )
+    scopes = [
+        path for path in files
+        if _under(path, *ui_roots)
+    ]
+    return _scan_lines(
+        scopes,
+        re.compile(
+            r"(?:from\s+PyQt6\.QtWidgets\s+import[^\n]*\bQTextEdit\b|"
+            r"\bQTextEdit\s*\(|"
+            r"\bqtextedit_cls\s*=\s*QTextEdit\b)"
+        ),
+        "production UI должен использовать проектную fluent-обёртку TextEdit, например ScrollBlockingTextEdit, а не обычный QTextEdit",
     )
 
 
@@ -366,6 +748,73 @@ def check_runtime_state_writers(files: list[Path]) -> list[Problem]:
     )
 
 
+def check_ui_state_store_writer_ownership(files: list[Path]) -> list[Problem]:
+    rules: tuple[tuple[re.Pattern[str], str, set[str]], ...] = (
+        (
+            re.compile(r"\.set_launch_busy\s*\("),
+            "launch busy state должен писать только LaunchRuntimeService",
+            {"src/winws_runtime/state/launch_runtime_service.py"},
+        ),
+        (
+            re.compile(r"\.set_subscription\s*\("),
+            "Premium state должен писать только Premium/Subscription слой",
+            {"src/donater/subscription_ui.py"},
+        ),
+        (
+            re.compile(r"\.set_current_strategy_summary\s*\("),
+            "current strategy summary должен писать только presets/display_state.py",
+            {"src/presets/display_state.py"},
+        ),
+        (
+            re.compile(r"\.set_holiday_overlays\s*\("),
+            "holiday overlay state должен писать только window_state_actions.py",
+            {"src/main/window_state_actions.py"},
+        ),
+        (
+            re.compile(r"\.set_window_opacity_value\s*\("),
+            "window opacity state должен писать только window_state_actions.py",
+            {"src/main/window_state_actions.py"},
+        ),
+        (
+            re.compile(r"\.set_autostart\s*\("),
+            "autostart state должен писать только autostart feature/AppRuntimeState",
+            {"src/app/feature_facades/autostart.py", "src/app/state_store.py"},
+        ),
+        (
+            re.compile(r"\.bump_active_preset_revision\b"),
+            "active preset revision должен писать только preset runtime coordinator",
+            {"src/core/runtime/preset_runtime_coordinator.py"},
+        ),
+        (
+            re.compile(r"\.bump_preset_content_revision\b"),
+            "preset content revision должен писать только preset runtime/runtime UI bridge setup",
+            {"src/core/runtime/preset_runtime_coordinator.py", "src/ui/window_bootstrap_runtime.py"},
+        ),
+        (
+            re.compile(r"\.bump_preset_structure_revision\b"),
+            "preset structure revision должен писать только presets UI subpage layer",
+            {"src/presets/ui/common/preset_subpage_base.py"},
+        ),
+        (
+            re.compile(r"\.bump_mode_revision\b"),
+            "mode revision должен писать только runtime method switch flow",
+            {"src/winws_runtime/runtime/method_switch_flow.py"},
+        ),
+    )
+
+    problems: list[Problem] = []
+    for pattern, message, allowed_paths in rules:
+        problems.extend(
+            _scan_lines(
+                files,
+                pattern,
+                message,
+                allowed_paths=allowed_paths,
+            )
+        )
+    return problems
+
+
 def check_blockcheck_runtime_boundary(files: list[Path]) -> list[Problem]:
     scopes = [path for path in files if _under(path, "src/blockcheck/")]
     return _scan_lines(
@@ -407,6 +856,17 @@ def check_page_deps_builder_coverage() -> list[Problem]:
             ", ".join(missing),
         )
     ]
+
+
+def check_page_composition_is_registry_only() -> list[Problem]:
+    path = SRC_ROOT / "ui" / "page_composition.py"
+    if not path.exists():
+        return [Problem(path, 1, "page_composition.py не найден")]
+    return _scan_lines(
+        [path],
+        re.compile(r"\b(?:def\s+build_.*page_kwargs|window\.app_runtime|runtime_parts)\b"),
+        "page_composition.py должен быть общей картой; builder-ы живут в ui/page_deps",
+    )
 
 
 def check_translated_pages_require_deps() -> list[Problem]:
@@ -508,11 +968,132 @@ def check_pages_have_no_navigation_request_signals(files: list[Path]) -> list[Pr
     )
 
 
+def check_nested_preset_pages_use_breadcrumbs() -> list[Problem]:
+    scopes = [
+        SRC_ROOT / "presets" / "ui" / "zapret1" / "user_presets_page.py",
+        SRC_ROOT / "presets" / "ui" / "zapret2" / "user_presets_page.py",
+        SRC_ROOT / "presets" / "ui" / "common" / "preset_subpage_base.py",
+    ]
+    forbidden_back_var = "back_" + "btn"
+    forbidden_back_camel = "back" + "Button"
+    forbidden_back_text = "Назад" + " к списку"
+    forbidden_chevron = "chevron" + "-left"
+    return _scan_lines(
+        [path for path in scopes if path.exists()],
+        re.compile(
+            r"\b(?:"
+            + re.escape(forbidden_back_var)
+            + r"|"
+            + re.escape(forbidden_back_camel)
+            + r"|"
+            + re.escape(forbidden_back_text)
+            + r"|"
+            + re.escape(forbidden_chevron)
+            + r")\b"
+        ),
+        "вложенные preset-страницы должны использовать BreadcrumbBar, а не одиночную кнопку назад",
+    )
+
+
+def check_settings_json_is_single_app_storage(files: list[Path]) -> list[Problem]:
+    problems: list[Problem] = []
+    problems.extend(
+        _scan_lines(
+            files,
+            re.compile(
+                r"\b(?:"
+                r"premium\.ini|user_hosts\.ini|post_activate|activation_key|RegistryWindowGeometryStore|"
+                r"\.update_cache\.json|\.update_rate_limit\.json|\.server_pool_stats\.json|"
+                r"\.selected_server\.json|\.github_cache\.json|\.github_rate_limit|"
+                r"\.vps_block\.json|\.server_stats\.json|strategy_scan_resume\.json|"
+                r"blockcheck_user_domains\.txt|blobs\.json"
+                r")\b"
+            ),
+            "настройки/состояние приложения должны жить в settings.json; отдельные state-файлы запрещены",
+        )
+    )
+
+    app_storage_scopes = [
+        path
+        for path in files
+        if _under(path, "src/donater/", "src/hosts/", "src/settings/")
+    ]
+    problems.extend(
+        _scan_lines(
+            app_storage_scopes,
+            re.compile(r"\b(?:ConfigParser|configparser)\b"),
+            "для рабочих настроек приложения нельзя возвращать ini-парсер; используйте settings.json",
+        )
+    )
+    return problems
+
+
+def check_page_deps_context_has_explicit_fields(files: list[Path]) -> list[Problem]:
+    scopes = [
+        path for path in files
+        if _under(path, "src/ui/page_deps/", "src/main/window_page_deps_setup.py")
+    ]
+    return _scan_lines(
+        scopes,
+        re.compile(r"\b(?:context\.features|context\.state|features\s*:\s*object|state\s*:\s*object)\b"),
+        "PageDepsContext не должен быть общим мешком features/state; передавайте явные feature-поля и ui_state_store",
+    )
+
+
+def check_ui_workflows_do_not_call_page_methods(files: list[Path]) -> list[Problem]:
+    scopes = [
+        path for path in files
+        if _under(path, "src/ui/workflows/")
+    ]
+    return _scan_lines(
+        scopes,
+        re.compile(r"\.(?:show_profile|set_preset_file_name|apply_profile_setup_change)\s*\("),
+        "UI workflow не должен вызывать методы конкретной страницы; используйте явное WindowPageActions/page presenter действие",
+    )
+
+
+def check_launch_preparation_does_not_mutate_source_preset() -> list[Problem]:
+    path = SRC_ROOT / "winws_runtime" / "flow" / "start_preparation.py"
+    if not path.exists():
+        return [Problem(path, 1, "start_preparation.py не найден")]
+    return _scan_lines(
+        [path],
+        re.compile(r"\bpreset_path\.write_text\s*\("),
+        "подготовка запуска не должна менять source preset; готовьте текст запуска в памяти",
+    )
+
+
+def check_no_runtime_launch_preset_files(files: list[Path]) -> list[Problem]:
+    return _scan_lines(
+        files,
+        re.compile(r"\b(?:runtime[/\\]launch_presets|launch_presets|\.launch\.txt|_launch_preset_artifact)\b"),
+        "запуск preset не должен создавать отдельные runtime/*.launch.txt файлы; используйте source preset и подготовку текста в памяти",
+    )
+
+
+def check_no_hidden_winws2_launch_normalization(files: list[Path]) -> list[Problem]:
+    scopes = [
+        path for path in files
+        if _under(path, "src/winws_runtime/", "src/profile/")
+    ]
+    return _scan_lines(
+        scopes,
+        re.compile(
+            r"\b(?:normalize_winws2_action_lines|normalize_out_range_action_lines|"
+            r"applied_default_out_range|defaulted_profiles|repaired_profiles|"
+            r"removed_placeholder_profiles|_OUT_RANGE_UNSIGNED_SIMPLE_RE)\b"
+        ),
+        "winws2 preset перед запуском нельзя скрыто нормализовать; только проверка и явная ошибка",
+    )
+
+
 def run_checks() -> list[Problem]:
     files = _python_files()
     problems: list[Problem] = []
     problems.extend(check_removed_legacy_files())
     problems.extend(check_no_app_context(files))
+    problems.extend(check_no_app_runtime_context(files))
+    problems.extend(check_app_features_is_registry_only())
     problems.extend(check_no_page_signal_layer(files))
     problems.extend(check_no_window_level_state_subscriptions(files))
     problems.extend(check_runtime_feedback_uses_ui_bridge(files))
@@ -521,18 +1102,47 @@ def run_checks() -> list[Problem]:
     problems.extend(check_window_state_sync_is_window_only())
     problems.extend(check_page_navigation_uses_page_host(files))
     problems.extend(check_main_window_not_business_container(files))
+    problems.extend(check_window_not_store_access_point(files))
+    problems.extend(check_window_does_not_build_app_runtime())
+    problems.extend(check_window_has_no_bootstrap_wrapper())
+    problems.extend(check_app_runtime_access_is_narrow(files))
+    problems.extend(check_window_feature_aliases_not_used(files))
+    problems.extend(check_window_hidden_dependency_bags_not_used(files))
+    problems.extend(check_tray_uses_window_port())
+    problems.extend(check_window_runtime_setup_is_thin())
+    problems.extend(check_window_feature_deps_use_explicit_port())
+    problems.extend(check_application_controller_uses_port_builders())
+    problems.extend(check_window_page_actions_is_callback_bag())
+    problems.extend(check_application_lifecycle_uses_window_port())
+    problems.extend(check_window_page_deps_setup_uses_actions())
+    problems.extend(check_post_startup_uses_explicit_host(files))
+    problems.extend(check_discord_tray_command_does_not_receive_window())
+    problems.extend(check_post_startup_does_not_use_window_as_feature_container())
+    problems.extend(check_page_deps_context_not_stored_on_window(files))
+    problems.extend(check_no_qfluentwidgets_fallbacks(files))
+    problems.extend(check_no_legacy_toggle_widgets_in_production_ui(files))
+    problems.extend(check_no_raw_text_edit_in_production_ui(files))
     problems.extend(check_pages_have_explicit_dependencies(files))
     problems.extend(check_external_imports(files))
     problems.extend(check_no_feature_internals_from_external(files))
     problems.extend(check_startup_coordinator_boundary())
     problems.extend(check_runtime_state_writers(files))
+    problems.extend(check_ui_state_store_writer_ownership(files))
     problems.extend(check_blockcheck_runtime_boundary(files))
     problems.extend(check_premium_public_boundary())
     problems.extend(check_page_deps_builder_coverage())
+    problems.extend(check_page_composition_is_registry_only())
     problems.extend(check_translated_pages_require_deps())
     problems.extend(check_translated_pages_have_no_command_signals())
     problems.extend(check_pages_have_no_command_request_signals(files))
     problems.extend(check_pages_have_no_navigation_request_signals(files))
+    problems.extend(check_nested_preset_pages_use_breadcrumbs())
+    problems.extend(check_settings_json_is_single_app_storage(files))
+    problems.extend(check_page_deps_context_has_explicit_fields(files))
+    problems.extend(check_ui_workflows_do_not_call_page_methods(files))
+    problems.extend(check_launch_preparation_does_not_mutate_source_preset())
+    problems.extend(check_no_runtime_launch_preset_files(files))
+    problems.extend(check_no_hidden_winws2_launch_normalization(files))
     return problems
 
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.text_catalog import tr as tr_catalog
 from blockcheck.strategy_scan_resume import clear_resume_state, get_resume_index, save_resume_state, scan_key
 from blockcheck.strategy_scan_state import (
     StrategyApplyResult,
@@ -28,6 +27,13 @@ from blockcheck.strategy_scan_targeting import (
     resolve_games_ipset_paths,
     scan_protocol_from_value,
 )
+
+
+def tr_catalog(key: str, *, language: str | None = None, default: str = "", **kwargs) -> str:
+    from app.text_catalog import tr
+
+    return tr(key, language=language, default=default, **kwargs)
+
 
 def build_protocol_ui_plan(*, scan_protocol: str, current_value: str) -> StrategyScanProtocolUiPlan:
     current = str(current_value or "")
@@ -329,7 +335,7 @@ def plan_scan_start(
         target = default_target_for_protocol(scan_protocol)
 
     prev_scan_key = scan_key(previous_target, previous_protocol, previous_scope)
-    scan_key = scan_key(target, scan_protocol, udp_games_scope)
+    current_scan_key = scan_key(target, scan_protocol, udp_games_scope)
 
     resume_next_index = get_resume_index(target, scan_protocol, udp_games_scope)
     resume_available = resume_next_index > 0
@@ -338,7 +344,7 @@ def plan_scan_start(
         resume_available
         and previous_protocol == scan_protocol
         and previous_scope == udp_games_scope
-        and prev_scan_key == scan_key
+        and prev_scan_key == current_scan_key
         and result_rows_count == resume_next_index
         and table_row_count == result_rows_count
     )

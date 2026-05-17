@@ -5,7 +5,7 @@ from PyQt6.QtCore import Qt, QThread, QTimer
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QApplication,
-    QTextEdit, QStackedWidget
+    QStackedWidget
 )
 from qfluentwidgets import (
     BodyLabel,
@@ -570,7 +570,6 @@ class LogsPage(BasePage):
             text_edit_cls=ScrollBlockingTextEdit,
             quick_actions_bar_cls=QuickActionsBar,
             qfont_cls=QFont,
-            qtextedit_cls=QTextEdit,
             qta_module=qta,
             get_theme_tokens_fn=get_theme_tokens,
             errors_text_min_height=self._errors_text_min_height,

@@ -21,17 +21,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidg
 from ui.fluent_widgets import set_tooltip
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens
 from ui.theme_refresh import ThemeRefreshBinding
-
-try:
-    from qfluentwidgets import CardWidget, BodyLabel, CaptionLabel, InfoBadge, InfoLevel
-    _HAS_FLUENT = True
-except ImportError:
-    from PyQt6.QtWidgets import QFrame as CardWidget  # type: ignore[assignment]
-    from PyQt6.QtWidgets import QLabel as BodyLabel  # type: ignore[assignment]
-    from PyQt6.QtWidgets import QLabel as CaptionLabel  # type: ignore[assignment]
-    InfoBadge = None  # type: ignore[assignment]
-    InfoLevel = None  # type: ignore[assignment]
-    _HAS_FLUENT = False
+from qfluentwidgets import BodyLabel, CaptionLabel, CardWidget, InfoBadge, InfoLevel
 
 
 class ElidedTextLabel(QLabel):

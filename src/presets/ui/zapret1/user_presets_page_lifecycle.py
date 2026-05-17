@@ -122,9 +122,7 @@ def cleanup_user_presets_page(*, set_cleanup_in_progress_fn, layout_resync_timer
         pass
 
 
-def apply_user_presets_language(*, tr_fn, back_btn, configs_title_label, get_configs_btn, create_btn, import_btn, open_folder_btn, reset_all_btn, presets_info_btn, info_btn, preset_search_input, presets_delegate, ui_language: str, viewport, layout, toolbar_layout, refresh_presets_view_from_cache_fn) -> None:
-    if back_btn is not None:
-        back_btn.setText(tr_fn("page.winws1_user_presets.back.control", "Управление"))
+def apply_user_presets_language(*, tr_fn, configs_title_label, get_configs_btn, create_btn, import_btn, open_folder_btn, reset_all_btn, presets_info_btn, info_btn, preset_search_input, presets_delegate, ui_language: str, viewport, layout, toolbar_layout, refresh_presets_view_from_cache_fn) -> None:
     if configs_title_label is not None:
         configs_title_label.setText(
             tr_fn(

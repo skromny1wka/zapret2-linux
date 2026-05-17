@@ -3,12 +3,8 @@ from __future__ import annotations
 from PyQt6.QtCore import QTimer
 
 
-def is_window_alive(window) -> bool:
-    close_state = window.close_state
-    return not bool(
-        close_state.is_exiting
-        or close_state.closing_completely
-    )
+def is_startup_host_alive(startup_host) -> bool:
+    return bool(startup_host.is_alive())
 
 
 def bind_startup_gate(signal, callback, *, is_ready) -> None:

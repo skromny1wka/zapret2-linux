@@ -366,6 +366,9 @@ class UpdatePageRuntime:
 
         log(f"Автопроверка при запуске: {'включена' if enabled else 'отключена'}", "🔄 UPDATE")
 
+    def open_update_channel(self, channel: str):
+        return self._updater_feature.open_update_channel(channel)
+
     def cleanup(self) -> None:
         self._cleanup_in_progress = True
         self._teardown_server_worker()

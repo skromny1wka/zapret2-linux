@@ -3,17 +3,11 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from PyQt6.QtGui import QAction, QColor
-from PyQt6.QtWidgets import QListView
+from PyQt6.QtGui import QColor
 
 from app.text_catalog import tr as tr_catalog
 from ui.theme import get_theme_tokens, get_themed_qta_icon
-
-try:
-    from qfluentwidgets import Action, FluentIcon
-except ImportError:
-    Action = None
-    FluentIcon = None
+from qfluentwidgets import Action, FluentIcon
 
 
 _icon_cache: dict[str, object] = {}
@@ -37,34 +31,19 @@ def tr_text(key: str, language: str, default: str, **kwargs) -> str:
 
 
 def fluent_icon(name: str):
-    if FluentIcon is None:
-        return None
     return getattr(FluentIcon, name, None)
 
 
 def make_menu_action(text: str, *, icon=None, parent=None):
-    if Action is not None:
-        if icon is not None:
-            try:
-                return Action(icon, text, parent)
-            except TypeError:
-                pass
+    if icon is not None:
         try:
-            action = Action(text, parent)
+            return Action(icon, text, parent)
         except TypeError:
-            try:
-                action = Action(text)
-            except TypeError:
-                action = None
-        if action is not None:
-            try:
-                if icon is not None and hasattr(action, "setIcon"):
-                    action.setIcon(icon)
-            except Exception:
-                pass
-            return action
-
-    action = QAction(text, parent)
+            pass
+    try:
+        action = Action(text, parent)
+    except TypeError:
+        action = Action(text)
     try:
         if icon is not None:
             action.setIcon(icon)

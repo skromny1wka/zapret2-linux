@@ -36,9 +36,7 @@ def build_network_page_shell(
     content_parent,
     tr_fn,
     add_section_title_fn,
-    has_fluent_labels: bool,
     body_label_cls,
-    qlabel_cls,
     settings_card_cls,
     qvbox_layout_cls,
     qhbox_layout_cls,
@@ -61,22 +59,14 @@ def build_network_page_shell(
     loading_layout = qvbox_layout_cls()
     loading_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-    loading_label = (
-        body_label_cls(tr_fn("page.network.loading", "⏳ Загрузка..."))
-        if has_fluent_labels
-        else qlabel_cls(tr_fn("page.network.loading", "⏳ Загрузка..."))
-    )
+    loading_label = body_label_cls(tr_fn("page.network.loading", "⏳ Загрузка..."))
     loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
     loading_layout.addWidget(loading_label)
 
     loading_bar = indeterminate_progress_bar_cls(parent)
     loading_bar.setFixedHeight(4)
     loading_bar.setMaximumWidth(150)
-    if has_fluent_labels:
-        loading_bar.start()
-    else:
-        loading_bar.setRange(0, 0)
-        loading_bar.setTextVisible(False)
+    loading_bar.start()
     loading_layout.addWidget(loading_bar, alignment=Qt.AlignmentFlag.AlignCenter)
     loading_card.add_layout(loading_layout)
 
@@ -88,12 +78,10 @@ def build_network_page_shell(
 
     custom_widgets = build_custom_dns_ui_fn(
         tr_fn=tr_fn,
-        has_fluent_labels=has_fluent_labels,
         settings_card_cls=settings_card_cls,
         qhbox_layout_cls=qhbox_layout_cls,
         qframe_cls=qframe_cls,
-        body_label_cls=body_label_cls if has_fluent_labels else qlabel_cls,
-        qlabel_cls=qlabel_cls,
+        body_label_cls=body_label_cls,
         line_edit_cls=line_edit_cls,
         action_button_cls=action_button_cls,
         on_apply=on_apply_custom_dns,
@@ -110,9 +98,7 @@ def build_network_page_shell(
         content_parent=content_parent,
         tr_fn=tr_fn,
         add_section_title_fn=add_section_title_fn,
-        has_fluent_labels=has_fluent_labels,
         setting_card_group_cls=setting_card_group_cls,
-        settings_card_cls=settings_card_cls,
         quick_actions_bar_cls=quick_actions_bar_cls,
         action_button_cls=action_button_cls,
         qhbox_layout_cls=qhbox_layout_cls,

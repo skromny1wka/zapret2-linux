@@ -16,8 +16,8 @@ class StoredWindowGeometry:
     maximized: bool
 
 
-class RegistryWindowGeometryStore:
-    """Низкоуровневое хранилище геометрии окна в config/registry слое."""
+class SettingsWindowGeometryStore:
+    """Низкоуровневое хранилище геометрии окна в settings.json."""
 
     def load(self) -> StoredWindowGeometry:
         from config.window_geometry_store import get_window_maximized, get_window_position, get_window_size
@@ -55,7 +55,7 @@ class WindowGeometryRuntime:
         default_width: int,
         default_height: int,
         close_state,
-        store: RegistryWindowGeometryStore | None = None,
+        store: SettingsWindowGeometryStore | None = None,
     ) -> None:
         self.host = host
         self.close_state = close_state
@@ -63,7 +63,7 @@ class WindowGeometryRuntime:
         self.min_height = int(min_height)
         self.default_width = int(default_width)
         self.default_height = int(default_height)
-        self.store = store or RegistryWindowGeometryStore()
+        self.store = store or SettingsWindowGeometryStore()
 
         self._restore_in_progress = False
         self._persistence_enabled = False

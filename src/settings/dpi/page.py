@@ -26,6 +26,7 @@ from ui.widgets.win11_controls import (
     Win11ToggleRow,
 )
 from log.log import log
+from qfluentwidgets import StrongBodyLabel, CaptionLabel as _CaptionLabel
 
 
 METHOD_OPTION_TEXT = {
@@ -58,15 +59,6 @@ METHOD_OPTION_TEXT = {
     },
 }
 
-
-try:
-    from qfluentwidgets import StrongBodyLabel, CaptionLabel as _CaptionLabel, SettingCardGroup
-    _HAS_FLUENT_LABELS = True
-except ImportError:
-    StrongBodyLabel = QLabel  # type: ignore[assignment,misc]
-    _CaptionLabel = QLabel  # type: ignore[assignment,misc]
-    SettingCardGroup = None  # type: ignore[assignment,misc]
-    _HAS_FLUENT_LABELS = False
 
 class DpiSettingsPage(BasePage):
     """Страница настроек DPI"""

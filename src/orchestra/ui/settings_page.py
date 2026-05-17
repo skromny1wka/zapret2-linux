@@ -10,13 +10,7 @@
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget
 from app.text_catalog import normalize_language, tr as tr_catalog
-
-try:
-    from qfluentwidgets import SegmentedWidget
-    _PIVOT_OK = True
-except ImportError:
-    SegmentedWidget = None
-    _PIVOT_OK = False
+from qfluentwidgets import SegmentedWidget
 
 
 class OrchestraSettingsPage(QWidget):
@@ -31,12 +25,15 @@ class OrchestraSettingsPage(QWidget):
     ]
     TAB_LABELS = ["Залоченные", "Заблокированные", "Белый список", "Рейтинги"]
 
-    def __init__(self, parent=None, *, orchestra_feature):
+    def __init__(self, parent=None, *, controllers):
         super().__init__(parent)
         self.setObjectName("OrchestraSettingsPage")
         self._ui_language = self._resolve_ui_language()
 
-        self._orchestra = orchestra_feature
+        self._locked_controller = controllers["locked"]
+        self._blocked_controller = controllers["blocked"]
+        self._whitelist_controller = controllers["whitelist"]
+        self._ratings_controller = controllers["ratings"]
         self.locked_page = None
         self.blocked_page = None
         self.whitelist_page = None
@@ -49,14 +46,7 @@ class OrchestraSettingsPage(QWidget):
             self.stacked.addWidget(QWidget(self))
 
         # Pivot tab bar
-        if _PIVOT_OK:
-            pivot_cls = SegmentedWidget
-            if pivot_cls is None:
-                self.pivot = None
-            else:
-                self.pivot = pivot_cls(self)
-        else:
-            self.pivot = None
+        self.pivot = SegmentedWidget(self)
 
         if self.pivot is not None:
             for i, (key, label) in enumerate(zip(self.TAB_KEYS, self._get_tab_labels())):
@@ -93,7 +83,7 @@ class OrchestraSettingsPage(QWidget):
 
             page = OrchestraLockedPage(
                 self,
-                orchestra_feature=self._orchestra,
+                controller=self._locked_controller,
             )
             self.locked_page = page
         elif index == 1:
@@ -101,7 +91,7 @@ class OrchestraSettingsPage(QWidget):
 
             page = OrchestraBlockedPage(
                 self,
-                orchestra_feature=self._orchestra,
+                controller=self._blocked_controller,
             )
             self.blocked_page = page
         elif index == 2:
@@ -109,13 +99,13 @@ class OrchestraSettingsPage(QWidget):
 
             page = OrchestraWhitelistPage(
                 self,
-                orchestra_feature=self._orchestra,
+                controller=self._whitelist_controller,
             )
             self.whitelist_page = page
         else:
             from orchestra.ui.ratings_page import OrchestraRatingsPage
 
-            page = OrchestraRatingsPage(self, orchestra_feature=self._orchestra)
+            page = OrchestraRatingsPage(self, controller=self._ratings_controller)
             self.ratings_page = page
 
         set_lang = getattr(page, "set_ui_language", None)

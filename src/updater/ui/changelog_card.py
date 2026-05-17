@@ -13,44 +13,18 @@ from config.build_info import APP_VERSION
 from app.text_catalog import tr as tr_catalog
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens, get_themed_qta_icon
 from ui.theme_refresh import ThemeRefreshBinding
+from ui.fluent_widgets import PrimaryActionButton
 import updater.update_page_plans as update_page_plans
-
-try:
-    from qfluentwidgets import (
-        BodyLabel,
-        CaptionLabel,
-        CardWidget,
-        IndeterminateProgressBar,
-        ProgressBar,
-        PrimaryActionButton,
-        PushButton,
-        StrongBodyLabel,
-        TransparentToolButton,
-    )
-    HAS_FLUENT = True
-except ImportError:
-    from PyQt6.QtWidgets import QFrame as CardWidget, QProgressBar, QPushButton
-
-    BodyLabel = QLabel
-    CaptionLabel = QLabel
-    StrongBodyLabel = QLabel
-    ProgressBar = QProgressBar
-    IndeterminateProgressBar = QProgressBar
-    HAS_FLUENT = False
-
-    class PushButton(QPushButton):
-        def __init__(self, parent=None):
-            super().__init__(parent)
-
-    class TransparentToolButton(QPushButton):
-        def __init__(self, parent=None):
-            super().__init__(parent)
-
-    class PrimaryActionButton(QPushButton):
-        def __init__(self, text: str = "", icon_name: str | None = None, parent=None):
-            super().__init__(parent)
-            self.setText(text)
-            _ = icon_name
+from qfluentwidgets import (
+    BodyLabel,
+    CaptionLabel,
+    CardWidget,
+    IndeterminateProgressBar,
+    ProgressBar,
+    PushButton,
+    StrongBodyLabel,
+    TransparentToolButton,
+)
 
 
 class ChangelogCard(CardWidget):
@@ -127,22 +101,12 @@ class ChangelogCard(CardWidget):
         progress_layout.setContentsMargins(0, 4, 0, 4)
         progress_layout.setSpacing(6)
 
-        if HAS_FLUENT:
-            self._progress_indeterminate = IndeterminateProgressBar(start=False)
-            progress_layout.addWidget(self._progress_indeterminate)
-        else:
-            self._progress_indeterminate = None
+        self._progress_indeterminate = IndeterminateProgressBar(start=False)
+        progress_layout.addWidget(self._progress_indeterminate)
 
-        if HAS_FLUENT and ProgressBar is not None:
-            self.progress_bar = ProgressBar(useAni=False)
-            self.progress_bar.setRange(0, 100)
-            self.progress_bar.setValue(0)
-        else:
-            from PyQt6.QtWidgets import QProgressBar as _QProgressBar
-
-            self.progress_bar = _QProgressBar()
-            self.progress_bar.setRange(0, 100)
-            self.progress_bar.setFixedHeight(4)
+        self.progress_bar = ProgressBar(useAni=False)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
         self.progress_bar.hide()
         progress_layout.addWidget(self.progress_bar)
 

@@ -7,7 +7,8 @@
 """
 
 from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QSize
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QGraphicsOpacityEffect
+from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QGraphicsOpacityEffect
+from qfluentwidgets import TransparentToolButton
 
 from ui.animation_policy import register_managed_animation, start_managed_animation
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens, get_themed_qta_icon
@@ -86,7 +87,7 @@ class NotificationBanner(QWidget):
         layout.addWidget(self.message_label, 1)
 
         # Кнопка закрытия
-        self.close_btn = QPushButton()
+        self.close_btn = TransparentToolButton()
         self.close_btn.setIconSize(QSize(16, 16))
         self.close_btn.setFixedSize(28, 28)
         self.close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -111,15 +112,15 @@ class NotificationBanner(QWidget):
 
         self.close_btn.setIcon(get_themed_qta_icon("mdi.close", color=icon_color))
         self.close_btn.setStyleSheet(f"""
-            QPushButton {{
+            TransparentToolButton {{
                 background-color: transparent;
                 border: none;
                 border-radius: 4px;
             }}
-            QPushButton:hover {{
+            TransparentToolButton:hover {{
                 background-color: {hover_bg};
             }}
-            QPushButton:pressed {{
+            TransparentToolButton:pressed {{
                 background-color: {pressed_bg};
             }}
         """)

@@ -12,7 +12,6 @@ class HostsFeature:
     get_hosts_path_str: Callable
     read_active_domains_map: Callable
     save_user_selection: Callable
-    ensure_ipv6_catalog_sections: Callable
     get_catalog_signature: Callable
     invalidate_catalog_cache: Callable
     restore_hosts_permissions: Callable
@@ -30,7 +29,6 @@ def build_hosts_feature() -> HostsFeature:
         get_hosts_path_str=hosts_public.get_hosts_path_str,
         read_active_domains_map=hosts_public.read_active_domains_map,
         save_user_selection=hosts_public.save_user_selection,
-        ensure_ipv6_catalog_sections=hosts_public.ensure_ipv6_catalog_sections,
         get_catalog_signature=hosts_public.get_catalog_signature,
         invalidate_catalog_cache=hosts_public.invalidate_catalog_cache,
         restore_hosts_permissions=hosts_public.restore_hosts_permissions,

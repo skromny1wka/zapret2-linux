@@ -1,17 +1,12 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from log.log import log
-from main.post_startup_gate import bind_startup_gate, is_window_alive
+from main.post_startup_gate import bind_startup_gate, is_startup_host_alive
 from main.post_startup_dns_workers import schedule_dns_startup
-
-if TYPE_CHECKING:
-    from main.window import LupiDPIApp
 
 
 def install_dns_startup(
-    window: "LupiDPIApp",
+    startup_host,
     *,
     apply_dns_on_startup_async,
     set_status,
@@ -37,7 +32,7 @@ def install_dns_startup(
             log(f"Не удалось обновить DNS-статус запуска: {exc}", "DEBUG")
 
     def _schedule_dns_startup() -> None:
-        if not is_window_alive(window):
+        if not is_startup_host_alive(startup_host):
             return
         try:
             duration_ms = schedule_dns_startup(
@@ -52,7 +47,7 @@ def install_dns_startup(
             log(f"❌ Ошибка планирования DNS при запуске: {exc}", "ERROR")
 
     bind_startup_gate(
-        window.startup_post_init_ready,
+        startup_host.startup_post_init_ready,
         _schedule_dns_startup,
-        is_ready=lambda: bool(window.startup_state.post_init_ready),
+        is_ready=lambda: bool(startup_host.startup_state.post_init_ready),
     )

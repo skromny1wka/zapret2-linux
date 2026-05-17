@@ -51,7 +51,7 @@ def reset_all_service_profiles_ui(
     *,
     service_combos: dict,
     is_fluent_combo: Callable[[object], bool],
-    checkbox_cls,
+    toggle_cls,
     get_building_state: Callable[[], bool],
     set_building_state: Callable[[bool], None],
     update_profile_visual: Callable[[str], None],
@@ -69,7 +69,7 @@ def reset_all_service_profiles_ui(
                 control.blockSignals(True)
                 control.setCurrentIndex(0)
                 control.blockSignals(False)
-            elif isinstance(control, checkbox_cls):
+            elif isinstance(control, toggle_cls):
                 control.setChecked(False)
     finally:
         set_building_state(was_building)
@@ -88,7 +88,6 @@ def complete_hosts_operation(
     hosts_path: str,
     invalidate_cache: Callable[[], None],
     update_ui: Callable[[], None],
-    sync_selections_from_hosts: Callable[[], None],
     reset_profiles_ui: Callable[[], None],
     hide_error: Callable[[], None],
     show_error: Callable[[str], None],
@@ -102,7 +101,6 @@ def complete_hosts_operation(
 
     invalidate_cache()
     update_ui()
-    sync_selections_from_hosts()
 
     if completion_plan.reset_profiles:
         reset_profiles_ui()

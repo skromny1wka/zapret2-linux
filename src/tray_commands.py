@@ -37,30 +37,31 @@ def toggle_github_api_removal(*, status_callback=None) -> bool:
         return False
 
 
-def toggle_discord_restart(host: Any, *, status_callback=None) -> None:
+def toggle_discord_restart(*, status_callback=None) -> None:
     from discord.discord_restart import toggle_discord_restart as _toggle_discord_restart
 
-    _toggle_discord_restart(host, status_callback=status_callback)
+    _toggle_discord_restart(status_callback=status_callback)
 
 
-def apply_window_opacity(host: Any, value: int) -> None:
-    from settings.store import set_window_opacity
+def apply_window_opacity(*, set_window_opacity, value: int) -> None:
+    from settings.store import set_window_opacity as save_window_opacity
 
     normalized_value = int(value)
+    try:
+        save_window_opacity(normalized_value)
+    except Exception:
+        pass
+
     try:
         set_window_opacity(normalized_value)
     except Exception:
         pass
 
-    try:
-        host.set_window_opacity(normalized_value)
-    except Exception:
-        pass
-
 
 def init_tray(
-    host: Any,
     *,
+    window_port: Any,
+    startup_state,
     tray_feature: Any,
     notify,
     log_startup_metric,
@@ -82,11 +83,11 @@ def init_tray(
         icon_path = ICON_PATH
 
     app_icon = QIcon(icon_path)
-    host.setWindowIcon(app_icon)
+    window_port.set_window_icon(app_icon)
     QApplication.instance().setWindowIcon(app_icon)
 
     tray_manager = SystemTrayManager(
-        parent=host,
+        window_port=window_port,
         icon_path=os.path.abspath(icon_path),
         app_version=APP_VERSION,
         tray_feature=tray_feature,
@@ -98,7 +99,6 @@ def init_tray(
     except Exception as exc:
         log(f"Не удалось записать startup-метрику StartupTrayInit: {exc}", "DEBUG")
 
-    startup_state = host.startup_state
     if bool(startup_state.tray_launch_notification_pending):
         notify(
             advisory_notification(
@@ -119,8 +119,7 @@ def init_tray(
     return tray_manager
 
 
-def show_tray_notification_if_available(host: Any, tray_manager, title: str, content: str) -> bool:
-    _ = host
+def show_tray_notification_if_available(*, tray_manager, title: str, content: str) -> bool:
     if tray_manager is None:
         return False
     tray_manager.show_notification(title, content)
@@ -143,15 +142,25 @@ def cleanup_tray_for_close(tray_manager) -> None:
         log(f"Ошибка очистки системного трея: {exc}", "DEBUG")
 
 
-def install_post_startup_tray(host: Any, *, tray_feature: Any) -> None:
-    from main.post_startup_gate import bind_startup_gate, is_window_alive
+def install_post_startup_tray(
+    *,
+    startup_state,
+    close_state,
+    start_in_tray: bool,
+    startup_post_init_ready,
+    tray_feature: Any,
+) -> None:
+    from main.post_startup_gate import bind_startup_gate
     from main.post_startup_threading import schedule_after
 
-    if bool(host.start_in_tray):
+    if bool(start_in_tray):
         return
 
+    def _is_alive() -> bool:
+        return not bool(close_state.is_exiting or close_state.closing_completely)
+
     def _start_tray() -> None:
-        if not is_window_alive(host):
+        if not _is_alive():
             return
         if tray_feature.is_initialized():
             return
@@ -162,7 +171,7 @@ def install_post_startup_tray(host: Any, *, tray_feature: Any) -> None:
             log(f"Не удалось создать системный трей после запуска: {exc}", "WARNING")
 
     def _schedule_tray_startup() -> None:
-        if not is_window_alive(host):
+        if not _is_alive():
             return
 
         delay_ms = 1500
@@ -177,11 +186,11 @@ def install_post_startup_tray(host: Any, *, tray_feature: Any) -> None:
 
         schedule_after(
             delay_ms,
-            lambda: is_window_alive(host) and _start_tray(),
+            lambda: _is_alive() and _start_tray(),
         )
 
     bind_startup_gate(
-        host.startup_post_init_ready,
+        startup_post_init_ready,
         _schedule_tray_startup,
-        is_ready=lambda: bool(host.startup_state.post_init_ready),
+        is_ready=lambda: bool(startup_state.post_init_ready),
     )

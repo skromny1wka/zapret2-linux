@@ -5,11 +5,7 @@ import inspect
 from PyQt6.QtCore import QEvent, QObject, QTimer
 
 from ui.theme import get_theme_tokens
-
-try:
-    from qfluentwidgets import qconfig
-except ImportError:
-    qconfig = None  # type: ignore[assignment]
+from qfluentwidgets import qconfig
 
 
 def build_theme_refresh_key(tokens) -> tuple[str, str, str, str, str]:
@@ -51,15 +47,14 @@ class ThemeRefreshBinding(QObject):
         except Exception:
             pass
 
-        if qconfig is not None:
-            try:
-                qconfig.themeChanged.connect(self._on_theme_signal)
-            except Exception:
-                pass
-            try:
-                qconfig.themeColorChanged.connect(self._on_theme_signal)
-            except Exception:
-                pass
+        try:
+            qconfig.themeChanged.connect(self._on_theme_signal)
+        except Exception:
+            pass
+        try:
+            qconfig.themeColorChanged.connect(self._on_theme_signal)
+        except Exception:
+            pass
 
     def eventFilter(self, watched, event):  # noqa: N802 (Qt override)
         if self._cleanup_in_progress:

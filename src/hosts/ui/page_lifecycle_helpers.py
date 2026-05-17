@@ -77,7 +77,6 @@ def run_hosts_runtime_init_once(
     runtime_initialized: bool,
     set_runtime_initialized_fn,
     install_host_window_event_filter_fn,
-    ensure_ipv6_catalog_sections_fn,
     build_page_init_plan_fn,
     has_hosts_runtime: bool,
     init_hosts_runtime_fn,
@@ -92,11 +91,9 @@ def run_hosts_runtime_init_once(
     set_runtime_initialized_fn(True)
     install_host_window_event_filter_fn()
 
-    ipv6_catalog_changed, _ = ensure_ipv6_catalog_sections_fn()
     init_plan = build_page_init_plan_fn(
         runtime_initialized=False,
         has_hosts_runtime=has_hosts_runtime,
-        ipv6_catalog_changed=ipv6_catalog_changed,
     )
 
     if init_plan.init_hosts_runtime:

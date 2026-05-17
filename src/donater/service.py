@@ -11,10 +11,7 @@ from .crypto import verify_signed_response
 from .storage import PremiumStorage
 from .types import ActivationStatus
 
-try:
-    from config._build_secrets import PREMIUM_API_BASE_URL as API_BASE_URL
-except ImportError:
-    API_BASE_URL = ""
+from config._build_secrets import PREMIUM_API_BASE_URL as API_BASE_URL
 REQUEST_TIMEOUT = 5
 AUTO_NETWORK_RETRY_COOLDOWN_SEC = 30
 PAIR_CODE_TTL_MINUTES = 10
@@ -116,7 +113,7 @@ class PremiumService:
     """
     Minimal "actor" service:
     - One lock for all premium operations (activate/check/clear).
-    - Single storage (premium.ini).
+    - Single storage (settings.json).
     """
 
     def __init__(self, *, api_base_url: str = API_BASE_URL, timeout: int = REQUEST_TIMEOUT):
@@ -249,7 +246,6 @@ class PremiumService:
             PremiumStorage.clear_device_token()
             PremiumStorage.clear_premium_cache()
             PremiumStorage.clear_pair_code()
-            PremiumStorage.clear_activation_key()
             PremiumStorage.save_last_check()
             return True
 

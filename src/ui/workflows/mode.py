@@ -5,17 +5,12 @@ from ui.navigation.sidebar_builder import sync_nav_visibility
 from ui.navigation_pages import (
     resolve_control_page_for_method,
     resolve_preset_setup_page_for_method,
-    resolve_preset_raw_editor_page_for_method,
-    resolve_profile_setup_page_for_method,
     resolve_zapret1_navigation_pages,
     resolve_zapret2_navigation_pages,
 )
 from app.page_names import PageName
-from ui.window_adapter import ensure_page, get_current_page, get_loaded_page, show_page
-from ui.workflows.common import (
-    get_current_launch_method,
-    open_preset_raw_editor_page,
-)
+from ui.window_adapter import get_current_page, get_loaded_page, show_page
+from ui.workflows.common import get_current_launch_method
 
 
 def get_mode_context_pages(window) -> set:
@@ -40,58 +35,12 @@ def get_mode_context_pages(window) -> set:
     return mode_context_pages
 
 
-def open_profile_setup_for_method(
-    window,
-    method: str | None,
-    profile_key: str,
-    *,
-    show_page_after_open: bool = True,
-    allow_internal: bool = False,
-) -> bool:
-    page_name = resolve_profile_setup_page_for_method(method)
-    if page_name is None:
-        return False
-    setup_page = ensure_page(window, page_name)
-    if setup_page is None:
-        return False
-
-    try:
-        setup_page.show_profile(profile_key)
-    except Exception:
-        return False
-
-    if show_page_after_open:
-        if not show_page(window, page_name, allow_internal=allow_internal):
-            return False
-
-    return True
-
-
 def resolve_navigation_page_for_preset_setup(method: str | None) -> PageName:
     normalized = normalize_launch_method(method, default="")
     page_name = resolve_preset_setup_page_for_method(normalized)
     if page_name is None:
         return resolve_control_page_for_method(normalized)
     return page_name
-
-
-def open_preset_raw_editor_for_method(
-    window,
-    method: str | None,
-    preset_name: str,
-    *,
-    allow_internal: bool,
-) -> bool:
-    page_name = resolve_preset_raw_editor_page_for_method(method)
-    if page_name is None:
-        return False
-    open_preset_raw_editor_page(
-        window,
-        page_name,
-        preset_name,
-        allow_internal=allow_internal,
-    )
-    return True
 
 
 def redirect_to_preset_setup_page_for_method(window, method: str) -> None:
@@ -150,8 +99,6 @@ def show_active_mode_control_page(window, *, allow_internal: bool) -> None:
 __all__ = [
     "apply_launch_method_changed_ui",
     "get_mode_context_pages",
-    "open_preset_raw_editor_for_method",
-    "open_profile_setup_for_method",
     "redirect_to_preset_setup_page_for_method",
     "resolve_navigation_page_for_preset_setup",
     "show_active_mode_control_page",

@@ -101,18 +101,16 @@ class PremiumFeature:
         )
 
 
-def build_premium_feature(*, host, ui_state_store) -> PremiumFeature:
+def build_premium_feature(*, deps, ui_state_store) -> PremiumFeature:
     from donater.subscription_ui import SubscriptionUiActions
 
     return PremiumFeature(
-        _thread_parent=host,
+        _thread_parent=deps.thread_parent,
         _ui_actions=SubscriptionUiActions(
-            set_status=host.set_status,
+            set_status=deps.set_status,
             ui_state_store=ui_state_store,
-            update_title_badge=host.update_subscription_title_badge,
-            init_holiday_effects=lambda effects_allowed: host.init_holiday_effects_from_settings(
-                effects_allowed=effects_allowed,
-            ),
-            mark_startup_ready=host.mark_startup_subscription_ready,
+            update_title_badge=deps.update_title_badge,
+            init_holiday_effects=deps.init_holiday_effects,
+            mark_startup_ready=deps.mark_startup_ready,
         ),
     )

@@ -220,13 +220,8 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
 
     def _build_deferred_sections(self) -> None:
         self.add_spacing(8)
-        try:
-            from ui.widgets.win11_controls import Win11ToggleRow
-        except Exception:
-            Win11ToggleRow = None
+        from ui.widgets.win11_controls import Win11ToggleRow
 
-        if Win11ToggleRow is None:
-            raise RuntimeError("Win11ToggleRow недоступен для страницы управления Zapret 1")
         deferred_widgets = build_winws1_pages_deferred_sections(
             add_section_title=self.add_section_title,
             tr_fn=lambda key, default: tr_catalog(key, language=self._ui_language, default=default),

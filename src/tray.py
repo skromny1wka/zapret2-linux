@@ -9,28 +9,9 @@ import time
 from ctypes import wintypes
 
 from PyQt6.QtCore import QTimer, QPoint
-from PyQt6.QtGui import QAction, QCursor, QFontMetrics
-from PyQt6.QtWidgets import QApplication, QInputDialog, QLineEdit, QMenu, QWidget
-
-from ui.theme import get_themed_qta_icon
-
-try:
-    import qtawesome as qta
-
-    HAS_QTAWESOME = True
-except Exception:
-    qta = None
-    HAS_QTAWESOME = False
-
-try:
-    from qfluentwidgets import RoundMenu, Action, FluentIcon
-
-    _HAS_FLUENT_MENU = True
-except Exception:
-    RoundMenu = None
-    Action = None
-    FluentIcon = None
-    _HAS_FLUENT_MENU = False
+from PyQt6.QtGui import QCursor, QFontMetrics
+from PyQt6.QtWidgets import QApplication, QMenu, QWidget
+from qfluentwidgets import RoundMenu, Action, FluentIcon
 
 try:
     from log.log import log
@@ -38,16 +19,6 @@ try:
 except Exception:
     def log(*args, **kwargs):  # type: ignore[no-redef]
         return None
-
-from ui.popup_menu import exec_popup_menu
-from ui.window_adapter import (
-    hide_window,
-    persist_window_geometry,
-    release_input_interaction_states,
-    request_exit,
-    show_window,
-)
-
 
 if sys.platform == "win32":
     user32 = ctypes.windll.user32
@@ -234,39 +205,22 @@ def _get_y_lparam(value: int) -> int:
 
 
 def _fluent_icon(name: str):
-    if FluentIcon is None:
-        return None
     return getattr(FluentIcon, name, None)
 
 
 def _make_menu_action(text: str, *, icon=None, parent=None):
-    if Action is not None:
-        if icon is not None:
-            try:
-                return Action(icon, text, parent)
-            except TypeError:
-                pass
+    if icon is not None:
         try:
-            action = Action(text, parent)
+            return Action(icon, text, parent)
         except TypeError:
-            try:
-                action = Action(text)
-            except TypeError:
-                action = None
-        if action is not None:
-            try:
-                if icon is not None and hasattr(action, "setIcon"):
-                    action.setIcon(icon)
-            except Exception:
-                pass
-            return action
+            pass
 
-    action = QAction(text, parent)
     try:
-        if icon is not None:
-            action.setIcon(icon)
-    except Exception:
-        pass
+        action = Action(text, parent)
+    except TypeError:
+        action = Action(text)
+    if icon is not None and hasattr(action, "setIcon"):
+        action.setIcon(icon)
     return action
 
 
@@ -295,17 +249,6 @@ def _global_mouse_button_down(vk_code: int) -> bool:
         return False
 
 
-def _exec_tray_popup_menu(menu: QWidget, pos: QPoint, *, owner: QWidget | None) -> None:
-    """Tray uses the shared popup lifecycle plus Windows click-outside polling."""
-
-    exec_popup_menu(
-        menu,
-        pos,
-        owner=owner,
-        monitor_global_mouse=True,
-    )
-
-
 class SystemTrayManager:
     """Windows-first менеджер системного трея.
 
@@ -313,8 +256,8 @@ class SystemTrayManager:
     native tray icon через Shell_NotifyIcon без Qt-tray слоя.
     """
 
-    def __init__(self, parent, icon_path, app_version, *, tray_feature):
-        self.parent = parent
+    def __init__(self, window_port, icon_path, app_version, *, tray_feature):
+        self.window_port = window_port
         self._tray_feature = tray_feature
         self.icon_path = os.path.abspath(icon_path)
         self.app_version = str(app_version or "").strip()
@@ -455,12 +398,7 @@ class SystemTrayManager:
         self.toggle_window_visibility()
 
     def toggle_window_visibility(self) -> None:
-        try:
-            is_visible = bool(self.parent.isVisible())
-        except Exception:
-            is_visible = False
-
-        if is_visible:
+        if self.window_port.is_visible():
             self.hide_to_tray(show_hint=False)
             return
 
@@ -472,10 +410,7 @@ class SystemTrayManager:
         launch_phase = self._launch_phase()
         tg_label = "Telegram Proxy: выкл"
 
-        try:
-            is_visible = bool(self.parent.isVisible())
-        except Exception:
-            is_visible = False
+        is_visible = self.window_port.is_visible()
 
         try:
             tg_label = self._tray_feature.telegram_proxy_label()
@@ -504,7 +439,7 @@ class SystemTrayManager:
 
         position = self._resolve_menu_position(menu, anchor_x=anchor_x, anchor_y=anchor_y)
         try:
-            _exec_tray_popup_menu(menu, position, owner=self.parent)
+            self.window_port.exec_popup_menu(menu, position)
         except Exception as e:
             log(f"Не удалось показать tray menu: {e}", "WARNING")
 
@@ -513,7 +448,7 @@ class SystemTrayManager:
         if menu is not None:
             return menu
 
-        menu = RoundMenu(parent=self.parent) if _HAS_FLUENT_MENU and RoundMenu is not None else QMenu(self.parent)
+        menu = self.window_port.create_menu()
         self._menu = menu
         try:
             menu.setMinimumWidth(self._tray_menu_min_width)
@@ -522,7 +457,7 @@ class SystemTrayManager:
 
         show_window_action = _make_menu_action(
             "Показать",
-            icon=_fluent_icon("PLAY") if _HAS_FLUENT_MENU else (get_themed_qta_icon("fa5s.window-restore", color="#60cdff") if HAS_QTAWESOME else None),
+            icon=_fluent_icon("PLAY"),
             parent=menu,
         )
         show_window_action.triggered.connect(self._toggle_primary_visibility_action)
@@ -534,7 +469,7 @@ class SystemTrayManager:
             if self._is_windows_11_or_newer()
             else "Прозрачность окна"
         )
-        opacity_menu = RoundMenu(parent=menu) if _HAS_FLUENT_MENU and RoundMenu is not None else QMenu(menu)
+        opacity_menu = RoundMenu(parent=menu)
         try:
             opacity_menu.setMinimumWidth(self._tray_submenu_min_width)
         except Exception:
@@ -544,10 +479,7 @@ class SystemTrayManager:
         except Exception:
             pass
         try:
-            if _HAS_FLUENT_MENU:
-                opacity_menu.setIcon(_fluent_icon("PALETTE"))
-            elif HAS_QTAWESOME:
-                opacity_menu.setIcon(get_themed_qta_icon("fa5s.adjust", color="#60cdff"))
+            opacity_menu.setIcon(_fluent_icon("PALETTE"))
         except Exception:
             pass
         menu.addMenu(opacity_menu)
@@ -560,7 +492,7 @@ class SystemTrayManager:
 
         tg_proxy_action = _make_menu_action(
             "Telegram Proxy: выкл",
-            icon=_fluent_icon("SEND") if _HAS_FLUENT_MENU else (get_themed_qta_icon("fa5s.paper-plane", color="#60cdff") if HAS_QTAWESOME else None),
+            icon=_fluent_icon("SEND"),
             parent=menu,
         )
         tg_proxy_action.triggered.connect(self._toggle_tg_proxy)
@@ -571,7 +503,7 @@ class SystemTrayManager:
 
         console_action = _make_menu_action(
             "Консоль",
-            icon=_fluent_icon("COMMAND_PROMPT") if _HAS_FLUENT_MENU else (get_themed_qta_icon("fa5s.terminal", color="#888888") if HAS_QTAWESOME else None),
+            icon=_fluent_icon("COMMAND_PROMPT"),
             parent=menu,
         )
         console_action.triggered.connect(self.show_console)
@@ -581,7 +513,7 @@ class SystemTrayManager:
 
         exit_only_action = _make_menu_action(
             "Выход",
-            icon=_fluent_icon("RETURN") if _HAS_FLUENT_MENU else (get_themed_qta_icon("fa5s.sign-out-alt", color="#aaaaaa") if HAS_QTAWESOME else None),
+            icon=_fluent_icon("RETURN"),
             parent=menu,
         )
         exit_only_action.triggered.connect(self.exit_only)
@@ -589,7 +521,7 @@ class SystemTrayManager:
 
         exit_stop_action = _make_menu_action(
             "Выход и остановить DPI",
-            icon=_fluent_icon("POWER_BUTTON") if _HAS_FLUENT_MENU else (get_themed_qta_icon("fa5s.power-off", color="#e81123") if HAS_QTAWESOME else None),
+            icon=_fluent_icon("POWER_BUTTON"),
             parent=menu,
         )
         exit_stop_action.triggered.connect(self.exit_and_stop)
@@ -655,7 +587,7 @@ class SystemTrayManager:
 
     def _toggle_primary_visibility_action(self) -> None:
         try:
-            if self.parent.isVisible():
+            if self.window_port.is_visible():
                 self.hide_to_tray(show_hint=False)
             else:
                 self.show_window()
@@ -704,7 +636,7 @@ class SystemTrayManager:
         return QPoint(x, y)
 
     def _apply_menu_style(self, menu: QMenu):
-        if _HAS_FLUENT_MENU and RoundMenu is not None and isinstance(menu, RoundMenu):
+        if isinstance(menu, RoundMenu):
             return
 
         try:
@@ -786,10 +718,7 @@ class SystemTrayManager:
         self._tray_feature.set_telegram_proxy_enabled(bool(running))
 
     def _save_window_geometry(self):
-        try:
-            persist_window_geometry(self.parent)
-        except Exception as e:
-            log(f"Ошибка сохранения геометрии окна: {e}", "ERROR")
+        self.window_port.persist_geometry()
 
     def _cleanup_transient_overlays(self) -> None:
         try:
@@ -810,12 +739,12 @@ class SystemTrayManager:
             pass
 
         try:
-            release_input_interaction_states(self.parent)
+            self.window_port.release_input_interaction_states()
         except Exception:
             pass
 
         try:
-            hide_window(self.parent)
+            self.window_port.hide()
         except Exception as e:
             log(f"Не удалось скрыть окно в трей: {e}", "WARNING")
             return False
@@ -836,19 +765,13 @@ class SystemTrayManager:
         return True
 
     def exit_only(self):
-        request_exit(self.parent, stop_dpi=False)
+        self.window_port.request_exit(stop_dpi=False)
 
     def exit_and_stop(self):
-        request_exit(self.parent, stop_dpi=True)
+        self.window_port.request_exit(stop_dpi=True)
 
     def show_console(self):
-        cmd, ok = QInputDialog.getText(
-            self.parent,
-            "Консоль",
-            "Введите команду:",
-            QLineEdit.EchoMode.Normal,
-            "",
-        )
+        cmd, ok = self.window_port.prompt_console_command()
         if not ok or not cmd:
             return
 
@@ -870,7 +793,7 @@ class SystemTrayManager:
             pass
 
         try:
-            show_window(self.parent)
+            self.window_port.show()
         except Exception:
             pass
 

@@ -28,22 +28,7 @@ from ui.fluent_widgets import (
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens
 from app.text_catalog import tr as tr_catalog
 from log.log import log
-
-
-try:
-    from qfluentwidgets import (
-        LineEdit, MessageBox, InfoBar,
-        SettingCardGroup,
-    )
-    _HAS_FLUENT_INPUTS = True
-except ImportError:
-    from PyQt6.QtWidgets import (
-        QLineEdit as LineEdit,
-    )
-    MessageBox = None
-    InfoBar = None
-    SettingCardGroup = None  # type: ignore[assignment]
-    _HAS_FLUENT_INPUTS = False
+from qfluentwidgets import LineEdit, MessageBox, InfoBar, SettingCardGroup
 
 
 class BlobsPage(BasePage):
@@ -91,7 +76,6 @@ class BlobsPage(BasePage):
         """Строит UI страницы"""
         widgets = build_blobs_page_header(
             page=self,
-            has_fluent_inputs=_HAS_FLUENT_INPUTS,
             setting_card_group_cls=SettingCardGroup,
             line_edit_cls=LineEdit,
             action_button_cls=ActionButton,
@@ -107,7 +91,7 @@ class BlobsPage(BasePage):
             on_open_json=self._open_json,
             on_filter_blobs=self._filter_blobs,
         )
-        self._back_btn = widgets.back_btn
+        self._breadcrumb = widgets.breadcrumb
         self._desc_label = widgets.desc_label
         self._actions_group = widgets.actions_group
         self._actions_meta_card = widgets.actions_meta_card
@@ -219,7 +203,7 @@ class BlobsPage(BasePage):
         )
             
     def _reload_blobs(self):
-        """Перезагружает блобы из JSON"""
+        """Перезагружает блобы из settings.json."""
         reload_blobs_data(
             cleanup_in_progress=self._cleanup_in_progress,
             reload_btn=self.reload_btn,
@@ -240,7 +224,7 @@ class BlobsPage(BasePage):
         )
             
     def _open_json(self):
-        """Открывает файл blobs.json в редакторе"""
+        """Открывает settings.json в редакторе."""
         open_json_action(
             tr_fn=self._tr,
             info_bar_cls=InfoBar,
@@ -253,7 +237,7 @@ class BlobsPage(BasePage):
         super().set_ui_language(language)
         apply_blobs_language(
             tr_fn=self._tr,
-            back_btn=getattr(self, "_back_btn", None),
+            breadcrumb=getattr(self, "_breadcrumb", None),
             desc_label=self._desc_label,
             actions_group=self._actions_group,
             add_btn=self.add_btn,

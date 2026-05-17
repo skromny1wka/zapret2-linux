@@ -11,7 +11,6 @@ from settings.mode import (
     DEFAULT_PRESET_FILE_NAME_BY_ENGINE,
     ENGINE_BY_LAUNCH_METHOD,
     ZAPRET1_MODE,
-    is_zapret2_launch_method,
     normalize_launch_method,
 )
 
@@ -50,21 +49,13 @@ class PresetModeStartupSnapshot:
     preset_name: str
     preset_path: Path
     display_name: str
-    has_required_filters: bool | None = None
-    has_placeholder_unknown: bool | None = None
 
     def to_selected_mode(self) -> dict[str, object]:
-        payload: dict[str, object] = {
+        return {
             "is_preset_file": True,
             "name": self.display_name,
             "preset_path": str(self.preset_path),
         }
-        if self.has_required_filters is not None:
-            payload["_preset_mode_filters_validated"] = bool(self.has_required_filters)
-            payload["_preset_mode_filters_validated_method"] = str(self.launch_method or "").strip().lower()
-        if self.has_placeholder_unknown is not None:
-            payload["_preset_mode_has_placeholder_unknown"] = bool(self.has_placeholder_unknown)
-        return payload
 
     def to_launch_preset(self) -> PresetModeLaunchPreset:
         return PresetModeLaunchPreset(
@@ -137,8 +128,6 @@ class PresetModeCoordinator:
         if not preset_path.exists():
             raise PresetModeError(f"Selected source preset not found: {preset_path}")
 
-        has_required_filters: bool | None = None
-        has_placeholder_unknown: bool | None = None
         if require_filters:
             text = ""
             t_read = time.perf_counter()
@@ -149,13 +138,7 @@ class PresetModeCoordinator:
             self._emit_timing(timing_callback, f"{label}.read_preset_text", t_read)
 
             t_filters = time.perf_counter()
-            has_required_filters = self._has_required_filters(method, text)
-            lowered = text.lower()
-            if is_zapret2_launch_method(method):
-                has_placeholder_unknown = ("unknown.txt" in lowered) or ("ipset-unknown.txt" in lowered)
-            else:
-                has_placeholder_unknown = False
-            if not has_required_filters:
+            if not self._has_required_filters(method, text):
                 raise PresetModeError("Выберите хотя бы одну категорию для запуска")
             self._emit_timing(timing_callback, f"{label}.filter_validation", t_filters)
 
@@ -168,8 +151,6 @@ class PresetModeCoordinator:
             preset_name=selected.name,
             preset_path=preset_path,
             display_name=f"Пресет: {selected.name}",
-            has_required_filters=has_required_filters,
-            has_placeholder_unknown=has_placeholder_unknown,
         )
 
     def build_selected_mode(

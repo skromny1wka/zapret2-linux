@@ -4,26 +4,13 @@
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QLabel,
-    QLineEdit
 )
 import qtawesome as qta
 
-try:
-    from qfluentwidgets import LineEdit, MessageBox, InfoBar, SettingCardGroup
-    _HAS_FLUENT = True
-except ImportError:
-    LineEdit = QLineEdit
-    MessageBox = None
-    InfoBar = None
-    SettingCardGroup = None  # type: ignore[assignment]
-    _HAS_FLUENT = False
-
-try:
-    from qfluentwidgets import StrongBodyLabel, BodyLabel, CaptionLabel
-    _HAS_FLUENT_LABELS = True
-except ImportError:
-    StrongBodyLabel = QLabel; BodyLabel = QLabel; CaptionLabel = QLabel
-    _HAS_FLUENT_LABELS = False
+from qfluentwidgets import (
+    BodyLabel, CaptionLabel, InfoBar, LineEdit, MessageBox, SettingCardGroup,
+    StrongBodyLabel,
+)
 
 from ui.pages.base_page import BasePage, ScrollBlockingPlainTextEdit
 from ui.fluent_widgets import (
@@ -37,6 +24,9 @@ from ui.fluent_widgets import (
 from ui.theme import get_theme_tokens
 from app.text_catalog import tr as tr_catalog
 from log.log import log
+from lists.editor_workflow import (
+    ListsEditorController,
+)
 
 
 
@@ -53,7 +43,7 @@ class CustomIpSetPage(BasePage):
             title_key="page.custom_ipset.title",
             subtitle_key="page.custom_ipset.subtitle",
         )
-        self._lists = lists_feature
+        self._lists_controller = ListsEditorController(lists_feature)
         self._desc_label = None
         self._add_card = None
         self._actions_card = None
@@ -262,7 +252,7 @@ class CustomIpSetPage(BasePage):
         if self._cleanup_in_progress:
             return
         try:
-            state = self._lists.load_custom_ipset_text()
+            state = self._lists_controller.load_text("ipset")
 
             # Блокируем сигнал чтобы не срабатывало автосохранение
             self.text_edit.blockSignals(True)
@@ -415,7 +405,7 @@ class CustomIpSetPage(BasePage):
         """Сохраняет пользовательский список в lists/user/ipset-all.txt."""
         try:
             text = self.text_edit.toPlainText()
-            state = self._lists.save_custom_ipset_text(text)
+            state = self._lists_controller.save_text("ipset", text)
 
             # Обновляем UI - заменяем URL на IP
             new_text = state.normalized_text
@@ -440,7 +430,7 @@ class CustomIpSetPage(BasePage):
     def _update_status(self):
         if self._cleanup_in_progress:
             return
-        plan = self._lists.build_custom_ipset_status_plan(self.text_edit.toPlainText())
+        plan = self._lists_controller.status_plan("ipset", self.text_edit.toPlainText())
 
         # Обновляем UI
         if plan.invalid_lines:
@@ -466,7 +456,8 @@ class CustomIpSetPage(BasePage):
         self._render_status_label()
 
     def _add_entry(self):
-        plan = self._lists.build_add_custom_ipset_plan(
+        plan = self._lists_controller.add_entry_plan(
+            "ipset",
             raw_text=self.input.text().strip(),
             current_text=self.text_edit.toPlainText(),
         )
@@ -515,7 +506,7 @@ class CustomIpSetPage(BasePage):
         try:
             # Сохраняем перед открытием
             self._save_entries()
-            self._lists.open_ipset_all_user_file()
+            self._lists_controller.open_user_file("ipset")
         except Exception as e:
             log(f"Ошибка открытия lists/user/ipset-all.txt: {e}", "ERROR")
             if InfoBar:

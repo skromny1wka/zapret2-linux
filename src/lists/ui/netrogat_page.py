@@ -6,26 +6,13 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
 )
 import qtawesome as qta
 
-try:
-    from qfluentwidgets import LineEdit, MessageBox, InfoBar, SettingCardGroup
-    _HAS_FLUENT = True
-except ImportError:
-    LineEdit = QLineEdit
-    MessageBox = None
-    InfoBar = None
-    SettingCardGroup = None  # type: ignore[assignment]
-    _HAS_FLUENT = False
-
-try:
-    from qfluentwidgets import StrongBodyLabel, BodyLabel, CaptionLabel
-    _HAS_FLUENT_LABELS = True
-except ImportError:
-    StrongBodyLabel = QLabel; BodyLabel = QLabel; CaptionLabel = QLabel
-    _HAS_FLUENT_LABELS = False
+from qfluentwidgets import (
+    BodyLabel, CaptionLabel, InfoBar, LineEdit, MessageBox, SettingCardGroup,
+    StrongBodyLabel,
+)
 
 from ui.pages.base_page import BasePage, ScrollBlockingPlainTextEdit
 from ui.fluent_widgets import (
@@ -39,6 +26,9 @@ from ui.fluent_widgets import (
 from ui.theme import get_theme_tokens
 from app.text_catalog import tr as tr_catalog
 from log.log import log
+from lists.editor_workflow import (
+    ListsEditorController,
+)
 
 
 
@@ -55,7 +45,7 @@ class NetrogatPage(BasePage):
             title_key="page.netrogat.title",
             subtitle_key="page.netrogat.subtitle",
         )
-        self._lists = lists_feature
+        self._lists_controller = ListsEditorController(lists_feature)
         self._desc_label = None
         self._add_card = None
         self._actions_card = None
@@ -266,7 +256,7 @@ class NetrogatPage(BasePage):
     def _load(self):
         if self._cleanup_in_progress:
             return
-        state = self._lists.load_custom_netrogat_text()
+            state = self._lists_controller.load_text("netrogat")
         # Блокируем сигнал чтобы не срабатывало автосохранение
         self.text_edit.blockSignals(True)
         self.text_edit.setPlainText(state.text)
@@ -386,7 +376,7 @@ class NetrogatPage(BasePage):
 
     def _save(self):
         text = self.text_edit.toPlainText()
-        state = self._lists.save_custom_netrogat_text(text)
+        state = self._lists_controller.save_text("netrogat", text)
         if state.success:
             # Обновляем UI - заменяем URL на домены
             new_text = state.normalized_text
@@ -411,14 +401,15 @@ class NetrogatPage(BasePage):
     def _update_status(self):
         if self._cleanup_in_progress:
             return
-        plan = self._lists.build_custom_netrogat_status_plan(self.text_edit.toPlainText())
+        plan = self._lists_controller.status_plan("netrogat", self.text_edit.toPlainText())
         self._status_state["total"] = plan.total_count
         self._status_state["base"] = plan.base_count
         self._status_state["user"] = plan.user_count
         self._render_status_label()
 
     def _add(self):
-        plan = self._lists.build_add_custom_netrogat_plan(
+        plan = self._lists_controller.add_entry_plan(
+            "netrogat",
             raw_text=self.input.text().strip(),
             current_text=self.text_edit.toPlainText(),
         )
@@ -473,7 +464,7 @@ class NetrogatPage(BasePage):
         try:
             # Сохраняем перед открытием
             self._save()
-            self._lists.open_netrogat_user_file()
+            self._lists_controller.open_user_file("netrogat")
         except Exception as e:
             log(f"Ошибка открытия lists/user/netrogat.txt: {e}", "ERROR")
             if InfoBar:
@@ -487,7 +478,7 @@ class NetrogatPage(BasePage):
         try:
             # Сохраняем user и пересобираем итог перед открытием
             self._save()
-            self._lists.open_netrogat_final_file()
+            self._lists_controller.open_final_file("netrogat")
         except Exception as e:
             log(f"Ошибка открытия итогового netrogat.txt: {e}", "ERROR")
             if InfoBar:
@@ -503,7 +494,7 @@ class NetrogatPage(BasePage):
 
     def _add_missing_defaults(self):
         self._save()
-        added = self._lists.add_missing_netrogat_defaults()
+        added = self._lists_controller.add_missing_netrogat_defaults()
         if added == 0:
             if InfoBar:
                 InfoBar.success(

@@ -142,10 +142,9 @@ def build_page_init_plan(
     *,
     runtime_initialized: bool,
     has_hosts_runtime: bool,
-    ipv6_catalog_changed: bool,
 ) -> HostsPageInitPlan:
     should_initialize = not bool(runtime_initialized)
-    _ = (has_hosts_runtime, ipv6_catalog_changed)
+    _ = has_hosts_runtime
 
     return HostsPageInitPlan(
         init_hosts_runtime=should_initialize and not has_hosts_runtime,
@@ -234,7 +233,7 @@ def build_catalog_refresh_plan(*, current_signature, new_signature, trigger: str
         invalidate_cache=changed,
         should_rebuild=bool(changed and services_layout_exists),
         should_log=bool(changed and current_signature is not None and services_layout_exists),
-        log_message=f"Hosts: hosts.ini изменился ({trigger}) — обновляем список сервисов",
+        log_message=f"Hosts: hosts_catalog.json изменился ({trigger}) — обновляем список сервисов",
     )
 
 
@@ -257,14 +256,16 @@ def build_restore_permissions_plan(*, success: bool, message: str) -> HostsPermi
 
 
 def get_direct_profile_name() -> str | None:
-    from hosts.proxy_domains import get_dns_profiles
+    from hosts.proxy_domains import get_dns_profile_display_name, get_dns_profiles
 
     try:
         for profile in (get_dns_profiles() or []):
-            p = (profile or "").strip().lower()
-            if not p:
+            profile_id = (profile or "").strip().lower()
+            display_name = (get_dns_profile_display_name(profile) or "").strip().lower()
+            text = f"{profile_id} {display_name}"
+            if not text.strip():
                 continue
-            if ("вкл. (активировать hosts)" in p) or ("direct" in p) or ("no proxy" in p):
+            if ("вкл. (активировать hosts)" in text) or ("direct" in text) or ("no proxy" in text):
                 return profile
     except Exception:
         pass
@@ -382,7 +383,9 @@ def build_selection_sync_plan(
 
 
 def format_dns_profile_label(profile_name: str) -> str:
-    label = (profile_name or "").strip()
+    from hosts.proxy_domains import get_dns_profile_display_name
+
+    label = (get_dns_profile_display_name(profile_name) or profile_name or "").strip()
     if not label:
         return ""
     return _DNS_PROFILE_IP_SUFFIX.sub("", label).strip()
@@ -439,6 +442,8 @@ def build_services_catalog_plan(
         service_names=ordered_services,
         active_domains_map=active_domains_map,
     )
+    current_selection = dict(current_selection or {})
+    new_selection: dict[str, str] = {}
 
     def get_common_dns_profiles(service_names: list[str]) -> list[str]:
         common: set[str] | None = None
@@ -477,6 +482,24 @@ def build_services_catalog_plan(
         for service_name in names:
             entry = sync_plan.entries.get(service_name)
             available_profiles = list(entry.available_profiles) if entry is not None else []
+            saved_profile = current_selection.get(service_name)
+            selected_profile: str | None = None
+            toggle_checked = False
+            toggle_enabled = bool(entry.toggle_enabled) if entry is not None else False
+
+            if saved_profile in available_profiles:
+                selected_profile = saved_profile
+                new_selection[service_name] = saved_profile
+            elif not saved_profile and entry is not None and entry.selected_profile in available_profiles:
+                selected_profile = entry.selected_profile
+                if selected_profile:
+                    new_selection[service_name] = selected_profile
+
+            if entry is not None and entry.direct_only:
+                toggle_checked = bool(selected_profile and selected_profile == get_direct_profile_name())
+            elif entry is not None:
+                toggle_checked = bool(entry.toggle_checked)
+
             rows.append(
                 HostsServiceRowPlan(
                     service_name=service_name,
@@ -488,9 +511,9 @@ def build_services_catalog_plan(
                         (profile_name, format_dns_profile_label(profile_name))
                         for profile_name in available_profiles
                     ],
-                    selected_profile=entry.selected_profile if entry is not None else None,
-                    toggle_enabled=bool(entry.toggle_enabled) if entry is not None else False,
-                    toggle_checked=bool(entry.toggle_checked) if entry is not None else False,
+                    selected_profile=selected_profile,
+                    toggle_enabled=toggle_enabled,
+                    toggle_checked=toggle_checked,
                 )
             )
 
@@ -504,7 +527,6 @@ def build_services_catalog_plan(
             )
         )
 
-    new_selection = dict(sync_plan.new_selection)
     return HostsServicesCatalogPlan(
         groups=groups,
         new_selection=new_selection,

@@ -2,27 +2,22 @@
 
 """
 Определения блобов для стратегий Zapret 2.
-Блобы загружаются из JSON файла и могут использоваться в нескольких стратегиях.
+Блобы могут использоваться в нескольких стратегиях.
 
 Поддерживает:
 1. HARDCODED_BLOBS - системные блобы, жёстко заданные в коде
-2. Пользовательские блобы из json/blobs.json (секция "user_blobs")
+2. Пользовательские блобы из settings/settings.json
 3. Автоматическую дедупликацию при сборке командной строки
 """
 
 import re
 import os
-import json
 
 from log.log import log
+from settings import store as settings_store
 
-
-# Примечание: blobs.json находится в /home/privacy/zapret/json/blobs.json
-# (не в папке проекта zapretgui, а в родительской папке zapret)
-
-# Кэш для блобов - заполняется при первом вызове get_blobs()
+# Кэш для блобов - заполняется при первом вызове get_blobs().
 _BLOBS_CACHE = None
-_BLOBS_JSON_PATH = None
 
 # Все системные блобы добавляются в начало preset файла.
 # Пути к файлам относительные (@bin/...) - они разрешаются winws2.exe.
@@ -88,32 +83,24 @@ HARDCODED_BLOBS = (
 )
 
 
-def _get_blobs_json_path() -> str:
-    """Возвращает путь к JSON файлу блобов"""
-    global _BLOBS_JSON_PATH
-    if _BLOBS_JSON_PATH is None:
-        from config.config import INDEXJSON_FOLDER
-
-        _BLOBS_JSON_PATH = os.path.join(INDEXJSON_FOLDER, "blobs.json")
-    return _BLOBS_JSON_PATH
+def _system_blobs_as_command_values() -> dict:
+    pattern = r'--blob=([^:]+):([^\s]+)'
+    return {match.group(1): match.group(2) for match in re.finditer(pattern, HARDCODED_BLOBS)}
 
 
-def _load_blobs_from_json() -> dict:
+def _load_blobs() -> dict:
     """
-    Загружает блобы из JSON файла.
-    Объединяет системные блобы (blobs) и пользовательские (user_blobs).
+    Загружает системные блобы и пользовательские блобы из settings.json.
 
     Returns:
         Словарь {имя_блоба: значение_для_командной_строки}
     """
     from config.config import BIN_FOLDER
 
-
-    json_path = _get_blobs_json_path()
-    result = {}
+    result = _system_blobs_as_command_values()
 
     def _process_blob(name: str, data: dict) -> str | None:
-        """Обрабатывает один блоб из JSON"""
+        """Обрабатывает один blob из settings.json."""
         if not isinstance(data, dict):
             return None
 
@@ -132,35 +119,19 @@ def _load_blobs_from_json() -> dict:
         return None
 
     try:
-        if os.path.exists(json_path):
-            with open(json_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+        settings = settings_store.get_blobs_settings()
+        user_blobs = settings.get("user_blobs", {}) if isinstance(settings, dict) else {}
+        if isinstance(user_blobs, dict):
+            for name, blob_data in user_blobs.items():
+                name = str(name or "").strip()
+                if not name or name.startswith("_"):
+                    continue
+                value = _process_blob(name, blob_data)
+                if value:
+                    result[name] = value
+                    log(f"Загружен пользовательский блоб: {name}", "DEBUG")
 
-            # Загружаем системные блобы
-            if "blobs" in data and isinstance(data["blobs"], dict):
-                for name, blob_data in data["blobs"].items():
-                    if name.startswith("_"):  # Пропускаем комментарии
-                        continue
-                    value = _process_blob(name, blob_data)
-                    if value:
-                        result[name] = value
-
-            # Загружаем пользовательские блобы (перезаписывают системные)
-            if "user_blobs" in data and isinstance(data["user_blobs"], dict):
-                for name, blob_data in data["user_blobs"].items():
-                    if name.startswith("_"):  # Пропускаем комментарии
-                        continue
-                    value = _process_blob(name, blob_data)
-                    if value:
-                        result[name] = value
-                        log(f"Загружен пользовательский блоб: {name}", "DEBUG")
-
-            log(f"Загружено {len(result)} блобов из {json_path}", "DEBUG")
-        else:
-            log(f"⚠️ Файл блобов не найден: {json_path}", "WARNING")
-
-    except json.JSONDecodeError as e:
-        log(f"❌ Ошибка парсинга JSON блобов: {e}", "ERROR")
+        log(f"Загружено {len(result)} блобов из settings.json", "DEBUG")
     except Exception as e:
         log(f"❌ Ошибка загрузки блобов: {e}", "ERROR")
 
@@ -178,13 +149,13 @@ def get_blobs() -> dict:
     if _BLOBS_CACHE is not None:
         return _BLOBS_CACHE
 
-    _BLOBS_CACHE = _load_blobs_from_json()
+    _BLOBS_CACHE = _load_blobs()
     return _BLOBS_CACHE
 
 
 def reload_blobs() -> dict:
     """
-    Перезагружает блобы из JSON файла (сбрасывает кэш).
+    Перезагружает блобы из settings.json (сбрасывает кэш).
     Полезно после редактирования пользователем.
 
     Returns:
@@ -249,25 +220,18 @@ def get_system_blobs_info() -> dict:
 
 def _load_user_blobs_info() -> dict:
     """
-    Загружает информацию о пользовательских блобах из JSON.
+    Загружает информацию о пользовательских блобах из settings.json.
 
     Returns:
         dict: Словарь с информацией о пользовательских блобах
     """
     from config.config import BIN_FOLDER
 
-
-    json_path = _get_blobs_json_path()
     result = {}
 
     try:
-        if not os.path.exists(json_path):
-            return {}
-
-        with open(json_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-
-        user_blobs_data = data.get("user_blobs", {})
+        settings = settings_store.get_blobs_settings()
+        user_blobs_data = settings.get("user_blobs", {}) if isinstance(settings, dict) else {}
 
         for name, blob_data in user_blobs_data.items():
             if name.startswith("_"):  # Пропускаем комментарии
@@ -337,7 +301,7 @@ def get_blobs_info() -> dict:
 
 def save_user_blob(name: str, blob_type: str, value: str, description: str = "") -> bool:
     """
-    Сохраняет пользовательский блоб в JSON.
+    Сохраняет пользовательский блоб в settings.json.
 
     Args:
         name: Имя блоба (без пробелов, латиница и цифры)
@@ -348,19 +312,11 @@ def save_user_blob(name: str, blob_type: str, value: str, description: str = "")
     Returns:
         True если успешно
     """
-    json_path = _get_blobs_json_path()
-
     try:
-        # Загружаем текущий JSON
-        if os.path.exists(json_path):
-            with open(json_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-        else:
-            data = {"blobs": {}, "user_blobs": {}}
-
-        # Создаём секцию user_blobs если её нет
-        if "user_blobs" not in data:
-            data["user_blobs"] = {}
+        data = settings_store.get_blobs_settings()
+        user_blobs = data.get("user_blobs", {}) if isinstance(data, dict) else {}
+        if not isinstance(user_blobs, dict):
+            user_blobs = {}
 
         # Добавляем блоб
         blob_data = {"description": description}
@@ -369,11 +325,8 @@ def save_user_blob(name: str, blob_type: str, value: str, description: str = "")
         else:
             blob_data["path"] = value
 
-        data["user_blobs"][name] = blob_data
-
-        # Сохраняем
-        with open(json_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
+        user_blobs[name] = blob_data
+        settings_store.set_blobs_settings({"user_blobs": user_blobs})
 
         # Сбрасываем кэш
         reload_blobs()
@@ -388,7 +341,7 @@ def save_user_blob(name: str, blob_type: str, value: str, description: str = "")
 
 def delete_user_blob(name: str) -> bool:
     """
-    Удаляет пользовательский блоб из JSON.
+    Удаляет пользовательский блоб из settings.json.
 
     Args:
         name: Имя блоба
@@ -396,23 +349,15 @@ def delete_user_blob(name: str) -> bool:
     Returns:
         True если успешно
     """
-    json_path = _get_blobs_json_path()
-
     try:
-        if not os.path.exists(json_path):
-            return False
-
-        with open(json_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-
-        if "user_blobs" not in data or name not in data["user_blobs"]:
+        data = settings_store.get_blobs_settings()
+        user_blobs = data.get("user_blobs", {}) if isinstance(data, dict) else {}
+        if not isinstance(user_blobs, dict) or name not in user_blobs:
             log(f"Блоб {name} не найден в user_blobs", "WARNING")
             return False
 
-        del data["user_blobs"][name]
-
-        with open(json_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
+        del user_blobs[name]
+        settings_store.set_blobs_settings({"user_blobs": user_blobs})
 
         # Сбрасываем кэш
         reload_blobs()
@@ -622,31 +567,27 @@ def get_user_blobs_args() -> str:
     from config.config import BIN_FOLDER
 
 
-    json_path = _get_blobs_json_path()
     user_blobs_parts = []
 
     try:
-        if os.path.exists(json_path):
-            with open(json_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+        data = settings_store.get_blobs_settings()
+        user_blobs = data.get("user_blobs", {}) if isinstance(data, dict) else {}
 
-            # Загружаем ТОЛЬКО пользовательские блобы
-            if "user_blobs" in data and isinstance(data["user_blobs"], dict):
-                for name, blob_data in data["user_blobs"].items():
-                    if name.startswith("_"):  # Пропускаем комментарии
-                        continue
-                    if not isinstance(blob_data, dict):
-                        continue
+        if isinstance(user_blobs, dict):
+            for name, blob_data in user_blobs.items():
+                name = str(name or "").strip()
+                if not name or name.startswith("_"):
+                    continue
+                if not isinstance(blob_data, dict):
+                    continue
 
-                    # Hex значение
-                    if "hex" in blob_data:
-                        user_blobs_parts.append(f"--blob={name}:{blob_data['hex']}")
-                    # Путь к файлу
-                    elif "path" in blob_data:
-                        path = blob_data["path"]
-                        if not os.path.isabs(path):
-                            path = os.path.join(BIN_FOLDER, path)
-                        user_blobs_parts.append(f"--blob={name}:@{path}")
+                if "hex" in blob_data:
+                    user_blobs_parts.append(f"--blob={name}:{blob_data['hex']}")
+                elif "path" in blob_data:
+                    path = blob_data["path"]
+                    if not os.path.isabs(path):
+                        path = os.path.join(BIN_FOLDER, path)
+                    user_blobs_parts.append(f"--blob={name}:@{path}")
 
     except Exception as e:
         log(f"Ошибка загрузки пользовательских блобов: {e}", "ERROR")

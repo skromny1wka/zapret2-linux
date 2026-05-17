@@ -1,17 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from app_notifications import advisory_notification
 from log.log import log
-from main.post_startup_gate import bind_startup_gate, is_window_alive
+from main.post_startup_gate import bind_startup_gate, is_startup_host_alive
 from main.post_startup_threading import schedule_after, start_daemon_thread
-from ui.window_adapter import get_loaded_page, show_page
-
-if TYPE_CHECKING:
-    from main.window import LupiDPIApp
 
 
 class _UpdateCheckBridge(QObject):
@@ -21,7 +15,7 @@ class _UpdateCheckBridge(QObject):
 
 
 def install_update_check(
-    window: "LupiDPIApp",
+    startup_host,
     *,
     updater_feature,
     notify,
@@ -30,27 +24,19 @@ def install_update_check(
     update_bridge = _UpdateCheckBridge()
 
     def _on_update_found(version: str, release_notes: str) -> None:
-        if not is_window_alive(window):
+        if not is_startup_host_alive(startup_host):
             return
         try:
             try:
                 set_status(f"Доступно обновление v{version}")
             except Exception:
                 pass
-            from qfluentwidgets import MessageBox as FluentMessageBox
             from app.page_names import PageName as StartupPageName
 
-            box = FluentMessageBox(
-                "Доступно обновление",
-                f"Выпущена версия {version}. Скачать и установить сейчас?",
-                window,
-            )
-            box.yesButton.setText("Скачать и установить")
-            box.cancelButton.setText("Позже")
-            if not box.exec():
+            if not startup_host.confirm_update_install(version):
                 return
-            show_page(window, StartupPageName.SERVERS)
-            page = get_loaded_page(window, StartupPageName.SERVERS)
+            startup_host.show_page(StartupPageName.SERVERS)
+            page = startup_host.get_loaded_page(StartupPageName.SERVERS)
             if page is not None:
                 page.present_startup_update(
                     version,
@@ -61,7 +47,7 @@ def install_update_check(
             log(f"Ошибка при показе диалога обновления: {exc}", "❌ ERROR")
 
     def _on_no_update(current_version: str) -> None:
-        if not is_window_alive(window):
+        if not is_startup_host_alive(startup_host):
             return
         try:
             try:
@@ -84,7 +70,7 @@ def install_update_check(
             log(f"Ошибка при показе InfoBar: {exc}", "❌ ERROR")
 
     def _on_update_check_error(error: str) -> None:
-        if not is_window_alive(window):
+        if not is_startup_host_alive(startup_host):
             return
         try:
             set_status("Не удалось проверить обновления")
@@ -117,7 +103,7 @@ def install_update_check(
             log(f"Ошибка воркера проверки обновлений: {exc}", "❌ ERROR")
 
     def _schedule_startup_update_check() -> None:
-        if not is_window_alive(window):
+        if not is_startup_host_alive(startup_host):
             return
         if not updater_feature.is_auto_update_enabled():
             log("Автопроверка обновлений при запуске отключена", "🔁 UPDATE")
@@ -130,17 +116,17 @@ def install_update_check(
         start_daemon_thread("StartupUpdateCheckWorker", _startup_update_worker)
 
     def _schedule_startup_update_check_deferred() -> None:
-        if not is_window_alive(window):
+        if not is_startup_host_alive(startup_host):
             return
         delay_ms = 12000
         log(f"Автопроверка обновлений отложена на {delay_ms}ms после готовности UI", "DEBUG")
         schedule_after(
             delay_ms,
-            lambda: is_window_alive(window) and _schedule_startup_update_check(),
+            lambda: is_startup_host_alive(startup_host) and _schedule_startup_update_check(),
         )
 
     bind_startup_gate(
-        window.startup_post_init_ready,
+        startup_host.startup_post_init_ready,
         _schedule_startup_update_check_deferred,
-        is_ready=lambda: bool(window.startup_state.post_init_ready),
+        is_ready=lambda: bool(startup_host.startup_state.post_init_ready),
     )

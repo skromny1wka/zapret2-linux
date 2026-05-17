@@ -51,10 +51,11 @@ class OrchestraFeature:
 
         set_orchestra_setting(key, value, runner=self.runner)
 
-    def get_whitelist_snapshot(self, runner):
+    def get_whitelist_snapshot(self, runner, *, refresh: bool = False):
         return orchestra_commands.get_whitelist_snapshot(
             runner,
             whitelist_service=self.whitelist_runtime_service,
+            refresh=refresh,
         )
 
     def add_whitelist_domain(self, runner, domain: str) -> bool:
@@ -75,10 +76,11 @@ class OrchestraFeature:
             )
         )
 
-    def clear_whitelist_user_domains(self, runner) -> int:
+    def clear_whitelist_user_domains(self, runner, domains: list[str]) -> int:
         return int(
             orchestra_commands.clear_whitelist_user_domains(
                 runner,
+                domains,
                 whitelist_service=self.whitelist_runtime_service,
             )
             or 0

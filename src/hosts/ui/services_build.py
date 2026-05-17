@@ -5,7 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QScrollArea, QFrame
+from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QFrame
+from qfluentwidgets import ScrollArea
 
 from ui.fluent_widgets import SettingsCard
 from ui.theme import get_theme_tokens
@@ -21,7 +22,7 @@ class HostsServicesContainerWidgets:
 class HostsServicesGroupWidgets:
     card: SettingsCard
     title_label: object
-    chips_scroll: QScrollArea | None
+    chips_scroll: ScrollArea | None
     chip_buttons: list[object]
 
 
@@ -97,7 +98,7 @@ def build_hosts_services_group(
             )
             chips_layout.addWidget(btn)
 
-        chips_scroll = QScrollArea()
+        chips_scroll = ScrollArea()
         chips_scroll.setFrameShape(QFrame.Shape.NoFrame)
         chips_scroll.setWidgetResizable(True)
         chips_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
@@ -134,7 +135,6 @@ def build_hosts_service_row(
     *,
     body_label_cls,
     combo_cls,
-    has_fluent: bool,
     toggle_cls,
     off_label: str,
     on_direct_toggle,
@@ -155,17 +155,13 @@ def build_hosts_service_row(
         control = toggle_cls()
         control.setEnabled(row_plan.toggle_enabled)
         control.setChecked(row_plan.toggle_checked)
-        control.toggled.connect(
+        toggle_signal = getattr(control, "checkedChanged", None) or getattr(control, "toggled", None)
+        toggle_signal.connect(
             lambda checked, s=row_plan.service_name: on_direct_toggle(s, checked)
         )
         row.addWidget(control, 0, Qt.AlignmentFlag.AlignVCenter)
     else:
-        if has_fluent and combo_cls is not None:
-            control = combo_cls()
-        else:
-            from PyQt6.QtWidgets import QComboBox as _QComboBox
-
-            control = _QComboBox()
+        control = combo_cls()
         control.setFixedHeight(32)
         control.setCursor(Qt.CursorShape.PointingHandCursor)
         control.setMinimumWidth(220)

@@ -249,6 +249,15 @@ def set_hosts_settings(values: dict[str, Any]) -> dict[str, Any]:
     return copy.deepcopy(updated["hosts"])
 
 
+def get_premium_settings() -> dict[str, Any]:
+    return copy.deepcopy(read_settings()["premium"])
+
+
+def set_premium_settings(values: dict[str, Any]) -> dict[str, Any]:
+    updated = _update_settings(lambda data: data["premium"].update(_as_dict(values)))
+    return copy.deepcopy(updated["premium"])
+
+
 def get_ui_state_settings() -> dict[str, Any]:
     return copy.deepcopy(read_settings()["ui_state"])
 
@@ -265,6 +274,42 @@ def get_profile_strategy_state_settings() -> dict[str, Any]:
 def set_profile_strategy_state_settings(values: dict[str, Any]) -> dict[str, Any]:
     updated = _update_settings(lambda data: _set_path_value(data, ("profile_strategy_state",), _as_dict(values)))
     return copy.deepcopy(updated["profile_strategy_state"])
+
+
+def get_updater_settings() -> dict[str, Any]:
+    return copy.deepcopy(read_settings()["updater"])
+
+
+def set_updater_settings(values: dict[str, Any]) -> dict[str, Any]:
+    updated = _update_settings(lambda data: data["updater"].update(_as_dict(values)))
+    return copy.deepcopy(updated["updater"])
+
+
+def get_blockcheck_settings() -> dict[str, Any]:
+    return copy.deepcopy(read_settings()["blockcheck"])
+
+
+def set_blockcheck_settings(values: dict[str, Any]) -> dict[str, Any]:
+    updated = _update_settings(lambda data: data["blockcheck"].update(_as_dict(values)))
+    return copy.deepcopy(updated["blockcheck"])
+
+
+def get_preset_library_settings() -> dict[str, Any]:
+    return copy.deepcopy(read_settings()["preset_library"])
+
+
+def set_preset_library_settings(values: dict[str, Any]) -> dict[str, Any]:
+    updated = _update_settings(lambda data: data["preset_library"].update(_as_dict(values)))
+    return copy.deepcopy(updated["preset_library"])
+
+
+def get_blobs_settings() -> dict[str, Any]:
+    return copy.deepcopy(read_settings()["blobs"])
+
+
+def set_blobs_settings(values: dict[str, Any]) -> dict[str, Any]:
+    updated = _update_settings(lambda data: data["blobs"].update(_as_dict(values)))
+    return copy.deepcopy(updated["blobs"])
 
 
 def get_orchestra_settings() -> dict[str, Any]:
@@ -643,6 +688,122 @@ def clear_active_hosts_domains() -> bool:
     return set_active_hosts_domains(set())
 
 
+def get_hosts_selection() -> dict[str, str]:
+    data = _get_path_value(read_settings(), ("hosts", "selection"), {})
+    if not isinstance(data, dict):
+        return {}
+    out: dict[str, str] = {}
+    for raw_service_name, raw_profile_name in data.items():
+        service_name = _as_clean_str(raw_service_name)
+        profile_name = _as_clean_str(raw_profile_name)
+        if service_name and profile_name:
+            out[service_name] = profile_name
+    return out
+
+
+def set_hosts_selection(selection: dict[str, str]) -> bool:
+    normalized: dict[str, str] = {}
+    for raw_service_name, raw_profile_name in _as_dict(selection).items():
+        service_name = _as_clean_str(raw_service_name)
+        profile_name = _as_clean_str(raw_profile_name)
+        if service_name and profile_name:
+            normalized[service_name] = profile_name
+    _update_settings(lambda data: _set_path_value(data, ("hosts", "selection"), normalized))
+    return True
+
+
+def get_premium_device_id() -> str:
+    return _get_str(("premium", "device_id"), "")
+
+
+def set_premium_device_id(value: str) -> bool:
+    return _set_str(("premium", "device_id"), _as_clean_str(value))
+
+
+def get_premium_device_token() -> str | None:
+    return _get_nullable_str(("premium", "device_token"))
+
+
+def set_premium_device_token(value: str | None) -> bool:
+    return _set_nullable_str(("premium", "device_token"), _as_clean_str(value) or None)
+
+
+def get_premium_last_check() -> str | None:
+    return _get_nullable_str(("premium", "last_check"))
+
+
+def set_premium_last_check(value: str | None) -> bool:
+    return _set_nullable_str(("premium", "last_check"), value)
+
+
+def get_premium_last_network_failure_ts() -> int | None:
+    value = _get_path_value(read_settings(), ("premium", "last_network_failure_ts"), None)
+    try:
+        return int(value) if value is not None else None
+    except Exception:
+        return None
+
+
+def set_premium_last_network_failure_ts(value: int | None) -> bool:
+    _update_settings(
+        lambda data: _set_path_value(
+            data,
+            ("premium", "last_network_failure_ts"),
+            None if value is None else int(value),
+        )
+    )
+    return True
+
+
+def get_premium_pair_code() -> str | None:
+    value = _get_nullable_str(("premium", "pair_code"))
+    return value.upper() if value else None
+
+
+def set_premium_pair_code(*, code: str | None, expires_at: int | None) -> bool:
+    normalized_code = _as_clean_str(code).upper()
+    expires = None
+    if expires_at is not None:
+        try:
+            expires = int(expires_at)
+        except Exception:
+            expires = None
+    if not normalized_code or not expires or expires <= 0:
+        normalized_code = ""
+        expires = None
+    _update_settings(
+        lambda data: (
+            _set_path_value(data, ("premium", "pair_code"), normalized_code or None),
+            _set_path_value(data, ("premium", "pair_expires_at"), expires),
+        )
+    )
+    return True
+
+
+def get_premium_pair_expires_at() -> int | None:
+    value = _get_path_value(read_settings(), ("premium", "pair_expires_at"), None)
+    try:
+        return int(value) if value is not None else None
+    except Exception:
+        return None
+
+
+def get_premium_cache() -> dict[str, Any] | None:
+    cache = _get_path_value(read_settings(), ("premium", "premium_cache"), None)
+    return copy.deepcopy(cache) if isinstance(cache, dict) else None
+
+
+def set_premium_cache(cache: dict[str, Any] | None) -> bool:
+    _update_settings(
+        lambda data: _set_path_value(
+            data,
+            ("premium", "premium_cache"),
+            copy.deepcopy(cache) if isinstance(cache, dict) else None,
+        )
+    )
+    return True
+
+
 def get_tg_proxy_enabled() -> bool:
     return _get_bool(("telegram_proxy", "enabled"), True)
 
@@ -985,6 +1146,7 @@ __all__ = [
     "get_garland_enabled",
     "get_gui_autostart_enabled",
     "get_hosts_bootstrap_signature",
+    "get_hosts_selection",
     "get_isp_dns_info_shown",
     "get_kaspersky_warning_disabled",
     "get_max_blocked",
@@ -1003,6 +1165,14 @@ __all__ = [
     "get_orchestra_user_locked",
     "get_orchestra_whitelist_user_domains",
     "get_program_settings",
+    "get_premium_cache",
+    "get_premium_device_id",
+    "get_premium_device_token",
+    "get_premium_last_check",
+    "get_premium_last_network_failure_ts",
+    "get_premium_pair_code",
+    "get_premium_pair_expires_at",
+    "get_premium_settings",
     "get_profile_strategy_state_settings",
     "get_remove_github_api",
     "get_rkn_background",
@@ -1059,6 +1229,7 @@ __all__ = [
     "set_garland_enabled",
     "set_gui_autostart_enabled",
     "set_hosts_bootstrap_signature",
+    "set_hosts_selection",
     "set_isp_dns_info_shown",
     "set_kaspersky_warning_disabled",
     "set_max_blocked",
@@ -1079,6 +1250,13 @@ __all__ = [
     "set_orchestra_user_locked",
     "set_orchestra_whitelist_user_domains",
     "set_program_settings",
+    "set_premium_cache",
+    "set_premium_device_id",
+    "set_premium_device_token",
+    "set_premium_last_check",
+    "set_premium_last_network_failure_ts",
+    "set_premium_pair_code",
+    "set_premium_settings",
     "set_profile_strategy_state_settings",
     "set_remove_github_api",
     "set_rkn_background",

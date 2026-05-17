@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import Any
 
 from main.post_startup_checks import install_startup_checks
 from main.post_startup_diagnostics import (
@@ -14,49 +15,60 @@ from main.post_startup_maintenance import install_deferred_maintenance
 from main.post_startup_proxy import install_telegram_proxy_startup
 from main.post_startup_update import install_update_check
 
-if TYPE_CHECKING:
-    from main.window import LupiDPIApp
+@dataclass(frozen=True, slots=True)
+class PostStartupDeps:
+    startup_host: Any
+    notify: Any
+    notify_many: Any
+    set_status: Any
+    log_startup_metric: Any
+    start_proxy_if_enabled_async: Any
+    startup_lists_check: Any
+    apply_dns_on_startup_async: Any
+    install_tray_post_startup: Any
+    updater_feature: Any
 
 
-def install_post_startup_tasks(window: "LupiDPIApp") -> None:
-    app_runtime = window.app_runtime
-    notifications = window.window_notification_center
-    log_startup_metric = window.log_startup_metric
+def install_post_startup_tasks(deps: PostStartupDeps) -> None:
+    startup_host = deps.startup_host
 
     install_startup_checks(
-        window,
-        notify_many=notifications.notify_many,
-        set_status=window.set_status,
-        log_startup_metric=log_startup_metric,
+        startup_host,
+        notify_many=deps.notify_many,
+        set_status=deps.set_status,
+        log_startup_metric=deps.log_startup_metric,
     )
     install_deferred_maintenance(
-        window,
-        notify_many=notifications.notify_many,
-        log_startup_metric=log_startup_metric,
+        startup_host,
+        notify_many=deps.notify_many,
+        log_startup_metric=deps.log_startup_metric,
     )
     install_telegram_proxy_startup(
-        window,
-        start_proxy_if_enabled_async=app_runtime.features.telegram_proxy.start_proxy_if_enabled_async,
-        log_startup_metric=log_startup_metric,
+        startup_host,
+        start_proxy_if_enabled_async=deps.start_proxy_if_enabled_async,
+        log_startup_metric=deps.log_startup_metric,
     )
     install_lists_check(
-        window,
-        startup_lists_check=app_runtime.features.lists.startup_lists_check,
-        log_startup_metric=log_startup_metric,
+        startup_host,
+        startup_lists_check=deps.startup_lists_check,
+        log_startup_metric=deps.log_startup_metric,
     )
     install_dns_startup(
-        window,
-        apply_dns_on_startup_async=app_runtime.features.dns.apply_dns_on_startup_async,
-        set_status=window.set_status,
-        log_startup_metric=log_startup_metric,
+        startup_host,
+        apply_dns_on_startup_async=deps.apply_dns_on_startup_async,
+        set_status=deps.set_status,
+        log_startup_metric=deps.log_startup_metric,
     )
-    app_runtime.features.tray.install_post_startup()
+    deps.install_tray_post_startup()
     install_update_check(
-        window,
-        updater_feature=app_runtime.features.updater,
-        notify=notifications.notify,
-        set_status=window.set_status,
+        startup_host,
+        updater_feature=deps.updater_feature,
+        notify=deps.notify,
+        set_status=deps.set_status,
     )
     install_cpu_diagnostic()
     install_qt_event_diagnostic_probe()
     install_global_exception_handler()
+
+
+__all__ = ["PostStartupDeps", "install_post_startup_tasks"]

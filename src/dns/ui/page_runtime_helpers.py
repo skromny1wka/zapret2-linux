@@ -8,7 +8,6 @@ def build_dynamic_network_ui(
     cleanup_in_progress: bool,
     ui_built: bool,
     tr_fn,
-    has_fluent_labels: bool,
     settings_card_cls,
     qhbox_layout_cls,
     qframe_cls,
@@ -49,11 +48,10 @@ def build_dynamic_network_ui(
 
     auto_widgets = build_auto_dns_ui_fn(
         tr_fn=tr_fn,
-        has_fluent_labels=has_fluent_labels,
         settings_card_cls=settings_card_cls,
         qhbox_layout_cls=qhbox_layout_cls,
         qframe_cls=qframe_cls,
-        strong_body_label_cls=strong_body_label_cls if has_fluent_labels else qlabel_cls,
+        strong_body_label_cls=strong_body_label_cls,
         qlabel_cls=qlabel_cls,
         qta_module=qta_module,
         icon_color=tokens.fg_faint,
@@ -64,9 +62,7 @@ def build_dynamic_network_ui(
 
     provider_cards = build_provider_cards_fn(
         providers_by_category=providers,
-        has_fluent_labels=has_fluent_labels,
-        caption_label_cls=caption_label_cls if has_fluent_labels else qlabel_cls,
-        qlabel_cls=qlabel_cls,
+        caption_label_cls=caption_label_cls,
         dns_provider_card_cls=dns_provider_card_cls,
         dns_cards_layout=dns_cards_layout,
         show_ipv6=ipv6_available,

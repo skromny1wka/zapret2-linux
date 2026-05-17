@@ -2,45 +2,27 @@
 """
 Страница управления заблокированными стратегиями оркестратора (чёрный список).
 Каждая блокировка отображается в виде ряда с редактируемым номером стратегии.
-Изменения автоматически сохраняются в реестр.
+Изменения автоматически сохраняются в settings.json.
 """
 from PyQt6.QtCore import Qt, QSize, QTimer, QEvent
 from PyQt6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QLabel, QWidget,
     QFrame,
-    QLineEdit, QSpinBox, QComboBox, QPushButton
 )
-
-try:
-    from qfluentwidgets import (
-        ComboBox,
-        SpinBox,
-        LineEdit,
-        PushButton,
-        TransparentToolButton,
-        CardWidget,
-        StrongBodyLabel,
-        MessageBox,
-        InfoBar,
-        InfoBarPosition,
-        CaptionLabel,
-        BodyLabel,
-    )
-    _HAS_FLUENT = True
-except ImportError:
-    ComboBox = QComboBox
-    SpinBox = QSpinBox
-    LineEdit = QLineEdit
-    PushButton = QPushButton
-    TransparentToolButton = QPushButton
-    CardWidget = QFrame
-    StrongBodyLabel = QLabel
-    MessageBox = None
-    InfoBar = None
-    InfoBarPosition = None
-    CaptionLabel = QLabel
-    BodyLabel = QLabel
-    _HAS_FLUENT = False
+from qfluentwidgets import (
+    ComboBox,
+    SpinBox,
+    LineEdit,
+    PushButton,
+    TransparentToolButton,
+    CardWidget,
+    StrongBodyLabel,
+    MessageBox,
+    InfoBar,
+    InfoBarPosition,
+    CaptionLabel,
+    BodyLabel,
+)
 
 from ui.pages.base_page import BasePage
 from ui.fluent_widgets import set_tooltip
@@ -225,7 +207,7 @@ class BlockedDomainRow(QFrame):
 class OrchestraBlockedPage(BasePage):
     """Страница управления заблокированными стратегиями (чёрный список)"""
 
-    def __init__(self, parent=None, *, orchestra_feature):
+    def __init__(self, parent=None, *, controller):
         super().__init__(
             "Заблокированные стратегии",
             "Системные блокировки (strategy=1 для заблокированных РКН сайтов) + пользовательский чёрный список. Оркестратор не будет их использовать.",
@@ -234,13 +216,11 @@ class OrchestraBlockedPage(BasePage):
             subtitle_key="page.orchestra.blocked.subtitle",
         )
         self.setObjectName("orchestraBlockedPage")
-        self._orchestra = orchestra_feature
-        self._askey_all = tuple(self._orchestra.ASKEY_ALL)
+        self._managed = controller
+        self._askey_all = self._managed.askey_all
         self._hint_label = None
         self._add_card = None
         self._list_card = None
-        # Инициализируем пустые данные. Первый reload выполняется после build/init страницы.
-        self._direct_blocked_by_askey = {askey: {} for askey in self._askey_all}
         self._runtime_initialized = False
         self._refresh_loading = False
         self._cleanup_in_progress = False
@@ -253,7 +233,7 @@ class OrchestraBlockedPage(BasePage):
         if self._runtime_initialized:
             return
         self._runtime_initialized = True
-        self._reload_from_registry()
+        self._reload_from_settings()
 
     def _tr(self, key: str, default: str, **kwargs) -> str:
         text = tr_catalog(key, language=self._ui_language, default=default)
@@ -270,9 +250,7 @@ class OrchestraBlockedPage(BasePage):
         card_layout.setContentsMargins(16, 16, 16, 16)
         card_layout.setSpacing(12)
 
-        title_label = StrongBodyLabel(title, card) if _HAS_FLUENT else QLabel(title)
-        if not _HAS_FLUENT:
-            title_label.setStyleSheet("font-size: 14px; font-weight: 600;")
+        title_label = StrongBodyLabel(title, card)
         card_layout.addWidget(title_label)
         card._title_label = title_label
 
@@ -356,14 +334,14 @@ class OrchestraBlockedPage(BasePage):
         # Styled in _apply_theme()
         top_row.addWidget(self.search_input)
 
-        # Кнопка обновления списка из реестра
+        # Кнопка обновления списка из settings.json
         self.refresh_btn = TransparentToolButton(self)
         self.refresh_btn.setFixedSize(32, 32)
         set_tooltip(
             self.refresh_btn,
             self._tr("page.orchestra.blocked.button.refresh.tooltip", "Обновить"),
         )
-        self.refresh_btn.clicked.connect(self._reload_from_registry)
+        self.refresh_btn.clicked.connect(self._reload_from_settings)
         top_row.addWidget(self.refresh_btn)
 
         self.unblock_all_btn = PushButton(
@@ -497,9 +475,6 @@ class OrchestraBlockedPage(BasePage):
 
         self._refresh_data()
 
-    def _get_runner(self):
-        return self._orchestra.runner
-
     def _refresh_data(self):
         """Обновляет все данные на странице"""
         if self._cleanup_in_progress:
@@ -523,8 +498,8 @@ class OrchestraBlockedPage(BasePage):
                 position=InfoBarPosition.TOP,
             )
 
-    def _reload_from_registry(self):
-        """Перезагружает данные из реестра и обновляет список"""
+    def _reload_from_settings(self):
+        """Перезагружает данные из settings.json и обновляет список."""
         if self._cleanup_in_progress:
             return
         self._set_refresh_loading(True)
@@ -533,13 +508,7 @@ class OrchestraBlockedPage(BasePage):
             if self._cleanup_in_progress:
                 return
             try:
-                runner = self._get_runner()
-                if runner and hasattr(runner, 'blocked_manager'):
-                    runner.blocked_manager.load()
-                    log("Список заблокированных перезагружен из реестра (runner)", "INFO")
-                else:
-                    self._load_directly_from_registry()
-                    log("Список заблокированных перезагружен из реестра (direct)", "INFO")
+                self._managed.reload_snapshot()
                 self._refresh_data()
             finally:
                 if not self._cleanup_in_progress:
@@ -548,14 +517,9 @@ class OrchestraBlockedPage(BasePage):
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, lambda: (not self._cleanup_in_progress) and _do_reload())
 
-    def _load_directly_from_registry(self):
-        """Загружает данные напрямую из реестра (без активного runner)"""
-        temp_manager = self._orchestra.create_loaded_blocked_manager()
-        # Сохраняем данные для отображения
-        self._direct_blocked_by_askey = {askey: dict(temp_manager.blocked_by_askey[askey]) for askey in self._askey_all}
-        # Логируем количество загруженных записей
-        total = sum(len(strategies) for askey_data in temp_manager.blocked_by_askey.values() for strategies in askey_data.values())
-        log(f"Загружено напрямую из реестра: {total} заблокированных стратегий", "INFO")
+    def _load_directly_from_settings(self):
+        """Загружает данные напрямую из settings.json (без активного runner)."""
+        self._managed.load_direct_snapshot()
 
     def _refresh_blocked_list(self):
         """Обновляет список заблокированных стратегий"""
@@ -568,43 +532,10 @@ class OrchestraBlockedPage(BasePage):
             if item.widget():
                 item.widget().deleteLater()
 
-        runner = self._get_runner()
+        snapshot = self._managed.current_snapshot()
 
-        # Источник данных: runner или напрямую загруженные из реестра
-        if runner:
-            blocked_data = runner.blocked_manager.blocked_by_askey
-            blocked_manager = runner.blocked_manager
-        elif hasattr(self, '_direct_blocked_by_askey'):
-            blocked_data = self._direct_blocked_by_askey
-            blocked_manager = None
-        else:
-            # Нет данных - попробуем загрузить
-            self._load_directly_from_registry()
-            blocked_data = getattr(self, '_direct_blocked_by_askey', {askey: {} for askey in self._askey_all})
-            blocked_manager = None
-
-        # Собираем все блокировки с флагом is_default по всем askey
-        all_blocked = []
-        for askey in self._askey_all:
-            for hostname, strategies in blocked_data.get(askey, {}).items():
-                for strategy in strategies:
-                    if blocked_manager:
-                        is_default = blocked_manager.is_default_blocked(hostname, strategy)
-                    else:
-                        # Без менеджера - проверяем только strategy=1 для TLS
-                        is_default = (
-                            strategy == 1
-                            and askey == "tls"
-                            and self._orchestra.is_default_blocked_pass_domain(hostname)
-                        )
-                    all_blocked.append((hostname, strategy, askey, is_default))
-
-        # Сортируем: сначала пользовательские, потом дефолтные, внутри групп по алфавиту
-        all_blocked.sort(key=lambda x: (x[3], x[0].lower(), x[2], x[1]))
-
-        # Добавляем разделитель если есть оба типа
-        user_items = [x for x in all_blocked if not x[3]]
-        default_items = [x for x in all_blocked if x[3]]
+        user_items = snapshot.user_items
+        default_items = snapshot.default_items
 
         if user_items:
             user_header = QLabel(
@@ -617,11 +548,11 @@ class OrchestraBlockedPage(BasePage):
             user_header.setProperty("blockedSection", "user")
             self.rows_layout.addWidget(user_header)
 
-            for hostname, strategy, askey, is_default in user_items:
+            for item in user_items:
                 row = BlockedDomainRow(
-                    hostname,
-                    strategy,
-                    askey,
+                    item.hostname,
+                    item.strategy,
+                    item.askey,
                     is_default=False,
                     add_tooltip=self._tr(
                         "page.orchestra.blocked.row.add.tooltip",
@@ -652,11 +583,11 @@ class OrchestraBlockedPage(BasePage):
             default_header.setProperty("blockedSection", "default")
             self.rows_layout.addWidget(default_header)
 
-            for hostname, strategy, askey, is_default in default_items:
+            for item in default_items:
                 row = BlockedDomainRow(
-                    hostname,
-                    strategy,
-                    askey,
+                    item.hostname,
+                    item.strategy,
+                    item.askey,
                     is_default=True,
                     system_tooltip=self._tr(
                         "page.orchestra.blocked.row.system.tooltip",
@@ -689,40 +620,33 @@ class OrchestraBlockedPage(BasePage):
             self._refresh_data()
             return
 
-        runner = self._get_runner()
-        if runner and hasattr(runner, 'blocked_manager'):
-            # Удаляем старую блокировку и добавляем новую
-            runner.blocked_manager.unblock(hostname, old_strategy, askey)
-            runner.blocked_manager.block(hostname, new_strategy, askey)
-            log(f"Изменена блокировка: {hostname} [{askey.upper()}] #{old_strategy} -> #{new_strategy}", "INFO")
-        else:
-            log(f"Не удалось изменить блокировку: оркестратор не запущен", "WARNING")
+        self._managed.change_strategy(
+            hostname=hostname,
+            old_strategy=old_strategy,
+            new_strategy=new_strategy,
+            askey=askey,
+        )
 
     def _on_row_delete_requested(self, hostname: str, strategy: int, askey: str):
         """Разблокирование при нажатии кнопки удаления"""
-        runner = self._get_runner()
-        if not runner:
-            return
-
-        success = runner.blocked_manager.unblock(hostname, strategy, askey)
-        if success:
-            log(f"Разблокирована стратегия #{strategy} для {hostname} [{askey.upper()}]", "INFO")
-            # Перезапускаем оркестратор чтобы применить изменения
-            if runner.is_running():
-                runner.restart()
-                if InfoBar is not None:
-                    InfoBar.success(
-                        title=self._tr("page.orchestra.blocked.infobar.applied.title", "Применено"),
-                        content=self._tr(
-                            "page.orchestra.blocked.infobar.unblocked",
-                            "Стратегия #{strategy} разблокирована для {domain}. Оркестратор перезапускается.",
-                            strategy=strategy,
-                            domain=hostname,
-                        ),
-                        isClosable=True,
-                        duration=3000,
-                        parent=self.window(),
-                    )
+        result = self._managed.remove_strategy(
+            hostname=hostname,
+            strategy=strategy,
+            askey=askey,
+        )
+        if result.restarted and InfoBar is not None:
+            InfoBar.success(
+                title=self._tr("page.orchestra.blocked.infobar.applied.title", "Применено"),
+                content=self._tr(
+                    "page.orchestra.blocked.infobar.unblocked",
+                    "Стратегия #{strategy} разблокирована для {domain}. Оркестратор перезапускается.",
+                    strategy=strategy,
+                    domain=hostname,
+                ),
+                isClosable=True,
+                duration=3000,
+                parent=self.window(),
+            )
         self._refresh_data()
 
     def _prefill_domain(self, hostname: str):
@@ -733,46 +657,14 @@ class OrchestraBlockedPage(BasePage):
 
     def _update_count(self):
         """Обновляет счётчик"""
-        runner = self._get_runner()
-
-        # Источник данных
-        if runner:
-            blocked_data = runner.blocked_manager.blocked_by_askey
-            blocked_manager = runner.blocked_manager
-        elif hasattr(self, '_direct_blocked_by_askey'):
-            blocked_data = self._direct_blocked_by_askey
-            blocked_manager = None
-        else:
-            self.count_label.setText(
-                self._tr("page.orchestra.blocked.count.reload_hint", "Нажмите 'Обновить' для загрузки данных")
-            )
-            return
-
-        user_count = 0
-        default_count = 0
-        for askey in self._askey_all:
-            for hostname, strategies in blocked_data.get(askey, {}).items():
-                for strategy in strategies:
-                    if blocked_manager:
-                        is_default = blocked_manager.is_default_blocked(hostname, strategy)
-                    else:
-                        is_default = (
-                            strategy == 1
-                            and askey == "tls"
-                            and self._orchestra.is_default_blocked_pass_domain(hostname)
-                        )
-                    if is_default:
-                        default_count += 1
-                    else:
-                        user_count += 1
-        total = user_count + default_count
+        snapshot = self._managed.current_snapshot()
         self.count_label.setText(
             self._tr(
                 "page.orchestra.blocked.count.total",
                 "Всего: {total} ({user_count} пользовательских + {default_count} системных)",
-                total=total,
-                user_count=user_count,
-                default_count=default_count,
+                total=snapshot.total_count,
+                user_count=snapshot.user_count,
+                default_count=snapshot.default_count,
             )
         )
 
@@ -780,8 +672,7 @@ class OrchestraBlockedPage(BasePage):
         """Блокирует стратегию"""
         if self._cleanup_in_progress:
             return
-        runner = self._get_runner()
-        if not runner:
+        if not self._managed.runner:
             return
 
         domain = self.domain_input.text().strip().lower()
@@ -798,13 +689,14 @@ class OrchestraBlockedPage(BasePage):
         # Очищаем поле после добавления
         self.domain_input.clear()
 
-        runner.blocked_manager.block(domain, strategy, askey, user_block=True)
-        log(f"Заблокирована стратегия #{strategy} для {domain} [{askey.upper()}]", "INFO")
+        result = self._managed.add_strategy(
+            domain=domain,
+            strategy=strategy,
+            askey=askey,
+        )
         self._refresh_data()
 
-        # Перезапускаем оркестратор чтобы применить изменения
-        if runner.is_running():
-            runner.restart()
+        if result.restarted:
             if InfoBar is not None:
                 InfoBar.success(
                     title=self._tr("page.orchestra.blocked.infobar.applied.title", "Применено"),
@@ -823,17 +715,10 @@ class OrchestraBlockedPage(BasePage):
         """Очищает пользовательский чёрный список (системные блокировки остаются)"""
         if self._cleanup_in_progress:
             return
-        runner = self._get_runner()
-        if not runner:
+        if not self._managed.runner:
             return
 
-        # Считаем только пользовательские блокировки по всем askey
-        user_count = 0
-        for askey in self._askey_all:
-            for hostname, strategies in runner.blocked_manager.blocked_by_askey.get(askey, {}).items():
-                for strategy in strategies:
-                    if not runner.blocked_manager.is_default_blocked(hostname, strategy):
-                        user_count += 1
+        user_count = self._managed.user_count()
 
         if user_count == 0:
             if InfoBar is not None:
@@ -862,12 +747,9 @@ class OrchestraBlockedPage(BasePage):
             )
             confirmed = bool(box.exec())
         if confirmed:
-            runner.blocked_manager.clear()
-            log(f"Очищен пользовательский чёрный список ({user_count} записей)", "INFO")
+            result = self._managed.clear_user_strategies(user_count=user_count)
             self._refresh_data()
-            # Перезапускаем оркестратор чтобы применить изменения
-            if runner.is_running():
-                runner.restart()
+            if result.restarted:
                 if InfoBar is not None:
                     InfoBar.success(
                         title=self._tr("page.orchestra.blocked.infobar.applied.title", "Применено"),

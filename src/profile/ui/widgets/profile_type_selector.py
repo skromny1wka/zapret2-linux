@@ -6,13 +6,7 @@
 
 from PyQt6.QtWidgets import QWidget, QHBoxLayout
 from PyQt6.QtCore import pyqtSignal
-
-try:
-    from qfluentwidgets import PillPushButton
-    _HAS_FLUENT = True
-except ImportError:
-    from PyQt6.QtWidgets import QPushButton as PillPushButton  # type: ignore[assignment]
-    _HAS_FLUENT = False
+from qfluentwidgets import PillPushButton
 
 
 class _ProfileTypeButton(PillPushButton):

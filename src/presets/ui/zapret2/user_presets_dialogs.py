@@ -2,25 +2,11 @@
 
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QLabel, QPushButton, QHBoxLayout, QLineEdit, QListView
+from PyQt6.QtWidgets import QHBoxLayout
 
 from ui.fluent_widgets import style_semantic_caption_label
 from app.text_catalog import tr as tr_catalog
-
-try:
-    from qfluentwidgets import (
-        BodyLabel,
-        CaptionLabel,
-        SubtitleLabel,
-        MessageBoxBase,
-        LineEdit,
-    )
-except ImportError:
-    BodyLabel = QLabel
-    CaptionLabel = QLabel
-    SubtitleLabel = QLabel
-    MessageBoxBase = object
-    LineEdit = QLineEdit
+from qfluentwidgets import BodyLabel, CaptionLabel, LineEdit, MessageBoxBase, SubtitleLabel
 
 
 def tr_presets_dialog(key: str, language: str, default: str, **kwargs) -> str:

@@ -464,7 +464,7 @@ class BlockedStrategiesManager:
                     if not user_dict[hostname]:
                         del user_dict[hostname]
 
-                # Если остались только дефолтные блокировки - удаляем ключ из реестра
+                # Если остались только дефолтные блокировки - удаляем пользовательский ключ из settings.json
                 user_strategies = [s for s in target_dict[hostname] if not self.is_default_blocked(hostname, s)]
                 if not user_strategies:
                     if not target_dict[hostname]:

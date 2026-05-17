@@ -6,25 +6,8 @@ from dataclasses import dataclass
 from collections.abc import Callable
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton
-
-try:
-    from qfluentwidgets import (
-        LineEdit,
-        PushButton,
-        PrimaryPushButton,
-        BodyLabel,
-        CaptionLabel,
-    )
-except ImportError:
-    from PyQt6.QtWidgets import (  # type: ignore[assignment]
-        QLineEdit as LineEdit,
-        QLabel as BodyLabel,
-        QLabel as CaptionLabel,
-    )
-
-    PushButton = QPushButton  # type: ignore[assignment]
-    PrimaryPushButton = QPushButton  # type: ignore[assignment]
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout
+from qfluentwidgets import BodyLabel, CaptionLabel, LineEdit, PrimaryPushButton, PushButton
 
 from ui.fluent_widgets import SettingsCard, RefreshButton, QuickActionsBar
 from ui.theme import get_themed_qta_icon

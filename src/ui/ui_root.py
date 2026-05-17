@@ -16,8 +16,10 @@ from app.page_names import PageName
 class WindowUiRoot:
     """Центральная точка сборки fluent UI-каркаса окна."""
 
-    def __init__(self, window):
+    def __init__(self, window, page_deps_context, runtime_bootstrap_deps):
         self._window = window
+        self._page_deps_context = page_deps_context
+        self._runtime_bootstrap_deps = runtime_bootstrap_deps
 
     def build(
         self,
@@ -26,7 +28,6 @@ class WindowUiRoot:
         height: int,
         nav_icons,
         nav_labels,
-        has_fluent: bool,
         default_nav_icon,
         nav_scroll_position,
         sidebar_search_widget_cls,
@@ -36,16 +37,20 @@ class WindowUiRoot:
 
         initialize_build_ui_state(
             self._window,
+            runtime_deps=self._runtime_bootstrap_deps,
+            page_deps_context=self._page_deps_context,
             nav_icons=nav_icons,
             nav_labels=nav_labels,
-            has_fluent=has_fluent,
             default_nav_icon=default_nav_icon,
             nav_scroll_position=nav_scroll_position,
             sidebar_search_widget_cls=sidebar_search_widget_cls,
         )
         session = get_window_ui_session(self._window)
         if session is not None:
-            session.preset_runtime_coordinator = create_preset_runtime_coordinator(self._window)
+            session.preset_runtime_coordinator = create_preset_runtime_coordinator(
+                self._window,
+                self._runtime_bootstrap_deps,
+            )
             session.page_host.mark_stack_bootstrap_pending()
 
         try:
@@ -61,7 +66,7 @@ class WindowUiRoot:
         ensure_session_memory_defaults(self._window)
 
     def finish_bootstrap(self) -> None:
-        finish_ui_bootstrap(self._window)
+        finish_ui_bootstrap(self._window, self._runtime_bootstrap_deps)
 
     def get_loaded_page(self, page_name: PageName):
         session = get_window_ui_session(self._window)

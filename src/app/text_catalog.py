@@ -1916,14 +1916,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "{message}\nПуть: {path}",
         "en": "{message}\nPath: {path}",
     },
-    "page.hosts.ipv6.infobar.title": {
-        "ru": "IPv6",
-        "en": "IPv6",
-    },
-    "page.hosts.ipv6.infobar.content": {
-        "ru": "У провайдера обнаружен IPv6. В hosts.ini добавлены IPv6 разделы DNS-провайдеров.",
-        "en": "IPv6 was detected on your provider. IPv6 DNS-provider sections were added to hosts.ini.",
-    },
     "page.hosts.permissions.restore.success.title": {
         "ru": "Успех",
         "en": "Success",
@@ -1949,12 +1941,12 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "After adding or removing domains, restart your browser for changes to take effect.",
     },
     "page.hosts.dialog.clear.title": {
-        "ru": "Очистить hosts?",
-        "en": "Clear hosts?",
+        "ru": "Очистить записи ZapretGUI?",
+        "en": "Clear ZapretGUI entries?",
     },
     "page.hosts.dialog.clear.body": {
-        "ru": "Это полностью сбросит файл hosts к стандартному содержимому Windows и удалит ВСЕ записи, включая добавленные вручную.",
-        "en": "This will fully reset the hosts file to default Windows content and remove ALL entries, including manually added ones.",
+        "ru": "Будет удалён только блок записей ZapretGUI. Ручные записи в файле hosts останутся на месте.",
+        "en": "Only the ZapretGUI managed block will be removed. Manual hosts entries will remain untouched.",
     },
     "page.hosts.open.error.title": {
         "ru": "Ошибка",
@@ -2549,8 +2541,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "[ERROR] Failed to restart orchestrator",
     },
     "page.orchestra.log.not_running_user_lock_saved": {
-        "ru": "[WARNING] Оркестратор не запущен, user lock сохранён в реестр",
-        "en": "[WARNING] Orchestrator is not running, user lock is saved in registry",
+        "ru": "[WARNING] Оркестратор не запущен, user lock сохранён в settings.json",
+        "en": "[WARNING] Orchestrator is not running, user lock is saved in settings.json",
     },
     "page.orchestra.log.not_initialized": {
         "ru": "[ERROR] Оркестратор не инициализирован",

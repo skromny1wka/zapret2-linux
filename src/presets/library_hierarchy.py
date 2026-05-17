@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import json
 from pathlib import Path
 import re
 from typing import Callable, Iterable
 
-from config.config import MAIN_DIRECTORY
+from settings import store as settings_store
 
 def _canonical_scope_key(scope_key: str) -> str:
     return str(scope_key or "").strip().lower()
@@ -18,10 +17,6 @@ def _safe_scope_name(scope_key: str) -> str:
         raw = "default"
     raw = re.sub(r"[^a-z0-9_.-]+", "_", raw)
     return raw or "default"
-
-
-def _storage_dir() -> Path:
-    return Path(MAIN_DIRECTORY) / "preset_library"
 
 
 def _default_state() -> dict:
@@ -68,21 +63,21 @@ class PresetHierarchyStore:
 
     @property
     def state_path(self) -> Path:
-        return _storage_dir() / f"{_safe_scope_name(self.canonical_scope_key)}.json"
+        return settings_store.get_settings_path()
 
     def _ensure_loaded(self) -> None:
         if self._state is not None:
             return
 
-        path = self.state_path
         state = _default_state()
-        if path.exists():
-            try:
-                loaded = json.loads(path.read_text(encoding="utf-8"))
-                if isinstance(loaded, dict):
-                    state.update(loaded)
-            except Exception:
-                state = _default_state()
+        try:
+            library = settings_store.get_preset_library_settings()
+            scopes = library.get("scopes", {}) if isinstance(library, dict) else {}
+            loaded = scopes.get(self.canonical_scope_key) if isinstance(scopes, dict) else None
+            if isinstance(loaded, dict):
+                state.update(loaded)
+        except Exception:
+            state = _default_state()
 
         presets = {}
         for key, raw in (state.get("presets", {}) or {}).items():
@@ -98,12 +93,12 @@ class PresetHierarchyStore:
 
     def _save(self) -> None:
         assert self._state is not None
-        path = self.state_path
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(
-            json.dumps(self._state, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
+        library = settings_store.get_preset_library_settings()
+        scopes = library.get("scopes", {}) if isinstance(library, dict) else {}
+        if not isinstance(scopes, dict):
+            scopes = {}
+        scopes[self.canonical_scope_key] = self._state
+        settings_store.set_preset_library_settings({"scopes": scopes})
 
     def _normalize_preset_entries(
         self,

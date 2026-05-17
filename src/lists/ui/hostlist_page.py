@@ -10,13 +10,10 @@ from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget,
 )
 
-try:
-    from qfluentwidgets import (
-        BodyLabel, CaptionLabel, InfoBar, LineEdit, MessageBox, SegmentedWidget,
-        StrongBodyLabel, SettingCardGroup, PushButton, PrimaryPushButton,
-    )
-except ImportError:
-    raise
+from qfluentwidgets import (
+    BodyLabel, CaptionLabel, InfoBar, LineEdit, MessageBox, PrimaryPushButton,
+    PushButton, SegmentedWidget, SettingCardGroup, StrongBodyLabel,
+)
 
 from ui.pages.base_page import BasePage, ScrollBlockingPlainTextEdit
 from ui.fluent_widgets import (
@@ -37,7 +34,7 @@ from lists.ui.hostlist_page_exclusions_workflow import (
     update_exclusions_status,
     update_ipru_status,
 )
-from lists.ui.hostlist_page_folder_info import (
+from lists.folder_info_workflow import (
     accept_folder_info_failed,
     accept_folder_info_loaded,
     build_folder_info_error_text,
@@ -45,6 +42,9 @@ from lists.ui.hostlist_page_folder_info import (
     normalize_folder_info_category,
     request_folder_info,
     start_folder_info_thread,
+)
+from lists.editor_workflow import (
+    ListsEditorController,
 )
 from lists.ui.hostlist_page_overview_build import build_overview_panel
 from lists.ui.hostlist_page_tabs import CurrentPanelStackedWidget, switch_hostlist_tab
@@ -74,7 +74,7 @@ class HostlistPage(BasePage):
             title_key="page.hostlist.title",
             subtitle_key="page.hostlist.subtitle",
         )
-        self._lists = lists_feature
+        self._lists_controller = ListsEditorController(lists_feature)
         self._runtime_initialized = False
         self._domains_loaded = False
         self._ips_loaded = False
@@ -439,11 +439,11 @@ class HostlistPage(BasePage):
     # ──────────────────────────────────────────────────────────────────────────
 
     def _open_lists_folder(self):
-        result = self._lists.open_lists_folder_action()
+        result = self._lists_controller.open_lists_folder_action()
         self._apply_hostlist_action_result(result)
 
     def _rebuild_hostlists(self):
-        result = self._lists.rebuild_hostlists_action()
+        result = self._lists_controller.rebuild_hostlists_action()
         self._apply_hostlist_action_result(result)
 
     def _load_info(self, *, force: bool = False):
@@ -505,10 +505,7 @@ class HostlistPage(BasePage):
 
     def _load_folder_info_worker(self, category: str, request_seq: int) -> None:
         try:
-            if category == "ipset":
-                state = self._lists.load_ipset_folder_info()
-            else:
-                state = self._lists.load_hostlist_folder_info()
+            state = self._lists_controller.load_folder_info(category)
             self.folder_info_loaded.emit(category, request_seq, state)
         except Exception as e:
             self.folder_info_failed.emit(category, request_seq, str(e))
@@ -560,7 +557,7 @@ class HostlistPage(BasePage):
         if self._cleanup_in_progress:
             return
         try:
-            state = self._lists.load_custom_domains_text()
+            state = self._lists_controller.load_text("domains")
             domains_text = state.text
             load_text_into_editor(self._d_editor, domains_text)
             self._domains_update_status()
@@ -588,7 +585,7 @@ class HostlistPage(BasePage):
     def _domains_save(self):
         try:
             text = self._d_editor.toPlainText()
-            state = self._lists.save_custom_domains_text(text)
+            state = self._lists_controller.save_text("domains", text)
             apply_normalized_text(
                 self._d_editor,
                 state.normalized_text,
@@ -606,7 +603,7 @@ class HostlistPage(BasePage):
         update_domains_status(
             self._d_status,
             self._d_editor,
-            build_plan_fn=self._lists.build_custom_domains_status_plan,
+            build_plan_fn=lambda text: self._lists_controller.status_plan("domains", text),
             tr_fn=self._tr,
         )
 
@@ -615,7 +612,7 @@ class HostlistPage(BasePage):
         if not text:
             return
         current = self._d_editor.toPlainText()
-        plan = self._lists.build_add_custom_domain_plan(raw_text=text, current_text=current)
+        plan = self._lists_controller.add_entry_plan("domains", raw_text=text, current_text=current)
         apply_add_plan(
             plan=plan,
             input_widget=self._d_input,
@@ -627,7 +624,7 @@ class HostlistPage(BasePage):
 
     def _domains_open_file(self):
         self._domains_save()
-        result = self._lists.open_domains_user_file_action()
+        result = self._lists_controller.open_user_file_action("domains")
         self._apply_hostlist_action_result(result)
 
     def _domains_confirm_reset_file(self):
@@ -642,7 +639,7 @@ class HostlistPage(BasePage):
         self._domains_reset_file()
 
     def _domains_reset_file(self):
-        result = self._lists.reset_domains_file_action()
+        result = self._lists_controller.reset_domains_file_action()
         self._apply_hostlist_action_result(result)
 
     def _domains_confirm_clear_all(self):
@@ -674,7 +671,7 @@ class HostlistPage(BasePage):
         if self._cleanup_in_progress:
             return
         try:
-            state = self._lists.load_custom_ipset_text()
+            state = self._lists_controller.load_text("ipset")
             self._ip_base_set_cache = state.base_set
             load_text_into_editor(self._i_editor, state.text)
             self._ips_update_status()
@@ -702,7 +699,7 @@ class HostlistPage(BasePage):
     def _ips_save(self):
         try:
             text = self._i_editor.toPlainText()
-            state = self._lists.save_custom_ipset_text(text)
+            state = self._lists_controller.save_text("ipset", text)
             apply_normalized_text(
                 self._i_editor,
                 state.normalized_text,
@@ -722,7 +719,7 @@ class HostlistPage(BasePage):
             self._i_status,
             getattr(self, "_i_error_label", None),
             self._i_editor,
-            build_plan_fn=self._lists.build_custom_ipset_status_plan,
+            build_plan_fn=lambda text: self._lists_controller.status_plan("ipset", text),
             tr_fn=self._tr,
         )
 
@@ -731,7 +728,7 @@ class HostlistPage(BasePage):
         if not text:
             return
         current = self._i_editor.toPlainText()
-        plan = self._lists.build_add_custom_ipset_plan(raw_text=text, current_text=current)
+        plan = self._lists_controller.add_entry_plan("ipset", raw_text=text, current_text=current)
         apply_add_plan(
             plan=plan,
             input_widget=self._i_input,
@@ -743,7 +740,7 @@ class HostlistPage(BasePage):
 
     def _ips_open_file(self):
         self._ips_save()
-        result = self._lists.open_ipset_all_user_file_action()
+        result = self._lists_controller.open_user_file_action("ipset")
         self._apply_hostlist_action_result(result)
 
     def _ips_clear_all(self):
@@ -829,7 +826,7 @@ class HostlistPage(BasePage):
         if self._cleanup_in_progress:
             return
         try:
-            state = self._lists.load_custom_netrogat_text()
+            state = self._lists_controller.load_text("netrogat")
             self._excl_base_set_cache = state.base_set
             load_text_into_editor(self._excl_editor, state.text)
             self._excl_update_status()
@@ -847,7 +844,7 @@ class HostlistPage(BasePage):
         if self._cleanup_in_progress:
             return
         try:
-            state = self._lists.load_custom_ipru_text()
+            state = self._lists_controller.load_text("ipru")
             self._ipru_base_set_cache = state.base_set
 
             load_text_into_editor(self._ipru_editor, state.text)
@@ -876,7 +873,7 @@ class HostlistPage(BasePage):
     def _excl_save(self):
         try:
             text = self._excl_editor.toPlainText()
-            state = self._lists.save_custom_netrogat_text(text)
+            state = self._lists_controller.save_text("netrogat", text)
             if state.success:
                 apply_normalized_text(
                     self._excl_editor,
@@ -892,7 +889,7 @@ class HostlistPage(BasePage):
         update_exclusions_status(
             self._excl_status,
             self._excl_editor,
-            build_plan_fn=self._lists.build_custom_netrogat_status_plan,
+            build_plan_fn=lambda text: self._lists_controller.status_plan("netrogat", text),
             tr_fn=self._tr,
         )
 
@@ -901,7 +898,7 @@ class HostlistPage(BasePage):
         if not raw:
             return
         current = self._excl_editor.toPlainText()
-        plan = self._lists.build_add_custom_netrogat_plan(raw_text=raw, current_text=current)
+        plan = self._lists_controller.add_entry_plan("netrogat", raw_text=raw, current_text=current)
         apply_add_plan(
             plan=plan,
             input_widget=self._excl_input,
@@ -913,12 +910,12 @@ class HostlistPage(BasePage):
 
     def _excl_open_file(self):
         self._excl_save()
-        result = self._lists.open_netrogat_user_file_action()
+        result = self._lists_controller.open_user_file_action("netrogat")
         self._apply_hostlist_action_result(result)
 
     def _excl_open_final_file(self):
         self._excl_save()
-        result = self._lists.open_netrogat_final_file_action()
+        result = self._lists_controller.open_final_file_action("netrogat")
         self._apply_hostlist_action_result(result)
 
     def _excl_clear_all(self):
@@ -932,7 +929,7 @@ class HostlistPage(BasePage):
 
     def _excl_add_missing_defaults(self):
         self._excl_save()
-        result = self._lists.add_missing_netrogat_defaults_action()
+        result = self._lists_controller.add_missing_netrogat_defaults_action()
         self._apply_hostlist_action_result(result)
 
     def _ipru_on_text_changed(self):
@@ -971,7 +968,7 @@ class HostlistPage(BasePage):
     def _ipru_save(self):
         try:
             text = self._ipru_editor.toPlainText()
-            state = self._lists.save_custom_ipru_text(text)
+            state = self._lists_controller.save_text("ipru", text)
             apply_normalized_text(
                 self._ipru_editor,
                 state.normalized_text,
@@ -989,7 +986,7 @@ class HostlistPage(BasePage):
             self._ipru_status,
             getattr(self, "_ipru_error_label", None),
             self._ipru_editor,
-            build_plan_fn=self._lists.build_custom_ipru_status_plan,
+            build_plan_fn=lambda text: self._lists_controller.status_plan("ipru", text),
             tr_fn=self._tr,
         )
 
@@ -999,7 +996,7 @@ class HostlistPage(BasePage):
             return
 
         current = self._ipru_editor.toPlainText()
-        plan = self._lists.build_add_custom_ipru_plan(raw_text=raw, current_text=current)
+        plan = self._lists_controller.add_entry_plan("ipru", raw_text=raw, current_text=current)
         apply_add_plan(
             plan=plan,
             input_widget=self._ipru_input,
@@ -1011,12 +1008,12 @@ class HostlistPage(BasePage):
 
     def _ipru_open_file(self):
         self._ipru_save()
-        result = self._lists.open_ipset_ru_user_file_action()
+        result = self._lists_controller.open_user_file_action("ipru")
         self._apply_hostlist_action_result(result)
 
     def _ipru_open_final_file(self):
         self._ipru_save()
-        result = self._lists.open_ipset_ru_final_file_action()
+        result = self._lists_controller.open_final_file_action("ipru")
         self._apply_hostlist_action_result(result)
 
     def _ipru_clear_all(self):

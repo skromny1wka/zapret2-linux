@@ -14,22 +14,16 @@ from ui.fluent_widgets import set_tooltip
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens, get_themed_qta_icon
 from ui.theme_refresh import ThemeRefreshBinding
 from app.text_catalog import tr as tr_catalog
-
-try:
-    from qfluentwidgets import (
-        LineEdit, ComboBox, MessageBox,
-        MessageBoxBase, SubtitleLabel, BodyLabel, CaptionLabel,
-        TransparentToolButton,
-    )
-except ImportError:
-    from PyQt6.QtWidgets import (
-        QLineEdit as LineEdit, QComboBox as ComboBox,
-        QDialog as MessageBoxBase, QPushButton as TransparentToolButton,
-    )
-    MessageBox = None
-    SubtitleLabel = QLabel
-    BodyLabel = QLabel
-    CaptionLabel = QLabel
+from qfluentwidgets import (
+    LineEdit,
+    ComboBox,
+    MessageBox,
+    MessageBoxBase,
+    SubtitleLabel,
+    BodyLabel,
+    CaptionLabel,
+    TransparentToolButton,
+)
 
 
 class BlobItemWidget(QFrame):

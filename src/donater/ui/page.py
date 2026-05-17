@@ -5,20 +5,7 @@ import time
 
 from PyQt6.QtCore import Qt, QTimer
 
-try:
-    from qfluentwidgets import (
-        MessageBox, InfoBar,
-        BodyLabel, SubtitleLabel,
-    )
-    _HAS_FLUENT = True
-except ImportError:
-    from PyQt6.QtWidgets import (   # type: ignore[assignment]
-        QLabel as BodyLabel,
-        QLabel as SubtitleLabel,
-    )
-    MessageBox = None
-    InfoBar = None
-    _HAS_FLUENT = False
+from qfluentwidgets import BodyLabel, InfoBar, MessageBox, SubtitleLabel
 
 import donater.ui.page_plans as premium_page_plans
 from ui.pages.base_page import BasePage
@@ -32,13 +19,19 @@ from donater.ui.pairing_workflow import (
     apply_pair_code_error_ui,
     apply_pair_code_result_ui,
     apply_pair_code_start_ui,
+    update_device_info_labels,
+)
+from donater.pairing_workflow import (
     can_poll_pairing_status,
     has_pending_pair_code,
     poll_pairing_status,
     start_pairing_status_autopoll,
     stop_pairing_status_autopoll,
     sync_pairing_status_autopoll,
-    update_device_info_labels,
+)
+from donater.premium_page_tasks import (
+    is_premium_task_running,
+    start_premium_worker_task,
 )
 from donater.ui.page_lifecycle import (
     activate_premium_page,
@@ -356,7 +349,7 @@ class PremiumPage(BasePage):
         )
         self.add_widget(self.status_badge)
 
-        self.days_label = SubtitleLabel("") if _HAS_FLUENT else BodyLabel("")
+        self.days_label = SubtitleLabel("")
         self.days_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.add_widget(self.days_label)
 
@@ -453,7 +446,7 @@ class PremiumPage(BasePage):
             page_visible=self.isVisible(),
             activation_in_progress=self._activation_in_progress,
             connection_test_in_progress=self._connection_test_in_progress,
-            worker_running=bool(self.current_thread and self.current_thread.isRunning()),
+            worker_running=is_premium_task_running(self.current_thread),
             current_time=int(time.time()),
         )
 
@@ -464,7 +457,7 @@ class PremiumPage(BasePage):
             page_visible=self.isVisible(),
             activation_in_progress=self._activation_in_progress,
             connection_test_in_progress=self._connection_test_in_progress,
-            worker_running=bool(self.current_thread and self.current_thread.isRunning()),
+            worker_running=is_premium_task_running(self.current_thread),
             current_time=int(time.time()),
         )
 
@@ -478,7 +471,7 @@ class PremiumPage(BasePage):
             page_visible=self.isVisible(),
             activation_in_progress=self._activation_in_progress,
             connection_test_in_progress=self._connection_test_in_progress,
-            worker_running=bool(self.current_thread and self.current_thread.isRunning()),
+            worker_running=is_premium_task_running(self.current_thread),
             current_time=int(time.time()),
         )
 
@@ -526,7 +519,7 @@ class PremiumPage(BasePage):
     def _create_pair_code(self):
         self._cleanup_in_progress = False
         gate_plan = premium_page_plans.build_worker_gate_plan(
-            thread_running=bool(self.current_thread and self.current_thread.isRunning()),
+            thread_running=is_premium_task_running(self.current_thread),
         )
         if not gate_plan.can_start:
             return
@@ -549,7 +542,7 @@ class PremiumPage(BasePage):
         self._activation_in_progress = plan.activation_in_progress
 
         self._start_worker_thread(
-            self._premium.create_premium_worker_thread(self._premium.start_pairing),
+            self._premium.start_pairing,
             self._on_pair_code_created,
             self._on_activation_error,
         )
@@ -588,7 +581,7 @@ class PremiumPage(BasePage):
     def _check_status(self):
         self._cleanup_in_progress = False
         gate_plan = premium_page_plans.build_worker_gate_plan(
-            thread_running=bool(self.current_thread and self.current_thread.isRunning()),
+            thread_running=is_premium_task_running(self.current_thread),
         )
         if not gate_plan.can_start:
             return
@@ -610,7 +603,7 @@ class PremiumPage(BasePage):
         )
 
         self._start_worker_thread(
-            self._premium.create_premium_worker_thread(self._premium.check_device_activation),
+            self._premium.check_device_activation,
             self._on_status_complete,
             self._on_status_error,
         )
@@ -660,7 +653,7 @@ class PremiumPage(BasePage):
     def _test_connection(self):
         self._cleanup_in_progress = False
         gate_plan = premium_page_plans.build_worker_gate_plan(
-            thread_running=bool(self.current_thread and self.current_thread.isRunning()),
+            thread_running=is_premium_task_running(self.current_thread),
         )
         if not gate_plan.can_start:
             return
@@ -680,7 +673,7 @@ class PremiumPage(BasePage):
             return
 
         self._start_worker_thread(
-            self._premium.create_premium_worker_thread(self._premium.test_connection),
+            self._premium.test_connection,
             self._on_connection_test_complete,
             self._on_connection_test_error,
         )
@@ -709,13 +702,14 @@ class PremiumPage(BasePage):
             set_server_status_state=self._set_server_status_state,
         )
 
-    def _start_worker_thread(self, thread, result_handler, error_handler) -> None:
-        self.current_thread = thread
-        self.current_thread.result_ready.connect(result_handler)
-        self.current_thread.error_occurred.connect(error_handler)
-        self.current_thread.finished.connect(self._on_worker_thread_finished)
-        self.current_thread.finished.connect(self.current_thread.deleteLater)
-        self.current_thread.start()
+    def _start_worker_thread(self, task_callable, result_handler, error_handler) -> None:
+        self.current_thread = start_premium_worker_task(
+            premium_feature=self._premium,
+            task_callable=task_callable,
+            result_handler=result_handler,
+            error_handler=error_handler,
+            finished_handler=self._on_worker_thread_finished,
+        )
 
     def _on_worker_thread_finished(self) -> None:
         self.current_thread = None

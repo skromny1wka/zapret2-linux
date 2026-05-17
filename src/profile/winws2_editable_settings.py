@@ -45,8 +45,8 @@ def with_winws2_editable_settings(
     if filter_kind not in {"hostlist", "ipset"}:
         raise ValueError("filter_kind must be hostlist or ipset")
 
-    in_line = _canonical_range_line("--in-range", settings.in_range, default_value="x")
-    out_line = _canonical_range_line("--out-range", settings.out_range, default_value="a")
+    in_line = _canonical_range_line("--in-range", settings.in_range)
+    out_line = _canonical_range_line("--out-range", settings.out_range)
 
     if _editable_filter_is_file_based(profile):
         filter_value = normalize_winws2_filter_value(settings.filter_value, filter_kind)
@@ -152,10 +152,8 @@ def _replace_range_filters(segments: list[ProfileSegment], range_lines: list[str
     return [*result[:insert_at], *range_segments, *result[insert_at:]]
 
 
-def _canonical_range_line(option_name: str, value: str, *, default_value: str) -> str:
+def _canonical_range_line(option_name: str, value: str) -> str:
     parsed = parse_out_range_expression(value, raw_line=f"{option_name}={value}")
-    if parsed is None:
-        parsed = parse_out_range_expression(default_value, raw_line=f"{option_name}={default_value}")
     if parsed is None:
         raise ValueError(f"Invalid {ENGINE_WINWS2} packet range value: {value}")
     return f"{option_name}={parsed.expression}"

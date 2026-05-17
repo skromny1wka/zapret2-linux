@@ -4,37 +4,21 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
-    QCheckBox,
     QFrame,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
-    QProgressBar,
-    QPushButton,
 )
 
-try:
-    from qfluentwidgets import (
-        CaptionLabel,
-        CheckBox,
-        IndeterminateProgressBar,
-        InfoBar,
-        LineEdit,
-        MessageBox,
-        SettingCardGroup,
-        StrongBodyLabel,
-    )
-    HAS_FLUENT_LABELS = True
-except ImportError:
-    CheckBox = QCheckBox
-    IndeterminateProgressBar = QProgressBar
-    LineEdit = QLineEdit
-    InfoBar = None
-    MessageBox = None  # type: ignore[assignment]
-    SettingCardGroup = None
-    CaptionLabel = QLabel
-    StrongBodyLabel = QLabel
-    HAS_FLUENT_LABELS = False
+from qfluentwidgets import (
+    CaptionLabel,
+    CheckBox,
+    IndeterminateProgressBar,
+    InfoBar,
+    LineEdit,
+    MessageBox,
+    SettingCardGroup,
+    StrongBodyLabel,
+)
 
 from ui.fluent_widgets import SettingsCard
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens
@@ -145,17 +129,11 @@ class DNSProviderCard(SettingsCard):
         icon_label.setFixedSize(20, 20)
         layout.addWidget(icon_label)
 
-        if HAS_FLUENT_LABELS:
-            name_label = StrongBodyLabel(self.name)
-        else:
-            name_label = QLabel(self.name)
+        name_label = StrongBodyLabel(self.name)
         self._name_label = name_label
         layout.addWidget(name_label)
 
-        if HAS_FLUENT_LABELS:
-            desc_label = CaptionLabel(f"· {self.data.get('desc', '')}")
-        else:
-            desc_label = QLabel(f"· {self.data.get('desc', '')}")
+        desc_label = CaptionLabel(f"· {self.data.get('desc', '')}")
         self._desc_label = desc_label
         layout.addWidget(desc_label)
 
@@ -170,10 +148,7 @@ class DNSProviderCard(SettingsCard):
         layout.addStretch()
 
         ip_text = self._provider_ip_text()
-        if HAS_FLUENT_LABELS:
-            ip_label = CaptionLabel(ip_text)
-        else:
-            ip_label = QLabel(ip_text)
+        ip_label = CaptionLabel(ip_text)
         self._ip_label = ip_label
         layout.addWidget(ip_label)
 
@@ -195,17 +170,11 @@ class DNSProviderCard(SettingsCard):
         except Exception:
             pass
         try:
-            if self._name_label is not None and not HAS_FLUENT_LABELS:
-                self._name_label.setStyleSheet(
-                    f"color: {theme_tokens.fg}; font-size: 12px; font-weight: 500;"
-                )
+            pass
         except Exception:
             pass
         try:
-            if self._desc_label is not None and not HAS_FLUENT_LABELS:
-                self._desc_label.setStyleSheet(
-                    f"color: {theme_tokens.fg_faint}; font-size: 11px;"
-                )
+            pass
         except Exception:
             pass
         try:
@@ -223,10 +192,7 @@ class DNSProviderCard(SettingsCard):
         except Exception:
             pass
         try:
-            if self._ip_label is not None and not HAS_FLUENT_LABELS:
-                self._ip_label.setStyleSheet(
-                    f"color: {theme_tokens.fg_muted}; font-size: 11px; font-family: monospace;"
-                )
+            pass
         except Exception:
             pass
 
@@ -298,10 +264,7 @@ class AdapterCard(SettingsCard):
         icon_label.setPixmap(get_cached_qta_pixmap('fa5s.network-wired', color=tokens.accent_hex, size=16))
         layout.addWidget(icon_label)
 
-        if HAS_FLUENT_LABELS:
-            name_label = StrongBodyLabel(self.adapter_name)
-        else:
-            name_label = QLabel(self.adapter_name)
+        name_label = StrongBodyLabel(self.adapter_name)
         self._name_label = name_label
         layout.addWidget(name_label)
 
@@ -311,10 +274,7 @@ class AdapterCard(SettingsCard):
         current_dns_v6 = self._normalize_dns_list(self.dns_info.get("ipv6", []))
         dns_text = self._format_dns_text(current_dns_v4, current_dns_v6)
 
-        if HAS_FLUENT_LABELS:
-            self.dns_label = CaptionLabel(dns_text)
-        else:
-            self.dns_label = QLabel(dns_text)
+        self.dns_label = CaptionLabel(dns_text)
         layout.addWidget(self.dns_label)
 
         self.add_layout(layout)
@@ -330,17 +290,11 @@ class AdapterCard(SettingsCard):
         except Exception:
             pass
         try:
-            if self._name_label is not None and not HAS_FLUENT_LABELS:
-                self._name_label.setStyleSheet(
-                    f"color: {theme_tokens.fg}; font-size: 12px; font-weight: 500;"
-                )
+            pass
         except Exception:
             pass
         try:
-            if self.dns_label is not None and not HAS_FLUENT_LABELS:
-                self.dns_label.setStyleSheet(
-                    f"color: {theme_tokens.fg_faint}; font-size: 11px; font-family: monospace;"
-                )
+            pass
         except Exception:
             pass
         self._update_check_icon()

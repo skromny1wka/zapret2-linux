@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel, QSizePolicy
+from qfluentwidgets import BreadcrumbBar
 
 from ui.fluent_widgets import (
     SettingsCard,
@@ -15,12 +15,10 @@ from ui.fluent_widgets import (
     RefreshButton,
     insert_widget_into_setting_card_group,
 )
-from ui.theme import get_themed_qta_icon
-
 
 @dataclass(slots=True)
 class BlobsPageHeaderWidgets:
-    back_btn: object | None
+    breadcrumb: BreadcrumbBar
     desc_label: object
     actions_group: object | None
     actions_meta_card: object | None
@@ -39,7 +37,6 @@ class BlobsPageHeaderWidgets:
 def build_blobs_page_header(
     *,
     page,
-    has_fluent_inputs: bool,
     setting_card_group_cls,
     line_edit_cls,
     action_button_cls,
@@ -55,24 +52,11 @@ def build_blobs_page_header(
     on_open_json,
     on_filter_blobs,
 ) -> BlobsPageHeaderWidgets:
-    back_btn = None
-    if has_fluent_inputs:
-        from PyQt6.QtCore import QSize
-        from qfluentwidgets import TransparentPushButton
-
-        back_btn = TransparentPushButton(parent=page)
-        back_btn.setText(tr_fn("page.blobs.button.back", "Управление"))
-        back_btn.setIcon(get_themed_qta_icon("fa5s.chevron-left", color="#888"))
-        back_btn.setIconSize(QSize(12, 12))
-        back_btn.clicked.connect(on_back)
-        back_row = QHBoxLayout()
-        back_row.setContentsMargins(0, 0, 0, 0)
-        back_row.addWidget(back_btn)
-        back_row.addStretch()
-        back_row_widget = QWidget()
-        back_row_widget.setLayout(back_row)
-        back_row_widget.setStyleSheet("background: transparent;")
-        page.vBoxLayout.insertWidget(0, back_row_widget)
+    breadcrumb = BreadcrumbBar(page)
+    breadcrumb.addItem("control", tr_fn("page.blobs.breadcrumb.control", "Управление"))
+    breadcrumb.addItem("blobs", tr_fn("page.blobs.title", "Блобы"))
+    breadcrumb.currentItemChanged.connect(lambda key: on_back() if key == "control" else None)
+    page.vBoxLayout.insertWidget(0, breadcrumb)
 
     desc_card = SettingsCard()
     desc_label = QLabel(
@@ -89,69 +73,41 @@ def build_blobs_page_header(
     actions_meta_card = None
     actions_bar = None
 
-    if setting_card_group_cls is not None and has_fluent_inputs:
-        actions_group = setting_card_group_cls(
-            tr_fn("page.blobs.section.actions", "Действия"),
-            page.content,
-        )
-        actions_bar = quick_actions_bar_cls(page.content)
+    actions_group = setting_card_group_cls(
+        tr_fn("page.blobs.section.actions", "Действия"),
+        page.content,
+    )
+    actions_bar = quick_actions_bar_cls(page.content)
 
-        add_btn = primary_action_button_cls(
-            tr_fn("page.blobs.button.add", "Добавить блоб"),
-            "fa5s.plus",
-        )
-        add_btn.clicked.connect(on_add_blob)
+    add_btn = primary_action_button_cls(
+        tr_fn("page.blobs.button.add", "Добавить блоб"),
+        "fa5s.plus",
+    )
+    add_btn.clicked.connect(on_add_blob)
 
-        reload_btn = refresh_button_cls()
-        reload_btn.clicked.connect(on_reload_blobs)
+    reload_btn = refresh_button_cls()
+    reload_btn.clicked.connect(on_reload_blobs)
 
-        open_folder_btn = action_button_cls(
-            tr_fn("page.blobs.button.bin_folder", "Папка bin"),
-            "fa5s.folder-open",
-        )
-        open_folder_btn.clicked.connect(on_open_bin_folder)
+    open_folder_btn = action_button_cls(
+        tr_fn("page.blobs.button.bin_folder", "Папка bin"),
+        "fa5s.folder-open",
+    )
+    open_folder_btn.clicked.connect(on_open_bin_folder)
 
-        open_json_btn = action_button_cls(
-            tr_fn("page.blobs.button.open_json", "Открыть JSON"),
-            "fa5s.file-code",
-        )
-        open_json_btn.clicked.connect(on_open_json)
+    open_json_btn = action_button_cls(
+        tr_fn("page.blobs.button.open_json", "Открыть JSON"),
+        "fa5s.file-code",
+    )
+    open_json_btn.clicked.connect(on_open_json)
 
-        actions_bar.add_buttons([add_btn, reload_btn, open_folder_btn, open_json_btn])
-        insert_widget_into_setting_card_group(actions_group, 1, actions_bar)
+    actions_bar.add_buttons([add_btn, reload_btn, open_folder_btn, open_json_btn])
+    insert_widget_into_setting_card_group(actions_group, 1, actions_bar)
 
-        actions_meta_card = SettingsCard()
-        count_label = QLabel("")
-        actions_meta_card.add_widget(count_label)
-        actions_group.addSettingCard(actions_meta_card)
-        add_widget(actions_group)
-    else:
-        actions_card = SettingsCard()
-        actions_layout = QHBoxLayout()
-        actions_layout.setSpacing(8)
-
-        add_btn = action_button_cls(tr_fn("page.blobs.button.add", "Добавить блоб"), "fa5s.plus")
-        add_btn.clicked.connect(on_add_blob)
-        actions_layout.addWidget(add_btn)
-
-        reload_btn = refresh_button_cls()
-        reload_btn.clicked.connect(on_reload_blobs)
-        actions_layout.addWidget(reload_btn)
-
-        open_folder_btn = action_button_cls(tr_fn("page.blobs.button.bin_folder", "Папка bin"), "fa5s.folder-open")
-        open_folder_btn.clicked.connect(on_open_bin_folder)
-        actions_layout.addWidget(open_folder_btn)
-
-        open_json_btn = action_button_cls(tr_fn("page.blobs.button.open_json", "Открыть JSON"), "fa5s.file-code")
-        open_json_btn.clicked.connect(on_open_json)
-        actions_layout.addWidget(open_json_btn)
-
-        actions_layout.addStretch()
-        actions_card.add_layout(actions_layout)
-
-        count_label = QLabel("")
-        actions_card.add_widget(count_label)
-        add_widget(actions_card)
+    actions_meta_card = SettingsCard()
+    count_label = QLabel("")
+    actions_meta_card.add_widget(count_label)
+    actions_group.addSettingCard(actions_meta_card)
+    add_widget(actions_group)
 
     filter_card = SettingsCard()
     filter_layout = QHBoxLayout()
@@ -179,7 +135,7 @@ def build_blobs_page_header(
     add_widget(blobs_container)
 
     return BlobsPageHeaderWidgets(
-        back_btn=back_btn,
+        breadcrumb=breadcrumb,
         desc_label=desc_label,
         actions_group=actions_group,
         actions_meta_card=actions_meta_card,

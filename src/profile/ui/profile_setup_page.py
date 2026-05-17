@@ -1,19 +1,21 @@
 from __future__ import annotations
 
-import re
-
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget
 
 from log.log import log
 from profile.winws2_editable_settings import normalize_winws2_filter_value
+from profile.ui.profile_setup_controls import (
+    range_expression_from_controls,
+    set_combo_by_data,
+    set_range_controls,
+    sync_range_value_enabled,
+)
+from profile.setup_controller import ProfileSetupController
 from qfluentwidgets import BodyLabel, BreadcrumbBar, CheckBox, ComboBox, LineEdit, PlainTextEdit, PushButton, TitleLabel
 from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE, is_zapret2_launch_method
 from ui.pages.base_page import BasePage
 from app.text_catalog import tr as tr_catalog
-
-
-_SIMPLE_RANGE_RE = re.compile(r"^-?(?P<mode>[nd])(?P<value>\d+)$", re.IGNORECASE)
 
 
 class ProfileSetupPageBase(BasePage):
@@ -30,7 +32,10 @@ class ProfileSetupPageBase(BasePage):
             parent=parent,
             title_key=self.title_key_name,
         )
-        self._profile = profile_feature
+        self._controller = ProfileSetupController(
+            profile_feature=profile_feature,
+            launch_method=self.launch_method,
+        )
         self._open_profiles = open_profiles
         self._open_root = open_root
         self._on_profile_changed_callback = on_profile_changed
@@ -245,11 +250,17 @@ class ProfileSetupPageBase(BasePage):
         self._profile_subpage = "profile"
         self.reload_current_profile()
 
+    def handle_page_command(self, command: str, payload: dict) -> bool:
+        if command == "open_profile":
+            self.show_profile(str((payload or {}).get("profile_key") or ""))
+            return True
+        return False
+
     def reload_current_profile(self) -> None:
         if not self._profile_key:
             return
         try:
-            payload = self._profile.get_profile_setup(self.launch_method, self._profile_key)
+            payload = self._controller.load(self._profile_key)
         except Exception as exc:
             log(f"{self.__class__.__name__}: не удалось прочитать профиль {self._profile_key}: {exc}", "ERROR")
             payload = None
@@ -354,46 +365,13 @@ class ProfileSetupPageBase(BasePage):
         filter_enabled = bool(getattr(payload, "editable_filter_enabled", True))
         self._filter_combo.setVisible(filter_enabled)
         self._filter_value.setVisible(filter_enabled)
-        self._set_combo_by_data(self._filter_combo, getattr(payload, "editable_filter_kind", "") or "hostlist")
+        set_combo_by_data(self._filter_combo, getattr(payload, "editable_filter_kind", "") or "hostlist")
         self._filter_value.setText(str(getattr(payload, "editable_filter_value", "") or ""))
-        self._set_range_controls(self._in_range_mode, self._in_range_value, getattr(payload, "in_range", "") or "x")
-        self._set_range_controls(self._out_range_mode, self._out_range_value, getattr(payload, "out_range", "") or "a")
-
-    def _set_combo_by_data(self, combo: ComboBox, value: str) -> None:
-        wanted = str(value or "").strip()
-        for index in range(combo.count()):
-            if str(combo.itemData(index) or "") == wanted:
-                combo.setCurrentIndex(index)
-                return
-
-    def _set_range_controls(self, combo: ComboBox, value_edit: LineEdit, expression: str) -> None:
-        expr = str(expression or "").strip().lower()
-        if expr in {"a", "x"}:
-            self._set_combo_by_data(combo, expr)
-            value_edit.clear()
-            self._sync_range_value_enabled(combo, value_edit)
-            return
-
-        match = _SIMPLE_RANGE_RE.match(expr)
-        if match:
-            self._set_combo_by_data(combo, match.group("mode").lower())
-            value_edit.setText(match.group("value"))
-            self._sync_range_value_enabled(combo, value_edit)
-            return
-
-        self._set_combo_by_data(combo, "custom")
-        value_edit.setText(expr)
-        self._sync_range_value_enabled(combo, value_edit)
-
-    def _sync_range_value_enabled(self, combo: ComboBox, value_edit: LineEdit) -> None:
-        mode = str(combo.itemData(combo.currentIndex()) or "").strip()
-        value_edit.setEnabled(mode not in {"a", "x"})
-        if mode in {"a", "x"}:
-            value_edit.clear()
-        value_edit.setPlaceholderText("s1<d1" if mode == "custom" else "8")
+        set_range_controls(self._in_range_mode, self._in_range_value, getattr(payload, "in_range", "") or "x")
+        set_range_controls(self._out_range_mode, self._out_range_value, getattr(payload, "out_range", "") or "a")
 
     def _on_range_mode_changed(self, combo: ComboBox, value_edit: LineEdit) -> None:
-        self._sync_range_value_enabled(combo, value_edit)
+        sync_range_value_enabled(combo, value_edit)
         self._schedule_settings_autosave()
 
     def _on_filter_kind_changed(self) -> None:
@@ -408,17 +386,6 @@ class ProfileSetupPageBase(BasePage):
         if normalized and normalized != self._filter_value.text().strip():
             self._filter_value.setText(normalized)
 
-    def _range_expression_from_controls(self, combo: ComboBox, value_edit: LineEdit, *, default: str) -> str:
-        mode = str(combo.itemData(combo.currentIndex()) or "").strip().lower()
-        value = value_edit.text().strip()
-        if mode in {"a", "x"}:
-            return mode
-        if mode in {"n", "d"}:
-            return f"-{mode}{value}" if value.isdigit() else default
-        if mode == "custom":
-            return value or default
-        return default
-
     def _schedule_settings_autosave(self) -> None:
         if self._loading or not self._profile_key or not is_zapret2_launch_method(self.launch_method):
             return
@@ -432,13 +399,12 @@ class ProfileSetupPageBase(BasePage):
         if filter_enabled and not filter_value:
             return
         try:
-            new_key = self._profile.update_winws2_profile_settings(
-                self.launch_method,
-                self._profile_key,
+            new_key = self._controller.save_winws2_settings(
+                profile_key=self._profile_key,
                 filter_kind=str(self._filter_combo.itemData(self._filter_combo.currentIndex()) or "hostlist"),
                 filter_value=filter_value,
-                in_range=self._range_expression_from_controls(self._in_range_mode, self._in_range_value, default="x"),
-                out_range=self._range_expression_from_controls(self._out_range_mode, self._out_range_value, default="a"),
+                in_range=range_expression_from_controls(self._in_range_mode, self._in_range_value, default="x"),
+                out_range=range_expression_from_controls(self._out_range_mode, self._out_range_value, default="a"),
             )
             if new_key:
                 self._profile_key = new_key
@@ -452,7 +418,10 @@ class ProfileSetupPageBase(BasePage):
             return
         enabled = bool(state == Qt.CheckState.Checked.value or state == 2)
         try:
-            new_key = self._profile.set_profile_enabled(self.launch_method, self._profile_key, enabled)
+            new_key = self._controller.set_enabled(
+                profile_key=self._profile_key,
+                enabled=enabled,
+            )
             if new_key:
                 self._profile_key = new_key
             self.reload_current_profile()
@@ -467,10 +436,9 @@ class ProfileSetupPageBase(BasePage):
         if not strategy_id or strategy_id in {"none", "custom"}:
             return
         try:
-            new_key = self._profile.apply_strategy_to_profile(
-                self.launch_method,
-                self._profile_key,
-                strategy_id,
+            new_key = self._controller.apply_strategy(
+                profile_key=self._profile_key,
+                strategy_id=strategy_id,
             )
             if new_key:
                 self._profile_key = new_key
@@ -483,9 +451,8 @@ class ProfileSetupPageBase(BasePage):
         if self._loading or not self._profile_key:
             return
         try:
-            self._profile.set_current_strategy_state(
-                self.launch_method,
-                self._profile_key,
+            self._controller.set_strategy_feedback(
+                profile_key=self._profile_key,
                 rating=rating,
             )
             self.reload_current_profile()
@@ -498,9 +465,8 @@ class ProfileSetupPageBase(BasePage):
             return
         try:
             current = bool(self._payload.current_strategy_state.favorite)
-            self._profile.set_current_strategy_state(
-                self.launch_method,
-                self._profile_key,
+            self._controller.set_strategy_feedback(
+                profile_key=self._profile_key,
                 favorite=not current,
             )
             self.reload_current_profile()

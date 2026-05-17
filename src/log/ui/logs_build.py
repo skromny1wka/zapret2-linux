@@ -55,7 +55,6 @@ def build_logs_tab_ui(
     text_edit_cls,
     quick_actions_bar_cls,
     qfont_cls,
-    qtextedit_cls,
     qta_module,
     get_theme_tokens_fn,
     errors_text_min_height: int,
@@ -149,7 +148,7 @@ def build_logs_tab_ui(
 
     log_text = text_edit_cls()
     log_text.setReadOnly(True)
-    log_text.setLineWrapMode(qtextedit_cls.LineWrapMode.NoWrap)
+    log_text.setLineWrapMode(text_edit_cls.LineWrapMode.NoWrap)
     log_text.setFont(qfont_cls("Consolas", 9))
     log_text.setMinimumHeight(260)
     log_layout.addWidget(log_text)
@@ -189,7 +188,7 @@ def build_logs_tab_ui(
 
     errors_text = text_edit_cls()
     errors_text.setReadOnly(True)
-    errors_text.setLineWrapMode(qtextedit_cls.LineWrapMode.NoWrap)
+    errors_text.setLineWrapMode(text_edit_cls.LineWrapMode.NoWrap)
     errors_text.setFont(qfont_cls("Consolas", 9))
     errors_text.setMinimumHeight(errors_text_min_height)
     errors_text.setMaximumHeight(errors_text_max_height)
@@ -232,7 +231,7 @@ def build_logs_tab_ui(
 
     winws_text = text_edit_cls()
     winws_text.setReadOnly(True)
-    winws_text.setLineWrapMode(qtextedit_cls.LineWrapMode.NoWrap)
+    winws_text.setLineWrapMode(text_edit_cls.LineWrapMode.NoWrap)
     winws_text.setFont(qfont_cls("Consolas", 9))
     winws_text.setFixedHeight(150)
     winws_layout.addWidget(winws_text)

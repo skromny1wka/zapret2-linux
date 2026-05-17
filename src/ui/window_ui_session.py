@@ -21,7 +21,6 @@ class WindowUiSession:
     nav_icons: dict[PageName, Any]
     nav_labels: dict[PageName, str]
     default_nav_icon: Any
-    has_fluent_nav: bool
     nav_scroll_position: Any
 
     sidebar_search_widget_cls: type | None

@@ -50,14 +50,15 @@ class StartupCoordinator:
 
     def __init__(
         self,
-        app_runtime,
-        window_shell: StartupWindowShell,
         *,
+        runtime_feature,
+        tray_feature,
+        window_shell: StartupWindowShell,
         log_startup_metric,
     ):
         self.window_shell = window_shell
-        self.runtime = app_runtime.features.runtime
-        self.tray = app_runtime.features.tray
+        self.runtime = runtime_feature
+        self.tray = tray_feature
         self.log_startup_metric = log_startup_metric
         self.startup_tasks_completed = set()
 

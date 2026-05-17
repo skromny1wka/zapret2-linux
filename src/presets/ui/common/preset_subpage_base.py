@@ -1,85 +1,48 @@
 from __future__ import annotations
 
-from datetime import datetime
 from pathlib import Path
 
 from PyQt6.QtCore import QTimer
-from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QWidget, QFileDialog
 
 from ui.pages.base_page import BasePage
 from ui.fluent_widgets import style_semantic_caption_label
 from ui.popup_menu import exec_popup_menu
 from ui.smooth_scroll import apply_editor_smooth_scroll_preference
-
-try:
-    from qfluentwidgets import (
-        Action,
-        BodyLabel,
-        CaptionLabel,
-        FluentIcon,
-        InfoBar,
-        LineEdit,
-        MessageBox,
-        MessageBoxBase,
-        PlainTextEdit,
-        PushButton,
-        RoundMenu,
-        SimpleCardWidget,
-        StrongBodyLabel,
-        TransparentPushButton,
-        TransparentToolButton,
-    )
-except ImportError:
-    from PyQt6.QtWidgets import (
-        QLabel as BodyLabel,
-        QLabel as CaptionLabel,
-        QLabel as StrongBodyLabel,
-        QLineEdit as LineEdit,
-        QPlainTextEdit as PlainTextEdit,
-        QPushButton as PushButton,
-        QPushButton as TransparentPushButton,
-        QPushButton as TransparentToolButton,
-        QFrame as SimpleCardWidget,
-    )
-
-    MessageBox = None
-    MessageBoxBase = object
-    RoundMenu = None
-    Action = None
-    FluentIcon = None
-    InfoBar = None
+from qfluentwidgets import (
+    Action,
+    BodyLabel,
+    BreadcrumbBar,
+    CaptionLabel,
+    FluentIcon,
+    InfoBar,
+    LineEdit,
+    MessageBox,
+    MessageBoxBase,
+    PlainTextEdit,
+    PushButton,
+    RoundMenu,
+    SimpleCardWidget,
+    StrongBodyLabel,
+    TransparentToolButton,
+)
+from presets.raw_preset_editor_workflow import RawPresetEditorController
 
 
 def _fluent_icon(name: str):
-    if FluentIcon is None:
-        return None
     return getattr(FluentIcon, name, None)
 
 
 def _make_menu_action(text: str, *, icon=None, parent=None):
-    if Action is not None:
-        if icon is not None:
-            try:
-                return Action(icon, text, parent)
-            except TypeError:
-                pass
+    if icon is not None:
         try:
-            action = Action(text, parent)
+            return Action(icon, text, parent)
         except TypeError:
-            try:
-                action = Action(text)
-            except TypeError:
-                action = None
-        if action is not None:
-            try:
-                if icon is not None and hasattr(action, "setIcon"):
-                    action.setIcon(icon)
-            except Exception:
-                pass
-            return action
-
-    action = QAction(text, parent)
+            pass
+    try:
+        action = Action(text, parent)
+    except TypeError:
+        action = Action(text)
     try:
         if icon is not None:
             action.setIcon(icon)
@@ -155,7 +118,10 @@ class PresetRawEditorPage(BasePage):
         self._cleanup_in_progress = False
         self._ui_state_store = None
 
-        self._presets = presets_feature
+        self._controller = RawPresetEditorController(
+            presets_feature=presets_feature,
+            launch_method=self._launch_method,
+        )
         self._save_timer = QTimer(self)
         self._save_timer.setSingleShot(True)
         self._save_timer.timeout.connect(self._save_file)
@@ -167,10 +133,7 @@ class PresetRawEditorPage(BasePage):
         return self._title
 
     def _get_preset_path(self, name: str) -> Path:
-        return self._presets.get_preset_source_path_by_file_name(
-            self._launch_method,
-            str(name or "").strip(),
-        )
+        return self._controller.source_path(str(name or "").strip())
 
     def _preset_launch_method(self) -> str | None:
         return self._launch_method
@@ -243,11 +206,7 @@ class PresetRawEditorPage(BasePage):
         try:
             if not self._preset_file_name:
                 return False
-            manifest = self._presets.get_preset_manifest_by_file_name(
-                self._preset_launch_method(),
-                self._preset_file_name,
-            )
-            return bool(manifest is not None and str(manifest.kind or "").strip().lower() == "builtin")
+            return self._controller.is_builtin(self._preset_file_name)
         except Exception:
             return False
 
@@ -268,19 +227,10 @@ class PresetRawEditorPage(BasePage):
         top_layout.setContentsMargins(0, 0, 0, 0)
         top_layout.setSpacing(8)
 
-        try:
-            from qfluentwidgets import BreadcrumbBar as _BreadcrumbBar
-
-            self._breadcrumb = _BreadcrumbBar(self)
-            self._rebuild_breadcrumb()
-            self._breadcrumb.currentItemChanged.connect(self._on_breadcrumb_item_changed)
-            top_layout.addWidget(self._breadcrumb, 1)
-        except Exception:
-            self.backButton = TransparentPushButton(self)
-            self.backButton.setText("Назад к списку")
-            self.backButton.setIcon(_fluent_icon("LEFT_ARROW"))
-            self.backButton.clicked.connect(self._open_back_callback)
-            top_layout.addWidget(self.backButton, 0)
+        self._breadcrumb = BreadcrumbBar(self)
+        self._rebuild_breadcrumb()
+        self._breadcrumb.currentItemChanged.connect(self._on_breadcrumb_item_changed)
+        top_layout.addWidget(self._breadcrumb, 1)
         top_layout.addStretch(1)
 
         self.menuButton = TransparentToolButton(_fluent_icon("MENU"), self)
@@ -335,23 +285,23 @@ class PresetRawEditorPage(BasePage):
         self._preset_name = Path(self._preset_file_name).stem if self._preset_file_name else ""
         if self._preset_file_name:
             try:
-                manifest = self._presets.get_preset_manifest_by_file_name(
-                    self._preset_launch_method(),
-                    self._preset_file_name,
-                )
+                manifest = self._controller.manifest(self._preset_file_name)
                 if manifest is not None:
                     self._preset_name = manifest.name
                     self._preset_file_name = manifest.file_name
-                self._preset_path = self._presets.get_preset_source_path_by_file_name(
-                    self._preset_launch_method(),
-                    self._preset_file_name,
-                )
+                self._preset_path = self._controller.source_path(self._preset_file_name)
             except Exception:
                 self._preset_path = self._get_preset_path(self._preset_name)
         else:
             self._preset_path = self._get_preset_path(self._preset_name)
         self._load_file()
         self._refresh_header()
+
+    def handle_page_command(self, command: str, payload: dict) -> bool:
+        if command == "open_raw_preset":
+            self.set_preset_file_name(str((payload or {}).get("preset_name") or ""))
+            return True
+        return False
 
     def _flush_pending_save(self) -> None:
         if self._cleanup_in_progress:
@@ -372,10 +322,7 @@ class PresetRawEditorPage(BasePage):
         origin = "builtin" if self._is_current_builtin() else "user"
         if self._preset_file_name:
             try:
-                manifest = self._presets.get_preset_manifest_by_file_name(
-                    self._preset_launch_method(),
-                    self._preset_file_name,
-                )
+                manifest = self._controller.manifest(self._preset_file_name)
                 if manifest is not None:
                     kind = str(manifest.kind or "").strip().lower()
                     if kind in {"builtin", "imported", "user"}:
@@ -403,12 +350,9 @@ class PresetRawEditorPage(BasePage):
     def _load_file(self) -> None:
         self._is_loading = True
         try:
-            if self._preset_path is None or not self._preset_path.exists():
-                self.editor.setPlainText("")
-                self._set_footer("Файл не найден")
-                return
-            self.editor.setPlainText(self._preset_path.read_text(encoding="utf-8", errors="replace"))
-            self._set_footer("Загружено")
+            result = self._controller.load_text(self._preset_path)
+            self.editor.setPlainText(result.text)
+            self._set_footer(result.footer_text)
         except Exception as e:
             self._set_footer(f"Ошибка загрузки: {e}")
         finally:
@@ -429,20 +373,15 @@ class PresetRawEditorPage(BasePage):
         if self._preset_path is None:
             return
         try:
-            if not self._preset_file_name:
-                raise ValueError("Не удалось определить имя файла пресета для сохранения.")
-            updated = self._presets.save_preset_source_by_file_name(
-                self._preset_launch_method(),
-                self._preset_file_name,
-                self.editor.toPlainText(),
+            result = self._controller.save_text(
+                file_name=self._preset_file_name,
+                source_text=self.editor.toPlainText(),
             )
+            updated = result.updated
             self._preset_name = updated.name
             self._preset_file_name = updated.file_name
-            self._preset_path = self._presets.get_preset_source_path_by_file_name(
-                self._preset_launch_method(),
-                self._preset_file_name,
-            )
-            self._set_footer(f"Сохранено {datetime.now().strftime('%H:%M:%S')}")
+            self._preset_path = result.path
+            self._set_footer(result.footer_text)
         except Exception as e:
             self._set_footer(f"Ошибка сохранения: {e}")
             self._show_error(str(e))
@@ -469,7 +408,7 @@ class PresetRawEditorPage(BasePage):
             self._flush_pending_save()
             if self._preset_path is None:
                 return
-            self._presets.open_preset_source_file(self._preset_path)
+            self._controller.open_source_file(self._preset_path)
         except Exception as e:
             self._show_error(str(e))
 
@@ -514,12 +453,9 @@ class PresetRawEditorPage(BasePage):
         if not new_name or new_name == self._preset_name:
             return
         try:
-            if not self._preset_file_name:
-                raise ValueError("Не удалось определить имя файла пресета для переименования.")
-            updated = self._presets.rename_preset_by_file_name(
-                self._preset_launch_method(),
-                self._preset_file_name,
-                new_name,
+            updated = self._controller.rename(
+                file_name=self._preset_file_name,
+                new_name=new_name,
             )
             self._notify_preset_structure_changed()
             self.set_preset_file_name(updated.file_name)
@@ -531,12 +467,9 @@ class PresetRawEditorPage(BasePage):
         self._flush_pending_save()
         try:
             new_name = f"{self._preset_name} (копия)"
-            if not self._preset_file_name:
-                raise ValueError("Не удалось определить имя файла пресета для дублирования.")
-            duplicated = self._presets.duplicate_preset_by_file_name(
-                self._preset_launch_method(),
-                self._preset_file_name,
-                new_name,
+            duplicated = self._controller.duplicate(
+                file_name=self._preset_file_name,
+                new_name=new_name,
             )
             self._notify_preset_structure_changed()
             self.set_preset_file_name(duplicated.file_name)
@@ -555,12 +488,9 @@ class PresetRawEditorPage(BasePage):
         if not file_path:
             return
         try:
-            if not self._preset_file_name:
-                raise ValueError("Не удалось определить имя файла пресета для экспорта.")
-            self._presets.export_preset_plain_text(
-                self._preset_launch_method(),
-                self._preset_file_name,
-                file_path,
+            self._controller.export(
+                file_name=self._preset_file_name,
+                target_path=file_path,
             )
             self._show_success(f"Пресет экспортирован: {file_path}")
         except Exception as e:
@@ -581,18 +511,12 @@ class PresetRawEditorPage(BasePage):
             if not box.exec():
                 return
         try:
-            if not self._preset_file_name:
-                raise ValueError("Не удалось определить имя файла пресета для сброса.")
-            updated = self._presets.reset_preset_to_builtin_by_file_name(
-                self._preset_launch_method(),
-                self._preset_file_name,
+            updated = self._controller.reset_to_builtin(
+                file_name=self._preset_file_name,
             )
             self._preset_name = updated.name
             self._preset_file_name = updated.file_name
-            self._preset_path = self._presets.get_preset_source_path_by_file_name(
-                self._preset_launch_method(),
-                self._preset_file_name,
-            )
+            self._preset_path = self._controller.source_path(self._preset_file_name)
             self._load_file()
             self._refresh_header()
             self._show_success(f"Восстановлен встроенный пресет «{self._preset_name}»")
@@ -617,11 +541,8 @@ class PresetRawEditorPage(BasePage):
                 return
         try:
             name = self._preset_name
-            if not self._preset_file_name:
-                raise ValueError("Не удалось определить имя файла пресета для удаления.")
-            self._presets.delete_preset_by_file_name(
-                self._preset_launch_method(),
-                self._preset_file_name,
+            self._controller.delete(
+                file_name=self._preset_file_name,
             )
             self._notify_preset_structure_changed()
             self._open_back_callback()
@@ -631,33 +552,21 @@ class PresetRawEditorPage(BasePage):
 
     def _current_selected_name(self) -> str:
         try:
-            selected = self._presets.get_selected_source_preset_manifest(
-                self._preset_launch_method(),
-            )
-            return (selected.name if selected is not None else "").strip()
+            return self._controller.selected_name()
         except Exception:
             return ""
 
     def _current_selected_file_name(self) -> str:
         try:
-            return (
-                self._presets.get_selected_source_preset_file_name(
-                    self._preset_launch_method(),
-                )
-                or ""
-            ).strip()
+            return self._controller.selected_file_name()
         except Exception:
             return ""
 
     def _activate_selected_preset(self) -> bool:
         try:
-            if not self._preset_file_name:
-                return False
-            self._presets.activate_preset_file(
-                self._preset_launch_method(),
-                self._preset_file_name,
+            return self._controller.activate(
+                file_name=self._preset_file_name,
             )
-            return True
         except Exception:
             return False
 

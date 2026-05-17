@@ -33,27 +33,19 @@ from app.state_store import AppUiState, MainWindowStateStore
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens, get_rkn_background_options
 from app.text_catalog import tr as tr_catalog
 from ui.widgets.win11_controls import Win11ToggleRow
-
-try:
-    from qfluentwidgets import (
-        BodyLabel, CaptionLabel, ColorPickerButton, setThemeColor,
-        ColorDialog,
-        CheckBox, SegmentedWidget, RadioButton, Slider, ComboBox, SettingCardGroup,
-    )
-    _HAS_FLUENT_LABELS = True
-    _HAS_COLOR_PICKER = True
-except ImportError:
-    from PyQt6.QtWidgets import (
-        QCheckBox as CheckBox,
-        QRadioButton as RadioButton,
-        QSlider as Slider,
-        QComboBox as ComboBox,
-    )
-    SegmentedWidget = None
-    ColorDialog = None
-    SettingCardGroup = None
-    _HAS_FLUENT_LABELS = False
-    _HAS_COLOR_PICKER = False
+from qfluentwidgets import (
+    BodyLabel,
+    CaptionLabel,
+    ColorPickerButton,
+    setThemeColor,
+    ColorDialog,
+    CheckBox,
+    SegmentedWidget,
+    RadioButton,
+    Slider,
+    ComboBox,
+    SettingCardGroup,
+)
 
 
 class AppearancePage(BasePage):
@@ -353,138 +345,112 @@ class AppearancePage(BasePage):
         # ═══════════════════════════════════════════════════════════
         # АКЦЕНТНЫЙ ЦВЕТ (qfluentwidgets setThemeColor)
         # ═══════════════════════════════════════════════════════════
-        if _HAS_COLOR_PICKER:
-            if SettingCardGroup is not None and _HAS_FLUENT_LABELS:
-                self._accent_group = SettingCardGroup(
-                    tr_catalog("page.appearance.section.accent", language=self._ui_language, default="Акцентный цвет"),
-                    self.content,
-                )
-                accent_card = self._accent_group
-                accent_layout = None
-            else:
-                self.add_section_title(text_key="page.appearance.section.accent")
-                self._accent_group = None
-                accent_card = SettingsCard()
-                accent_layout = QVBoxLayout()
-                accent_layout.setSpacing(12)
+        self._accent_group = SettingCardGroup(
+            tr_catalog("page.appearance.section.accent", language=self._ui_language, default="Акцентный цвет"),
+            self.content,
+        )
+        accent_card = self._accent_group
+        accent_layout = None
 
-            accent_desc = CaptionLabel(
-                tr_catalog(
-                    "page.appearance.accent.description",
-                    language=self._ui_language,
-                    default=(
-                        "Цвет акцентных элементов интерфейса: кнопок, иконок, индикаторов. "
-                        "Изменяет цвет нативных компонентов WinUI."
-                    ),
-                )
-            )
-            accent_desc.setWordWrap(True)
-            self._accent_desc_label = accent_desc
-            if accent_layout is not None:
-                accent_layout.addWidget(accent_desc)
-            else:
-                insert_widget_into_setting_card_group(accent_card, 1, accent_desc)
-
-            accent_row = SettingsRow(
-                "fa5s.palette",
-                tr_catalog("page.appearance.accent.color.title", language=self._ui_language, default="Цвет акцента"),
-                "",
-            )
-            self._accent_color_row = accent_row
-            self._color_picker_btn = ColorPickerButton(
-                QColor("#0078d4"),
-                tr_catalog("page.appearance.accent.color.pick", language=self._ui_language, default="Выбрать цвет"),
-            )
-            try:
-                self._color_picker_btn.clicked.disconnect()
-                self._color_picker_btn.clicked.connect(self._show_accent_color_dialog)
-            except Exception:
-                pass
-            self._color_picker_btn.colorChanged.connect(self._on_accent_color_changed)
-            accent_row.set_control(self._color_picker_btn)
-            if accent_layout is not None:
-                accent_layout.addWidget(accent_row)
-            else:
-                accent_card.addSettingCard(accent_row)
-
-            self._follow_windows_accent_cb = Win11ToggleRow(
-                "fa5s.windows",
-                tr_catalog("page.appearance.accent.windows.title", language=self._ui_language, default="Акцент из Windows"),
-                tr_catalog(
-                    "page.appearance.accent.windows.description",
-                    language=self._ui_language,
-                    default="Автоматически использовать системный акцентный цвет Windows",
+        accent_desc = CaptionLabel(
+            tr_catalog(
+                "page.appearance.accent.description",
+                language=self._ui_language,
+                default=(
+                    "Цвет акцентных элементов интерфейса: кнопок, иконок, индикаторов. "
+                    "Изменяет цвет нативных компонентов WinUI."
                 ),
             )
-            self._follow_windows_accent_cb.toggled.connect(self._on_follow_windows_accent_changed)
-            if accent_layout is not None:
-                accent_layout.addWidget(self._follow_windows_accent_cb)
-            else:
-                accent_card.addSettingCard(self._follow_windows_accent_cb)
+        )
+        accent_desc.setWordWrap(True)
+        self._accent_desc_label = accent_desc
+        insert_widget_into_setting_card_group(accent_card, 1, accent_desc)
 
-            self._tinted_bg_cb = Win11ToggleRow(
-                "fa5s.fill-drip",
-                tr_catalog(
-                    "page.appearance.accent.tint_background.title",
-                    language=self._ui_language,
-                    default="Тонировать фон акцентным цветом",
-                ),
-                tr_catalog(
-                    "page.appearance.accent.tint_background.description",
-                    language=self._ui_language,
-                    default="Фон окна окрашивается в оттенок акцентного цвета",
-                ),
+        accent_row = SettingsRow(
+            "fa5s.palette",
+            tr_catalog("page.appearance.accent.color.title", language=self._ui_language, default="Цвет акцента"),
+            "",
+        )
+        self._accent_color_row = accent_row
+        self._color_picker_btn = ColorPickerButton(
+            QColor("#0078d4"),
+            tr_catalog("page.appearance.accent.color.pick", language=self._ui_language, default="Выбрать цвет"),
+        )
+        try:
+            self._color_picker_btn.clicked.disconnect()
+            self._color_picker_btn.clicked.connect(self._show_accent_color_dialog)
+        except Exception:
+            pass
+        self._color_picker_btn.colorChanged.connect(self._on_accent_color_changed)
+        accent_row.set_control(self._color_picker_btn)
+        accent_card.addSettingCard(accent_row)
+
+        self._follow_windows_accent_cb = Win11ToggleRow(
+            "fa5s.windows",
+            tr_catalog("page.appearance.accent.windows.title", language=self._ui_language, default="Акцент из Windows"),
+            tr_catalog(
+                "page.appearance.accent.windows.description",
+                language=self._ui_language,
+                default="Автоматически использовать системный акцентный цвет Windows",
+            ),
+        )
+        self._follow_windows_accent_cb.toggled.connect(self._on_follow_windows_accent_changed)
+        accent_card.addSettingCard(self._follow_windows_accent_cb)
+
+        self._tinted_bg_cb = Win11ToggleRow(
+            "fa5s.fill-drip",
+            tr_catalog(
+                "page.appearance.accent.tint_background.title",
+                language=self._ui_language,
+                default="Тонировать фон акцентным цветом",
+            ),
+            tr_catalog(
+                "page.appearance.accent.tint_background.description",
+                language=self._ui_language,
+                default="Фон окна окрашивается в оттенок акцентного цвета",
+            ),
+        )
+        self._tinted_bg_cb.toggled.connect(self._on_tinted_bg_changed)
+        accent_card.addSettingCard(self._tinted_bg_cb)
+
+        self._tinted_intensity_container = QWidget()
+        intensity_row_layout = QHBoxLayout(self._tinted_intensity_container)
+        intensity_row_layout.setContentsMargins(8, 0, 8, 0)
+        intensity_row_layout.setSpacing(8)
+        intensity_label = CaptionLabel(
+            tr_catalog(
+                "page.appearance.accent.tint_intensity.label",
+                language=self._ui_language,
+                default="Интенсивность тонировки:",
             )
-            self._tinted_bg_cb.toggled.connect(self._on_tinted_bg_changed)
-            if accent_layout is not None:
-                accent_layout.addWidget(self._tinted_bg_cb)
-            else:
-                accent_card.addSettingCard(self._tinted_bg_cb)
+        )
+        self._tinted_intensity_label = intensity_label
+        self._tinted_intensity_slider = Slider(Qt.Orientation.Horizontal)
+        self._tinted_intensity_slider.setRange(0, 30)
+        self._tinted_intensity_slider.setValue(15)
+        self._tinted_intensity_value_label = CaptionLabel("15")
+        self._tinted_intensity_slider.valueChanged.connect(self._on_tinted_intensity_changed)
+        intensity_row_layout.addWidget(intensity_label)
+        intensity_row_layout.addWidget(self._tinted_intensity_slider, 1)
+        intensity_row_layout.addWidget(self._tinted_intensity_value_label)
+        self._tinted_intensity_row = SettingsRow(
+            "fa5s.sliders-h",
+            tr_catalog(
+                "page.appearance.accent.tint_intensity.label",
+                language=self._ui_language,
+                default="Интенсивность тонировки:",
+            ),
+            "",
+        )
+        self._tinted_intensity_row.set_control(self._tinted_intensity_container)
+        accent_card.addSettingCard(self._tinted_intensity_row)
 
-            self._tinted_intensity_container = QWidget()
-            intensity_row_layout = QHBoxLayout(self._tinted_intensity_container)
-            intensity_row_layout.setContentsMargins(8, 0, 8, 0)
-            intensity_row_layout.setSpacing(8)
-            intensity_label = CaptionLabel(
-                tr_catalog(
-                    "page.appearance.accent.tint_intensity.label",
-                    language=self._ui_language,
-                    default="Интенсивность тонировки:",
-                )
-            )
-            self._tinted_intensity_label = intensity_label
-            self._tinted_intensity_slider = Slider(Qt.Orientation.Horizontal)
-            self._tinted_intensity_slider.setRange(0, 30)
-            self._tinted_intensity_slider.setValue(15)
-            self._tinted_intensity_value_label = CaptionLabel("15")
-            self._tinted_intensity_slider.valueChanged.connect(self._on_tinted_intensity_changed)
-            intensity_row_layout.addWidget(intensity_label)
-            intensity_row_layout.addWidget(self._tinted_intensity_slider, 1)
-            intensity_row_layout.addWidget(self._tinted_intensity_value_label)
-            if accent_layout is not None:
-                accent_layout.addWidget(self._tinted_intensity_container)
-            else:
-                self._tinted_intensity_row = SettingsRow(
-                    "fa5s.sliders-h",
-                    tr_catalog(
-                        "page.appearance.accent.tint_intensity.label",
-                        language=self._ui_language,
-                        default="Интенсивность тонировки:",
-                    ),
-                    "",
-                )
-                self._tinted_intensity_row.set_control(self._tinted_intensity_container)
-                accent_card.addSettingCard(self._tinted_intensity_row)
+        enable_setting_card_group_auto_height(accent_card)
+        self.add_widget(accent_card)
 
-            if accent_layout is not None:
-                accent_card.add_layout(accent_layout)
-            else:
-                enable_setting_card_group_auto_height(accent_card)
-            self.add_widget(accent_card)
-
-            self.add_spacing(16)
-            self._load_accent_color()
-            self._load_extra_accent_settings()
+        self.add_spacing(16)
+        self._load_accent_color()
+        self._load_extra_accent_settings()
 
         # ═══════════════════════════════════════════════════════════
         # ПРОИЗВОДИТЕЛЬНОСТЬ
@@ -493,9 +459,6 @@ class AppearancePage(BasePage):
             page=self,
             tr_language=self._ui_language,
             settings_card_group_cls=SettingCardGroup,
-            has_fluent_labels=_HAS_FLUENT_LABELS,
-            settings_card_cls=SettingsCard,
-            qvbox_layout_cls=QVBoxLayout,
             toggle_row_cls=Win11ToggleRow,
             on_animations_changed=self._on_animations_changed,
             on_smooth_scroll_changed=self._on_smooth_scroll_changed,
@@ -515,7 +478,7 @@ class AppearancePage(BasePage):
 
     def _show_accent_color_dialog(self) -> None:
         """Открывает fluent-диалог выбора цвета с нормальным русским заголовком."""
-        if self._color_picker_btn is None or ColorDialog is None:
+        if self._color_picker_btn is None:
             return
         try:
             title = tr_catalog(
@@ -860,8 +823,6 @@ class AppearancePage(BasePage):
         """Обработчик изменения акцентного цвета через ColorPickerButton."""
         if self._is_ui_syncing():
             return
-        if not _HAS_COLOR_PICKER:
-            return
         try:
             setThemeColor(color)
         except Exception:
@@ -893,7 +854,7 @@ class AppearancePage(BasePage):
     def _load_extra_accent_settings(self):
         """Загружает настройки Follow Windows Accent и Tinted Background."""
         load_extra_accent_settings(
-            has_color_picker=_HAS_COLOR_PICKER,
+            has_color_picker=True,
             follow_windows_accent_cb=self._follow_windows_accent_cb,
             tinted_bg_cb=self._tinted_bg_cb,
             tinted_intensity_slider=self._tinted_intensity_slider,
@@ -961,7 +922,7 @@ class AppearancePage(BasePage):
     def _load_accent_color(self):
         """Загружает сохранённый акцентный цвет и применяет его."""
         load_accent_color(
-            has_color_picker=_HAS_COLOR_PICKER,
+            has_color_picker=True,
             color_picker_btn=self._color_picker_btn,
             begin_ui_sync=self._begin_ui_sync,
             end_ui_sync=self._end_ui_sync,

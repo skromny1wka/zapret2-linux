@@ -187,6 +187,15 @@ class PresetSetupPageBase(BasePage):
         _ = (profile_key, change_kind)
         self.refresh_from_preset_switch()
 
+    def handle_page_command(self, command: str, payload: dict) -> bool:
+        if command == "profile_setup_changed":
+            self.apply_profile_setup_change(
+                str((payload or {}).get("profile_key") or ""),
+                str((payload or {}).get("change_kind") or ""),
+            )
+            return True
+        return False
+
     def _expand_all(self) -> None:
         if self._profiles_list is not None:
             self._profiles_list.expand_all()

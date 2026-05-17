@@ -4,19 +4,50 @@
 
 ## Основные Роли
 
-`window_bootstrap_for(...)` создаёт главное окно и регистрирует окно как активное.
+`ApplicationController` создаёт главное окно, собирает `AppRuntime` и явно
+подключает его к окну через `attach_app_runtime_to_window(...)`.
 
-`WindowStartupMixin` создаёт `AppRuntime`, то есть тонкую сборку путей,
-состояния и feature-входов приложения. `AppContext` в рабочем потоке больше
-нет.
+Главное окно создаётся напрямую в `ApplicationController`. Там же оно
+регистрируется как активное окно приложения.
+
+`window_runtime_setup.attach_app_runtime_to_window(...)` — единственное место,
+где готовый `AppRuntime` подключается к окну. Сам файл остаётся коротким
+координатором, а подробная сборка разнесена по маленьким setup-файлам:
+page deps, lifecycle, уведомления и стартовые сигналы.
+
+Feature-зависимости не собираются из полного окна. Для этого есть
+`FeatureWindowDeps`: маленький явный набор Qt-parent, startup/close state и
+callback-ов окна. Для страниц есть `WindowPageActions`, то есть отдельный набор
+разрешённых действий окна. `WindowPageActions` не хранит полное окно: он
+передаёт дальше только готовые callback-и.
+
+`AppRuntime` — это тонкая сборка путей, состояния и feature-входов приложения.
+Его создаёт управляющий слой приложения, а не само окно. `AppContext` в рабочем
+потоке больше нет.
 
 `WindowStartupMixin` отвечает за жизненный цикл окна во время старта:
 
+- подготовить стартовое состояние окна;
 - показать окно как можно раньше;
 - собрать основной UI после первого показа;
-- создать стартовые объекты через `startup_bootstrap_for(...)`;
+- взять `WindowStartupRuntime`;
+- создать `StartupCoordinator` через переданный callback;
 - запустить `StartupCoordinator`;
 - отметить метрики `StartupInteractive`, `StartupCoreReady`, `StartupPostInit`.
+
+`ApplicationLifecycle` исполняет полный выход из приложения:
+
+- скрыть tray-иконку;
+- сохранить геометрию;
+- остановить DPI, если пользователь выбрал выход с остановкой;
+- очистить Premium, runtime threads, страницы и визуальные ресурсы;
+- вызвать `QApplication.quit()`.
+
+`ApplicationLifecycle` не хранит главное окно напрямую. Для действий, которым
+всё ещё нужен Qt-объект окна, используется `ApplicationLifecycleWindowPort`.
+
+`WindowLifecycleMixin` только принимает Qt-события окна и передаёт команды в
+`ApplicationLifecycle`.
 
 `StartupCoordinator` отвечает только за порядок запуска:
 
@@ -25,7 +56,16 @@
 - постановка post-init задач;
 - постановка DPI autostart.
 
-`post_startup_*.py` отвечают за поздние задачи после `StartupPostInit`: проверки, DNS, списки, Telegram Proxy, tray для обычного запуска, update-check и диагностику.
+`application_post_startup.py` собирает явные зависимости для поздних задач из
+готового окна и готового `AppRuntime`. Самим post-startup задачам передаётся
+`PostStartupHost`, а не полное окно.
+
+`post_startup.py` только принимает `PostStartupDeps` и ставит поздние задачи.
+Он не достаёт feature-ы из окна.
+
+`post_startup_*.py` отвечают за поздние задачи после `StartupPostInit`: проверки,
+DNS, списки, Telegram Proxy, tray для обычного запуска, update-check и
+диагностику.
 
 ## Что Не Создаётся На Первом Старте
 
@@ -48,3 +88,9 @@
 
 Все startup-метрики должны начинаться с `Startup...`.
 Дополнительные поздние метрики должны начинаться с `StartupPostInit...`.
+
+## Fluent UI
+
+Production-интерфейс требует `qfluentwidgets`. Если этой библиотеки нет, это
+ошибка окружения запуска, а не повод строить запасной интерфейс на обычных
+Qt-кнопках и полях.

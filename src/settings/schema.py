@@ -122,6 +122,19 @@ def default_hosts() -> dict[str, Any]:
     return {
         "bootstrap_signature": None,
         "active_domains": [],
+        "selection": {},
+    }
+
+
+def default_premium() -> dict[str, Any]:
+    return {
+        "device_id": "",
+        "device_token": None,
+        "last_check": None,
+        "last_network_failure_ts": None,
+        "pair_code": None,
+        "pair_expires_at": None,
+        "premium_cache": None,
     }
 
 
@@ -170,6 +183,44 @@ def default_orchestra() -> dict[str, Any]:
     }
 
 
+def default_updater() -> dict[str, Any]:
+    return {
+        "release_cache": {},
+        "rate_limit": {},
+        "github_cache": {},
+        "github_rate_limit_reset": None,
+        "server_pool": {
+            "stats": {},
+            "selected_server_id": None,
+            "selected_at": None,
+        },
+        "release_manager": {
+            "vps_block_until": 0,
+            "server_stats": {},
+        },
+    }
+
+
+def default_blockcheck() -> dict[str, Any]:
+    return {
+        "user_domains": [],
+        "scan_resume": {"domains": {}},
+    }
+
+
+def default_preset_library() -> dict[str, Any]:
+    return {
+        "version": 1,
+        "scopes": {},
+    }
+
+
+def default_blobs() -> dict[str, Any]:
+    return {
+        "user_blobs": {},
+    }
+
+
 def build_default_settings() -> dict[str, Any]:
     return {
         "version": SETTINGS_VERSION,
@@ -180,7 +231,12 @@ def build_default_settings() -> dict[str, Any]:
         "telegram_proxy": default_telegram_proxy(),
         "dns": default_dns(),
         "hosts": default_hosts(),
+        "premium": default_premium(),
         "ui_state": default_ui_state(),
         "profile_strategy_state": default_profile_strategy_state(),
         "orchestra": default_orchestra(),
+        "updater": default_updater(),
+        "blockcheck": default_blockcheck(),
+        "preset_library": default_preset_library(),
+        "blobs": default_blobs(),
     }
