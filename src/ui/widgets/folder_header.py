@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, QRect, Qt, pyqtSignal
-from PyQt6.QtGui import QCursor, QFontMetrics, QPainter
+from PyQt6.QtCore import QEvent, QPoint, QRect, Qt, pyqtSignal
+from PyQt6.QtGui import QCursor, QFont, QFontMetrics, QPainter
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QStyle, QStyleOptionViewItem, QVBoxLayout, QWidget
 from qfluentwidgets import HorizontalSeparator, StrongBodyLabel
 
@@ -11,6 +11,24 @@ from ui.theme_refresh import ThemeRefreshBinding
 
 
 FOLDER_HEADER_HEIGHT = 28
+FOLDER_HEADER_RADIUS = 4
+FOLDER_HEADER_ICON_BOX = 16
+FOLDER_HEADER_ICON_SIZE = 12
+FOLDER_HEADER_LEFT_MARGIN = 0
+FOLDER_HEADER_RIGHT_MARGIN = 8
+FOLDER_HEADER_GAP = 4
+FOLDER_HEADER_LINE_GAP = 12
+FOLDER_HEADER_HOVER_BG = "rgba(128, 128, 128, 0.08)"
+FOLDER_HEADER_STYLE_SHEET = f"""
+    QFrame[folderHeader="true"] {{
+        background: transparent;
+        border: none;
+        border-radius: {FOLDER_HEADER_RADIUS}px;
+    }}
+    QFrame[folderHeader="true"]:hover {{
+        background: {FOLDER_HEADER_HOVER_BG};
+    }}
+"""
 
 
 def folder_header_icon_name(expanded: bool) -> str:
@@ -19,13 +37,23 @@ def folder_header_icon_name(expanded: bool) -> str:
 
 def folder_header_title(title: object, count: int = 0) -> str:
     text = str(title or "").strip()
-    try:
-        normalized_count = int(count or 0)
-    except Exception:
-        normalized_count = 0
+    normalized_count = _safe_count(count)
     if normalized_count > 0:
         return f"{text}  {normalized_count}"
     return text
+
+
+def folder_header_font(base_font: QFont) -> QFont:
+    font = QFont(base_font)
+    font.setWeight(QFont.Weight.DemiBold)
+    return font
+
+
+def _safe_count(count: object) -> int:
+    try:
+        return max(0, int(count or 0))
+    except Exception:
+        return 0
 
 
 def folder_header_icon_color() -> str:
@@ -48,11 +76,13 @@ def is_folder_toggle_click(event) -> bool:
 
 class FolderGroupHeader(QFrame):
     toggled = pyqtSignal(str, bool)
+    context_requested = pyqtSignal(str, QPoint)
 
-    def __init__(self, group_key: str, title: str, parent=None):
+    def __init__(self, group_key: str, title: str, parent=None, *, count: int = 0):
         super().__init__(parent)
         self._group_key = str(group_key or "")
         self._title = str(title or "")
+        self._count = _safe_count(count)
         self._expanded = True
         self._pressed = False
         self._build_ui()
@@ -71,27 +101,19 @@ class FolderGroupHeader(QFrame):
         self.setProperty("clickable", True)
         self.setProperty("noDrag", True)
         self.setProperty("folderHeader", True)
-        self.setStyleSheet("""
-            QFrame[folderHeader="true"] {
-                background: transparent;
-                border: none;
-                border-radius: 4px;
-            }
-            QFrame[folderHeader="true"]:hover {
-                background: rgba(128, 128, 128, 0.08);
-            }
-        """)
+        self.setStyleSheet(FOLDER_HEADER_STYLE_SHEET)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 8, 0)
-        layout.setSpacing(4)
+        layout.setContentsMargins(FOLDER_HEADER_LEFT_MARGIN, 0, FOLDER_HEADER_RIGHT_MARGIN, 0)
+        layout.setSpacing(FOLDER_HEADER_GAP)
 
         self._chevron = QLabel()
-        self._chevron.setFixedSize(16, 16)
+        self._chevron.setFixedSize(FOLDER_HEADER_ICON_BOX, FOLDER_HEADER_ICON_BOX)
         self._update_chevron()
         layout.addWidget(self._chevron)
 
-        self._title_label = StrongBodyLabel(self._title)
+        self._title_label = StrongBodyLabel(folder_header_title(self._title, self._count))
+        self._title_label.setFont(folder_header_font(self._title_label.font()))
         layout.addWidget(self._title_label)
 
         self._line = HorizontalSeparator()
@@ -103,7 +125,7 @@ class FolderGroupHeader(QFrame):
             get_cached_qta_pixmap(
                 folder_header_icon_name(self._expanded),
                 color=folder_header_icon_color(),
-                size=12,
+                size=FOLDER_HEADER_ICON_SIZE,
             )
         )
 
@@ -126,6 +148,10 @@ class FolderGroupHeader(QFrame):
         self._pressed = False
         return super().leaveEvent(event)
 
+    def contextMenuEvent(self, event):  # noqa: N802
+        self.context_requested.emit(self._group_key, event.globalPos())
+        event.accept()
+
     def toggle(self) -> None:
         self._expanded = not self._expanded
         self._update_chevron()
@@ -139,12 +165,13 @@ class FolderGroupHeader(QFrame):
 
 class FolderGroup(QWidget):
     toggled = pyqtSignal(str, bool)
+    context_requested = pyqtSignal(str, QPoint)
 
-    def __init__(self, group_key: str, title: str, parent=None):
+    def __init__(self, group_key: str, title: str, parent=None, *, count: int = 0):
         super().__init__(parent)
         self._group_key = str(group_key or "")
         self._content_widget = None
-        self._build_ui(str(title or ""))
+        self._build_ui(str(title or ""), count=_safe_count(count))
 
     @property
     def group_key(self) -> str:
@@ -158,13 +185,14 @@ class FolderGroup(QWidget):
     def content_widget(self) -> QWidget:
         return self._content_widget
 
-    def _build_ui(self, title: str) -> None:
+    def _build_ui(self, title: str, *, count: int = 0) -> None:
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(4)
 
-        self._header = FolderGroupHeader(self._group_key, title, self)
+        self._header = FolderGroupHeader(self._group_key, title, self, count=count)
         self._header.toggled.connect(self._on_header_toggled)
+        self._header.context_requested.connect(self.context_requested)
         layout.addWidget(self._header)
 
         self._content_container = QWidget()
@@ -211,24 +239,41 @@ def paint_folder_header_row(
     painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
     tokens = get_theme_tokens()
 
-    row_rect = option.rect.adjusted(4, 1, -4, -1)
+    row_rect = option.rect.adjusted(0, 0, 0, 0)
     if bool(option.state & QStyle.StateFlag.State_MouseOver):
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(to_qcolor(tokens.surface_bg_hover, "rgba(128,128,128,0.08)"))
-        painter.drawRoundedRect(row_rect, 4, 4)
+        painter.setBrush(to_qcolor(tokens.surface_bg_hover, FOLDER_HEADER_HOVER_BG))
+        painter.drawRoundedRect(row_rect, FOLDER_HEADER_RADIUS, FOLDER_HEADER_RADIUS)
 
-    rect = option.rect.adjusted(12, 0, -12, 0)
-    icon_rect = QRect(rect.left(), rect.center().y() - 6, 12, 12)
+    rect = option.rect.adjusted(FOLDER_HEADER_LEFT_MARGIN, 0, -FOLDER_HEADER_RIGHT_MARGIN, 0)
+    icon_box_rect = QRect(
+        rect.left(),
+        rect.center().y() - FOLDER_HEADER_ICON_BOX // 2,
+        FOLDER_HEADER_ICON_BOX,
+        FOLDER_HEADER_ICON_BOX,
+    )
+    icon_rect = QRect(
+        icon_box_rect.center().x() - FOLDER_HEADER_ICON_SIZE // 2,
+        icon_box_rect.center().y() - FOLDER_HEADER_ICON_SIZE // 2,
+        FOLDER_HEADER_ICON_SIZE,
+        FOLDER_HEADER_ICON_SIZE,
+    )
     cached_icon(folder_header_icon_name(expanded), folder_header_icon_color()).paint(painter, icon_rect)
 
     text = folder_header_title(title, count)
-    text_rect = QRect(icon_rect.right() + 8, rect.top(), max(0, rect.width() - 20), rect.height())
+    text_rect = QRect(
+        icon_box_rect.right() + FOLDER_HEADER_GAP,
+        rect.top(),
+        max(0, rect.right() - icon_box_rect.right() - FOLDER_HEADER_GAP),
+        rect.height(),
+    )
+    painter.setFont(folder_header_font(painter.font()))
     painter.setPen(to_qcolor(tokens.fg, "#f5f5f5"))
     painter.drawText(text_rect, int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter), text)
 
     line_y = rect.center().y()
     metrics = QFontMetrics(painter.font())
-    left_end = text_rect.left() + metrics.horizontalAdvance(text) + 12
+    left_end = text_rect.left() + metrics.horizontalAdvance(text) + FOLDER_HEADER_LINE_GAP
     if left_end < rect.right():
         painter.setPen(to_qcolor(tokens.divider, "#5f6368"))
         painter.drawLine(left_end, line_y, rect.right(), line_y)
@@ -242,6 +287,7 @@ __all__ = [
     "FolderGroupHeader",
     "folder_header_icon_color",
     "folder_header_icon_name",
+    "folder_header_font",
     "folder_header_title",
     "is_folder_toggle_click",
     "paint_folder_header_row",

@@ -302,6 +302,32 @@ def normalize_profile_strategy_state(data: object) -> dict[str, Any]:
     }
 
 
+def normalize_user_profiles(data: object) -> dict[str, Any]:
+    raw = as_dict(data)
+    profiles: dict[str, Any] = {}
+    for raw_profile_id, raw_profile in as_dict(raw.get("profiles")).items():
+        profile_id = normalize_lookup_key(raw_profile_id)
+        profile = as_dict(raw_profile)
+        name = as_clean_str(profile.get("name"))
+        protocol = as_clean_str(profile.get("protocol")).lower()
+        ports = as_clean_str(profile.get("ports"))
+        hostlist = as_clean_str(profile.get("hostlist"))
+        ipset = as_clean_str(profile.get("ipset"))
+        if not profile_id or not name or protocol not in {"tcp", "udp"} or not ports or not hostlist or not ipset:
+            continue
+        profiles[profile_id] = {
+            "name": name,
+            "protocol": protocol,
+            "ports": ports,
+            "hostlist": hostlist,
+            "ipset": ipset,
+        }
+    return {
+        "version": 1,
+        "profiles": profiles,
+    }
+
+
 def normalize_orchestra_settings(data: object) -> dict[str, Any]:
     raw = as_dict(data)
     defaults = schema.default_orchestra_settings()
@@ -515,6 +541,7 @@ def normalize_settings(data: object) -> dict[str, Any]:
         "premium": normalize_premium(raw.get("premium")),
         "ui_state": normalize_ui_state(raw.get("ui_state")),
         "profile_strategy_state": normalize_profile_strategy_state(raw.get("profile_strategy_state")),
+        "user_profiles": normalize_user_profiles(raw.get("user_profiles")),
         "orchestra": normalize_orchestra(raw.get("orchestra")),
         "updater": normalize_updater(raw.get("updater")),
         "blockcheck": normalize_blockcheck(raw.get("blockcheck")),

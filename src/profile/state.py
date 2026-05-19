@@ -24,6 +24,7 @@ class ProfileListItem:
     group_name: str
     order: int
     order_is_manual: bool = False
+    group_collapsed: bool = False
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,8 @@ class ProfileListPayload:
     items: tuple[ProfileListItem, ...]
     selected_preset_file_name: str
     selected_preset_name: str
+    normalized_split_profiles: int = 0
+    normalized_created_profiles: int = 0
 
 
 @dataclass(frozen=True)
@@ -44,6 +47,7 @@ class ProfileSetupPayload:
     editable_filter_kind: str = ""
     editable_filter_value: str = ""
     editable_filter_enabled: bool = True
+    editable_filter_kinds: tuple[str, ...] = ()
     in_range: str = "x"
     out_range: str = "a"
     current_strategy_state: ProfileStrategyState = ProfileStrategyState()

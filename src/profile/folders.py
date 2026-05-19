@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from folders.defaults import COMMON_FOLDER_KEY, build_default_profile_folders, classify_profile_folder
-from folders.store import normalize_folder_state
+from folders.store import FolderLibraryStore, normalize_folder_state
 from settings import store as settings_store
 
 
@@ -20,6 +20,54 @@ def save_profile_folder_state(state: dict[str, Any]) -> dict[str, Any]:
     folders = settings_store.get_folders_settings()
     folders["profiles"] = normalize_folder_state(state, build_default_profile_folders())
     return settings_store.set_folders_settings(folders)["profiles"]
+
+
+def create_profile_folder(name: str) -> str:
+    state = load_profile_folder_state()
+    store = FolderLibraryStore(state, default_state=build_default_profile_folders())
+    folder_key = store.create_folder_after(name, COMMON_FOLDER_KEY)
+    save_profile_folder_state(store.to_dict())
+    return folder_key
+
+
+def rename_profile_folder(folder_key: str, name: str) -> bool:
+    state = load_profile_folder_state()
+    store = FolderLibraryStore(state, default_state=build_default_profile_folders())
+    if not store.rename_folder(folder_key, name):
+        return False
+    save_profile_folder_state(store.to_dict())
+    return True
+
+
+def delete_profile_folder(folder_key: str) -> bool:
+    state = load_profile_folder_state()
+    store = FolderLibraryStore(state, default_state=build_default_profile_folders())
+    if not store.delete_folder(folder_key):
+        return False
+    save_profile_folder_state(store.to_dict())
+    return True
+
+
+def move_profile_folder_by_step(folder_key: str, direction: int) -> bool:
+    state = load_profile_folder_state()
+    store = FolderLibraryStore(state, default_state=build_default_profile_folders())
+    if not store.move_folder_by_step(folder_key, direction):
+        return False
+    save_profile_folder_state(store.to_dict())
+    return True
+
+
+def set_profile_folder_collapsed(folder_key: str, collapsed: bool) -> bool:
+    state = load_profile_folder_state()
+    store = FolderLibraryStore(state, default_state=build_default_profile_folders())
+    if not store.set_folder_collapsed(folder_key, collapsed):
+        return False
+    save_profile_folder_state(store.to_dict())
+    return True
+
+
+def reset_profile_folders() -> dict[str, Any]:
+    return save_profile_folder_state(build_default_profile_folders())
 
 
 def profile_folder_for_profile(profile, state: dict[str, Any] | None = None) -> tuple[str, str, int | None]:
@@ -43,6 +91,13 @@ def profile_folder_for_profile(profile, state: dict[str, Any] | None = None) -> 
     folder = folders.get(folder_key) if isinstance(folders, dict) else {}
     folder_name = str(folder.get("name") or "Общие") if isinstance(folder, dict) else "Общие"
     return folder_key, folder_name, order
+
+
+def profile_folder_collapsed(folder_key: str, state: dict[str, Any] | None = None) -> bool:
+    key = str(folder_key or "").strip()
+    folder_state = normalize_folder_state(state, build_default_profile_folders())
+    folder = folder_state.get("folders", {}).get(key)
+    return bool(folder.get("collapsed", False)) if isinstance(folder, dict) else False
 
 
 def set_profile_folder_order(profile_key: str, order: int | None) -> None:
@@ -93,10 +148,17 @@ def _profile_classification_text(profile) -> str:
 
 
 __all__ = [
+    "create_profile_folder",
+    "delete_profile_folder",
     "load_profile_folder_state",
+    "move_profile_folder_by_step",
     "move_profile_before_in_folder_state",
     "move_profile_to_end_in_folder_state",
+    "profile_folder_collapsed",
     "profile_folder_for_profile",
+    "rename_profile_folder",
+    "reset_profile_folders",
     "save_profile_folder_state",
+    "set_profile_folder_collapsed",
     "set_profile_folder_order",
 ]

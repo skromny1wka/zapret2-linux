@@ -112,7 +112,7 @@ PAGE_DEPS_BUILDERS: dict[PageName, PageDepsSpec] = {
     PageName.AUTOSTART: PageDepsSpec(
         build_autostart_page_kwargs,
         features=("autostart",),
-        actions=("show_page",),
+        actions=("show_page", "notify"),
         include_ui_state_store=True,
     ),
     PageName.APPEARANCE: PageDepsSpec(

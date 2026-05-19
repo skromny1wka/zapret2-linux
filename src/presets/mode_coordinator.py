@@ -10,7 +10,6 @@ from settings.schema import SETTINGS_DIR_NAME, SETTINGS_FILE_NAME
 from settings.mode import (
     DEFAULT_PRESET_FILE_NAME_BY_ENGINE,
     ENGINE_BY_LAUNCH_METHOD,
-    ZAPRET1_MODE,
     normalize_launch_method,
 )
 
@@ -18,6 +17,7 @@ from presets.cache_signatures import path_cache_signature
 from presets.file_store import PresetFileStore
 from presets.models import PresetManifest
 from presets.selection_service import PresetSelectionService
+from profile.launch_validation import preset_has_enabled_profiles_for_launch
 
 
 class PresetModeError(RuntimeError):
@@ -256,10 +256,7 @@ class PresetModeCoordinator:
 
     @staticmethod
     def _has_required_filters(launch_method: str, text: str) -> bool:
-        content = str(text or "")
-        if launch_method == ZAPRET1_MODE:
-            return any(flag in content for flag in ("--wf-tcp=", "--wf-udp="))
-        return any(flag in content for flag in ("--wf-tcp-out", "--wf-udp-out", "--wf-raw-part"))
+        return preset_has_enabled_profiles_for_launch(launch_method, text)
 
     @staticmethod
     def _emit_timing(

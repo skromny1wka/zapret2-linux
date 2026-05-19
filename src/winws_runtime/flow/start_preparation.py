@@ -13,6 +13,10 @@ from settings.mode import (
 
 
 from winws_runtime.runtime.start_workers import PreparedDpiStartRequest
+from profile.launch_validation import (
+    preset_filter_flags_for_launch_method,
+    preset_has_enabled_profiles_for_launch,
+)
 
 
 def resolve_launch_method(launch_method=None) -> str:
@@ -64,10 +68,7 @@ def prepare_selected_mode_for_start(selected_mode, launch_method: str, *, preset
 
 
 def preset_filter_flags(launch_method: str) -> tuple[str, ...]:
-    method = normalize_launch_method(launch_method, default="")
-    if is_zapret1_launch_method(method):
-        return ("--wf-tcp=", "--wf-udp=")
-    return ("--wf-tcp-out", "--wf-udp-out", "--wf-raw-part")
+    return preset_filter_flags_for_launch_method(launch_method)
 
 
 def validate_preset_selected_mode(selected_mode, launch_method: str, *, prepared_text: str | None = None) -> None:
@@ -87,8 +88,8 @@ def validate_preset_selected_mode(selected_mode, launch_method: str, *, prepared
             if prepared_text is not None
             else preset_path.read_text(encoding="utf-8").strip()
         )
-        if not any(flag in content for flag in preset_filter_flags(method)):
-            raise RuntimeError("Выберите хотя бы одну категорию для запуска")
+        if not preset_has_enabled_profiles_for_launch(method, content):
+            raise RuntimeError("В выбранном preset нет включённых profile для запуска")
     except RuntimeError:
         raise
     except Exception as e:

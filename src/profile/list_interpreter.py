@@ -17,7 +17,9 @@ def build_profile_list_sources(
     preset_profiles: tuple[Profile, ...],
     templates: dict[str, Profile],
 ) -> tuple[ProfileListSource, ...]:
-    groups: dict[str, list[ProfileListSource]] = {}
+    groups: list[list[ProfileListSource]] = []
+    group_aliases: list[set[str]] = []
+    alias_to_group: dict[str, int] = {}
 
     for profile in preset_profiles:
         source = ProfileListSource(
@@ -26,7 +28,7 @@ def build_profile_list_sources(
             in_preset=True,
             order=profile.index,
         )
-        groups.setdefault(_logical_profile_key(profile), []).append(source)
+        _add_source_to_groups(source, groups, group_aliases, alias_to_group)
 
     template_order = len(preset_profiles)
     for template_id, profile in templates.items():
@@ -36,16 +38,60 @@ def build_profile_list_sources(
             in_preset=False,
             order=template_order + profile.index,
         )
-        groups.setdefault(_logical_profile_key(profile), []).append(source)
+        _add_source_to_groups(source, groups, group_aliases, alias_to_group)
 
-    selected = [_select_source(candidates) for candidates in groups.values()]
+    selected = [_select_source(candidates) for candidates in groups if candidates]
     selected.sort(key=lambda source: (source.order, source.profile.display_name.lower(), source.key))
     return tuple(selected)
 
 
+def _add_source_to_groups(
+    source: ProfileListSource,
+    groups: list[list[ProfileListSource]],
+    group_aliases: list[set[str]],
+    alias_to_group: dict[str, int],
+) -> None:
+    aliases = _logical_profile_keys(source.profile)
+    existing = sorted({alias_to_group[alias] for alias in aliases if alias in alias_to_group})
+    if not existing:
+        group_index = len(groups)
+        groups.append([source])
+        group_aliases.append(set(aliases))
+        for alias in aliases:
+            alias_to_group[alias] = group_index
+        return
+
+    target = existing[0]
+    groups[target].append(source)
+    group_aliases[target].update(aliases)
+
+    for other in reversed(existing[1:]):
+        if other == target or not groups[other]:
+            continue
+        groups[target].extend(groups[other])
+        group_aliases[target].update(group_aliases[other])
+        groups[other] = []
+        group_aliases[other] = set()
+
+    for alias in group_aliases[target]:
+        alias_to_group[alias] = target
+
+
+def _logical_profile_keys(profile: Profile) -> tuple[str, ...]:
+    keys: list[str] = []
+    name = str(getattr(profile, "name", "") or "").strip()
+    if name:
+        keys.append(f"name:{name.casefold()}")
+    match_key = build_profile_logical_key(profile.match_signature)
+    if match_key:
+        keys.append(match_key)
+    if not keys:
+        keys.append(str(profile.match_signature or profile.key))
+    return tuple(dict.fromkeys(keys))
+
+
 def _logical_profile_key(profile: Profile) -> str:
-    key = build_profile_logical_key(profile.match_signature)
-    return key or str(profile.match_signature or profile.key)
+    return _logical_profile_keys(profile)[0]
 
 
 def _select_source(candidates: list[ProfileListSource]) -> ProfileListSource:

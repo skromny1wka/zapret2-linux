@@ -26,6 +26,7 @@ class ProfileDisplayItem:
     group_name: str
     order: int
     order_is_manual: bool = False
+    group_collapsed: bool = False
 
 
 def build_profile_display_items(items: tuple[Any, ...]) -> tuple[ProfileDisplayItem, ...]:
@@ -63,6 +64,7 @@ def _display_item_from_profile(item: Any) -> ProfileDisplayItem:
         group_name=str(getattr(item, "group_name", "") or getattr(item, "group", "") or "Общие"),
         order=int(getattr(item, "order", 0) or 0),
         order_is_manual=bool(getattr(item, "order_is_manual", False)),
+        group_collapsed=bool(getattr(item, "group_collapsed", False)),
     )
 
 

@@ -546,11 +546,12 @@ class UserPresetsPageBase(BasePage):
             tr_prefix=self._config.tr_prefix,
         )
 
-    def _show_reset_all_result(self, success_count: int, total_count: int) -> None:
+    def _show_reset_all_result(self, success_count: int, total_count: int, failed_count: int = 0) -> None:
         show_reset_all_result(
             cleanup_in_progress=self._cleanup_in_progress,
             success_count=success_count,
             total_count=total_count,
+            failed_count=failed_count,
             reset_all_btn=self.reset_all_btn,
             themed_icon_fn=get_themed_qta_icon,
             get_theme_tokens_fn=get_theme_tokens,

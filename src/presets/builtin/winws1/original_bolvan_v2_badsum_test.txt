@@ -12,8 +12,21 @@
 
 # === HTTPS ===
 --filter-tcp=443
+--dpi-desync=multisplit
+--dpi-desync-split-seqovl=286
+--dpi-desync-split-seqovl-pattern=bin/tls_clienthello_11.bin
+--dup=2
+--dup-cutoff=n3
+
+# === HTTP (порт 80) ===
+--new
 --ipset=lists/cloudflare-ipset.txt
---ipset-exclude-ip=1.1.1.1,1.0.0.1,212.109.195.93,83.220.169.155,141.105.71.21,18.244.96.0/19,18.244.128.0/19
+--dpi-desync=multidisorder
+--dpi-desync-split-seqovl=1
+--dpi-desync-split-pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2
+
+# === HTTPS ===
+--filter-tcp=443
 --dpi-desync=multisplit
 --dpi-desync-split-seqovl=286
 --dpi-desync-split-seqovl-pattern=bin/tls_clienthello_11.bin

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 from log.log import log
-from settings.mode import is_preset_launch_method, is_zapret1_launch_method, normalize_launch_method
+from settings.mode import is_preset_launch_method, normalize_launch_method
+from profile.launch_validation import preset_has_enabled_profiles_for_launch
 
 
 def _is_launch_running(runtime_feature) -> bool:
@@ -13,13 +14,6 @@ def _is_launch_running(runtime_feature) -> bool:
     except Exception as e:
         log(f"Ошибка проверки состояния DPI: {e}", "DEBUG")
     return False
-
-
-def _preset_filter_flags(launch_method: str) -> tuple[str, ...]:
-    method = normalize_launch_method(launch_method, default="")
-    if is_zapret1_launch_method(method):
-        return ("--wf-tcp=", "--wf-udp=")
-    return ("--wf-tcp-out", "--wf-udp-out", "--wf-raw-part")
 
 
 def _get_selected_presets_path(presets_feature, launch_method: str) -> Path | None:
@@ -67,8 +61,8 @@ def request_preset_runtime_content_apply(
         log(f"Preset runtime apply: failed to read preset for {method}: {e}", "ERROR")
         return False
 
-    if not any(flag in content for flag in _preset_filter_flags(method)):
-        log(f"Preset runtime apply: preset has no active filters for {method}, stopping DPI", "INFO")
+    if not preset_has_enabled_profiles_for_launch(method, content):
+        log(f"Preset runtime apply: preset has no enabled profiles for {method}, stopping DPI", "INFO")
         launch_runtime.stop_dpi_async()
         return True
 

@@ -64,7 +64,7 @@ def setup_autostart_for_exe(
 
         ok = register_canonical_autostart_task(exe_path)
         if not ok:
-            _log("Ошибка создания задачи автозапуска через Task Scheduler API", "❌ ERROR")
+            _log("Ошибка создания задачи автозапуска через Task Scheduler API", "WARNING")
             _status("Не удалось создать задачу автозапуска")
             return False
 
@@ -72,6 +72,6 @@ def setup_autostart_for_exe(
         _status("Автозапуск программы включён")
         return True
     except Exception as exc:
-        _log(f"setup_autostart_for_exe: {exc}", "❌ ERROR")
+        _log(f"setup_autostart_for_exe: {exc}", "WARNING")
         _status(f"Ошибка: {exc}")
         return False

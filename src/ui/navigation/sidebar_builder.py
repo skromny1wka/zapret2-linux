@@ -253,8 +253,16 @@ def sync_nav_visibility(window, method: str | None = None) -> None:
     visibility_by_page = get_nav_visibility(method)
 
     log(f"[NAV] _sync_nav_visibility method={method!r}, nav_items keys={[p.name for p in session.nav_items]}", "DEBUG")
+    for page_name, item in tuple(session.nav_items.items()):
+        if page_name in visibility_by_page and not bool(visibility_by_page.get(page_name, True)):
+            try:
+                item.setVisible(False)
+            except Exception:
+                pass
+
     mode_visibility: dict[PageName, bool] = {
-        page_name: True for page_name in session.nav_items
+        page_name: bool(visibility_by_page.get(page_name, True))
+        for page_name in session.nav_items
     }
     for page_name, should_show in visibility_by_page.items():
         item = session.nav_items.get(page_name)
@@ -263,6 +271,7 @@ def sync_nav_visibility(window, method: str | None = None) -> None:
                 window,
                 page_name,
                 session.nav_scroll_position,
+                initial_visible=False,
                 insert_index=_resolve_scroll_insert_index(window, page_name, method),
             )
             item = session.nav_items.get(page_name)

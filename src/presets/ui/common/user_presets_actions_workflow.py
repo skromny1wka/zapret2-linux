@@ -163,7 +163,7 @@ def run_reset_all_presets_action(
         if result.structure_changed:
             runtime_service.mark_presets_structure_changed()
         log_fn(result.log_message, result.log_level)
-        show_result_fn(result.success_count, result.total_count)
+        show_result_fn(result.success_count, result.total_count, result.failed_count)
     except Exception as exc:
         log_fn(f"Ошибка массового восстановления пресетов: {exc}", "ERROR")
         info_bar_cls.error(
@@ -186,6 +186,7 @@ def show_reset_all_result(
     cleanup_in_progress: bool,
     success_count: int,
     total_count: int,
+    failed_count: int = 0,
     reset_all_btn,
     themed_icon_fn,
     get_theme_tokens_fn,
@@ -194,11 +195,19 @@ def show_reset_all_result(
 ) -> None:
     if cleanup_in_progress:
         return
-    total = int(total_count or 0)
+    _ = total_count
     ok = int(success_count or 0)
+    failed = int(failed_count or 0)
     try:
-        reset_all_btn.setText(f"{ok}/{total}")
-        icon_name = "fa5s.check" if total > 0 and ok >= total else "fa5s.exclamation-triangle"
+        if failed > 0:
+            reset_all_btn.setText(f"Ошибки: {failed}")
+            icon_name = "fa5s.exclamation-triangle"
+        elif ok > 0:
+            reset_all_btn.setText(f"Сброшено: {ok}")
+            icon_name = "fa5s.check"
+        else:
+            reset_all_btn.setText("Нечего менять")
+            icon_name = "fa5s.check"
         reset_all_btn.setIcon(themed_icon_fn(icon_name, color=get_theme_tokens_fn().fg))
     except Exception:
         pass

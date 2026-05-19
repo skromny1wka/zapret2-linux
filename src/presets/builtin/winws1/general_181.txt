@@ -30,17 +30,125 @@
 --new
 --filter-tcp=443
 --hostlist=lists/list-general.txt
+--dpi-desync=fake,split
+--dpi-desync-autottl=5
+--dpi-desync-repeats=6
+--dpi-desync-fooling=badseq
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/discord.txt
+--dpi-desync=fake,split
+--dpi-desync-autottl=5
+--dpi-desync-repeats=6
+--dpi-desync-fooling=badseq
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/other.txt
+--dpi-desync=fake,split
+--dpi-desync-autottl=5
+--dpi-desync-repeats=6
+--dpi-desync-fooling=badseq
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/soundcloud.txt
+--dpi-desync=fake,split
+--dpi-desync-autottl=5
+--dpi-desync-repeats=6
+--dpi-desync-fooling=badseq
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/rutracker.txt
+--dpi-desync=fake,split
+--dpi-desync-autottl=5
+--dpi-desync-repeats=6
+--dpi-desync-fooling=badseq
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/rutor.txt
+--dpi-desync=fake,split
+--dpi-desync-autottl=5
+--dpi-desync-repeats=6
+--dpi-desync-fooling=badseq
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/roblox.txt
+--dpi-desync=fake,split
+--dpi-desync-autottl=5
+--dpi-desync-repeats=6
+--dpi-desync-fooling=badseq
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/itch.txt
+--dpi-desync=fake,split
+--dpi-desync-autottl=5
+--dpi-desync-repeats=6
+--dpi-desync-fooling=badseq
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/facebook.txt
+--dpi-desync=fake,split
+--dpi-desync-autottl=5
+--dpi-desync-repeats=6
+--dpi-desync-fooling=badseq
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/instagram.txt
+--dpi-desync=fake,split
+--dpi-desync-autottl=5
+--dpi-desync-repeats=6
+--dpi-desync-fooling=badseq
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/twitter.txt
+--dpi-desync=fake,split
+--dpi-desync-autottl=5
+--dpi-desync-repeats=6
+--dpi-desync-fooling=badseq
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/whatsapp.txt
+--dpi-desync=fake,split
+--dpi-desync-autottl=5
+--dpi-desync-repeats=6
+--dpi-desync-fooling=badseq
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/other.txt
 --dpi-desync=fake,split
 --dpi-desync-autottl=5

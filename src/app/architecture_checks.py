@@ -1054,6 +1054,52 @@ def check_preset_switch_has_no_full_start_fallback() -> list[Problem]:
     )
 
 
+def check_fast_switch_runners_do_not_call_full_start_pipeline() -> list[Problem]:
+    targets = (
+        (SRC_ROOT / "winws_runtime" / "runners" / "zapret1_runner.py", "Winws1StrategyRunner"),
+        (SRC_ROOT / "winws_runtime" / "runners" / "zapret2_runner.py", "Winws2StrategyRunner"),
+    )
+    problems: list[Problem] = []
+    for path, class_name in targets:
+        if not path.exists():
+            problems.append(Problem(path, 1, f"{path.name} не найден"))
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+        runner = next(
+            (
+                node
+                for node in ast.walk(tree)
+                if isinstance(node, ast.ClassDef) and node.name == class_name
+            ),
+            None,
+        )
+        if runner is None:
+            problems.append(Problem(path, 1, f"{class_name} не найден"))
+            continue
+        switch_method = next(
+            (
+                node
+                for node in runner.body
+                if isinstance(node, ast.FunctionDef) and node.name == "switch_preset_file_fast"
+            ),
+            None,
+        )
+        if switch_method is None:
+            problems.append(Problem(path, getattr(runner, "lineno", 1), "switch_preset_file_fast не найден"))
+            continue
+        for node in ast.walk(switch_method):
+            if isinstance(node, ast.Attribute) and node.attr == "_start_from_preset_file_locked":
+                problems.append(
+                    Problem(
+                        path,
+                        getattr(node, "lineno", getattr(switch_method, "lineno", 1)),
+                        "switch_preset_file_fast не должен откатываться в полный start pipeline",
+                        "_start_from_preset_file_locked",
+                    )
+                )
+    return problems
+
+
 def check_no_running_preset_pid_probe(files: list[Path]) -> list[Problem]:
     scopes = [
         path for path in files
@@ -1167,6 +1213,7 @@ def run_checks() -> list[Problem]:
     problems.extend(check_settings_json_is_single_app_storage(files))
     problems.extend(check_page_deps_context_has_explicit_fields(files))
     problems.extend(check_preset_switch_has_no_full_start_fallback())
+    problems.extend(check_fast_switch_runners_do_not_call_full_start_pipeline())
     problems.extend(check_no_running_preset_pid_probe(files))
     problems.extend(check_ui_workflows_do_not_call_page_methods(files))
     problems.extend(check_launch_preparation_does_not_mutate_source_preset())

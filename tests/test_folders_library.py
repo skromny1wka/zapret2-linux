@@ -45,6 +45,7 @@ class FolderDefaultsTests(unittest.TestCase):
         self.assertEqual(classify_profile_folder("Telegram --hostlist=telegram.txt"), "messengers")
         self.assertEqual(classify_profile_folder("Facebook --hostlist=facebook.txt"), "social")
         self.assertEqual(classify_profile_folder("Valorant game filter"), "games")
+        self.assertEqual(classify_profile_folder("itch.io --hostlist=lists/itch.txt"), "games")
         self.assertEqual(classify_profile_folder("--filter-tcp=80,443 --hostlist-exclude=ru.txt"), "all-sites")
         self.assertEqual(classify_profile_folder("rutracker.org"), "sites")
 

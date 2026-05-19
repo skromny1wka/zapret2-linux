@@ -9,6 +9,7 @@ class GuiAutostartResult:
     success: bool
     removed_count: int = 0
     restart_requested: bool = False
+    message: str = ""
 
 
 def get_current_launch_method() -> str:
@@ -36,10 +37,26 @@ def enable_gui_autostart(*, status_cb: Callable[[str], None] | None = None) -> G
 
     if not is_admin():
         restart_requested = bool(request_admin_for_autostart())
-        return GuiAutostartResult(success=False, restart_requested=restart_requested)
+        message = (
+            "ZapretGUI нужно запустить с правами администратора, "
+            "чтобы создать системную задачу автозапуска."
+        )
+        return GuiAutostartResult(
+            success=False,
+            restart_requested=restart_requested,
+            message=message,
+        )
 
     ok = bool(setup_autostart_for_exe(status_cb=status_cb))
-    return GuiAutostartResult(success=ok)
+    if ok:
+        return GuiAutostartResult(success=True)
+    return GuiAutostartResult(
+        success=False,
+        message=(
+            "Не удалось включить автозапуск. Windows не принял задачу "
+            "Планировщика заданий."
+        ),
+    )
 
 
 __all__ = [

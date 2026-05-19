@@ -738,11 +738,43 @@ class ProfileSetupPageBase(BasePage):
         filter_enabled = bool(getattr(payload, "editable_filter_enabled", True))
         self._filter_combo.setVisible(filter_enabled)
         self._filter_value.setVisible(filter_enabled)
+        self._rebuild_filter_kind_combo(
+            tuple(getattr(payload, "editable_filter_kinds", ()) or ()),
+            str(getattr(payload, "editable_filter_kind", "") or "hostlist"),
+        )
         set_combo_by_data(self._filter_combo, getattr(payload, "editable_filter_kind", "") or "hostlist")
         self._filter_value.setText(str(getattr(payload, "editable_filter_value", "") or ""))
         set_range_controls(self._in_range_mode, self._in_range_value, getattr(payload, "in_range", "") or "x")
         set_range_controls(self._out_range_mode, self._out_range_value, getattr(payload, "out_range", "") or "a")
         self._update_all_range_tooltips()
+
+    def _rebuild_filter_kind_combo(self, available_kinds: tuple[str, ...], current_kind: str) -> None:
+        labels = {
+            "hostlist": tr_catalog("page.winws2_profile_setup.filter.hostlist", language=self._ui_language, default="Hostlist"),
+            "ipset": tr_catalog("page.winws2_profile_setup.filter.ipset", language=self._ui_language, default="IPset"),
+        }
+        kinds: list[str] = []
+        for kind in (*available_kinds, current_kind):
+            normalized = str(kind or "").strip().lower()
+            if normalized in labels and normalized not in kinds:
+                kinds.append(normalized)
+        if not kinds:
+            kinds = ["hostlist"]
+
+        current_items = [
+            str(self._filter_combo.itemData(index) or "").strip().lower()
+            for index in range(self._filter_combo.count())
+        ]
+        if current_items == kinds:
+            return
+
+        self._filter_combo.blockSignals(True)
+        try:
+            self._filter_combo.clear()
+            for kind in kinds:
+                self._filter_combo.addItem(labels[kind], userData=kind)
+        finally:
+            self._filter_combo.blockSignals(False)
 
     def _on_range_mode_changed(self, combo: ComboBox, value_edit: LineEdit) -> None:
         sync_range_value_enabled(combo, value_edit)

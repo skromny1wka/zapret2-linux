@@ -19,6 +19,7 @@ from ui.theme import (
 from ui.theme_semantic import get_semantic_palette
 from app.state_store import AppUiState, MainWindowStateStore
 from app.text_catalog import tr as tr_catalog
+from autostart.ui.notifications import build_autostart_error_notification
 from log.log import log
 from qfluentwidgets import (
     SimpleCardWidget,
@@ -199,7 +200,7 @@ class ClickableModeCard(SimpleCardWidget):
 class AutostartPage(BasePage):
     """Страница настроек автозапуска."""
 
-    def __init__(self, parent=None, *, autostart_feature, open_dpi_settings, ui_state_store):
+    def __init__(self, parent=None, *, autostart_feature, open_dpi_settings, notify, ui_state_store):
         super().__init__(
             "Автозапуск",
             "Настройка автоматического запуска Zapret",
@@ -210,6 +211,7 @@ class AutostartPage(BasePage):
 
         self._autostart = autostart_feature
         self._open_dpi_settings_callback = open_dpi_settings
+        self._notify = notify
         self.strategy_name = None
         self._cleanup_in_progress = False
 
@@ -551,7 +553,9 @@ class AutostartPage(BasePage):
             else:
                 log("Автозапуск отключён", "INFO")
         except Exception as exc:
-            log(f"Ошибка отключения автозапуска: {exc}", "ERROR")
+            message = f"Не удалось отключить автозапуск: {exc}"
+            log(message, "WARNING")
+            self._show_autostart_error(message)
 
     def _on_gui_autostart(self):
         try:
@@ -564,11 +568,27 @@ class AutostartPage(BasePage):
                 return
 
             if not result.success:
-                log("Не удалось настроить автозапуск GUI", "ERROR")
+                message = str(
+                    getattr(result, "message", "")
+                    or "Не удалось включить автозапуск. Windows не принял задачу Планировщика заданий."
+                )
+                log(message, "WARNING")
+                self._show_autostart_error(message)
                 return
             self._push_autostart_state(True, self.strategy_name)
         except Exception as exc:
-            log(f"Ошибка автозапуска GUI: {exc}", "ERROR")
+            message = f"Не удалось включить автозапуск: {exc}"
+            log(message, "WARNING")
+            self._show_autostart_error(message)
+
+    def _show_autostart_error(self, message: str) -> None:
+        notify = getattr(self, "_notify", None)
+        if not callable(notify):
+            return
+        try:
+            notify(build_autostart_error_notification(message))
+        except Exception as exc:
+            log(f"Не удалось показать уведомление автозапуска: {exc}", "DEBUG")
 
     def cleanup(self):
         self._cleanup_in_progress = True

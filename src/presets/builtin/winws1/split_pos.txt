@@ -8,8 +8,35 @@
 # === HTTPS YouTube ===
 --filter-tcp=443
 --hostlist=lists/russia-blacklist.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-fake-tls-mod=rnd,dupsid
+--dpi-desync-repeats=3
+--dpi-desync-split-pos=100,midsld,sniext+1,endhost-2,-10
+--dpi-desync-ttl=4
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/other.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-fake-tls-mod=rnd,dupsid
+--dpi-desync-repeats=3
+--dpi-desync-split-pos=100,midsld,sniext+1,endhost-2,-10
+--dpi-desync-ttl=4
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/youtube.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-fake-tls-mod=rnd,dupsid
+--dpi-desync-repeats=3
+--dpi-desync-split-pos=100,midsld,sniext+1,endhost-2,-10
+--dpi-desync-ttl=4
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/discord.txt
 --dpi-desync=fake,multidisorder
 --dpi-desync-fake-tls-mod=rnd,dupsid

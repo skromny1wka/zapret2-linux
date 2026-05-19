@@ -276,6 +276,15 @@ def set_profile_strategy_state_settings(values: dict[str, Any]) -> dict[str, Any
     return copy.deepcopy(updated["profile_strategy_state"])
 
 
+def get_user_profiles_settings() -> dict[str, Any]:
+    return copy.deepcopy(read_settings()["user_profiles"])
+
+
+def set_user_profiles_settings(values: dict[str, Any]) -> dict[str, Any]:
+    updated = _update_settings(lambda data: _set_path_value(data, ("user_profiles",), _as_dict(values)))
+    return copy.deepcopy(updated["user_profiles"])
+
+
 def get_updater_settings() -> dict[str, Any]:
     return copy.deepcopy(read_settings()["updater"])
 

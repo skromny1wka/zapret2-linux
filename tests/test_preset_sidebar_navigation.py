@@ -4,6 +4,7 @@ import inspect
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 
 PROJECT_SRC = Path(__file__).resolve().parents[1] / "src"
@@ -169,6 +170,79 @@ class PresetSidebarNavigationTests(unittest.TestCase):
             resolve_mode_context_page_for_method(PageName.ZAPRET1_MODE_CONTROL, ZAPRET2_MODE),
             PageName.ZAPRET2_MODE_CONTROL,
         )
+
+    def test_mode_switch_hides_old_mode_items_before_adding_new_visible_items(self) -> None:
+        from app.page_names import PageName
+        from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE
+        import ui.navigation.sidebar_builder as sidebar_builder
+
+        class FakeNavItem:
+            def __init__(self, visible: bool = True) -> None:
+                self.visible = visible
+
+            def setVisible(self, visible: bool) -> None:
+                self.visible = bool(visible)
+
+        class FakeNavigationInterface:
+            def __init__(self, session) -> None:
+                self._session = session
+
+            def addItem(self, *, routeKey, icon, text, onClick, selectable, position):
+                _ = routeKey, icon, text, onClick, selectable, position
+                return FakeNavItem(True)
+
+            def insertItem(self, index, *, routeKey, icon, text, onClick, selectable, position):
+                _ = index, routeKey, icon, text, onClick, selectable, position
+                return FakeNavItem(True)
+
+        old_pages = (
+            PageName.ZAPRET2_MODE_CONTROL,
+            PageName.ZAPRET2_USER_PRESETS,
+            PageName.ZAPRET2_PRESET_SETUP,
+        )
+        new_pages = (
+            PageName.ZAPRET1_MODE_CONTROL,
+            PageName.ZAPRET1_USER_PRESETS,
+            PageName.ZAPRET1_PRESET_SETUP,
+        )
+        session = SimpleNamespace(
+            nav_items={page_name: FakeNavItem(True) for page_name in old_pages},
+            nav_icons={},
+            nav_labels={},
+            nav_headers=[],
+            nav_header_by_group={},
+            nav_search_query="",
+            nav_mode_visibility={},
+            nav_scroll_position=None,
+            default_nav_icon=None,
+            ui_language="ru",
+            sidebar_search_model=None,
+            sidebar_search_completer=None,
+            page_host=SimpleNamespace(ensure_page=lambda page_name: None),
+        )
+        window = SimpleNamespace(
+            ui_session=session,
+            navigationInterface=FakeNavigationInterface(session),
+            get_launch_method=lambda: ZAPRET2_MODE,
+        )
+        snapshots: list[tuple[set[PageName], set[PageName]]] = []
+
+        original_pump = sidebar_builder.pump_startup_ui
+        try:
+            sidebar_builder.pump_startup_ui = lambda current_window: snapshots.append(
+                (
+                    {page for page in old_pages if session.nav_items.get(page) and session.nav_items[page].visible},
+                    {page for page in new_pages if session.nav_items.get(page) and session.nav_items[page].visible},
+                )
+            )
+
+            sidebar_builder.sync_nav_visibility(window, ZAPRET1_MODE)
+        finally:
+            sidebar_builder.pump_startup_ui = original_pump
+
+        self.assertTrue(snapshots)
+        for old_visible, new_visible in snapshots:
+            self.assertFalse(old_visible and new_visible)
 
 
 if __name__ == "__main__":

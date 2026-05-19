@@ -110,6 +110,14 @@ class ProfileFeature:
     def move_profile_to_end(self, launch_method: str, profile_key: str) -> str | None:
         return profile_internal_commands.move_profile_to_end(self, launch_method, profile_key)
 
+    def create_user_profile(self, *, name: str, protocol: str, ports: str) -> str:
+        return profile_internal_commands.create_user_profile(
+            self,
+            name=name,
+            protocol=protocol,
+            ports=ports,
+        )
+
     def get_advanced_settings_state(self, launch_method: str):
         return profile_settings.get_advanced_settings_state(self, launch_method=launch_method)
 

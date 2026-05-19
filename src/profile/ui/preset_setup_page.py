@@ -3,9 +3,12 @@ from __future__ import annotations
 from PyQt6.QtCore import QTimer
 
 from log.log import log
+from profile.folders import set_profile_folder_collapsed
+from profile.ui.profile_folder_menu import show_profile_folder_menu
 from profile.ui.profiles_list import ProfilesList
 from profile.ui.shell import build_profile_shell
-from qfluentwidgets import BodyLabel, MessageBox
+from profile.ui.user_profile_dialog import CreateUserProfileDialog
+from qfluentwidgets import BodyLabel, InfoBar, MessageBox, PrimaryPushButton
 from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE
 from ui.pages.base_page import BasePage
 from app.text_catalog import tr as tr_catalog
@@ -50,6 +53,7 @@ class PresetSetupPageBase(BasePage):
         self._collapse_btn = None
         self._request_btn = None
         self._info_btn = None
+        self._add_profile_btn = None
         self._toolbar_actions_bar = None
         self._cleanup_in_progress = False
         self._build_content()
@@ -116,6 +120,7 @@ class PresetSetupPageBase(BasePage):
         if self._content_host_layout is None:
             return
         self._apply_selected_preset_title(payload)
+        self._show_profile_normalization_info(payload)
         self._clear_dynamic_widgets()
         if not payload.items:
             self._show_empty_state(
@@ -127,10 +132,34 @@ class PresetSetupPageBase(BasePage):
         profiles_list.profile_selected.connect(self._on_profile_clicked)
         profiles_list.profile_move_requested.connect(self._on_profile_move_requested)
         profiles_list.profile_move_to_end_requested.connect(self._on_profile_move_to_end_requested)
+        profiles_list.folder_context_requested.connect(self._on_folder_context_requested)
+        profiles_list.folder_toggled.connect(self._on_folder_toggled)
         profiles_list.build_profiles(tuple(payload.items))
         self._profiles_list = profiles_list
         self._content_host_layout.addWidget(profiles_list, 1)
+        self._add_profile_btn = PrimaryPushButton("Добавить", self)
+        self._add_profile_btn.clicked.connect(self._on_add_user_profile_clicked)
+        self._content_host_layout.addWidget(self._add_profile_btn)
         self._empty_state_label = None
+
+    def _show_profile_normalization_info(self, payload) -> None:
+        split_count = int(getattr(payload, "normalized_split_profiles", 0) or 0)
+        created_count = int(getattr(payload, "normalized_created_profiles", 0) or 0)
+        if split_count <= 0 or created_count <= 0:
+            return
+        try:
+            InfoBar.info(
+                title="Profile-ы разделены",
+                content=(
+                    f"Найдено сложных profile-ов: {split_count}. "
+                    f"Создано отдельных profile-ов: {created_count}. "
+                    "Теперь каждому списку можно менять стратегию отдельно."
+                ),
+                parent=self.window(),
+                duration=6500,
+            )
+        except Exception as exc:
+            log(f"{self.__class__.__name__}: не удалось показать уведомление о разделении profile-ов: {exc}", "DEBUG")
 
     def _apply_selected_preset_title(self, payload) -> None:
         if self.title_label is None:
@@ -156,6 +185,9 @@ class PresetSetupPageBase(BasePage):
         label = BodyLabel(text)
         label.setWordWrap(True)
         self._content_host_layout.addWidget(label)
+        self._add_profile_btn = PrimaryPushButton("Добавить", self)
+        self._add_profile_btn.clicked.connect(self._on_add_user_profile_clicked)
+        self._content_host_layout.addWidget(self._add_profile_btn)
         self._empty_state_label = label
 
     def _on_profile_clicked(self, profile_key: str) -> None:
@@ -178,6 +210,21 @@ class PresetSetupPageBase(BasePage):
             self.refresh_from_preset_switch()
         except Exception as exc:
             log(f"{self.__class__.__name__}: не удалось переместить профиль в конец: {exc}", "ERROR")
+
+    def _on_folder_context_requested(self, folder_key: str, global_pos) -> None:
+        show_profile_folder_menu(
+            parent=self,
+            folder_key=folder_key,
+            global_pos=global_pos,
+            refresh_fn=self.refresh_from_preset_switch,
+            log_fn=log,
+        )
+
+    def _on_folder_toggled(self, folder_key: str, is_expanded: bool) -> None:
+        try:
+            set_profile_folder_collapsed(folder_key, not bool(is_expanded))
+        except Exception as exc:
+            log(f"{self.__class__.__name__}: не удалось запомнить состояние папки profile-ов: {exc}", "ERROR")
 
     def apply_profile_setup_change(self, profile_key: str, change_kind: str) -> None:
         _ = (profile_key, change_kind)
@@ -208,6 +255,27 @@ class PresetSetupPageBase(BasePage):
             "Если профиль выключить, программа добавит --skip, чтобы движок его пропустил.",
             self,
         ).exec()
+
+    def _on_add_user_profile_clicked(self) -> None:
+        dialog = CreateUserProfileDialog(self)
+        if not dialog.exec():
+            return
+        name, protocol, ports = dialog.values()
+        try:
+            self._profile.create_user_profile(name=name, protocol=protocol, ports=ports)
+            InfoBar.success(
+                title="Profile добавлен",
+                content="Он появился в общем списке и пока выключен во всех preset-ах.",
+                parent=self.window(),
+            )
+            self.refresh_from_preset_switch()
+        except Exception as exc:
+            log(f"{self.__class__.__name__}: не удалось создать пользовательский profile: {exc}", "ERROR")
+            InfoBar.error(
+                title="Ошибка",
+                content=str(exc),
+                parent=self.window(),
+            )
 
 
 class Zapret2PresetSetupPage(PresetSetupPageBase):

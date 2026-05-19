@@ -327,10 +327,6 @@ class WindowGeometryRuntime:
         self._window_zoom_visual_state = zoomed
         self._last_non_minimized_zoomed = zoomed
 
-        set_zoom_chrome_compact = getattr(self.host, "set_zoom_chrome_compact", None)
-        if callable(set_zoom_chrome_compact):
-            set_zoom_chrome_compact(zoomed)
-
     def _schedule_window_maximized_persist(self, is_zoomed: bool) -> None:
         self._pending_window_maximized_state = bool(is_zoomed)
         try:

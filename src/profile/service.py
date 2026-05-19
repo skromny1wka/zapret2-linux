@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from settings.mode import DEFAULT_LAUNCH_METHOD, ENGINE_WINWS2, engine_for_launch_method, normalize_launch_method
 
@@ -9,10 +10,12 @@ from .folders import (
     load_profile_folder_state,
     move_profile_before_in_folder_state,
     move_profile_to_end_in_folder_state,
+    profile_folder_collapsed,
     profile_folder_for_profile,
 )
 from .list_interpreter import build_profile_list_sources
 from .models import EngineName, Preset, Profile
+from .normalizer import normalize_preset_profiles
 from .parser import parse_preset_text
 from .serializer import (
     append_profile_from_template,
@@ -25,8 +28,14 @@ from .serializer import (
 from .strategy_state import ProfileStrategyState, ProfileStrategyStateStore
 from .strategy_catalog import StrategyEntry, load_strategy_catalogs
 from .state import ProfileListItem, ProfileListPayload, ProfileSetupPayload
-from .template_catalog import load_profile_templates
-from .winws2_editable_settings import Winws2EditableSettings, read_winws2_editable_settings, with_winws2_editable_settings
+from .template_library import load_profile_template_library
+from .user_profiles import create_user_profile
+from .winws2_editable_settings import (
+    Winws2EditableSettings,
+    normalize_winws2_filter_value,
+    read_winws2_editable_settings,
+    with_winws2_editable_settings,
+)
 
 
 class ProfilePresetService:
@@ -51,6 +60,10 @@ class ProfilePresetService:
 
     def list_profiles(self) -> ProfileListPayload:
         preset, manifest = self.load_selected_preset()
+        normalization = normalize_preset_profiles(preset)
+        if normalization.changed:
+            preset = normalization.preset
+            self.save_selected_preset(preset)
         catalogs = load_strategy_catalogs(self._app_paths, self._engine)
         templates = self._load_profile_templates()
         folder_state = load_profile_folder_state()
@@ -72,6 +85,8 @@ class ProfilePresetService:
             items=tuple(items),
             selected_preset_file_name=str(getattr(manifest, "file_name", "") or ""),
             selected_preset_name=str(getattr(manifest, "name", "") or ""),
+            normalized_split_profiles=normalization.split_profile_count,
+            normalized_created_profiles=normalization.created_profile_count,
         )
 
     def count_enabled_profiles(self) -> int:
@@ -112,6 +127,7 @@ class ProfilePresetService:
             editable_filter_kind=winws2_editable.filter_kind,
             editable_filter_value=winws2_editable.filter_value,
             editable_filter_enabled=winws2_editable.filter_editable,
+            editable_filter_kinds=_available_filter_kinds(winws2_editable, self._app_paths),
             in_range=winws2_editable.in_range,
             out_range=winws2_editable.out_range,
             current_strategy_state=strategy_states.get(item.strategy_id, ProfileStrategyState()),
@@ -255,6 +271,8 @@ class ProfilePresetService:
             return None
         if current.filter_kind == filter_kind:
             return profile.key
+        if filter_kind not in _available_filter_kinds(current, self._app_paths):
+            return None
 
         preset = with_winws2_editable_settings(
             preset,
@@ -312,6 +330,11 @@ class ProfilePresetService:
         )
         return source.key
 
+    def create_user_profile(self, *, name: str, protocol: str, ports: str) -> str:
+        profile_id = create_user_profile(self._app_paths, name=name, protocol=protocol, ports=ports)
+        self._load_profile_templates.cache_clear()
+        return profile_id
+
     def _profile_sources_for_folder_order(self):
         preset, _manifest = self.load_selected_preset()
         templates = self._load_profile_templates()
@@ -350,6 +373,11 @@ class ProfilePresetService:
         list_type = _list_type(profile)
         folder_key, folder_name, folder_order = profile_folder_for_profile(profile, folder_state)
         effective_strategy_id = strategy_id if in_preset and profile.enabled else "none"
+        display_strategy_name = _profile_status_name(
+            in_preset=in_preset,
+            enabled=bool(profile.enabled),
+            strategy_name=strategy_name,
+        )
         state = (
             self._state_store.get_strategy_state(profile.persistent_key, effective_strategy_id)
             if effective_strategy_id not in {"", "none", "custom"}
@@ -363,7 +391,7 @@ class ProfilePresetService:
             enabled=profile.enabled if in_preset else False,
             in_preset=in_preset,
             strategy_id=effective_strategy_id,
-            strategy_name=strategy_name if in_preset and profile.enabled else "Отключено",
+            strategy_name=display_strategy_name,
             match_lines=tuple(profile.match.all_lines()),
             list_type=list_type,
             rating=state.rating,
@@ -372,11 +400,12 @@ class ProfilePresetService:
             group_name=folder_name,
             order=folder_order if folder_order is not None else (profile.index if order is None else int(order)),
             order_is_manual=folder_order is not None,
+            group_collapsed=profile_folder_collapsed(folder_key, folder_state),
         )
 
     @lru_cache(maxsize=1)
     def _load_profile_templates(self) -> dict[str, Profile]:
-        return load_profile_templates(self._app_paths, self._engine)
+        return load_profile_template_library(self._app_paths, self._engine)
 
 
 def _engine_for_method(launch_method: str) -> EngineName:
@@ -423,6 +452,14 @@ def _resolve_strategy(profile: Profile, entries: dict[str, StrategyEntry]) -> tu
     return "custom", "custom"
 
 
+def _profile_status_name(*, in_preset: bool, enabled: bool, strategy_name: str) -> str:
+    if not in_preset:
+        return "Не добавлен"
+    if not enabled:
+        return "Выключен"
+    return str(strategy_name or "").strip() or "Отключено"
+
+
 def _normalize_lines(lines) -> tuple[str, ...]:
     return tuple(str(line or "").strip() for line in lines if str(line or "").strip())
 
@@ -455,6 +492,45 @@ def _match_summary(profile: Profile) -> str:
     match_lines = tuple(profile.match.all_lines())
     parts = [part for part in (protocol_label_from_match_lines(match_lines), ports_label_from_match_lines(match_lines), _list_type(profile)) if part]
     return " • ".join(parts) or "без явных условий"
+
+
+def _available_filter_kinds(settings: Winws2EditableSettings, app_paths) -> tuple[str, ...]:
+    current_kind = str(settings.filter_kind or "hostlist").strip().lower()
+    if not settings.filter_editable or current_kind not in {"hostlist", "ipset"}:
+        return (current_kind,)
+
+    result: list[str] = []
+    for candidate in ("hostlist", "ipset"):
+        candidate_value = normalize_winws2_filter_value(settings.filter_value, candidate)
+        if candidate == current_kind or _filter_files_available(app_paths, candidate_value):
+            result.append(candidate)
+    return tuple(result) or (current_kind,)
+
+
+def _filter_files_available(app_paths, filter_value: str) -> bool:
+    lists_root = Path(getattr(app_paths, "user_root", "")) / "lists"
+    if not lists_root.exists():
+        return False
+    for value in _filter_reference_values(filter_value):
+        if not _looks_like_list_file_reference(value):
+            continue
+        if not (lists_root / Path(value.replace("\\", "/")).name).is_file():
+            return False
+    return True
+
+
+def _filter_reference_values(filter_value: str) -> tuple[str, ...]:
+    values: list[str] = []
+    for part in str(filter_value or "").split(","):
+        value = part.strip().strip('"').strip("'").lstrip("@")
+        if value:
+            values.append(value)
+    return tuple(values)
+
+
+def _looks_like_list_file_reference(value: str) -> bool:
+    normalized = str(value or "").strip().replace("\\", "/")
+    return normalized.startswith("lists/") or "/" in normalized or normalized.lower().endswith((".txt", ".lst", ".list"))
 
 
 def _profile_raw_text(profile: Profile) -> str:

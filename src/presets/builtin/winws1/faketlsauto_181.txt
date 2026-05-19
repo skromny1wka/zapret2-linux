@@ -30,17 +30,125 @@
 --new
 --filter-tcp=443
 --hostlist=lists/list-general.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-split-pos=1,midsld
+--dpi-desync-repeats=11
+--dpi-desync-fooling=md5sig
+--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/discord.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-split-pos=1,midsld
+--dpi-desync-repeats=11
+--dpi-desync-fooling=md5sig
+--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/other.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-split-pos=1,midsld
+--dpi-desync-repeats=11
+--dpi-desync-fooling=md5sig
+--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/soundcloud.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-split-pos=1,midsld
+--dpi-desync-repeats=11
+--dpi-desync-fooling=md5sig
+--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/rutracker.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-split-pos=1,midsld
+--dpi-desync-repeats=11
+--dpi-desync-fooling=md5sig
+--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/rutor.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-split-pos=1,midsld
+--dpi-desync-repeats=11
+--dpi-desync-fooling=md5sig
+--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/roblox.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-split-pos=1,midsld
+--dpi-desync-repeats=11
+--dpi-desync-fooling=md5sig
+--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/itch.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-split-pos=1,midsld
+--dpi-desync-repeats=11
+--dpi-desync-fooling=md5sig
+--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/facebook.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-split-pos=1,midsld
+--dpi-desync-repeats=11
+--dpi-desync-fooling=md5sig
+--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/instagram.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-split-pos=1,midsld
+--dpi-desync-repeats=11
+--dpi-desync-fooling=md5sig
+--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/twitter.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-split-pos=1,midsld
+--dpi-desync-repeats=11
+--dpi-desync-fooling=md5sig
+--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/whatsapp.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-split-pos=1,midsld
+--dpi-desync-repeats=11
+--dpi-desync-fooling=md5sig
+--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/other.txt
 --dpi-desync=fake,multidisorder
 --dpi-desync-split-pos=1,midsld

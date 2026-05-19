@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from core.paths import AppPaths
+from profile.ui.profiles_list import _ordered_group_keys
 from profile.strategy_state import ProfileStrategyState
 from profile.service import ProfilePresetService
 
@@ -23,6 +24,15 @@ class _PresetStore:
 
 
 class ProfileListPayloadTests(unittest.TestCase):
+    def test_profile_folder_order_keeps_zero_order_first(self) -> None:
+        grouped = {
+            "discord": [object()],
+            "youtube": [object()],
+            "messengers": [object()],
+        }
+
+        self.assertEqual(_ordered_group_keys(grouped), ["youtube", "discord", "messengers"])
+
     def test_list_profiles_keeps_catalog_rows_but_collapses_hostlist_ipset_variants(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -74,6 +84,40 @@ class ProfileListPayloadTests(unittest.TestCase):
         self.assertFalse(discord.in_preset)
         self.assertTrue(discord.key.startswith("template:"))
 
+    def test_list_profiles_normalizes_multi_list_profile_and_saves_preset(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            templates_dir = root / "profile" / "templates"
+            templates_dir.mkdir(parents=True)
+            (templates_dir / "all_profiles.txt").write_text("", encoding="utf-8")
+            store = _PresetStore(
+                "\n".join(
+                    (
+                        "--filter-tcp=80,443",
+                        "--hostlist=lists/discord.txt",
+                        "--hostlist=lists/other.txt",
+                        "--hostlist-exclude=lists/list-exclude.txt",
+                        "--lua-desync=pass",
+                        "",
+                    )
+                )
+            )
+            feature = SimpleNamespace(
+                _presets_feature=store,
+                _app_paths=AppPaths(user_root=root, local_root=root),
+            )
+
+            with patch("settings.store.MAIN_DIRECTORY", str(root)):
+                payload = ProfilePresetService(feature, "zapret2_mode").list_profiles()
+
+        self.assertEqual(payload.normalized_split_profiles, 1)
+        self.assertEqual(payload.normalized_created_profiles, 1)
+        self.assertEqual(len(payload.items), 2)
+        self.assertIn("--new", store.text)
+        self.assertIn("--hostlist=lists/discord.txt", store.text)
+        self.assertIn("--hostlist=lists/other.txt", store.text)
+        self.assertNotIn("--hostlist-exclude=lists/list-exclude.txt", store.text)
+
     def test_list_profiles_shows_current_ipset_variant_when_preset_uses_ipset(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -115,6 +159,151 @@ class ProfileListPayloadTests(unittest.TestCase):
         self.assertEqual(len(payload.items), 1)
         self.assertEqual(payload.items[0].list_type, "ipset")
         self.assertIn("--ipset=lists/ipset-youtube.txt", payload.items[0].match_lines)
+
+    def test_template_profile_is_shown_as_not_added(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            templates_dir = root / "profile" / "templates"
+            templates_dir.mkdir(parents=True)
+            (templates_dir / "all_profiles.txt").write_text(
+                "\n".join(
+                    (
+                        "--filter-tcp=80,443",
+                        "--hostlist=lists/youtube.txt",
+                        "",
+                    )
+                ),
+                encoding="utf-8",
+            )
+            store = _PresetStore("")
+            feature = SimpleNamespace(
+                _presets_feature=store,
+                _app_paths=AppPaths(user_root=root, local_root=root),
+            )
+
+            with patch("settings.store.MAIN_DIRECTORY", str(root)):
+                payload = ProfilePresetService(feature, "zapret2_mode").list_profiles()
+                setup = ProfilePresetService(feature, "zapret2_mode").get_profile_setup(payload.items[0].key)
+
+        self.assertEqual(len(payload.items), 1)
+        self.assertFalse(payload.items[0].in_preset)
+        self.assertFalse(payload.items[0].enabled)
+        self.assertEqual(payload.items[0].strategy_id, "none")
+        self.assertEqual(payload.items[0].strategy_name, "Не добавлен")
+        self.assertIsNotNone(setup)
+        self.assertEqual(setup.item.strategy_name, "Не добавлен")
+        self.assertEqual(store.text, "")
+
+    def test_skipped_preset_profile_is_shown_as_disabled(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            templates_dir = root / "profile" / "templates"
+            templates_dir.mkdir(parents=True)
+            (templates_dir / "all_profiles.txt").write_text("", encoding="utf-8")
+            store = _PresetStore(
+                "\n".join(
+                    (
+                        "--skip",
+                        "--filter-tcp=80,443",
+                        "--hostlist=lists/youtube.txt",
+                        "--lua-desync=pass",
+                        "",
+                    )
+                )
+            )
+            feature = SimpleNamespace(
+                _presets_feature=store,
+                _app_paths=AppPaths(user_root=root, local_root=root),
+            )
+
+            with patch("settings.store.MAIN_DIRECTORY", str(root)):
+                payload = ProfilePresetService(feature, "zapret2_mode").list_profiles()
+
+        self.assertEqual(len(payload.items), 1)
+        self.assertTrue(payload.items[0].in_preset)
+        self.assertFalse(payload.items[0].enabled)
+        self.assertEqual(payload.items[0].strategy_id, "none")
+        self.assertEqual(payload.items[0].strategy_name, "Выключен")
+
+    def test_same_profile_name_collapses_different_hostlist_files(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            templates_dir = root / "profile" / "templates"
+            templates_dir.mkdir(parents=True)
+            (templates_dir / "all_profiles.txt").write_text(
+                "\n".join(
+                    (
+                        "--name=youtube.com (интерфейс)",
+                        "--filter-tcp=80,443",
+                        "--hostlist=lists/youtube.txt",
+                        "",
+                        "--new",
+                        "--name=youtube.com (интерфейс)",
+                        "--filter-tcp=80,443",
+                        "--hostlist=lists/russia-youtube.txt",
+                        "",
+                        "--new",
+                        "--name=youtube.com (интерфейс)",
+                        "--filter-tcp=80,443",
+                        "--ipset=lists/ipset-youtube.txt",
+                        "",
+                    )
+                ),
+                encoding="utf-8",
+            )
+
+            store = _PresetStore("")
+            feature = SimpleNamespace(
+                _presets_feature=store,
+                _app_paths=AppPaths(user_root=root, local_root=root),
+            )
+
+            with patch("settings.store.MAIN_DIRECTORY", str(root)):
+                payload = ProfilePresetService(feature, "zapret2_mode").list_profiles()
+
+        self.assertEqual(len(payload.items), 1)
+        self.assertEqual(payload.items[0].display_name, "youtube.com (интерфейс)")
+        self.assertEqual(payload.items[0].list_type, "hostlist")
+        self.assertIn("--hostlist=lists/youtube.txt", payload.items[0].match_lines)
+
+    def test_named_template_collapses_with_unnamed_preset_profile_by_same_list(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            templates_dir = root / "profile" / "templates"
+            templates_dir.mkdir(parents=True)
+            (templates_dir / "all_profiles.txt").write_text(
+                "\n".join(
+                    (
+                        "--name=googlevideo.com (CDN сервера)",
+                        "--filter-tcp=80,443",
+                        "--hostlist=lists/googlevideo.txt",
+                        "",
+                    )
+                ),
+                encoding="utf-8",
+            )
+
+            store = _PresetStore(
+                "\n".join(
+                    (
+                        "--filter-tcp=80,443",
+                        "--hostlist=lists/googlevideo.txt",
+                        "--lua-desync=multisplit:pos=sniext+1",
+                        "",
+                    )
+                )
+            )
+            feature = SimpleNamespace(
+                _presets_feature=store,
+                _app_paths=AppPaths(user_root=root, local_root=root),
+            )
+
+            with patch("settings.store.MAIN_DIRECTORY", str(root)):
+                payload = ProfilePresetService(feature, "zapret2_mode").list_profiles()
+
+        self.assertEqual(len(payload.items), 1)
+        self.assertTrue(payload.items[0].in_preset)
+        self.assertIn("--hostlist=lists/googlevideo.txt", payload.items[0].match_lines)
 
     def test_profile_folder_does_not_depend_on_preset_membership(self) -> None:
         with TemporaryDirectory() as temp_dir:

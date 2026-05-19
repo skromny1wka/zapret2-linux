@@ -378,7 +378,7 @@ class Winws1StrategyRunner(StrategyRunnerBase):
             return False
 
     def switch_preset_file_fast(self, preset_path: str, strategy_name: str = "Preset") -> bool:
-        """Fast path for switching running preset mode without full aggressive cleanup."""
+        """Fast path for switching running preset mode without full start pipeline."""
         if not os.path.exists(preset_path):
             log(f"Fast switch preset file not found: {preset_path}", "ERROR")
             self._set_last_error(f"Preset файл не найден: {preset_path}", notify=False)
@@ -403,23 +403,62 @@ class Winws1StrategyRunner(StrategyRunnerBase):
 
             if self.running_process and self.is_running():
                 self._stop_process_only_locked()
+                cleanup_required = True
+            else:
+                try:
+                    cleanup_required = bool(get_process_pids_by_name(os.path.basename(self.winws_exe)))
+                except Exception:
+                    cleanup_required = False
+
+            if cleanup_required:
+                self._prepare_cleanup_before_spawn_locked(retry_count=0)
+
+            if not self._ensure_windivert_ready_before_spawn():
+                self._last_spawn_exit_code = 34
+                self._last_spawn_stderr = "windivert: readiness probe failed before fast switch spawn"
+                self._set_last_error("WinDivert ещё не готов к открытию фильтра", notify=False)
+                return False
 
             self._preset_file_path = preset_path
             success = self._spawn_process_locked(artifact, strategy_name, notify_failure=False)
             if not success:
-                log(
-                    "Fast preset switch failed, retrying via full start path with cleanup",
-                    "WARNING",
-                )
-                success = self._start_from_preset_file_locked(
-                    preset_path,
+                success = self._retry_fast_switch_after_failed_spawn_locked(
+                    artifact,
                     strategy_name,
-                    retry_count=0,
-                    max_retries=2,
                 )
         if success:
             self._start_config_watcher(preset_path)
         return success
+
+    def _retry_fast_switch_after_failed_spawn_locked(self, artifact: PreparedPresetArtifact, strategy_name: str) -> bool:
+        exit_code = int(self._last_spawn_exit_code or -1)
+        stderr_output = str(self._last_spawn_stderr or "")
+
+        retry_allowed = self._is_windivert_conflict_error(stderr_output, exit_code)
+        retry_allowed = retry_allowed or self._should_retry_transient_windivert_service_error(
+            stderr_output,
+            exit_code,
+            retry_count=0,
+            max_retry_count=1,
+        )
+        if not retry_allowed:
+            return False
+        if self._is_windivert_system_error(stderr_output, exit_code):
+            log("Fast preset switch hit WinDivert system error; retry will not help", "WARNING")
+            return False
+
+        log(
+            "Fast preset switch hit WinDivert conflict, retrying inside switch after cleanup",
+            "WARNING",
+        )
+        self._prepare_cleanup_before_spawn_locked(retry_count=1)
+        if not self._ensure_windivert_ready_before_spawn():
+            self._last_spawn_exit_code = 34
+            self._last_spawn_stderr = "windivert: readiness probe failed before fast switch retry"
+            self._set_last_error("WinDivert ещё не готов к открытию фильтра", notify=False)
+            return False
+
+        return bool(self._spawn_process_locked(artifact, strategy_name, notify_failure=False))
 
     def start_from_preset_file(self, preset_path: str, strategy_name: str = "Preset", _retry_count: int = 0) -> bool:
         """

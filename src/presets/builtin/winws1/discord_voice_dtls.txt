@@ -16,7 +16,23 @@
 --new
 --filter-tcp=443
 --hostlist=lists/russia-blacklist.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-fake-tls=bin/dtls_clienthello_w3_org.bin
+--dpi-desync-split-pos=1,midsld
+--dpi-desync-fooling=badseq,md5sig
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/youtube.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-fake-tls=bin/dtls_clienthello_w3_org.bin
+--dpi-desync-split-pos=1,midsld
+--dpi-desync-fooling=badseq,md5sig
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/discord.txt
 --dpi-desync=fake,multidisorder
 --dpi-desync-fake-tls=bin/dtls_clienthello_w3_org.bin

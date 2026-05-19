@@ -8,16 +8,93 @@
 # === HTTPS ===
 --filter-tcp=443
 --hostlist=lists/other.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-fooling=md5sig
+--dpi-desync-autottl
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/discord.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-fooling=md5sig
+--dpi-desync-autottl
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/other.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-fooling=md5sig
+--dpi-desync-autottl
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/soundcloud.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-fooling=md5sig
+--dpi-desync-autottl
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/rutracker.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-fooling=md5sig
+--dpi-desync-autottl
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/rutor.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-fooling=md5sig
+--dpi-desync-autottl
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/roblox.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-fooling=md5sig
+--dpi-desync-autottl
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/itch.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-fooling=md5sig
+--dpi-desync-autottl
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/facebook.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-fooling=md5sig
+--dpi-desync-autottl
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/instagram.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-fooling=md5sig
+--dpi-desync-autottl
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/twitter.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-fooling=md5sig
+--dpi-desync-autottl
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/whatsapp.txt
 --dpi-desync=fake,multisplit
 --dpi-desync-fooling=md5sig
@@ -75,6 +152,12 @@
 --new
 --filter-tcp=443
 --hostlist=lists/discord.txt
+--dpi-desync=fake
+--dpi-desync-ttl=1
+--dpi-desync-autottl=4
+--dpi-desync-fake-tls-mod=rnd,rndsni,padencap
+--new
+--filter-tcp=443
 --ipset=lists/ipset-cloudflare.txt
 --dpi-desync=fake
 --dpi-desync-ttl=1

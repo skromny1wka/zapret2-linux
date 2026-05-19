@@ -32,6 +32,71 @@ class Winws2LaunchPresetValidationTests(unittest.TestCase):
         self.assertFalse(prepared.changed)
         self.assertNotIn("--out-range=-d8", prepared.text)
 
+    def test_launch_filter_check_ignores_only_skipped_profiles(self) -> None:
+        from presets.mode_coordinator import PresetModeCoordinator
+        from settings.mode import ZAPRET2_MODE
+
+        source = "\n".join(
+            (
+                "--wf-tcp-out=443",
+                "--skip",
+                "--filter-tcp=443",
+                "--hostlist=lists/youtube.txt",
+                "--lua-desync=fake:blob=tls_google",
+                "",
+            )
+        )
+
+        self.assertFalse(PresetModeCoordinator._has_required_filters(ZAPRET2_MODE, source))
+
+    def test_launch_filter_check_allows_some_skipped_profiles_when_one_is_enabled(self) -> None:
+        from presets.mode_coordinator import PresetModeCoordinator
+        from settings.mode import ZAPRET2_MODE
+
+        source = "\n".join(
+            (
+                "--wf-tcp-out=443",
+                "--skip",
+                "--filter-tcp=443",
+                "--hostlist=lists/disabled.txt",
+                "--lua-desync=fake:blob=tls_google",
+                "",
+                "--new",
+                "--filter-tcp=443",
+                "--hostlist=lists/enabled.txt",
+                "--lua-desync=multisplit:pos=sniext+1",
+                "",
+            )
+        )
+
+        self.assertTrue(PresetModeCoordinator._has_required_filters(ZAPRET2_MODE, source))
+
+    def test_start_validation_rejects_preset_with_only_skipped_profiles(self) -> None:
+        from winws_runtime.flow.start_preparation import validate_preset_selected_mode
+        from settings.mode import ZAPRET2_MODE
+
+        with tempfile.TemporaryDirectory() as tmp:
+            preset_path = Path(tmp) / "only-skipped.txt"
+            preset_path.write_text(
+                "\n".join(
+                    (
+                        "--wf-tcp-out=443",
+                        "--skip",
+                        "--filter-tcp=443",
+                        "--hostlist=lists/youtube.txt",
+                        "--lua-desync=fake:blob=tls_google",
+                        "",
+                    )
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "включ"):
+                validate_preset_selected_mode(
+                    {"is_preset_file": True, "preset_path": str(preset_path)},
+                    ZAPRET2_MODE,
+                )
+
     def test_launch_preparation_allows_unknown_filename_when_syntax_is_valid(self) -> None:
         from winws_runtime.preset_launch_text import prepare_winws2_preset_text_for_launch
 

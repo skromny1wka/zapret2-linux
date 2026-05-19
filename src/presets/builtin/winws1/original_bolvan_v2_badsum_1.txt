@@ -30,6 +30,16 @@
 --filter-tcp=443
 --hostlist-domains=rutracker.cc,hmvmania.com,roskomsvoboda.org,rublacklist.net,onlinesim.io,android.com,proton.me,moscowtimes.ru,dw.com,z-library.sk
 --hostlist=lists/youtube.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-split-pos=1,midsld
+--dpi-desync-repeats=6
+--dpi-desync-fooling=badseq
+--dpi-desync-fake-tls-mod=rnd,dupsid,sni=www.google.com
+
+# === HTTPS Discord ===
+--new
+--filter-tcp=443
+--hostlist-domains=rutracker.cc,hmvmania.com,roskomsvoboda.org,rublacklist.net,onlinesim.io,android.com,proton.me,moscowtimes.ru,dw.com,z-library.sk
 --hostlist=lists/faceinsta.txt
 --dpi-desync=fake,multidisorder
 --dpi-desync-split-pos=1,midsld
@@ -57,9 +67,24 @@
 --new
 --filter-tcp=443,1024-65535
 --ipset=lists/ipset-all.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-split-pos=1,midsld
+--dpi-desync-repeats=6
+--dpi-desync-fooling=badseq
+
+# === HTTPS ===
+--new
+--filter-tcp=443,1024-65535
 --hostlist=lists/other.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-split-pos=1,midsld
+--dpi-desync-repeats=6
+--dpi-desync-fooling=badseq
+
+# === HTTPS ===
+--new
+--filter-tcp=443,1024-65535
 --hostlist=lists/russia-blacklist.txt
---hostlist-exclude=lists/faceinsta.txt
 --dpi-desync=fake,multidisorder
 --dpi-desync-split-pos=1,midsld
 --dpi-desync-repeats=6

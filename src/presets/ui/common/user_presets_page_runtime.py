@@ -440,12 +440,15 @@ class UserPresetsPageRuntime:
         failed_count = len(failed or [])
         if failed_count:
             log_message = (
-                f"Восстановление встроенных пресетов завершено частично: "
-                f"успешно={success_count}/{total}, ошибки={failed_count}"
+                f"Сброс встроенных пресетов завершён с ошибками: "
+                f"сброшено={success_count}, ошибки={failed_count}, всего встроенных={total}"
             )
             level = "WARNING"
+        elif int(success_count or 0) > 0:
+            log_message = f"Сброшено встроенных пресетов: {success_count}"
+            level = "INFO"
         else:
-            log_message = f"Восстановлены встроенные пресеты: {success_count}/{total}"
+            log_message = "Сброс встроенных пресетов: нечего менять"
             level = "INFO"
 
         return UserPresetResetAllResult(

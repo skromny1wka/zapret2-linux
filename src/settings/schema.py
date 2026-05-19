@@ -150,6 +150,13 @@ def default_profile_strategy_state() -> dict[str, Any]:
     }
 
 
+def default_user_profiles() -> dict[str, Any]:
+    return {
+        "version": 1,
+        "profiles": {},
+    }
+
+
 def default_orchestra_settings() -> dict[str, Any]:
     return {
         "strict_detection": True,
@@ -241,6 +248,7 @@ def build_default_settings() -> dict[str, Any]:
         "premium": default_premium(),
         "ui_state": default_ui_state(),
         "profile_strategy_state": default_profile_strategy_state(),
+        "user_profiles": default_user_profiles(),
         "orchestra": default_orchestra(),
         "updater": default_updater(),
         "blockcheck": default_blockcheck(),

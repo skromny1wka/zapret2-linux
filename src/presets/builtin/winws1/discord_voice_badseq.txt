@@ -21,10 +21,60 @@
 --new
 --filter-tcp=443
 --hostlist=lists/russia-blacklist.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-split-pos=method+2,midsld,5
+--dpi-desync-ttl=0
+--dpi-desync-fooling=badsum,badseq
+--dpi-desync-repeats=15
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/ipset-all.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-split-pos=method+2,midsld,5
+--dpi-desync-ttl=0
+--dpi-desync-fooling=badsum,badseq
+--dpi-desync-repeats=15
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/discord.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-split-pos=method+2,midsld,5
+--dpi-desync-ttl=0
+--dpi-desync-fooling=badsum,badseq
+--dpi-desync-repeats=15
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/youtube.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-split-pos=method+2,midsld,5
+--dpi-desync-ttl=0
+--dpi-desync-fooling=badsum,badseq
+--dpi-desync-repeats=15
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/other.txt
+--dpi-desync=fake,multidisorder
+--dpi-desync-split-pos=method+2,midsld,5
+--dpi-desync-ttl=0
+--dpi-desync-fooling=badsum,badseq
+--dpi-desync-repeats=15
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === QUIC ===
+--new
+--filter-tcp=443
 --hostlist=lists/list-general.txt
 --dpi-desync=fake,multidisorder
 --dpi-desync-split-pos=method+2,midsld,5

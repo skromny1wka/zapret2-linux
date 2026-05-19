@@ -25,6 +25,13 @@
 --new
 --filter-tcp=80
 --hostlist=lists/discord.txt
+--dpi-desync=fake,split2
+--dpi-desync-autottl=2
+--dpi-desync-fooling=md5sig
+
+# === UDP порт 5056 ===
+--new
+--filter-tcp=80
 --ipset=lists/ipset-cloudflare.txt
 --dpi-desync=fake,split2
 --dpi-desync-autottl=2

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import QPoint, pyqtSignal
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from folders.defaults import build_default_profile_folders
@@ -17,6 +17,8 @@ class ProfilesList(QWidget):
     profile_selected = pyqtSignal(str)
     profile_move_requested = pyqtSignal(str, str)
     profile_move_to_end_requested = pyqtSignal(str)
+    folder_context_requested = pyqtSignal(str, QPoint)
+    folder_toggled = pyqtSignal(str, bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -58,7 +60,10 @@ class ProfilesList(QWidget):
             if not rows:
                 continue
             rows.sort(key=profile_display_sort_key)
-            group = ProfileGroup(group_key, group_titles.get(group_key, group_key.title()), self)
+            group = ProfileGroup(group_key, group_titles.get(group_key, group_key.title()), self, count=len(rows))
+            group.context_requested.connect(self.folder_context_requested)
+            group.toggled.connect(self.folder_toggled)
+            group.set_expanded(not bool(getattr(rows[0], "group_collapsed", False)))
             self._groups[group_key] = group
 
             for item in rows:
@@ -194,7 +199,7 @@ def _ordered_group_keys(grouped: dict[str, list[Any]]) -> list[str]:
     default_state = build_default_profile_folders()
     folders = default_state.get("folders", {})
     order_by_key = {
-        str(key): int(folder.get("order", 10_000) or 10_000)
+        str(key): _folder_order(folder.get("order"))
         for key, folder in folders.items()
         if isinstance(folder, dict)
     }
@@ -205,3 +210,10 @@ def _ordered_group_keys(grouped: dict[str, list[Any]]) -> list[str]:
             str(key).lower(),
         ),
     )
+
+
+def _folder_order(value: object) -> int:
+    try:
+        return int(value)
+    except Exception:
+        return 10_000

@@ -8,16 +8,115 @@
 # === HTTPS ===
 --filter-tcp=443
 --hostlist=lists/other.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-split-seqovl=1
+--dpi-desync-split-pos=1
+--dpi-desync-fake-tls=bin/tls_clienthello_vk_com.bin
+--dpi-desync-ttl=5
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/discord.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-split-seqovl=1
+--dpi-desync-split-pos=1
+--dpi-desync-fake-tls=bin/tls_clienthello_vk_com.bin
+--dpi-desync-ttl=5
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/other.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-split-seqovl=1
+--dpi-desync-split-pos=1
+--dpi-desync-fake-tls=bin/tls_clienthello_vk_com.bin
+--dpi-desync-ttl=5
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/soundcloud.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-split-seqovl=1
+--dpi-desync-split-pos=1
+--dpi-desync-fake-tls=bin/tls_clienthello_vk_com.bin
+--dpi-desync-ttl=5
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/rutracker.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-split-seqovl=1
+--dpi-desync-split-pos=1
+--dpi-desync-fake-tls=bin/tls_clienthello_vk_com.bin
+--dpi-desync-ttl=5
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/rutor.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-split-seqovl=1
+--dpi-desync-split-pos=1
+--dpi-desync-fake-tls=bin/tls_clienthello_vk_com.bin
+--dpi-desync-ttl=5
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/roblox.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-split-seqovl=1
+--dpi-desync-split-pos=1
+--dpi-desync-fake-tls=bin/tls_clienthello_vk_com.bin
+--dpi-desync-ttl=5
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/itch.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-split-seqovl=1
+--dpi-desync-split-pos=1
+--dpi-desync-fake-tls=bin/tls_clienthello_vk_com.bin
+--dpi-desync-ttl=5
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/facebook.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-split-seqovl=1
+--dpi-desync-split-pos=1
+--dpi-desync-fake-tls=bin/tls_clienthello_vk_com.bin
+--dpi-desync-ttl=5
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/instagram.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-split-seqovl=1
+--dpi-desync-split-pos=1
+--dpi-desync-fake-tls=bin/tls_clienthello_vk_com.bin
+--dpi-desync-ttl=5
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/twitter.txt
+--dpi-desync=fake,multisplit
+--dpi-desync-split-seqovl=1
+--dpi-desync-split-pos=1
+--dpi-desync-fake-tls=bin/tls_clienthello_vk_com.bin
+--dpi-desync-ttl=5
+
+# === QUIC Discord ===
+--new
+--filter-tcp=443
 --hostlist=lists/whatsapp.txt
 --dpi-desync=fake,multisplit
 --dpi-desync-split-seqovl=1
@@ -77,6 +176,11 @@
 --new
 --filter-tcp=443
 --hostlist=lists/discord.txt
+--dpi-desync=fake
+--dpi-desync-fooling=md5sig
+--dpi-desync-fake-tls-mod=rnd,rndsni,padencap
+--new
+--filter-tcp=443
 --ipset=lists/ipset-cloudflare.txt
 --dpi-desync=fake
 --dpi-desync-fooling=md5sig

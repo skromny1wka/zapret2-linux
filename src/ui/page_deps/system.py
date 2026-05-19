@@ -73,11 +73,12 @@ def build_support_page_kwargs(*, page_name: PageName) -> dict:
     }
 
 
-def build_autostart_page_kwargs(*, page_name: PageName, autostart_feature, show_page, ui_state_store) -> dict:
+def build_autostart_page_kwargs(*, page_name: PageName, autostart_feature, show_page, notify, ui_state_store) -> dict:
     _ = page_name
     return {
         "autostart_feature": autostart_feature,
         "open_dpi_settings": lambda: show_page(PageName.DPI_SETTINGS),
+        "notify": notify,
         "ui_state_store": ui_state_store,
     }
 

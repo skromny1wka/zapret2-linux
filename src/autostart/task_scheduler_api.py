@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import getpass
-import os
+import ntpath
 from contextlib import contextmanager
 from typing import Iterator
 
@@ -9,11 +8,12 @@ from log.log import log
 
 
 CANONICAL_TASK_NAME = "ZapretGUI_AutoStart"
+ADMINISTRATORS_GROUP_SID = "S-1-5-32-544"
 
 _TASK_TRIGGER_LOGON = 9
 _TASK_ACTION_EXEC = 0
 _TASK_CREATE_OR_UPDATE = 6
-_TASK_LOGON_INTERACTIVE_TOKEN = 3
+_TASK_LOGON_GROUP = 4
 _TASK_RUNLEVEL_HIGHEST = 1
 
 
@@ -37,30 +37,6 @@ def _open_scheduler_service() -> Iterator[tuple[object, object, object, object]]
         yield service, pywintypes, win32api, win32con
     finally:
         pythoncom.CoUninitialize()
-
-
-def _resolve_current_user_id(win32api, win32con) -> str:
-    candidates: list[str] = []
-
-    try:
-        candidates.append(str(win32api.GetUserNameEx(win32con.NameSamCompatible) or "").strip())
-    except Exception:
-        pass
-
-    try:
-        candidates.append(str(win32api.GetUserName() or "").strip())
-    except Exception:
-        pass
-
-    try:
-        candidates.append(str(getpass.getuser() or "").strip())
-    except Exception:
-        pass
-
-    for candidate in candidates:
-        if candidate:
-            return candidate
-    return ""
 
 
 def _get_root_folder(service):
@@ -97,9 +73,8 @@ def register_canonical_autostart_task(exe_path: str) -> bool:
         return False
 
     try:
-        with _open_scheduler_service() as (service, _pywintypes, win32api, win32con):
+        with _open_scheduler_service() as (service, _pywintypes, _win32api, _win32con):
             root_folder = _get_root_folder(service)
-            current_user_id = _resolve_current_user_id(win32api, win32con)
 
             task_definition = service.NewTask(0)
 
@@ -122,33 +97,27 @@ def register_canonical_autostart_task(exe_path: str) -> bool:
                 pass
 
             principal = task_definition.Principal
-            if current_user_id:
-                principal.UserId = current_user_id
-            principal.LogonType = _TASK_LOGON_INTERACTIVE_TOKEN
+            principal.GroupId = ADMINISTRATORS_GROUP_SID
+            principal.LogonType = _TASK_LOGON_GROUP
             principal.RunLevel = _TASK_RUNLEVEL_HIGHEST
 
             trigger = task_definition.Triggers.Create(_TASK_TRIGGER_LOGON)
             trigger.Enabled = True
-            if current_user_id:
-                try:
-                    trigger.UserId = current_user_id
-                except Exception:
-                    pass
 
             action = task_definition.Actions.Create(_TASK_ACTION_EXEC)
             action.Path = exe_path
             action.Arguments = "--tray"
-            action.WorkingDirectory = os.path.dirname(exe_path) or exe_path
+            action.WorkingDirectory = ntpath.dirname(exe_path) or exe_path
 
             root_folder.RegisterTaskDefinition(
                 CANONICAL_TASK_NAME,
                 task_definition,
                 _TASK_CREATE_OR_UPDATE,
-                current_user_id,
-                "",
-                _TASK_LOGON_INTERACTIVE_TOKEN,
+                None,
+                None,
+                _TASK_LOGON_GROUP,
             )
             return True
     except Exception as exc:
-        log(f"Task Scheduler register failed: {exc}", "ERROR")
+        log(f"Task Scheduler register failed: {exc}", "WARNING")
         return False

@@ -43,14 +43,95 @@
 --new
 --filter-tcp=80,443,1080,2053,2083,2087,2096,8443
 --hostlist=lists/discord.txt
+--dpi-desync=fake,split2
+--dpi-desync-repeats=6
+--dpi-desync-fooling=md5sig
+--dpi-desync-autottl=2
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === Discord Media ===
+--new
+--filter-tcp=80,443,1080,2053,2083,2087,2096,8443
 --hostlist=lists/other.txt
+--dpi-desync=fake,split2
+--dpi-desync-repeats=6
+--dpi-desync-fooling=md5sig
+--dpi-desync-autottl=2
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === Discord Media ===
+--new
+--filter-tcp=80,443,1080,2053,2083,2087,2096,8443
 --hostlist=lists/soundcloud.txt
+--dpi-desync=fake,split2
+--dpi-desync-repeats=6
+--dpi-desync-fooling=md5sig
+--dpi-desync-autottl=2
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === Discord Media ===
+--new
+--filter-tcp=80,443,1080,2053,2083,2087,2096,8443
 --hostlist=lists/rutracker.txt
+--dpi-desync=fake,split2
+--dpi-desync-repeats=6
+--dpi-desync-fooling=md5sig
+--dpi-desync-autottl=2
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === Discord Media ===
+--new
+--filter-tcp=80,443,1080,2053,2083,2087,2096,8443
 --hostlist=lists/rutor.txt
+--dpi-desync=fake,split2
+--dpi-desync-repeats=6
+--dpi-desync-fooling=md5sig
+--dpi-desync-autottl=2
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === Discord Media ===
+--new
+--filter-tcp=80,443,1080,2053,2083,2087,2096,8443
 --hostlist=lists/roblox.txt
+--dpi-desync=fake,split2
+--dpi-desync-repeats=6
+--dpi-desync-fooling=md5sig
+--dpi-desync-autottl=2
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === Discord Media ===
+--new
+--filter-tcp=80,443,1080,2053,2083,2087,2096,8443
 --hostlist=lists/itch.txt
+--dpi-desync=fake,split2
+--dpi-desync-repeats=6
+--dpi-desync-fooling=md5sig
+--dpi-desync-autottl=2
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === Discord Media ===
+--new
+--filter-tcp=80,443,1080,2053,2083,2087,2096,8443
 --hostlist=lists/facebook.txt
+--dpi-desync=fake,split2
+--dpi-desync-repeats=6
+--dpi-desync-fooling=md5sig
+--dpi-desync-autottl=2
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === Discord Media ===
+--new
+--filter-tcp=80,443,1080,2053,2083,2087,2096,8443
 --hostlist=lists/instagram.txt
+--dpi-desync=fake,split2
+--dpi-desync-repeats=6
+--dpi-desync-fooling=md5sig
+--dpi-desync-autottl=2
+--dpi-desync-fake-tls=bin/tls_clienthello_www_google_com.bin
+
+# === Discord Media ===
+--new
+--filter-tcp=80,443,1080,2053,2083,2087,2096,8443
 --hostlist=lists/whatsapp.txt
 --dpi-desync=fake,split2
 --dpi-desync-repeats=6
@@ -107,8 +188,14 @@
 # === General blocked sites ===
 --new
 --filter-tcp=443
---hostlist-exclude=lists/netrogat.txt
 --hostlist=lists/other.txt
+--dpi-desync=multidisorder
+--dpi-desync-split-pos=1,host+2,sld+2,endhost-2
+--dpi-desync-split-seqovl=1
+
+# === UDP 5056/27002 ===
+--new
+--filter-tcp=443
 --hostlist=lists/russia-blacklist.txt
 --dpi-desync=multidisorder
 --dpi-desync-split-pos=1,host+2,sld+2,endhost-2

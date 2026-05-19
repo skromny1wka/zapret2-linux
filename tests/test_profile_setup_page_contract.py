@@ -12,7 +12,7 @@ from profile.ui.profile_setup_page import (
     ProfileStrategyListWidget,
     _match_tab_text,
 )
-from profile.ui.preset_setup_page import preset_setup_title_for_payload
+from profile.ui.preset_setup_page import PresetSetupPageBase, preset_setup_title_for_payload
 from ui.presets_menu.delegate import PresetListDelegate
 
 
@@ -38,6 +38,24 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             preset_setup_title_for_payload(payload),
             "Настройка пресета: custom.txt",
         )
+
+    def test_preset_setup_page_shows_normalization_infobar(self) -> None:
+        apply_payload = inspect.getsource(PresetSetupPageBase._apply_payload)
+        notify = inspect.getsource(PresetSetupPageBase._show_profile_normalization_info)
+
+        self.assertIn("_show_profile_normalization_info(payload)", apply_payload)
+        self.assertIn("normalized_split_profiles", notify)
+        self.assertIn("normalized_created_profiles", notify)
+        self.assertIn("InfoBar.info", notify)
+
+    def test_preset_setup_page_has_add_user_profile_action(self) -> None:
+        apply_payload = inspect.getsource(PresetSetupPageBase._apply_payload)
+        handler = inspect.getsource(PresetSetupPageBase._on_add_user_profile_clicked)
+
+        self.assertIn('PrimaryPushButton("Добавить"', apply_payload)
+        self.assertIn("CreateUserProfileDialog", handler)
+        self.assertIn("create_user_profile", handler)
+        self.assertIn("refresh_from_preset_switch", handler)
 
     def test_strategy_list_click_handlers_match_qlistwidget_signals(self) -> None:
         clicked = inspect.signature(ProfileStrategyListWidget._on_item_clicked)
