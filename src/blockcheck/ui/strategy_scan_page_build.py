@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ui.theme import get_themed_qta_icon
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QHBoxLayout, QHeaderView
 from qfluentwidgets import CaptionLabel
@@ -12,6 +11,7 @@ from qfluentwidgets import CaptionLabel
 from ui.fluent_widgets import ActionButton, QuickActionsBar, SettingsCard, set_tooltip
 from ui.log_limits import BLOCKCHECK_LOG_VIEW_MAX_LINES, apply_text_line_limit
 from ui.pages.base_page import ScrollBlockingTextEdit
+from ui.widgets.action_button import apply_themed_action_button
 from ui.widgets.fluent_item_tooltip import install_fluent_item_tooltips
 
 
@@ -181,7 +181,7 @@ def build_strategy_scan_control_section(
 
     start_btn = push_button_cls()
     start_btn.setText(tr_fn("page.strategy_scan.start", "Начать сканирование"))
-    start_btn.setIcon(get_themed_qta_icon("fa5s.search", color="#4CAF50"))
+    apply_themed_action_button(start_btn, icon_name="fa5s.search", alignment="left")
     set_tooltip(
         start_btn,
         tr_fn(
@@ -194,7 +194,7 @@ def build_strategy_scan_control_section(
 
     stop_btn = push_button_cls()
     stop_btn.setText(tr_fn("page.strategy_scan.stop", "Остановить"))
-    stop_btn.setIcon(get_themed_qta_icon("fa5s.stop", color="#ff9800"))
+    apply_themed_action_button(stop_btn, icon_name="fa5s.stop", alignment="left")
     set_tooltip(
         stop_btn,
         tr_fn(
@@ -272,6 +272,7 @@ def build_strategy_scan_log_section(*, tr_fn, push_button_cls, parent, on_toggle
     expand_log_btn = push_button_cls()
     expand_log_btn.setText("Развернуть")
     expand_log_btn.setFixedWidth(120)
+    apply_themed_action_button(expand_log_btn, icon_name="fa5s.expand-alt", alignment="left", min_width=120)
     expand_log_btn.clicked.connect(on_toggle_log_expand)
 
     log_header = QHBoxLayout()

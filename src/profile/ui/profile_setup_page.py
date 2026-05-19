@@ -48,6 +48,7 @@ from ui.pages.base_page import BasePage
 from ui.fluent_widgets import set_tooltip
 from app.text_catalog import tr as tr_catalog
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens, to_qcolor
+from ui.widgets.action_button import apply_themed_action_button
 from ui.widgets.fluent_item_tooltip import FluentItemToolTipController
 from ui.widgets.fluent_scrollbar import install_fluent_scrollbars
 from ui.widgets.hover_row import paint_profile_hover_row, profile_hover_row_rect
@@ -440,10 +441,12 @@ class ProfileSetupPageBase(BasePage):
         self._enabled_checkbox.stateChanged.connect(self._on_enabled_changed)
         header_layout.addWidget(self._enabled_checkbox, 0, Qt.AlignmentFlag.AlignRight)
         self._update_user_profile_button = PushButton("Изменить")
+        apply_themed_action_button(self._update_user_profile_button, icon_name="fa5s.edit", alignment="left")
         self._update_user_profile_button.clicked.connect(self._on_update_user_profile_clicked)
         self._update_user_profile_button.hide()
         header_layout.addWidget(self._update_user_profile_button, 0, Qt.AlignmentFlag.AlignRight)
         self._delete_user_profile_button = PushButton("Удалить")
+        apply_themed_action_button(self._delete_user_profile_button, icon_name="fa5s.trash-alt", alignment="left")
         self._delete_user_profile_button.clicked.connect(self._on_delete_user_profile_clicked)
         self._delete_user_profile_button.hide()
         header_layout.addWidget(self._delete_user_profile_button, 0, Qt.AlignmentFlag.AlignRight)
@@ -548,6 +551,7 @@ class ProfileSetupPageBase(BasePage):
         editor_actions_layout.setContentsMargins(0, 0, 0, 0)
         editor_actions_layout.setSpacing(12)
         self._list_file_save_button = PushButton("Сохранить список")
+        apply_themed_action_button(self._list_file_save_button, icon_name="fa5s.save", alignment="left")
         self._list_file_save_button.clicked.connect(self._on_list_file_save_clicked)
         editor_actions_layout.addWidget(self._list_file_save_button)
         self._list_file_status_label = CaptionLabel("")
@@ -586,6 +590,7 @@ class ProfileSetupPageBase(BasePage):
         raw_actions_layout.setContentsMargins(0, 0, 0, 0)
         raw_actions_layout.setSpacing(12)
         self._raw_profile_save_button = PushButton("Сохранить текст profile")
+        apply_themed_action_button(self._raw_profile_save_button, icon_name="fa5s.save", alignment="left")
         self._raw_profile_save_button.clicked.connect(self._on_raw_profile_save_clicked)
         set_tooltip(
             self._raw_profile_save_button,
@@ -601,6 +606,7 @@ class ProfileSetupPageBase(BasePage):
         feedback_actions_layout.setSpacing(12)
 
         self._work_button = PushButton("Работает")
+        apply_themed_action_button(self._work_button, icon_name="fa5s.check", alignment="left")
         set_tooltip(
             self._work_button,
             "Пометить текущую готовую стратегию как рабочую для этого profile.",
@@ -609,6 +615,7 @@ class ProfileSetupPageBase(BasePage):
         feedback_actions_layout.addWidget(self._work_button)
 
         self._notwork_button = PushButton("Не работает")
+        apply_themed_action_button(self._notwork_button, icon_name="fa5s.times", alignment="left")
         set_tooltip(
             self._notwork_button,
             "Пометить текущую готовую стратегию как нерабочую для этого profile.",
@@ -617,6 +624,7 @@ class ProfileSetupPageBase(BasePage):
         feedback_actions_layout.addWidget(self._notwork_button)
 
         self._favorite_button = PushButton("В избранное")
+        apply_themed_action_button(self._favorite_button, icon_name="fa5s.star", alignment="left")
         set_tooltip(
             self._favorite_button,
             "Добавить текущую готовую стратегию в избранное или убрать её оттуда.",
@@ -625,6 +633,7 @@ class ProfileSetupPageBase(BasePage):
         feedback_actions_layout.addWidget(self._favorite_button)
 
         self._clear_feedback_button = PushButton("Убрать оценку")
+        apply_themed_action_button(self._clear_feedback_button, icon_name="fa5s.undo", alignment="left")
         set_tooltip(
             self._clear_feedback_button,
             "Очистить вашу оценку для текущей готовой стратегии.",

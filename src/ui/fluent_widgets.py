@@ -550,13 +550,9 @@ class PrimaryActionButton(PrimaryPushButton):
         self.setFixedHeight(32)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-
         if icon_name:
             self.setIconSize(QSize(16, 16))
-            try:
-                _set_qta_button_icon(self, icon_name, color="#ffffff", size=16)
-            except Exception:
-                pass
+        apply_themed_action_button(self, icon_name=icon_name, alignment="center")
 
 
 # ---------------------------------------------------------------------------

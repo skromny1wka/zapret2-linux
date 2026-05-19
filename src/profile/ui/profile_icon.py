@@ -2,15 +2,23 @@ from __future__ import annotations
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
+from PyQt6.QtSvg import QSvgRenderer
 
 from ui.theme import get_cached_qta_pixmap
 
 
 _INITIALS_PREFIX = "profile-initials:"
+_SIMPLE_PREFIX = "simple:"
 
 
 def profile_icon_pixmap(icon_name: str, *, color: str, size: int, theme_name: str = "") -> QPixmap:
     name = str(icon_name or "").strip()
+    if name.startswith(_SIMPLE_PREFIX):
+        slug, fallback = _parse_simple_icon_name(name)
+        pixmap = _simple_icon_pixmap(slug, color=str(color or ""), size=size)
+        if not pixmap.isNull():
+            return pixmap
+        return _initials_pixmap(fallback or _initials_from_slug(slug), color=str(color or "#3B82F6"), size=size)
     if name.startswith(_INITIALS_PREFIX):
         return _initials_pixmap(
             name.removeprefix(_INITIALS_PREFIX).strip() or "P",
@@ -18,6 +26,67 @@ def profile_icon_pixmap(icon_name: str, *, color: str, size: int, theme_name: st
             size=size,
         )
     return get_cached_qta_pixmap(name, color=color, size=size, theme_name=theme_name)
+
+
+def _parse_simple_icon_name(icon_name: str) -> tuple[str, str]:
+    payload = str(icon_name or "").removeprefix(_SIMPLE_PREFIX)
+    slug, _sep, fallback = payload.partition(":")
+    return slug.strip(), fallback.strip()
+
+
+def _simple_icon_pixmap(slug: str, *, color: str, size: int) -> QPixmap:
+    svg = _simple_icon_svg(slug, color=color)
+    if not svg:
+        return QPixmap()
+
+    safe_size = max(12, int(size or 18))
+    renderer = QSvgRenderer(svg.encode("utf-8"))
+    if not renderer.isValid():
+        return QPixmap()
+
+    canvas = QPixmap(safe_size, safe_size)
+    canvas.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(canvas)
+    try:
+        renderer.render(painter)
+    finally:
+        painter.end()
+    return canvas
+
+
+def _simple_icon_svg(slug: str, *, color: str) -> str:
+    clean_slug = str(slug or "").strip().lower().replace("-", "")
+    if not clean_slug:
+        return ""
+    try:
+        from simplepycons import all_icons  # type: ignore
+    except Exception:
+        return ""
+
+    try:
+        icon = all_icons[clean_slug]
+    except Exception:
+        getter = getattr(all_icons, f"get_{clean_slug}_icon", None)
+        if not callable(getter):
+            return ""
+        try:
+            icon = getter()
+        except Exception:
+            return ""
+
+    raw_svg = str(getattr(icon, "raw_svg", "") or "")
+    if not raw_svg:
+        return ""
+    primary_color = _valid_hex_color(f"#{str(getattr(icon, 'primary_color', '') or '').lstrip('#')}")
+    fill_color = _valid_hex_color(color) or primary_color or "#3B82F6"
+    if "<svg" in raw_svg and "fill=" not in raw_svg.split(">", 1)[0]:
+        raw_svg = raw_svg.replace("<svg", f'<svg fill="{fill_color}"', 1)
+    return raw_svg
+
+
+def _valid_hex_color(color: str) -> str:
+    qcolor = QColor(str(color or ""))
+    return qcolor.name() if qcolor.isValid() else ""
 
 
 def _initials_pixmap(initials: str, *, color: str, size: int) -> QPixmap:
@@ -45,6 +114,11 @@ def _initials_pixmap(initials: str, *, color: str, size: int) -> QPixmap:
     finally:
         painter.end()
     return canvas
+
+
+def _initials_from_slug(slug: str) -> str:
+    clean = "".join(ch for ch in str(slug or "") if ch.isalnum())
+    return (clean[:2] or "P").upper()
 
 
 __all__ = ["profile_icon_pixmap"]

@@ -15,23 +15,23 @@ class ProfileIconSpec:
 
 
 _KNOWN_ICONS: dict[str, ProfileIconSpec] = {
-    "youtube": ProfileIconSpec("fa5b.youtube", "#FF0000"),
-    "googlevideo": ProfileIconSpec("fa5b.youtube", "#FF0000"),
-    "discord": ProfileIconSpec("fa5b.discord", "#5865F2"),
-    "discord-updates": ProfileIconSpec("fa5b.discord", "#5865F2"),
-    "telegram": ProfileIconSpec("fa5b.telegram-plane", "#229ED9"),
-    "whatsapp": ProfileIconSpec("fa5b.whatsapp", "#25D366"),
-    "facebook": ProfileIconSpec("fa5b.facebook", "#1877F2"),
-    "instagram": ProfileIconSpec("fa5b.instagram", "#E4405F"),
-    "twitter": ProfileIconSpec("fa5b.twitter", "#1DA1F2"),
-    "twimg": ProfileIconSpec("fa5b.twitter", "#1DA1F2"),
-    "steam": ProfileIconSpec("fa5b.steam", "#66C0F4"),
-    "github": ProfileIconSpec("fa5b.github", "#F0F3F6"),
-    "twitch": ProfileIconSpec("fa5b.twitch", "#9146FF"),
-    "soundcloud": ProfileIconSpec("fa5b.soundcloud", "#FF5500"),
-    "itch": ProfileIconSpec("fa5b.itch-io", "#FA5C5C"),
-    "google": ProfileIconSpec("fa5b.google", "#4285F4"),
-    "amazon": ProfileIconSpec("fa5b.amazon", "#FF9900"),
+    "youtube": ProfileIconSpec("simple:youtube:YT", "#FF0000"),
+    "googlevideo": ProfileIconSpec("simple:youtube:YT", "#FF0000"),
+    "discord": ProfileIconSpec("simple:discord:DI", "#5865F2"),
+    "discord-updates": ProfileIconSpec("simple:discord:DI", "#5865F2"),
+    "telegram": ProfileIconSpec("simple:telegram:TG", "#229ED9"),
+    "whatsapp": ProfileIconSpec("simple:whatsapp:WA", "#25D366"),
+    "facebook": ProfileIconSpec("simple:facebook:FB", "#1877F2"),
+    "instagram": ProfileIconSpec("simple:instagram:IN", "#E4405F"),
+    "twitter": ProfileIconSpec("simple:x:X", "#000000"),
+    "twimg": ProfileIconSpec("simple:x:X", "#000000"),
+    "steam": ProfileIconSpec("simple:steam:ST", "#66C0F4"),
+    "github": ProfileIconSpec("simple:github:GH", "#F0F3F6"),
+    "twitch": ProfileIconSpec("simple:twitch:TW", "#9146FF"),
+    "soundcloud": ProfileIconSpec("simple:soundcloud:SC", "#FF5500"),
+    "itch": ProfileIconSpec("simple:itchdotio:IT", "#FA5C5C"),
+    "google": ProfileIconSpec("simple:google:GO", "#4285F4"),
+    "amazon": ProfileIconSpec("simple:amazon:AM", "#FF9900"),
 }
 
 _NAMED_COLORS: dict[str, str] = {
@@ -59,6 +59,17 @@ _FALLBACK_PALETTE: tuple[str, ...] = (
     "#EAB308",
 )
 
+_FALLBACK_SIMPLE_ICON_SLUGS: tuple[str, ...] = (
+    "simpleicons",
+    "abstract",
+    "codementor",
+    "codecrafters",
+    "codeforces",
+    "codesandbox",
+    "codepen",
+    "polymerproject",
+)
+
 
 def resolve_profile_icon(display_name: object, match_lines: tuple[str, ...] | list[str] = ()) -> ProfileIconSpec:
     identity = _profile_identity(display_name, tuple(match_lines or ()))
@@ -67,7 +78,7 @@ def resolve_profile_icon(display_name: object, match_lines: tuple[str, ...] | li
 
     color = _NAMED_COLORS.get(identity) or _color_from_seed(identity)
     initials = _initials_from_identity(identity)
-    return ProfileIconSpec(f"profile-initials:{initials}", color)
+    return ProfileIconSpec(f"simple:{_simple_fallback_slug(identity)}:{initials}", color)
 
 
 def _profile_identity(display_name: object, match_lines: tuple[str, ...]) -> str:
@@ -124,6 +135,11 @@ def _initials_from_identity(identity: str) -> str:
 def _color_from_seed(seed: str) -> str:
     digest = hashlib.sha1(str(seed or "profile").encode("utf-8")).digest()
     return _FALLBACK_PALETTE[digest[0] % len(_FALLBACK_PALETTE)]
+
+
+def _simple_fallback_slug(seed: str) -> str:
+    digest = hashlib.sha1(str(seed or "profile").encode("utf-8")).digest()
+    return _FALLBACK_SIMPLE_ICON_SLUGS[digest[1] % len(_FALLBACK_SIMPLE_ICON_SLUGS)]
 
 
 __all__ = ["ProfileIconSpec", "resolve_profile_icon"]

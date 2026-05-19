@@ -8,8 +8,9 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QHBoxLayout
 
 from ui.fluent_widgets import SettingsCard, SemanticNotice
-from ui.theme import get_cached_qta_pixmap, get_theme_tokens, get_themed_qta_icon
+from ui.theme import get_cached_qta_pixmap, get_theme_tokens
 from ui.theme_semantic import get_semantic_palette
+from ui.widgets.action_button import apply_themed_action_button
 from qfluentwidgets import BodyLabel, CaptionLabel, PushButton, StrongBodyLabel, SwitchButton
 
 
@@ -104,18 +105,14 @@ def build_hosts_status_section(
     status_layout.addWidget(status_label, 1)
 
     clear_btn = PushButton()
-    clear_btn.setIcon(get_themed_qta_icon('fa5s.trash-alt', color=tokens.fg_muted))
     clear_btn.setText(tr_fn("page.hosts.button.clear", " Очистить"))
-    clear_btn.setFixedHeight(32)
-    clear_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    apply_themed_action_button(clear_btn, icon_name="fa5s.trash-alt", alignment="left")
     clear_btn.clicked.connect(on_clear_clicked)
     status_layout.addWidget(clear_btn)
 
     open_hosts_button = PushButton()
-    open_hosts_button.setIcon(get_themed_qta_icon('fa5s.external-link-alt', color=tokens.fg))
     open_hosts_button.setText(tr_fn("page.hosts.button.open", " Открыть"))
-    open_hosts_button.setFixedHeight(32)
-    open_hosts_button.setCursor(Qt.CursorShape.PointingHandCursor)
+    apply_themed_action_button(open_hosts_button, icon_name="fa5s.external-link-alt", alignment="left")
     open_hosts_button.clicked.connect(on_open_hosts_file)
     status_layout.addWidget(open_hosts_button)
 

@@ -54,6 +54,9 @@ class LogsTailStartPlan:
     should_start: bool
     info_text: str
     file_path: str
+    should_clear_view: bool = True
+    initial_max_bytes: int | None = 1024 * 1024
+    file_signature: tuple[str, int, int] | None = None
 
 
 @dataclass(slots=True)
@@ -228,14 +231,14 @@ def prepare_support_bundle(*, current_log_file: str, orchestra_runner):
 def open_logs_folder() -> None:
     subprocess.run(["explorer", LOGS_FOLDER], check=False)
 
-def create_log_tail_worker(file_path: str):
+def create_log_tail_worker(file_path: str, *, initial_max_bytes: int | None = 1024 * 1024):
     from log_tail import LogTailWorker
 
     return LogTailWorker(
         file_path,
         poll_interval=0.6,
         initial_chunk_chars=65536,
-        initial_max_bytes=1024 * 1024,
+        initial_max_bytes=initial_max_bytes,
     )
 
 def create_winws_output_worker(process):
@@ -255,18 +258,38 @@ def build_thread_stop_plan(*, has_worker: bool, thread_running: bool, blocking: 
         terminate_wait_ms=500,
     )
 
-def build_tail_start_plan(*, current_log_file: str) -> LogsTailStartPlan:
+def _log_file_signature(file_path: str) -> tuple[str, int, int] | None:
+    try:
+        stat = os.stat(file_path)
+        return (os.path.abspath(file_path), int(stat.st_size), int(stat.st_mtime_ns))
+    except Exception:
+        return None
+
+
+def build_tail_start_plan(
+    *,
+    current_log_file: str,
+    previous_signature: tuple[str, int, int] | None = None,
+) -> LogsTailStartPlan:
     file_path = str(current_log_file or "").strip()
     if not file_path or not os.path.exists(file_path):
         return LogsTailStartPlan(
             should_start=False,
             info_text="",
             file_path=file_path,
+            should_clear_view=False,
+            initial_max_bytes=None,
+            file_signature=None,
         )
+    file_signature = _log_file_signature(file_path)
+    is_same_file_content = bool(file_signature and file_signature == previous_signature)
     return LogsTailStartPlan(
         should_start=True,
         info_text=f"📄 {os.path.basename(file_path)}",
         file_path=file_path,
+        should_clear_view=not is_same_file_content,
+        initial_max_bytes=0 if is_same_file_content else 1024 * 1024,
+        file_signature=file_signature,
     )
 
 def build_support_feedback(result) -> LogsSupportFeedbackPlan:
@@ -322,8 +345,8 @@ def build_stats_text_plan(stats: LogsStatsState, *, language: str) -> LogsStatsT
         )
     )
 
-def build_winws_output_plan(*, launch_method: str, orchestra_runner, language: str) -> LogsWinwsOutputPlan:
-    source, runner = get_running_runner_source(launch_method, orchestra_runner)
+def build_winws_output_plan(*, launch_method: str, orchestra_runner, direct_runner, language: str) -> LogsWinwsOutputPlan:
+    source, runner = get_running_runner_source(launch_method, orchestra_runner, direct_runner)
 
     if source == ORCHESTRA_MODE and runner:
         pid = get_runner_pid(runner)

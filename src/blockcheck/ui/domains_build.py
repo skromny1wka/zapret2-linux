@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ui.theme import get_themed_qta_icon
+from ui.widgets.action_button import apply_themed_action_button
 
 
 @dataclass(slots=True)
@@ -45,7 +45,7 @@ def build_blockcheck_domains_ui(
 
     add_button = push_button_cls()
     add_button.setText(tr_fn("page.blockcheck.add_domain", "Добавить"))
-    add_button.setIcon(get_themed_qta_icon("fa5s.plus", color=theme_color_fn().name()))
+    apply_themed_action_button(add_button, icon_name="fa5s.plus", alignment="left")
     add_button.clicked.connect(on_add)
     input_row.addWidget(add_button)
 

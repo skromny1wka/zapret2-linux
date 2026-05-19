@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ui.log_limits import BLOCKCHECK_LOG_VIEW_MAX_LINES, apply_text_line_limit
-from ui.theme import get_themed_qta_icon
+from ui.widgets.action_button import apply_themed_action_button
 
 
 @dataclass(slots=True)
@@ -38,6 +38,7 @@ def build_log_card_section(
     expand_btn = push_button_cls()
     expand_btn.setText("Развернуть")
     expand_btn.setFixedWidth(120)
+    apply_themed_action_button(expand_btn, icon_name="fa5s.expand-alt", alignment="left", min_width=120)
     expand_btn.clicked.connect(on_toggle_expand)
 
     log_header = qhbox_layout_cls()
@@ -50,7 +51,7 @@ def build_log_card_section(
     prepare_support_btn.setText(
         tr_fn("page.blockcheck.prepare_support", "Подготовить обращение")
     )
-    prepare_support_btn.setIcon(get_themed_qta_icon("fa5b.github", color=theme_color_fn().name()))
+    apply_themed_action_button(prepare_support_btn, icon_name="fa5b.github", alignment="left")
     prepare_support_btn.clicked.connect(on_prepare_support)
     log_header.addWidget(prepare_support_btn)
     log_header.addWidget(expand_btn)

@@ -14,7 +14,6 @@ from ui.fluent_widgets import (
     set_tooltip,
 )
 from telegram_proxy.upstream_catalog import UpstreamCatalog
-from ui.theme import get_themed_qta_icon
 from ui.widgets.action_button import apply_themed_action_button
 
 

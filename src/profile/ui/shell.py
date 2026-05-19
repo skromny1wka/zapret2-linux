@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from PyQt6.QtWidgets import QWidget, QVBoxLayout
 
 from ui.fluent_widgets import QuickActionsBar, RefreshButton, set_tooltip
-from ui.theme import get_theme_tokens, get_themed_qta_icon
+from ui.widgets.action_button import apply_themed_action_button
 from qfluentwidgets import BodyLabel, PushButton, PrimaryPushButton
 
 
@@ -55,7 +55,7 @@ def build_profile_shell(
     request_btn.setText(
         tr_fn(request_button_key, "ОТКРЫТЬ ФОРМУ НА GITHUB")
     )
-    request_btn.setIcon(get_themed_qta_icon("fa5b.github", color=get_theme_tokens().accent_hex))
+    apply_themed_action_button(request_btn, icon_name="fa5b.github", alignment="left")
     request_btn.clicked.connect(on_open_profile_request_form)
     set_tooltip(
         request_btn,
@@ -79,7 +79,7 @@ def build_profile_shell(
 
     expand_btn = PushButton()
     expand_btn.setText(tr_fn(_toolbar_key("expand"), "Развернуть"))
-    expand_btn.setIcon(get_themed_qta_icon("fa5s.expand-alt", color="#4CAF50"))
+    apply_themed_action_button(expand_btn, icon_name="fa5s.expand-alt", alignment="left")
     expand_btn.clicked.connect(on_expand_all)
     set_tooltip(
         expand_btn,
@@ -92,7 +92,7 @@ def build_profile_shell(
 
     collapse_btn = PushButton()
     collapse_btn.setText(tr_fn(_toolbar_key("collapse"), "Свернуть"))
-    collapse_btn.setIcon(get_themed_qta_icon("fa5s.compress-alt", color="#ff9800"))
+    apply_themed_action_button(collapse_btn, icon_name="fa5s.compress-alt", alignment="left")
     collapse_btn.clicked.connect(on_collapse_all)
     set_tooltip(
         collapse_btn,
@@ -105,7 +105,7 @@ def build_profile_shell(
 
     info_btn = PushButton()
     info_btn.setText(tr_fn(_toolbar_key("info"), "Что это такое?"))
-    info_btn.setIcon(get_themed_qta_icon("fa5s.question-circle", color="#60cdff"))
+    apply_themed_action_button(info_btn, icon_name="fa5s.question-circle", alignment="left")
     info_btn.clicked.connect(on_show_info_popup)
     set_tooltip(
         info_btn,

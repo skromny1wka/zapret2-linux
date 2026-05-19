@@ -68,6 +68,7 @@ PySocks
 python-telegram
 python-telegram-bot
 qtawesome
+simplepycons
 pytz
 PyQt6-Fluent-Widgets
 wmi
