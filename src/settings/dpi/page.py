@@ -90,8 +90,16 @@ class DpiSettingsPage(BasePage):
         self._zapret1_header = None
         self._orchestra_label = None
         self._orchestra_settings_bound = False
+        self._orchestra_settings_built = False
+        self.orchestra_settings_container = None
+        self.strict_detection_toggle = None
+        self.debug_file_toggle = None
+        self.auto_restart_discord_toggle = None
+        self.discord_fails_spin = None
+        self.lock_successes_spin = None
+        self.unlock_fails_spin = None
+        self._settings_loaded = False
         self._build_ui()
-        self._load_settings()
 
     def _tr(self, key: str, default: str, **kwargs) -> str:
         text = tr_catalog(key, language=self._ui_language, default=default)
@@ -118,10 +126,10 @@ class DpiSettingsPage(BasePage):
                 self.separator2.setStyleSheet(f"background-color: {theme_tokens.divider_strong}; margin: 8px 0;")
         except Exception:
             pass
-        
+
     def _build_ui(self):
         """Строит UI страницы"""
-        
+
         # Метод запуска
         method_card = SettingsCard(
             self._tr(
@@ -192,19 +200,30 @@ class DpiSettingsPage(BasePage):
         self.separator2.setFixedHeight(1)
         method_layout.addWidget(self.separator2)
 
-        # ─────────────────────────────────────────────────────────────────────
-        # НАСТРОЙКИ ОРКЕСТРАТОРА (только в режиме оркестратора)
-        # ─────────────────────────────────────────────────────────────────────
         self.orchestra_settings_container = QWidget()
+        self.orchestra_settings_container.setVisible(False)
+        method_layout.addWidget(self.orchestra_settings_container)
+
+        method_card.add_layout(method_layout)
+        self.layout.addWidget(method_card)
+
+        self.layout.addStretch()
+
+        # Apply token-driven accents/dividers.
+        self._apply_page_theme(force=True)
+
+    def _ensure_orchestra_settings_built(self) -> None:
+        if self._orchestra_settings_built:
+            return
+        self._orchestra_settings_built = True
         orchestra_settings_layout = QVBoxLayout(self.orchestra_settings_container)
         orchestra_settings_layout.setContentsMargins(0, 0, 0, 0)
         orchestra_settings_layout.setSpacing(6)
 
-        orchestra_label = StrongBodyLabel(
+        self._orchestra_label = StrongBodyLabel(
             self._tr("page.dpi_settings.section.orchestra_settings", "Настройки оркестратора")
         )
-        self._orchestra_label = orchestra_label
-        orchestra_settings_layout.addWidget(orchestra_label)
+        orchestra_settings_layout.addWidget(self._orchestra_label)
 
         self.strict_detection_toggle = Win11ToggleRow(
             "mdi.check-decagram",
@@ -233,7 +252,6 @@ class DpiSettingsPage(BasePage):
         )
         orchestra_settings_layout.addWidget(self.auto_restart_discord_toggle)
 
-        # Количество фейлов для рестарта Discord
         self.discord_fails_spin = Win11NumberRow(
             "mdi.discord",
             self._tr("page.dpi_settings.orchestra.discord_fails.title", "Фейлов для рестарта Discord"),
@@ -242,10 +260,10 @@ class DpiSettingsPage(BasePage):
                 "Сколько FAIL подряд для перезапуска Discord",
             ),
             "#7289da",
-            min_val=1, max_val=10, default_val=3)
+            min_val=1, max_val=10, default_val=3,
+        )
         orchestra_settings_layout.addWidget(self.discord_fails_spin)
 
-        # Успехов для LOCK (сколько успехов подряд для закрепления стратегии)
         self.lock_successes_spin = Win11NumberRow(
             "mdi.lock",
             self._tr("page.dpi_settings.orchestra.lock_successes.title", "Успехов для LOCK"),
@@ -254,10 +272,10 @@ class DpiSettingsPage(BasePage):
                 "Количество успешных обходов для закрепления стратегии",
             ),
             "#4CAF50",
-            min_val=1, max_val=10, default_val=3)
+            min_val=1, max_val=10, default_val=3,
+        )
         orchestra_settings_layout.addWidget(self.lock_successes_spin)
 
-        # Ошибок для AUTO-UNLOCK (сколько ошибок подряд для разблокировки)
         self.unlock_fails_spin = Win11NumberRow(
             "mdi.lock-open",
             self._tr("page.dpi_settings.orchestra.unlock_fails.title", "Ошибок для AUTO-UNLOCK"),
@@ -266,21 +284,15 @@ class DpiSettingsPage(BasePage):
                 "Количество ошибок для автоматической разблокировки стратегии",
             ),
             "#FF5722",
-            min_val=1, max_val=10, default_val=3)
+            min_val=1, max_val=10, default_val=3,
+        )
         orchestra_settings_layout.addWidget(self.unlock_fails_spin)
-
-        method_layout.addWidget(self.orchestra_settings_container)
-
-        method_card.add_layout(method_layout)
-        self.layout.addWidget(method_card)
-        
-        self.layout.addStretch()
-
-        # Apply token-driven accents/dividers.
-        self._apply_page_theme(force=True)
         
     def _load_settings(self):
         """Загружает настройки"""
+        if self._settings_loaded:
+            return
+        self._settings_loaded = True
         try:
             initial = self._dpi_settings.load_initial_state()
             self._update_method_selection(initial.launch_method)
@@ -288,7 +300,14 @@ class DpiSettingsPage(BasePage):
             self._sync_visible_settings()
 
         except Exception as e:
+            self._settings_loaded = False
             log(f"Ошибка загрузки настроек DPI: {e}", "WARNING")
+
+    def _run_runtime_init_once(self) -> None:
+        self._load_settings()
+
+    def on_page_activated(self) -> None:
+        self._run_runtime_init_once()
     
     def _update_method_selection(self, method: str):
         """Обновляет визуальное состояние выбора метода"""
@@ -311,6 +330,7 @@ class DpiSettingsPage(BasePage):
     def _load_orchestra_settings(self, state):
         """Загружает настройки оркестратора"""
         try:
+            self._ensure_orchestra_settings_built()
             self.strict_detection_toggle.setChecked(bool(state.strict_detection), block_signals=True)
             self.debug_file_toggle.setChecked(bool(state.debug_file), block_signals=True)
             self.auto_restart_discord_toggle.setChecked(bool(state.auto_restart_discord), block_signals=True)
@@ -391,7 +411,10 @@ class DpiSettingsPage(BasePage):
             visibility = self._dpi_settings.describe_visibility(resolved_method)
 
             # Настройки оркестратора только для Python-оркестратора.
-            self.orchestra_settings_container.setVisible(visibility.show_orchestra_settings)
+            if visibility.show_orchestra_settings:
+                self._ensure_orchestra_settings_built()
+            if self.orchestra_settings_container is not None:
+                self.orchestra_settings_container.setVisible(visibility.show_orchestra_settings)
 
         except:
             pass
@@ -402,6 +425,7 @@ class DpiSettingsPage(BasePage):
                 self._dpi_settings.get_launch_method()
             )
             if visibility.show_orchestra_settings:
+                self._ensure_orchestra_settings_built()
                 self._load_orchestra_settings(
                     self._dpi_settings.load_orchestra_settings()
                 )
@@ -443,39 +467,45 @@ class DpiSettingsPage(BasePage):
             *self._method_option_text(ZAPRET1_MODE),
         )
 
-        self.strict_detection_toggle.set_texts(
-            self._tr("page.dpi_settings.orchestra.strict_detection.title", "Строгий режим детекции"),
-            self._tr("page.dpi_settings.orchestra.strict_detection.desc", "HTTP 200 + проверка блок-страниц"),
-        )
-        self.debug_file_toggle.set_texts(
-            self._tr("page.dpi_settings.orchestra.debug_file.title", "Сохранять debug файл"),
-            self._tr("page.dpi_settings.orchestra.debug_file.desc", "Сырой debug файл для отладки"),
-        )
-        self.auto_restart_discord_toggle.set_texts(
-            self._tr("page.dpi_settings.orchestra.auto_restart_discord.title", "Авторестарт Discord при FAIL"),
-            self._tr(
-                "page.dpi_settings.orchestra.auto_restart_discord.desc",
-                "Перезапуск Discord при неудачном обходе",
-            ),
-        )
-        self.discord_fails_spin.set_texts(
-            self._tr("page.dpi_settings.orchestra.discord_fails.title", "Фейлов для рестарта Discord"),
-            self._tr(
-                "page.dpi_settings.orchestra.discord_fails.desc",
-                "Сколько FAIL подряд для перезапуска Discord",
-            ),
-        )
-        self.lock_successes_spin.set_texts(
-            self._tr("page.dpi_settings.orchestra.lock_successes.title", "Успехов для LOCK"),
-            self._tr(
-                "page.dpi_settings.orchestra.lock_successes.desc",
-                "Количество успешных обходов для закрепления стратегии",
-            ),
-        )
-        self.unlock_fails_spin.set_texts(
-            self._tr("page.dpi_settings.orchestra.unlock_fails.title", "Ошибок для AUTO-UNLOCK"),
-            self._tr(
-                "page.dpi_settings.orchestra.unlock_fails.desc",
-                "Количество ошибок для автоматической разблокировки стратегии",
-            ),
-        )
+        if self.strict_detection_toggle is not None:
+            self.strict_detection_toggle.set_texts(
+                self._tr("page.dpi_settings.orchestra.strict_detection.title", "Строгий режим детекции"),
+                self._tr("page.dpi_settings.orchestra.strict_detection.desc", "HTTP 200 + проверка блок-страниц"),
+            )
+        if self.debug_file_toggle is not None:
+            self.debug_file_toggle.set_texts(
+                self._tr("page.dpi_settings.orchestra.debug_file.title", "Сохранять debug файл"),
+                self._tr("page.dpi_settings.orchestra.debug_file.desc", "Сырой debug файл для отладки"),
+            )
+        if self.auto_restart_discord_toggle is not None:
+            self.auto_restart_discord_toggle.set_texts(
+                self._tr("page.dpi_settings.orchestra.auto_restart_discord.title", "Авторестарт Discord при FAIL"),
+                self._tr(
+                    "page.dpi_settings.orchestra.auto_restart_discord.desc",
+                    "Перезапуск Discord при неудачном обходе",
+                ),
+            )
+        if self.discord_fails_spin is not None:
+            self.discord_fails_spin.set_texts(
+                self._tr("page.dpi_settings.orchestra.discord_fails.title", "Фейлов для рестарта Discord"),
+                self._tr(
+                    "page.dpi_settings.orchestra.discord_fails.desc",
+                    "Сколько FAIL подряд для перезапуска Discord",
+                ),
+            )
+        if self.lock_successes_spin is not None:
+            self.lock_successes_spin.set_texts(
+                self._tr("page.dpi_settings.orchestra.lock_successes.title", "Успехов для LOCK"),
+                self._tr(
+                    "page.dpi_settings.orchestra.lock_successes.desc",
+                    "Количество успешных обходов для закрепления стратегии",
+                ),
+            )
+        if self.unlock_fails_spin is not None:
+            self.unlock_fails_spin.set_texts(
+                self._tr("page.dpi_settings.orchestra.unlock_fails.title", "Ошибок для AUTO-UNLOCK"),
+                self._tr(
+                    "page.dpi_settings.orchestra.unlock_fails.desc",
+                    "Количество ошибок для автоматической разблокировки стратегии",
+                ),
+            )

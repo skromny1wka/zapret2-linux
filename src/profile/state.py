@@ -62,4 +62,3 @@ class ProfileSetupPayload:
     in_range: str = "x"
     out_range: str = "a"
     current_strategy_state: ProfileStrategyState = ProfileStrategyState()
-    list_editor: ProfileListFileEditorState = ProfileListFileEditorState()

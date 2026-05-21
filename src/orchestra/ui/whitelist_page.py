@@ -159,7 +159,6 @@ class OrchestraWhitelistPage(BasePage):
 
         self._setup_ui()
         self._apply_page_theme(force=True)
-        self._run_runtime_init_once()
 
     def _run_runtime_init_once(self) -> None:
         if self._runtime_initialized:
@@ -376,9 +375,13 @@ class OrchestraWhitelistPage(BasePage):
             ),
         )
 
-        self._sync_whitelist_view(refresh=True)
+        if self._runtime_initialized:
+            self._sync_whitelist_view(refresh=True)
 
     def on_page_activated(self) -> None:
+        if not self._runtime_initialized:
+            self._run_runtime_init_once()
+            return
         self._sync_whitelist_view(refresh=False)
 
     def _is_orchestra_running(self) -> bool:

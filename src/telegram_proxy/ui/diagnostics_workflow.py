@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import threading
-
 from PyQt6.QtCore import QTimer
 
 
@@ -33,16 +31,21 @@ def start_diagnostics(
     set_diag_result(None)
     set_thread_done(False)
 
-    def _run_diag_tests():
-        result_text = telegram_proxy_feature.run_diagnostics(
-            proxy_port=proxy_port,
-            progress_callback=publish_diag_result,
-        )
+    worker = telegram_proxy_feature.create_diagnostics_worker(
+        proxy_port=proxy_port,
+        parent=page,
+    )
+
+    def _apply_diag_result(result_text: str) -> None:
         set_diag_result(result_text)
         set_thread_done(True)
 
-    thread = threading.Thread(target=_run_diag_tests, daemon=True)
-    thread.start()
+    worker.progress.connect(publish_diag_result)
+    worker.completed.connect(_apply_diag_result)
+    worker.finished.connect(lambda: setattr(page, "_diag_worker", None))
+    worker.finished.connect(worker.deleteLater)
+    setattr(page, "_diag_worker", worker)
+    worker.start()
 
     poll_timer = existing_poll_timer
     if poll_timer is not None:

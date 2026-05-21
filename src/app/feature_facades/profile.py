@@ -42,6 +42,9 @@ class ProfileFeature:
     def get_profile_setup(self, launch_method: str, profile_key: str):
         return profile_internal_commands.get_profile_setup(self, launch_method, profile_key)
 
+    def get_profile_list_file_editor_state(self, launch_method: str, profile_key: str):
+        return profile_internal_commands.get_profile_list_file_editor_state(self, launch_method, profile_key)
+
     def apply_strategy_to_profile(self, launch_method: str, profile_key: str, strategy_id: str) -> str | None:
         return profile_internal_commands.apply_strategy_to_profile(self, launch_method, profile_key, strategy_id)
 

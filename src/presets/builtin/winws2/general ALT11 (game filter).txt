@@ -79,7 +79,7 @@
 --wf-raw-part=@windivert.filter/windivert_part.stun.txt
 --wf-raw-part=@windivert.filter/windivert_part.wireguard.txt
 
---filter-udp=443
+--filter-udp=80,443-65535
 --ipset-exclude=lists/ipset-exclude.txt
 --ipset-exclude=lists/ipset-ru.txt
 --ipset-exclude=lists/ipset-dns.txt
@@ -96,7 +96,7 @@
 
 --new
 
---filter-tcp=2053,2083,2087,2096,8443
+--filter-tcp=80,443,1080,2053,2083,2087,2096,8443
 --hostlist-domains=discord.media
 --out-range=-d8
 --lua-desync=fake:blob=tls_google:repeats=8:tcp_ts=-600000
@@ -160,7 +160,7 @@
 
 --new
 
---filter-tcp=80,443
+--filter-tcp=80,443-65535
 --hostlist=lists/roblox.txt
 --out-range=-d10
 --lua-desync=fake:blob=tls_google:repeats=8:tcp_ts=-600000
@@ -208,7 +208,7 @@
 
 --new
 
---filter-tcp=80,443
+--filter-tcp=80,443-65535
 --ipset-exclude=lists/ipset-exclude.txt
 --ipset-exclude=lists/ipset-ru.txt
 --ipset-exclude=lists/ipset-dns.txt
@@ -219,7 +219,7 @@
 
 --new
 
---filter-udp=443
+--filter-udp=443-65535
 --ipset=lists/ipset-all.txt
 --out-range=-n8
 --payload=quic_initial
@@ -227,7 +227,7 @@
 
 --new
 
---filter-tcp=80,443,444-65535
+--filter-tcp=80,443-65535
 --ipset=lists/ipset-all.txt
 --out-range=-d10
 --lua-desync=fake:blob=tls_max:repeats=8:tcp_ts=-600000
@@ -235,7 +235,7 @@
 
 --new
 
---filter-tcp=80,443,444-65535
+--filter-tcp=80,443-65535
 --ipset=lists/ipset-discord.txt
 --out-range=-d10
 --lua-desync=fake:blob=tls_max:repeats=8:tcp_ts=-600000
@@ -243,7 +243,7 @@
 
 --new
 
---filter-tcp=80,443,444-65535
+--filter-tcp=80,443-65535
 --ipset=lists/ipset-cloudflare.txt
 --out-range=-d10
 --lua-desync=fake:blob=tls_max:repeats=8:tcp_ts=-600000
@@ -251,7 +251,7 @@
 
 --new
 
---filter-tcp=80,443,444-65535
+--filter-tcp=80,443-65535
 --ipset=lists/cloudflare-ipset.txt
 --out-range=-d10
 --lua-desync=fake:blob=tls_max:repeats=8:tcp_ts=-600000
@@ -259,7 +259,7 @@
 
 --new
 
---filter-tcp=80,443,444-65535
+--filter-tcp=80,443-65535
 --ipset=lists/cloudflare-ipset_v6.txt
 --out-range=-d10
 --lua-desync=fake:blob=tls_max:repeats=8:tcp_ts=-600000
@@ -267,7 +267,7 @@
 
 --new
 
---filter-tcp=80,443,444-65535
+--filter-tcp=80,443-65535
 --ipset=lists/ipset-cloudflare1.txt
 --out-range=-d10
 --lua-desync=fake:blob=tls_max:repeats=8:tcp_ts=-600000
@@ -275,7 +275,7 @@
 
 --new
 
---filter-tcp=80,443,444-65535
+--filter-tcp=80,443-65535
 --ipset=lists/ipset-amazon.txt
 --out-range=-d10
 --lua-desync=fake:blob=tls_max:repeats=8:tcp_ts=-600000
@@ -283,7 +283,7 @@
 
 --new
 
---filter-tcp=80,443,444-65535
+--filter-tcp=80,443-65535
 --ipset=lists/ipset-roblox.txt
 --out-range=-d10
 --lua-desync=fake:blob=tls_max:repeats=8:tcp_ts=-600000
@@ -291,7 +291,7 @@
 
 --new
 
---filter-tcp=80,443,444-65535
+--filter-tcp=80,443-65535
 --ipset=lists/ipset-lol-ru.txt
 --out-range=-d10
 --lua-desync=fake:blob=tls_max:repeats=8:tcp_ts=-600000
@@ -299,7 +299,7 @@
 
 --new
 
---filter-tcp=80,443,444-65535
+--filter-tcp=80,443-65535
 --ipset=lists/ipset-lol-euw.txt
 --out-range=-d10
 --lua-desync=fake:blob=tls_max:repeats=8:tcp_ts=-600000
@@ -307,7 +307,7 @@
 
 --new
 
---filter-tcp=80,443,444-65535
+--filter-tcp=80,443-65535
 --ipset=lists/ipset-ovh.txt
 --out-range=-d10
 --lua-desync=fake:blob=tls_max:repeats=8:tcp_ts=-600000
@@ -315,7 +315,7 @@
 
 --new
 
---filter-tcp=80,443,444-65535
+--filter-tcp=80,443-65535
 --ipset=lists/ipset-whatsapp.txt
 --out-range=-d10
 --lua-desync=fake:blob=tls_max:repeats=8:tcp_ts=-600000
@@ -323,7 +323,7 @@
 
 --new
 
---filter-tcp=80,443,444-65535
+--filter-tcp=80,443-65535
 --ipset=lists/ipset-warp.txt
 --out-range=-d10
 --lua-desync=fake:blob=tls_max:repeats=8:tcp_ts=-600000
@@ -331,7 +331,7 @@
 
 --new
 
---filter-tcp=80,443,444-65535
+--filter-tcp=80,443-65535
 --ipset=lists/ipset-zapretkvn.txt
 --out-range=-d10
 --lua-desync=fake:blob=tls_max:repeats=8:tcp_ts=-600000
@@ -339,7 +339,7 @@
 
 --new
 
---filter-tcp=80,443,444-65535
+--filter-tcp=80,443-65535
 --ipset=lists/ipset-timeweb.txt
 --out-range=-d10
 --lua-desync=fake:blob=tls_max:repeats=8:tcp_ts=-600000
@@ -347,7 +347,7 @@
 
 --new
 
---filter-udp=444-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-all.txt
 --out-range=-n4
 --payload=all
@@ -355,7 +355,7 @@
 
 --new
 
---filter-udp=444-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-discord.txt
 --out-range=-n4
 --payload=all
@@ -363,7 +363,7 @@
 
 --new
 
---filter-udp=444-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-cloudflare.txt
 --out-range=-n4
 --payload=all
@@ -371,7 +371,7 @@
 
 --new
 
---filter-udp=444-65535
+--filter-udp=443-65535
 --ipset=lists/cloudflare-ipset.txt
 --out-range=-n4
 --payload=all
@@ -379,7 +379,7 @@
 
 --new
 
---filter-udp=444-65535
+--filter-udp=443-65535
 --ipset=lists/cloudflare-ipset_v6.txt
 --out-range=-n4
 --payload=all
@@ -387,7 +387,7 @@
 
 --new
 
---filter-udp=444-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-cloudflare1.txt
 --out-range=-n4
 --payload=all
@@ -395,7 +395,7 @@
 
 --new
 
---filter-udp=444-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-amazon.txt
 --out-range=-n4
 --payload=all
@@ -403,7 +403,7 @@
 
 --new
 
---filter-udp=444-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-roblox.txt
 --out-range=-n4
 --payload=all
@@ -411,7 +411,7 @@
 
 --new
 
---filter-udp=444-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-lol-ru.txt
 --out-range=-n4
 --payload=all
@@ -419,7 +419,7 @@
 
 --new
 
---filter-udp=444-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-lol-euw.txt
 --out-range=-n4
 --payload=all
@@ -427,7 +427,7 @@
 
 --new
 
---filter-udp=444-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-ovh.txt
 --out-range=-n4
 --payload=all
@@ -435,7 +435,7 @@
 
 --new
 
---filter-udp=444-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-whatsapp.txt
 --out-range=-n4
 --payload=all
@@ -443,7 +443,7 @@
 
 --new
 
---filter-udp=444-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-warp.txt
 --out-range=-n4
 --payload=all
@@ -451,7 +451,7 @@
 
 --new
 
---filter-udp=444-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-zapretkvn.txt
 --out-range=-n4
 --payload=all
@@ -459,7 +459,7 @@
 
 --new
 
---filter-udp=444-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-timeweb.txt
 --out-range=-n4
 --payload=all

@@ -1,7 +1,5 @@
 """Workflow/helper'ы информации по папкам hostlist/ipset."""
 
-import threading
-
 
 def normalize_folder_info_category(category: str) -> str:
     return "ipset" if category == "ipset" else "hostlist"
@@ -57,16 +55,6 @@ def request_folder_info(
         loaded_map[normalized] = False
         state_map[normalized] = None
     return True, normalized, request_seq
-
-
-def start_folder_info_thread(*, load_worker_fn, category: str, request_seq: int) -> None:
-    worker = threading.Thread(
-        target=load_worker_fn,
-        args=(category, request_seq),
-        daemon=True,
-        name=f"HostlistPageInfo-{category}",
-    )
-    worker.start()
 
 
 def accept_folder_info_loaded(

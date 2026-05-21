@@ -158,11 +158,10 @@ class HostsPage(BasePage):
         self._current_operation = None
         self._startup_initialized = False
         self._runtime_initialized = False
-        self._service_dns_selection = self._controller.load_user_selection()
+        self._service_dns_selection = {}
 
         self._build_ui()
         self._apply_page_theme(force=True)
-        self._run_runtime_init_once()
 
     def _tr(self, key: str, default: str, **kwargs) -> str:
         text = tr_catalog(key, language=self._ui_language, default=default)
@@ -186,6 +185,7 @@ class HostsPage(BasePage):
         )
 
     def on_page_activated(self) -> None:
+        self._run_runtime_init_once()
         self._start_catalog_watcher()
         activate_hosts_page(
             install_host_window_event_filter_fn=self._install_host_window_event_filter,
@@ -197,6 +197,8 @@ class HostsPage(BasePage):
         )
 
     def _run_runtime_init_once(self) -> None:
+        if not self._runtime_initialized:
+            self._service_dns_selection = self._controller.load_user_selection()
         run_hosts_runtime_init_once(
             runtime_initialized=self._runtime_initialized,
             set_runtime_initialized_fn=lambda value: setattr(self, "_runtime_initialized", value),
@@ -489,10 +491,9 @@ class HostsPage(BasePage):
         self.add_widget(self._browser_warning_label)
 
     def _build_status_section(self):
-        active = self._get_active_domains()
         widgets = build_hosts_status_section(
             tr_fn=self._tr,
-            active_count=len(active),
+            active_count=0,
             on_clear_clicked=self._on_clear_clicked,
             on_open_hosts_file=self._open_hosts_file,
         )

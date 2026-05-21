@@ -7,8 +7,6 @@ port configuration, and quick-setup deep link for Telegram.
 
 from __future__ import annotations
 
-import threading
-
 from PyQt6.QtCore import Qt, QTimer, pyqtSlot
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout,
@@ -120,9 +118,23 @@ class TelegramProxyPage(BasePage):
         self._stats_timer = None
         self._diag_poll_timer = None
         self._upstream_restart_timer = None
+        self._diag_worker = None
+        self._proxy_start_worker = None
+        self._restart_stop_worker = None
+        self._relay_check_worker = None
+        self._ensure_hosts_worker = None
         self._relay_check_gen = 0
         self._cleanup_in_progress = False
         self._runtime_initialized = False
+        self._built_panel_indexes: set[int] = set()
+        self._btn_copy_logs = None
+        self._btn_open_log_file = None
+        self._btn_clear_logs = None
+        self._log_edit = None
+        self._diag_desc_label = None
+        self._btn_run_diag = None
+        self._btn_copy_diag = None
+        self._diag_edit = None
         self._setup_ui()
         self._after_ui_built()
         # Запуск Telegram Proxy живёт в общем старте приложения,
@@ -136,14 +148,11 @@ class TelegramProxyPage(BasePage):
         self._load_settings()
         self._log_timer = QTimer(self)
         self._log_timer.timeout.connect(self._flush_log_buffer)
-        if self.isVisible():
-            self._log_timer.start(_LOG_REFRESH_MS)
         self._stats_timer = QTimer(self)
         self._stats_timer.timeout.connect(self._emit_stats_if_visible)
         if self.isVisible():
             self._stats_timer.start(2000)
         self._apply_ui_texts()
-        self._run_runtime_init_once()
 
     def _run_runtime_init_once(self) -> None:
         plan = telegram_proxy_page_runtime.build_page_init_plan(
@@ -153,6 +162,9 @@ class TelegramProxyPage(BasePage):
             return
         self._runtime_initialized = True
         self._ensure_telegram_hosts()
+
+    def on_page_activated(self) -> None:
+        self._run_runtime_init_once()
 
     def _setup_ui(self):
         shell = build_telegram_proxy_shell(
@@ -164,40 +176,43 @@ class TelegramProxyPage(BasePage):
         self._stacked = shell.stacked
 
         self._build_settings_panel(shell.settings_layout)
-        logs_widgets = build_telegram_proxy_logs_panel(
-            shell.logs_layout,
-            push_button_cls=PushButton,
-            on_copy_all_logs=self._on_copy_all_logs,
-            on_open_log_file=self._on_open_log_file,
-            on_clear_logs=self._on_clear_logs,
-        )
-        self._btn_copy_logs = logs_widgets.btn_copy_logs
-        self._btn_open_log_file = logs_widgets.btn_open_log_file
-        self._btn_clear_logs = logs_widgets.btn_clear_logs
-        self._log_edit = logs_widgets.log_edit
-
-        diag_widgets = build_telegram_proxy_diag_panel(
-            shell.diag_layout,
-            caption_label_cls=CaptionLabel,
-            primary_push_button_cls=PrimaryPushButton,
-            push_button_cls=PushButton,
-            on_run_diagnostics=self._on_run_diagnostics,
-            on_copy_diag=self._on_copy_diag,
-        )
-        self._diag_desc_label = diag_widgets.diag_desc_label
-        self._btn_run_diag = diag_widgets.btn_run_diag
-        self._btn_copy_diag = diag_widgets.btn_copy_diag
-        self._diag_edit = diag_widgets.diag_edit
+        self._built_panel_indexes.add(0)
+        self._logs_layout = shell.logs_layout
+        self._diag_layout = shell.diag_layout
 
         self.add_widget(self._pivot)
         self.add_widget(self._stacked)
-        self._switch_tab(0)
+        self._stacked.setCurrentIndex(0)
+
+    def _ensure_panel_built(self, index: int) -> None:
+        if index in self._built_panel_indexes:
+            return
+        if index == 1:
+            self._build_logs_panel(self._logs_layout)
+            self._built_panel_indexes.add(index)
+            self._apply_ui_texts()
+            self._flush_log_buffer()
+        elif index == 2:
+            self._build_diag_panel(self._diag_layout)
+            self._built_panel_indexes.add(index)
+            self._apply_ui_texts()
 
     def _switch_tab(self, index: int):
+        self._ensure_panel_built(index)
         self._stacked.setCurrentIndex(index)
+        self._sync_log_timer()
         keys = ["settings", "logs", "diag"]
         if 0 <= index < len(keys):
             self._pivot.setCurrentItem(keys[index])
+
+    def _sync_log_timer(self) -> None:
+        if self._log_timer is None:
+            return
+        should_run = bool(self.isVisible() and self._stacked.currentIndex() == 1 and self._log_edit is not None)
+        if should_run and not self._log_timer.isActive():
+            self._log_timer.start(_LOG_REFRESH_MS)
+        elif not should_run and self._log_timer.isActive():
+            self._log_timer.stop()
 
     def _add_settings_item(self, container, widget: QWidget) -> None:
         add_setting_card = getattr(container, "addSettingCard", None)
@@ -507,6 +522,8 @@ class TelegramProxyPage(BasePage):
 
     def _flush_log_buffer(self):
         """Called every 500ms by QTimer. Drains new lines from ProxyLogger."""
+        if self._log_edit is None:
+            return
         mgr = self._proxy_manager()
         new_lines = mgr.proxy_logger.drain()
         if not new_lines:
@@ -532,6 +549,8 @@ class TelegramProxyPage(BasePage):
     # -- Log tab buttons --
 
     def _on_copy_all_logs(self):
+        if self._log_edit is None:
+            return
         text = self._log_edit.toPlainText()
         plan = self._telegram_proxy.copy_text(
             text,
@@ -558,7 +577,8 @@ class TelegramProxyPage(BasePage):
             self._append_log_line(plan.log_line)
 
     def _on_clear_logs(self):
-        self._log_edit.clear()
+        if self._log_edit is not None:
+            self._log_edit.clear()
 
     # -- Handlers --
 
@@ -581,6 +601,7 @@ class TelegramProxyPage(BasePage):
             restarting=bool(getattr(self, "_restarting", False)),
             set_restarting=lambda value: setattr(self, "_restarting", value),
             status_label=self._status_label,
+            telegram_proxy_feature=self._telegram_proxy,
         )
 
     @pyqtSlot()
@@ -615,6 +636,7 @@ class TelegramProxyPage(BasePage):
             btn_toggle=self._btn_toggle,
             status_label=self._status_label,
             append_log_line=self._append_log_line,
+            telegram_proxy_feature=self._telegram_proxy,
         )
 
     @pyqtSlot()
@@ -640,6 +662,7 @@ class TelegramProxyPage(BasePage):
             set_relay_diag=lambda value: setattr(self, "_relay_diag", value),
             get_zapret_running=lambda: telegram_proxy_page_runtime.is_zapret_runtime_running(self._runtime_feature),
             log_warning=lambda text: log(text, "WARNING"),
+            telegram_proxy_feature=self._telegram_proxy,
         )
 
     @pyqtSlot()
@@ -857,21 +880,21 @@ class TelegramProxyPage(BasePage):
                 pass
 
     def _ensure_telegram_hosts(self):
-        """Check/add Telegram entries in Windows hosts file (background thread)."""
-        threading.Thread(
-            target=self._ensure_telegram_hosts_worker,
-            daemon=True,
-        ).start()
+        """Проверяет и добавляет Telegram-записи в hosts через worker."""
+        worker = self._telegram_proxy.create_ensure_hosts_worker(parent=self)
+        self._ensure_hosts_worker = worker
+        worker.completed.connect(self._on_telegram_hosts_ensured)
+        worker.finished.connect(lambda: setattr(self, "_ensure_hosts_worker", None))
+        worker.finished.connect(worker.deleteLater)
+        worker.start()
 
-    def _ensure_telegram_hosts_worker(self):
-        plan = self._telegram_proxy.ensure_telegram_hosts()
+    def _on_telegram_hosts_ensured(self, plan):
         if not plan.ok and plan.log_line:
             log(plan.log_line, "WARNING")
 
     def showEvent(self, event):
         super().showEvent(event)
-        if self._log_timer is not None and not self._log_timer.isActive():
-            self._log_timer.start(_LOG_REFRESH_MS)
+        self._sync_log_timer()
         if self._stats_timer is not None and self._proxy_manager().is_running and not self._stats_timer.isActive():
             self._stats_timer.start(2000)
             self._emit_stats_if_visible()

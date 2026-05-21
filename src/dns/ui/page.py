@@ -124,6 +124,8 @@ class NetworkPage(BasePage):
         self._runtime_initialized = False
         self._cleanup_in_progress = False
         self._dns_selection_sync_queued = False
+        self._page_load_worker = None
+        self._connectivity_test_worker = None
         
         self.dns_cards = {}
         self.adapter_cards = []
@@ -167,7 +169,6 @@ class NetworkPage(BasePage):
             set_selected_provider_fn=lambda value: setattr(self, "_selected_provider", value),
         )
         self._apply_page_theme(force=True)
-        self._run_runtime_init_once()
 
     def _dns_feature(self):
         return self._dns
@@ -217,6 +218,7 @@ class NetworkPage(BasePage):
         )
 
     def on_page_activated(self) -> None:
+        self._run_runtime_init_once()
         if self._is_loading and not self._ui_built:
             try:
                 self.loading_bar.start()
@@ -399,16 +401,19 @@ class NetworkPage(BasePage):
         """Запускает асинхронную загрузку данных"""
         if self._cleanup_in_progress:
             return
-        start_background_loading(load_data_fn=self._load_data)
+        worker = start_background_loading(
+            load_page_data_fn=self._dns_feature().load_page_data,
+            parent=self,
+        )
+        self._page_load_worker = worker
+        worker.loaded.connect(self._on_page_state_loaded)
+        worker.finished_loading.connect(lambda: setattr(self, "_page_load_worker", None))
     
-    def _load_data(self):
-        """Загружает данные в фоне"""
+    def _on_page_state_loaded(self, state):
+        """Применяет готовое состояние DNS страницы в UI-потоке."""
         if self._cleanup_in_progress:
             return
         try:
-            state = self._dns_feature().load_page_data()
-            if self._cleanup_in_progress:
-                return
             apply_loaded_page_state(
                 state=state,
                 set_ipv6_available_fn=lambda value: setattr(self, "_ipv6_available", value),
@@ -871,7 +876,7 @@ class NetworkPage(BasePage):
 
     def _test_connection(self):
         """Тестирует соединение с интернетом"""
-        start_connectivity_test(
+        self._connectivity_test_worker = start_connectivity_test(
             cleanup_in_progress=self._cleanup_in_progress,
             set_test_in_progress_fn=lambda value: setattr(self, "_test_in_progress", value),
             update_test_action_text_fn=self._update_test_action_text,
@@ -880,6 +885,7 @@ class NetworkPage(BasePage):
             build_connectivity_test_plan_fn=dns_page_plans.build_connectivity_test_plan,
             run_connectivity_test_fn=self._dns_feature().run_connectivity_test,
             language=self._ui_language,
+            parent=self,
         )
 
     def _on_test_complete(self, results: list):

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from PyQt6.QtCore import QPoint, pyqtSignal
+from PyQt6.QtCore import QPoint, QTimer, pyqtSignal
 from PyQt6.QtWidgets import QVBoxLayout, QWidget
 
 from folders.defaults import build_default_profile_folders
@@ -27,7 +27,14 @@ class ProfilesList(QWidget):
         self._items_by_key: Dict[str, ProfileItem] = {}
         self._profile_items: Dict[str, Any] = {}
         self._groups: Dict[str, ProfileGroup] = {}
+        self._group_rows: Dict[str, tuple[Any, ...]] = {}
+        self._built_group_keys: set[str] = set()
+        self._pending_group_build_keys: list[str] = []
         self._profile_to_group: Dict[str, str] = {}
+        self._active_profile_types: set[str] = {"all"}
+        self._group_build_timer = QTimer(self)
+        self._group_build_timer.setSingleShot(True)
+        self._group_build_timer.timeout.connect(self._build_next_pending_group)
         self.setAcceptDrops(True)
         self._build_ui()
 
@@ -62,20 +69,20 @@ class ProfilesList(QWidget):
             if not rows:
                 continue
             rows.sort(key=profile_display_sort_key)
+            self._group_rows[group_key] = tuple(rows)
             group = ProfileGroup(group_key, group_titles.get(group_key, group_key.title()), self, count=len(rows))
             group.context_requested.connect(self.folder_context_requested)
-            group.toggled.connect(self.folder_toggled)
+            group.toggled.connect(self._on_group_toggled)
             group.set_expanded(not bool(getattr(rows[0], "group_collapsed", False)))
             self._groups[group_key] = group
 
             for item in rows:
-                widget = self._create_item(item)
-                group.add_widget(widget)
-                self._items_by_key[item.key] = widget
                 self._profile_items[item.key] = item
                 self._profile_to_group[item.key] = group_key
 
             self._content_layout.insertWidget(self._content_layout.count() - 1, group)
+            if group.is_expanded:
+                self._schedule_group_build(group_key)
 
     def clear(self) -> None:
         while self._content_layout.count() > 1:
@@ -86,11 +93,15 @@ class ProfilesList(QWidget):
         self._items_by_key.clear()
         self._profile_items.clear()
         self._groups.clear()
+        self._group_rows.clear()
+        self._built_group_keys.clear()
+        self._pending_group_build_keys.clear()
         self._profile_to_group.clear()
 
     def expand_all(self) -> None:
-        for group in self._groups.values():
+        for group_key, group in self._groups.items():
             group.set_expanded(True)
+            self._schedule_group_build(group_key)
 
     def collapse_all(self) -> None:
         for group in self._groups.values():
@@ -128,6 +139,44 @@ class ProfilesList(QWidget):
         widget.set_feedback_state(item.rating, item.favorite)
         return widget
 
+    def _on_group_toggled(self, group_key: str, is_expanded: bool) -> None:
+        if is_expanded:
+            self._schedule_group_build(group_key)
+        self.folder_toggled.emit(group_key, is_expanded)
+
+    def _schedule_group_build(self, group_key: str) -> None:
+        key = str(group_key or "")
+        if not key or key in self._built_group_keys:
+            return
+        if key not in self._pending_group_build_keys:
+            self._pending_group_build_keys.append(key)
+        if not self._group_build_timer.isActive():
+            self._group_build_timer.start(0)
+
+    def _build_next_pending_group(self) -> None:
+        while self._pending_group_build_keys:
+            group_key = self._pending_group_build_keys.pop(0)
+            group = self._groups.get(group_key)
+            if group is None or group_key in self._built_group_keys:
+                continue
+            if not group.is_expanded:
+                continue
+            self._build_group_contents(group_key)
+            break
+        if self._pending_group_build_keys:
+            self._group_build_timer.start(0)
+
+    def _build_group_contents(self, group_key: str) -> None:
+        group = self._groups.get(group_key)
+        if group is None or group_key in self._built_group_keys:
+            return
+        for item in self._group_rows.get(group_key, ()):
+            widget = self._create_item(item)
+            group.add_widget(widget)
+            self._items_by_key[item.key] = widget
+        self._built_group_keys.add(group_key)
+        self._apply_profile_type_filter(self._active_profile_types)
+
     def _on_item_clicked(self, profile_key: str) -> None:
         self.profile_selected.emit(profile_key)
 
@@ -144,6 +193,7 @@ class ProfilesList(QWidget):
         self.profile_move_requested.emit(source_key, destination_key)
 
     def _apply_profile_type_filter(self, active_profile_types: set[str]) -> None:
+        self._active_profile_types = set(active_profile_types or {"all"})
         if "all" in active_profile_types:
             for widget in self._items_by_key.values():
                 widget.setVisible(True)
@@ -172,8 +222,8 @@ class ProfilesList(QWidget):
 
         for group_key, group in self._groups.items():
             group.setVisible(any(
-                widget.isVisible()
-                for key, widget in self._items_by_key.items()
+                key in visible
+                for key, item in self._profile_items.items()
                 if self._profile_to_group.get(key) == group_key
             ))
 

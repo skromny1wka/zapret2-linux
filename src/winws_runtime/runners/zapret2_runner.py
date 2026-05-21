@@ -26,7 +26,6 @@ from .preset_runner_support import (
     PresetRunnerState,
     PresetRunnerStateMachine,
     is_process_alive_with_expected_name,
-    launch_args_from_preset_text,
     preset_cache_key,
     remember_cache_entry,
     wait_for_process_exit,
@@ -369,7 +368,7 @@ class Winws2StrategyRunner(StrategyRunnerBase):
 
             try:
                 normalized_text = self._prepare_preset_text_for_launch(source_content)
-                launch_args = tuple(launch_args_from_preset_text(normalized_text))
+                launch_args = self._build_launch_args_from_preset_text(normalized_text)
                 missing = self._collect_missing_preset_references_from_text(normalized_text)
                 validation_ok = not missing
                 validation_report = "" if validation_ok else self._build_validation_report(missing)

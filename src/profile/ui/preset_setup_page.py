@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import time
 
-from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QSizePolicy
 
 from log.log import log
@@ -61,9 +60,10 @@ class PresetSetupPageBase(BasePage):
         self._toolbar_actions_bar = None
         self._profile_load_request_id = 0
         self._profile_load_worker = None
+        self._profile_payload_loaded_once = False
+        self._profile_payload_dirty = True
         self._cleanup_in_progress = False
         self._build_content()
-        QTimer.singleShot(0, self._request_profiles_payload)
 
     def on_page_activated(self) -> None:
         self._request_profiles_payload()
@@ -93,11 +93,21 @@ class PresetSetupPageBase(BasePage):
         self._loading_label = shell.loading_label
 
     def refresh_from_preset_switch(self) -> None:
-        self._request_profiles_payload()
+        self._request_profiles_payload(force=True)
 
-    def _request_profiles_payload(self) -> None:
+    def _request_profiles_payload(self, *, force: bool = False) -> None:
         if self._cleanup_in_progress:
             return
+        worker = self._profile_load_worker
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    return
+            except Exception:
+                return
+        if not force and self._profile_payload_loaded_once and not self._profile_payload_dirty:
+            return
+        self._profile_payload_dirty = True
         self._profile_load_request_id += 1
         request_id = self._profile_load_request_id
         if self._loading_label is not None:
@@ -115,11 +125,14 @@ class PresetSetupPageBase(BasePage):
             return
         if self._loading_label is not None:
             self._loading_label.hide()
+        self._profile_payload_loaded_once = True
+        self._profile_payload_dirty = False
         self._apply_payload(payload)
 
     def _on_profile_payload_failed(self, request_id: int, error: str) -> None:
         if request_id != self._profile_load_request_id or self._cleanup_in_progress:
             return
+        self._profile_payload_dirty = True
         if self._loading_label is not None:
             self._loading_label.hide()
         log(f"{self.__class__.__name__}: не удалось прочитать профили: {error}", "ERROR")

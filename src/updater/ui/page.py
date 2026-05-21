@@ -70,7 +70,6 @@ class ServersPage(BasePage):
 
         self._build_ui()
         self._apply_page_theme(force=True)
-        self._run_runtime_init_once()
 
     def _tr(self, key: str, default: str) -> str:
         return tr_catalog(key, language=self._ui_language, default=default)
@@ -87,8 +86,11 @@ class ServersPage(BasePage):
             lambda action=plan.view_action, elapsed=plan.elapsed_seconds: (not self._cleanup_in_progress) and self._update_runtime.apply_idle_view_state(
                 view_action=action,
                 elapsed_seconds=elapsed,
-            ),
+                ),
         )
+
+    def on_page_activated(self) -> None:
+        self._run_runtime_init_once()
 
     def _apply_page_theme(self, tokens=None, force: bool = False) -> None:
         _ = force

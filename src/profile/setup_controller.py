@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from profile.setup_workflow import (
     apply_strategy_to_profile,
+    load_profile_list_file_editor_state,
     load_profile_setup,
     save_profile_raw_text,
     save_profile_list_file_text,
@@ -32,6 +33,18 @@ class ProfileSetupController:
         from profile.profile_setup_loader import ProfileSetupLoadWorker
 
         return ProfileSetupLoadWorker(request_id, self, profile_key, parent)
+
+    def load_list_file_editor_state(self, profile_key: str):
+        return load_profile_list_file_editor_state(
+            profile_feature=self._profile,
+            launch_method=self._launch_method,
+            profile_key=profile_key,
+        )
+
+    def create_list_file_load_worker(self, request_id: int, profile_key: str, parent=None):
+        from profile.profile_setup_loader import ProfileListFileLoadWorker
+
+        return ProfileListFileLoadWorker(request_id, self, profile_key, parent)
 
     def save_winws2_settings(
         self,

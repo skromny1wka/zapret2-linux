@@ -23,3 +23,23 @@ class ProfileSetupLoadWorker(QThread):
             self.failed.emit(self._request_id, str(exc))
             return
         self.loaded.emit(self._request_id, payload)
+
+
+class ProfileListFileLoadWorker(QThread):
+    loaded = pyqtSignal(int, object)
+    failed = pyqtSignal(int, str)
+
+    def __init__(self, request_id: int, controller, profile_key: str, parent=None):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self._controller = controller
+        self._profile_key = str(profile_key or "").strip()
+
+    def run(self) -> None:
+        try:
+            state = self._controller.load_list_file_editor_state(self._profile_key)
+        except Exception as exc:
+            log(f"ProfileListFileLoadWorker: не удалось загрузить файл списка profile: {exc}", "ERROR")
+            self.failed.emit(self._request_id, str(exc))
+            return
+        self.loaded.emit(self._request_id, state)

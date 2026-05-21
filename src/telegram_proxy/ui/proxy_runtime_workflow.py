@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import threading
-
 from PyQt6.QtCore import QMetaObject, Qt as QtNS
 from qfluentwidgets import FluentIcon
 
@@ -46,6 +44,7 @@ def restart_proxy_if_running(
     restarting: bool,
     set_restarting,
     status_label,
+    telegram_proxy_feature,
 ) -> None:
     plan = telegram_proxy_page_runtime.build_restart_plan(
         running=bool(manager.is_running),
@@ -57,15 +56,12 @@ def restart_proxy_if_running(
     set_restarting(True)
     status_label.setText(plan.status_text)
 
-    def _bg_stop():
-        manager._stop_runtime_only()
-        QMetaObject.invokeMethod(
-            page,
-            "_finish_restart",
-            QtNS.ConnectionType.QueuedConnection,
-        )
-
-    threading.Thread(target=_bg_stop, daemon=True).start()
+    worker = telegram_proxy_feature.create_stop_runtime_worker(manager=manager, parent=page)
+    setattr(page, "_restart_stop_worker", worker)
+    worker.stopped.connect(lambda: QMetaObject.invokeMethod(page, "_finish_restart", QtNS.ConnectionType.QueuedConnection))
+    worker.finished.connect(lambda: setattr(page, "_restart_stop_worker", None))
+    worker.finished.connect(worker.deleteLater)
+    worker.start()
 
 
 def start_proxy_runtime(
@@ -80,6 +76,7 @@ def start_proxy_runtime(
     btn_toggle,
     status_label,
     append_log_line,
+    telegram_proxy_feature,
 ) -> None:
     upstream_config = telegram_proxy_settings.build_upstream_config()
     plan = telegram_proxy_page_runtime.build_start_plan(
@@ -98,21 +95,20 @@ def start_proxy_runtime(
     if plan.upstream_log_line:
         append_log_line(plan.upstream_log_line)
 
-    def _bg_start():
-        ok = manager.start_proxy(
-            port=port,
-            mode="socks5",
-            host=host,
-            upstream_config=upstream_config,
-        )
-        setattr(page, "_start_result", ok)
-        QMetaObject.invokeMethod(
-            page,
-            "_finish_start",
-            QtNS.ConnectionType.QueuedConnection,
-        )
-
-    threading.Thread(target=_bg_start, daemon=True).start()
+    worker = telegram_proxy_feature.create_start_worker(
+        manager=manager,
+        port=port,
+        mode="socks5",
+        host=host,
+        upstream_config=upstream_config,
+        parent=page,
+    )
+    setattr(page, "_proxy_start_worker", worker)
+    worker.completed.connect(lambda ok: setattr(page, "_start_result", bool(ok)))
+    worker.completed.connect(lambda _ok: QMetaObject.invokeMethod(page, "_finish_start", QtNS.ConnectionType.QueuedConnection))
+    worker.finished.connect(lambda: setattr(page, "_proxy_start_worker", None))
+    worker.finished.connect(worker.deleteLater)
+    worker.start()
 
 
 def finish_proxy_start(
@@ -144,6 +140,7 @@ def start_relay_check(
     set_relay_diag,
     get_zapret_running,
     log_warning,
+    telegram_proxy_feature,
 ) -> None:
     start_plan = telegram_proxy_page_runtime.build_relay_start_plan(
         current_generation=current_generation,
@@ -156,54 +153,24 @@ def start_relay_check(
     if manager.is_running:
         status_label.setText(start_plan.status_text)
 
-    def _do_check():
-        import time
+    worker = telegram_proxy_feature.create_relay_check_worker(
+        generation=gen,
+        get_zapret_running=get_zapret_running,
+        parent=page,
+    )
+    setattr(page, "_relay_check_worker", worker)
 
-        time.sleep(2)
-        if getattr(page, "_relay_check_gen", 0) != gen:
+    def _apply_worker_result(result_generation: int, diag: dict) -> None:
+        if getattr(page, "_relay_check_gen", 0) != int(result_generation):
             return
+        set_relay_diag(dict(diag or {}))
+        QMetaObject.invokeMethod(page, "_apply_relay_result", QtNS.ConnectionType.QueuedConnection)
 
-        try:
-            from telegram_proxy.wss_proxy import check_relay_reachable
-
-            best_result = None
-            for attempt in range(3):
-                if getattr(page, "_relay_check_gen", 0) != gen:
-                    return
-                result = check_relay_reachable(timeout=5.0)
-                if result["reachable"]:
-                    best_result = result
-                    break
-                if attempt < 2:
-                    time.sleep(2)
-
-            if getattr(page, "_relay_check_gen", 0) != gen:
-                return
-
-            if best_result and best_result["reachable"]:
-                set_relay_diag({"status": "ok", "ms": best_result["ms"]})
-            else:
-                http_ok = telegram_proxy_page_runtime.check_relay_http()
-                set_relay_diag(
-                    {
-                        "status": "fail",
-                        "http_ok": http_ok,
-                        "zapret_running": bool(get_zapret_running()),
-                    }
-                )
-
-            if getattr(page, "_relay_check_gen", 0) != gen:
-                return
-
-            QMetaObject.invokeMethod(
-                page,
-                "_apply_relay_result",
-                QtNS.ConnectionType.QueuedConnection,
-            )
-        except Exception as exc:
-            log_warning(f"Relay check error: {exc}")
-
-    threading.Thread(target=_do_check, daemon=True).start()
+    worker.completed.connect(_apply_worker_result)
+    worker.warning.connect(log_warning)
+    worker.finished.connect(lambda: setattr(page, "_relay_check_worker", None))
+    worker.finished.connect(worker.deleteLater)
+    worker.start()
 
 
 def apply_relay_result(

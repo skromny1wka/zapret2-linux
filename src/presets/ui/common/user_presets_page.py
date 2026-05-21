@@ -274,7 +274,6 @@ class UserPresetsPageBase(BasePage):
     def on_page_hidden(self) -> None:
         self._layout_resync_timer.stop()
         self._layout_resync_delayed_timer.stop()
-        self._runtime_service.stop_watching_presets()
 
     def _after_ui_built(self) -> None:
         after_user_presets_ui_built(

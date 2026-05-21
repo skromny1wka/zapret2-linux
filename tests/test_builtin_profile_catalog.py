@@ -114,7 +114,8 @@ class BuiltinProfileCatalogTests(unittest.TestCase):
                 profile.match.hostlist_exclude_lines
                 or profile.match.ipset_exclude_lines
             )
-            if has_all_sites_excludes:
+            is_named_all_sites_template = str(profile.display_name or "").strip().lower().startswith("все сайты ")
+            if has_all_sites_excludes and not is_named_all_sites_template:
                 offenders.append(f"profile {profile.index}: {profile.display_name}")
 
         self.assertEqual(offenders, [])

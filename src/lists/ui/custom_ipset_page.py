@@ -52,6 +52,15 @@ class CustomIpSetPage(BasePage):
         self._hint_label = None
         self.open_btn = None
         self.clear_btn = None
+        self.input = None
+        self.add_btn = None
+        self.text_edit = None
+        self.error_label = None
+        self.status_label = None
+        self._save_timer = None
+        self._normal_style = ""
+        self._error_style = ""
+        self._has_validation_error = False
         self._status_state = {
             "total": 0,
             "base": 0,
@@ -72,15 +81,24 @@ class CustomIpSetPage(BasePage):
         self._status_timer.timeout.connect(self._update_status)
         self._runtime_initialized = False
 
+        self._ui_built = False
+
+    def _ensure_ui_built(self) -> None:
+        if self._ui_built:
+            return
+        self._ui_built = True
         self._build_ui()
         self._apply_page_theme(force=True)
-        self._run_runtime_init_once()
 
     def _run_runtime_init_once(self) -> None:
         if self._runtime_initialized:
             return
         self._runtime_initialized = True
         QTimer.singleShot(0, lambda: (not self._cleanup_in_progress) and self._load_entries())
+
+    def on_page_activated(self) -> None:
+        self._ensure_ui_built()
+        self._run_runtime_init_once()
 
     def _tr(self, key: str, default: str, **kwargs) -> str:
         text = tr_catalog(key, language=self._ui_language, default=default)
@@ -255,6 +273,7 @@ class CustomIpSetPage(BasePage):
         """Загружает пользовательский список из lists/user/ipset-all.txt."""
         if self._cleanup_in_progress:
             return
+        self._ensure_ui_built()
         self._request_editor_text("ipset")
 
     def _request_editor_text(self, kind: str) -> None:
@@ -339,6 +358,8 @@ class CustomIpSetPage(BasePage):
 
     def set_ui_language(self, language: str) -> None:
         super().set_ui_language(language)
+        if not self._ui_built:
+            return
 
         if self._desc_label is not None:
             self._desc_label.setText(
@@ -543,6 +564,7 @@ class CustomIpSetPage(BasePage):
         self._cleanup_in_progress = True
         for timer in (self._save_timer, self._status_timer):
             try:
-                timer.stop()
+                if timer is not None:
+                    timer.stop()
             except Exception:
                 pass

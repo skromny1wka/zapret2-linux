@@ -16,9 +16,9 @@ class ProfileStrategyResolutionTests(unittest.TestCase):
         cls.paths = AppPaths(user_root=Path("src").resolve(), local_root=Path("src").resolve())
         cls.catalogs = load_strategy_catalogs(cls.paths, "winws2")
         cls.preset = parse_preset_text(
-            Path("src/presets/builtin/winws2/Default v5.txt").read_text(encoding="utf-8"),
+            Path("src/presets/builtin/winws2/Default v5 (game filter).txt").read_text(encoding="utf-8"),
             engine="winws2",
-            source_name="Default v5.txt",
+            source_name="Default v5 (game filter).txt",
         )
 
     def test_default_v5_youtube_tcp_strategy_is_detected_by_lua_desync_lines(self) -> None:

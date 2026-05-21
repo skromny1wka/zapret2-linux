@@ -24,7 +24,6 @@ from .preset_runner_support import (
     PresetRunnerState,
     PresetRunnerStateMachine,
     is_process_alive_with_expected_name,
-    launch_args_from_preset_text,
     preset_cache_key,
     remember_cache_entry,
     wait_for_process_exit,
@@ -157,7 +156,7 @@ class Winws1StrategyRunner(StrategyRunnerBase):
                 preset_path=p,
                 cache_key=cache_key,
                 normalized_text=source_text,
-                launch_args=tuple(launch_args_from_preset_text(source_text)),
+                launch_args=self._build_launch_args_from_preset_text(source_text),
                 validation_ok=True,
                 validation_report="",
             )

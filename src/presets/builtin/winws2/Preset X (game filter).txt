@@ -243,7 +243,7 @@
 
 --new
 
---filter-tcp=80,443
+--filter-tcp=80,443-65535
 --hostlist=lists/roblox.txt
 --out-range=-n8
 --lua-desync=send:repeats=2
@@ -252,7 +252,7 @@
 
 --new
 
---filter-udp=443,49152-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-roblox.txt
 --out-range=-n8
 --payload=all
@@ -260,7 +260,7 @@
 
 --new
 
---filter-tcp=443
+--filter-tcp=80,443
 --hostlist=lists/other.txt
 --out-range=-d10
 --lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2
@@ -274,9 +274,8 @@
 
 --new
 
+--filter-udp=443-65535
 --ipset=lists/ipset-zapretkvn.txt
---ipset-ip=93.115.203.112
---ipset-ip=84.54.31.114
 --out-range=-n8
 --lua-desync=send:repeats=2
 --lua-desync=syndata:blob=stun_pat
@@ -284,9 +283,8 @@
 
 --new
 
+--filter-udp=443-65535
 --ipset=lists/ipset-timeweb.txt
---ipset-ip=93.115.203.112
---ipset-ip=84.54.31.114
 --out-range=-n8
 --lua-desync=send:repeats=2
 --lua-desync=syndata:blob=stun_pat
@@ -429,7 +427,7 @@
 
 --new
 
---filter-udp=443,49152-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-all.txt
 --out-range=-n8
 --payload=all
@@ -437,7 +435,7 @@
 
 --new
 
---filter-udp=443,49152-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-discord.txt
 --out-range=-n8
 --payload=all
@@ -445,7 +443,7 @@
 
 --new
 
---filter-udp=443,49152-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-cloudflare.txt
 --out-range=-n8
 --payload=all
@@ -453,7 +451,7 @@
 
 --new
 
---filter-udp=443,49152-65535
+--filter-udp=443-65535
 --ipset=lists/cloudflare-ipset.txt
 --out-range=-n8
 --payload=all
@@ -461,7 +459,7 @@
 
 --new
 
---filter-udp=443,49152-65535
+--filter-udp=443-65535
 --ipset=lists/cloudflare-ipset_v6.txt
 --out-range=-n8
 --payload=all
@@ -469,7 +467,7 @@
 
 --new
 
---filter-udp=443,49152-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-cloudflare1.txt
 --out-range=-n8
 --payload=all
@@ -477,7 +475,7 @@
 
 --new
 
---filter-udp=443,49152-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-amazon.txt
 --out-range=-n8
 --payload=all
@@ -485,7 +483,7 @@
 
 --new
 
---filter-udp=443,49152-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-roblox.txt
 --out-range=-n8
 --payload=all
@@ -493,7 +491,7 @@
 
 --new
 
---filter-udp=443,49152-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-lol-ru.txt
 --out-range=-n8
 --payload=all
@@ -501,7 +499,7 @@
 
 --new
 
---filter-udp=443,49152-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-lol-euw.txt
 --out-range=-n8
 --payload=all
@@ -509,7 +507,7 @@
 
 --new
 
---filter-udp=443,49152-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-ovh.txt
 --out-range=-n8
 --payload=all
@@ -517,7 +515,7 @@
 
 --new
 
---filter-udp=443,49152-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-whatsapp.txt
 --out-range=-n8
 --payload=all
@@ -525,7 +523,7 @@
 
 --new
 
---filter-udp=443,49152-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-warp.txt
 --out-range=-n8
 --payload=all
@@ -533,7 +531,7 @@
 
 --new
 
---filter-udp=443,49152-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-zapretkvn.txt
 --out-range=-n8
 --payload=all
@@ -541,7 +539,7 @@
 
 --new
 
---filter-udp=443,49152-65535
+--filter-udp=443-65535
 --ipset=lists/ipset-timeweb.txt
 --out-range=-n8
 --payload=all

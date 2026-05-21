@@ -72,8 +72,11 @@ class ProfileListFileEditorTests(unittest.TestCase):
             service = ProfilePresetService(feature, "zapret2_mode")
 
             setup = service.get_profile_setup("profile:0")
-            self.assertEqual(setup.list_editor.kind, "ipset")
-            self.assertEqual(setup.list_editor.text, "1.1.1.1\n")
+            list_editor = service.get_profile_list_file_editor_state("profile:0")
+            self.assertIsNotNone(setup)
+            self.assertIsNotNone(list_editor)
+            self.assertEqual(list_editor.kind, "ipset")
+            self.assertEqual(list_editor.text, "1.1.1.1\n")
 
             saved = service.save_profile_list_file_text("profile:0", "8.8.8.8\n")
             saved_text = (lists_dir / "ipset-youtube.txt").read_text(encoding="utf-8")

@@ -39,6 +39,7 @@ class OrchestraSettingsPage(QWidget):
         self.whitelist_page = None
         self.ratings_page = None
         self._tab_pages: list[QWidget | None] = [None, None, None, None]
+        self._first_tab_built = False
 
         # Stacked widget
         self.stacked = QStackedWidget(self)
@@ -68,7 +69,13 @@ class OrchestraSettingsPage(QWidget):
 
         main_layout.addWidget(self.stacked)
 
-        self._switch_tab(0)
+        self.stacked.setCurrentIndex(0)
+
+    def showEvent(self, event):  # noqa: N802
+        super().showEvent(event)
+        if not self._first_tab_built:
+            self._first_tab_built = True
+            self._switch_tab(0)
 
     def _ensure_tab_page(self, index: int) -> QWidget | None:
         if not (0 <= index < len(self.TAB_KEYS)):

@@ -295,6 +295,7 @@ class PremiumPage(BasePage):
     # ── lifecycle ────────────────────────────────────────────────────────────
 
     def on_page_activated(self) -> None:
+        self._run_runtime_init_once()
         activate_premium_page(
             sync_pairing_status_autopoll_fn=self._sync_pairing_status_autopoll,
         )
@@ -405,7 +406,6 @@ class PremiumPage(BasePage):
         self.test_btn = actions_widgets.test_btn
         self.extend_btn = actions_widgets.extend_btn
         self.add_widget(self._actions_bar)
-        self._run_runtime_init_once()
 
     def set_ui_language(self, language: str) -> None:
         super().set_ui_language(language)

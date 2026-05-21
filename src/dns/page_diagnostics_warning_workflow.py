@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import threading
-
 
 def start_connectivity_test(
     *,
@@ -15,9 +13,10 @@ def start_connectivity_test(
     build_connectivity_test_plan_fn,
     run_connectivity_test_fn,
     language: str,
-) -> None:
+    parent=None,
+):
     if cleanup_in_progress:
-        return
+        return None
 
     set_test_in_progress_fn(True)
     update_test_action_text_fn()
@@ -30,14 +29,13 @@ def start_connectivity_test(
 
     test_plan = build_connectivity_test_plan_fn(language=language)
 
-    def thread_func():
-        results = run_connectivity_test_fn(test_plan.test_hosts)
-        if cleanup_in_progress:
-            return
-        test_completed_signal.emit(results)
+    from dns.page_workers import DnsConnectivityTestWorker
 
-    thread = threading.Thread(target=thread_func, daemon=True)
-    thread.start()
+    worker = DnsConnectivityTestWorker(run_connectivity_test_fn, test_plan.test_hosts, parent)
+    worker.completed.connect(test_completed_signal.emit)
+    worker.finished.connect(worker.deleteLater)
+    worker.start()
+    return worker
 
 
 def apply_connectivity_test_result(

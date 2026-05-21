@@ -301,6 +301,84 @@ class Winws2LaunchPresetValidationTests(unittest.TestCase):
 
             self.assertEqual(runner._collect_missing_preset_references_from_text(source), [])
 
+    def test_winws2_compile_resolves_bare_list_paths_for_launch(self) -> None:
+        from threading import RLock
+
+        from winws_runtime.runners.zapret2_runner import Winws2StrategyRunner
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lists_dir = root / "lists"
+            lists_dir.mkdir()
+            (lists_dir / "tankix.txt").write_text("example.com\n", encoding="utf-8")
+            (lists_dir / "ipset-tankix.txt").write_text("1.2.3.4\n", encoding="utf-8")
+            preset_path = root / "selected.txt"
+            preset_path.write_text(
+                "\n".join(
+                    (
+                        "--wf-tcp-out=443",
+                        "--filter-tcp=443",
+                        "--hostlist=tankix.txt",
+                        "--ipset=lists/ipset-tankix.txt",
+                        "--lua-desync=fake:blob=tls_google",
+                        "",
+                    )
+                ),
+                encoding="utf-8",
+            )
+
+            runner = object.__new__(Winws2StrategyRunner)
+            runner._state_lock = RLock()
+            runner._prepared_preset_cache = {}
+            runner.work_dir = str(root)
+            runner.lists_dir = str(lists_dir)
+            runner.bin_dir = str(root / "bin")
+
+            artifact = runner._compile_preset_artifact(str(preset_path))
+
+            self.assertTrue(artifact.validation_ok, artifact.validation_report)
+            self.assertIn(f"--hostlist={lists_dir / 'tankix.txt'}", artifact.launch_args)
+            self.assertIn(f"--ipset={lists_dir / 'ipset-tankix.txt'}", artifact.launch_args)
+            self.assertNotIn("--hostlist=tankix.txt", artifact.launch_args)
+            self.assertNotIn("--ipset=lists/ipset-tankix.txt", artifact.launch_args)
+
+    def test_winws1_compile_resolves_bare_list_paths_for_launch(self) -> None:
+        from threading import RLock
+
+        from winws_runtime.runners.zapret1_runner import Winws1StrategyRunner
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            lists_dir = root / "lists"
+            lists_dir.mkdir()
+            (lists_dir / "tankix.txt").write_text("example.com\n", encoding="utf-8")
+            preset_path = root / "selected.txt"
+            preset_path.write_text(
+                "\n".join(
+                    (
+                        "--wf-tcp=443",
+                        "--filter-tcp=443",
+                        "--hostlist=tankix.txt",
+                        "--dpi-desync=fake",
+                        "",
+                    )
+                ),
+                encoding="utf-8",
+            )
+
+            runner = object.__new__(Winws1StrategyRunner)
+            runner._state_lock = RLock()
+            runner._prepared_preset_cache = {}
+            runner.work_dir = str(root)
+            runner.lists_dir = str(lists_dir)
+            runner.bin_dir = str(root / "bin")
+
+            artifact = runner._compile_preset_artifact(str(preset_path))
+
+            self.assertTrue(artifact.validation_ok, artifact.validation_report)
+            self.assertIn(f"--hostlist={lists_dir / 'tankix.txt'}", artifact.launch_args)
+            self.assertNotIn("--hostlist=tankix.txt", artifact.launch_args)
+
     def test_launch_preparation_rejects_invalid_ranges_and_payload(self) -> None:
         from winws_runtime.preset_launch_text import prepare_winws2_preset_text_for_launch
 

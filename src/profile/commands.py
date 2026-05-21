@@ -50,6 +50,10 @@ def get_profile_setup(profile_services, launch_method: str, profile_key: str):
     return _profile_preset_service(profile_services, launch_method).get_profile_setup(profile_key)
 
 
+def get_profile_list_file_editor_state(profile_services, launch_method: str, profile_key: str):
+    return _profile_preset_service(profile_services, launch_method).get_profile_list_file_editor_state(profile_key)
+
+
 def apply_strategy_to_profile(profile_services, launch_method: str, profile_key: str, strategy_id: str) -> str | None:
     return _profile_preset_service(profile_services, launch_method).apply_strategy(profile_key, strategy_id)
 

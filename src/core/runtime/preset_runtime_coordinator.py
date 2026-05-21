@@ -144,11 +144,12 @@ class PresetRuntimeCoordinator(QObject):
                 f"Активный preset сохранён в новом source-файле: {new_path or updated_file_name}",
                 "INFO",
             )
-            self._request_selected_source_preset_apply(
-                launch_method=method,
-                reason="preset_content_changed",
-                preset_file_name=updated_file_name,
-            )
+
+        self._request_selected_source_preset_apply(
+            launch_method=method,
+            reason="preset_content_changed",
+            preset_file_name=updated_file_name,
+        )
 
     def _request_selected_source_preset_apply(
         self,

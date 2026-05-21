@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Callable
-import threading
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +46,46 @@ class TelegramProxyFeature:
         except Exception:
             pass
 
+    def create_start_worker(self, *, manager, port: int, mode: str, host: str, upstream_config, parent=None):
+        from telegram_proxy.workers import TelegramProxyStartWorker
+
+        return TelegramProxyStartWorker(
+            manager=manager,
+            port=port,
+            mode=mode,
+            host=host,
+            upstream_config=upstream_config,
+            parent=parent,
+        )
+
+    def create_stop_runtime_worker(self, *, manager, parent=None):
+        from telegram_proxy.workers import TelegramProxyStopRuntimeWorker
+
+        return TelegramProxyStopRuntimeWorker(manager=manager, parent=parent)
+
+    def create_relay_check_worker(self, *, generation: int, get_zapret_running, parent=None):
+        from telegram_proxy.workers import TelegramProxyRelayCheckWorker
+
+        return TelegramProxyRelayCheckWorker(
+            generation=generation,
+            get_zapret_running=get_zapret_running,
+            parent=parent,
+        )
+
+    def create_diagnostics_worker(self, *, proxy_port: int, parent=None):
+        from telegram_proxy.workers import TelegramProxyDiagnosticsWorker
+
+        return TelegramProxyDiagnosticsWorker(
+            run_diagnostics_fn=self.run_diagnostics,
+            proxy_port=proxy_port,
+            parent=parent,
+        )
+
+    def create_ensure_hosts_worker(self, *, parent=None):
+        from telegram_proxy.workers import TelegramHostsEnsureWorker
+
+        return TelegramHostsEnsureWorker(ensure_hosts_fn=self.ensure_telegram_hosts, parent=parent)
+
     def toggle_async(self) -> None:
         try:
             manager = self.get_proxy_manager()
@@ -56,16 +95,17 @@ class TelegramProxyFeature:
                 return
 
             config = self.get_start_config()
-            threading.Thread(
-                target=lambda: manager.start_proxy(
-                    port=config.port,
-                    mode=config.mode,
-                    host=config.host,
-                    upstream_config=config.upstream_config,
-                ),
-                daemon=True,
-                name="TrayTelegramProxyStart",
-            ).start()
+            worker = self.create_start_worker(
+                manager=manager,
+                port=config.port,
+                mode=config.mode,
+                host=config.host,
+                upstream_config=config.upstream_config,
+            )
+            setattr(manager, "_tray_start_worker", worker)
+            worker.finished.connect(lambda: setattr(manager, "_tray_start_worker", None))
+            worker.finished.connect(worker.deleteLater)
+            worker.start()
         except Exception as exc:
             from log.log import log
 

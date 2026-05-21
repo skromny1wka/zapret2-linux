@@ -53,13 +53,15 @@ class BlobsPage(BasePage):
 
         self._build_ui()
         self._apply_page_theme(force=True)
-        self._run_runtime_init_once()
 
     def _run_runtime_init_once(self) -> None:
         if self._runtime_initialized:
             return
         self._runtime_initialized = True
         QTimer.singleShot(0, lambda: (not self._cleanup_in_progress) and self._load_blobs())
+
+    def on_page_activated(self) -> None:
+        self._run_runtime_init_once()
 
     def _tr(self, key: str, default: str, **kwargs) -> str:
         text = tr_catalog(key, language=self._ui_language, default=default)

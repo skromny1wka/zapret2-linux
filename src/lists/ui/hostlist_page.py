@@ -39,7 +39,6 @@ from lists.folder_info_workflow import (
     build_folder_info_text,
     normalize_folder_info_category,
     request_folder_info,
-    start_folder_info_thread,
 )
 from lists.editor_workflow import (
     ListsEditorController,
@@ -61,9 +60,6 @@ class HostlistPage(BasePage):
 
     domains_changed = pyqtSignal()
     ipset_changed = pyqtSignal()
-    folder_info_loaded = pyqtSignal(str, int, object)
-    folder_info_failed = pyqtSignal(str, int, str)
-
     def __init__(self, parent=None, *, lists_feature):
         super().__init__(
             "Листы",
@@ -84,8 +80,9 @@ class HostlistPage(BasePage):
         self._folder_info_state = {"hostlist": None, "ipset": None}
         self._editor_load_request_seq: dict[str, int] = {}
         self._editor_load_workers: dict[tuple[str, int], object] = {}
-        self.folder_info_loaded.connect(self._on_folder_info_loaded)
-        self.folder_info_failed.connect(self._on_folder_info_failed)
+        self._folder_info_workers: dict[tuple[str, int], object] = {}
+        self._panel_containers: list[QWidget] = []
+        self._built_panel_indexes: set[int] = set()
 
         # Autosave timers (created early so textChanged can reference them before panel is shown)
         self._domains_save_timer = QTimer(self)
@@ -118,7 +115,6 @@ class HostlistPage(BasePage):
 
         self._build_ui()
         self._apply_page_theme(force=True)
-        self._run_runtime_init_once()
 
     def _tr(self, key: str, default: str, **kwargs) -> str:
         text = tr_catalog(key, language=self._ui_language, default=default)
@@ -171,6 +167,10 @@ class HostlistPage(BasePage):
         self._runtime_initialized = True
         QTimer.singleShot(0, lambda: (not self._cleanup_in_progress) and self._load_info())
 
+    def on_page_activated(self) -> None:
+        self._ensure_panel_built(self.stacked.currentIndex())
+        self._run_runtime_init_once()
+
 
     # ──────────────────────────────────────────────────────────────────────────
     # Main UI builder
@@ -187,17 +187,15 @@ class HostlistPage(BasePage):
             QSizePolicy.Policy.Preferred,
         )
 
-        panel_hostlist = self._build_hostlist_panel()       # index 0
-        panel_ipset = self._build_ipset_panel()             # index 1
-        panel_domains = self._build_domains_panel()         # index 2
-        panel_ips = self._build_ips_panel()                 # index 3
-        panel_exclusions = self._build_exclusions_panel()   # index 4
-
-        self.stacked.addWidget(panel_hostlist)
-        self.stacked.addWidget(panel_ipset)
-        self.stacked.addWidget(panel_domains)
-        self.stacked.addWidget(panel_ips)
-        self.stacked.addWidget(panel_exclusions)
+        self._panel_containers = []
+        self._built_panel_indexes = set()
+        for _index in range(5):
+            container = QWidget(self)
+            container_layout = QVBoxLayout(container)
+            container_layout.setContentsMargins(0, 0, 0, 0)
+            container_layout.setSpacing(0)
+            self._panel_containers.append(container)
+            self.stacked.addWidget(container)
 
         self.pivot.addItem("hostlist", self._tr("page.hostlist.tab.hostlist", "Hostlist"), lambda: self._switch_tab(0))
         self.pivot.addItem("ipset", self._tr("page.hostlist.tab.ipset", "IPset"), lambda: self._switch_tab(1))
@@ -209,9 +207,31 @@ class HostlistPage(BasePage):
         self.layout.addWidget(self.pivot)
 
         self.layout.addWidget(self.stacked)
-        self._switch_tab(0)
+        self.stacked.setCurrentIndex(0)
+        self._refresh_stacked_geometry()
+
+    def _ensure_panel_built(self, index: int) -> None:
+        if index in self._built_panel_indexes:
+            return
+        builders = (
+            self._build_hostlist_panel,
+            self._build_ipset_panel,
+            self._build_domains_panel,
+            self._build_ips_panel,
+            self._build_exclusions_panel,
+        )
+        if index < 0 or index >= len(builders) or index >= len(self._panel_containers):
+            return
+        panel = builders[index]()
+        container_layout = self._panel_containers[index].layout()
+        if container_layout is not None:
+            container_layout.addWidget(panel)
+        self._built_panel_indexes.add(index)
+        self._refresh_folder_info_labels()
+        self._apply_editor_styles()
 
     def _switch_tab(self, index: int):
+        self._ensure_panel_built(index)
         result = switch_hostlist_tab(
             index=index,
             stacked=self.stacked,
@@ -456,9 +476,13 @@ class HostlistPage(BasePage):
     def _set_folder_info_loading(self, category: str) -> None:
         loading_text = self._tr("page.hostlist.info.loading", "Загрузка информации...")
         if category == "ipset":
-            self.ipset_info_label.setText(loading_text)
+            label = getattr(self, "ipset_info_label", None)
+            if label is not None:
+                label.setText(loading_text)
         else:
-            self.hostlist_info_label.setText(loading_text)
+            label = getattr(self, "hostlist_info_label", None)
+            if label is not None:
+                label.setText(loading_text)
 
     def _apply_folder_info_state(self, category: str, state) -> None:
         text = build_folder_info_text(
@@ -468,9 +492,13 @@ class HostlistPage(BasePage):
         )
 
         if category == "ipset":
-            self.ipset_info_label.setText(text)
+            label = getattr(self, "ipset_info_label", None)
+            if label is not None:
+                label.setText(text)
         else:
-            self.hostlist_info_label.setText(text)
+            label = getattr(self, "hostlist_info_label", None)
+            if label is not None:
+                label.setText(text)
 
     def _apply_folder_info_error(self, category: str, error: str) -> None:
         error_text = build_folder_info_error_text(
@@ -478,9 +506,13 @@ class HostlistPage(BasePage):
             tr_fn=self._tr,
         )
         if category == "ipset":
-            self.ipset_info_label.setText(error_text)
+            label = getattr(self, "ipset_info_label", None)
+            if label is not None:
+                label.setText(error_text)
         else:
-            self.hostlist_info_label.setText(error_text)
+            label = getattr(self, "hostlist_info_label", None)
+            if label is not None:
+                label.setText(error_text)
 
     def _request_folder_info(self, category: str, *, force: bool = False) -> None:
         if self._cleanup_in_progress:
@@ -497,18 +529,16 @@ class HostlistPage(BasePage):
             return
         self._set_folder_info_loading(normalized)
 
-        start_folder_info_thread(
-            load_worker_fn=self._load_folder_info_worker,
-            category=normalized,
-            request_seq=request_seq,
-        )
+        worker = self._lists_controller.create_folder_info_load_worker(normalized, request_seq, self)
+        self._folder_info_workers[(normalized, request_seq)] = worker
+        worker.loaded.connect(self._on_folder_info_loaded)
+        worker.failed.connect(self._on_folder_info_failed)
+        worker.finished.connect(lambda w=worker, c=normalized, s=request_seq: self._on_folder_info_worker_finished(c, s, w))
+        worker.start()
 
-    def _load_folder_info_worker(self, category: str, request_seq: int) -> None:
-        try:
-            state = self._lists_controller.load_folder_info(category)
-            self.folder_info_loaded.emit(category, request_seq, state)
-        except Exception as e:
-            self.folder_info_failed.emit(category, request_seq, str(e))
+    def _on_folder_info_worker_finished(self, category: str, request_seq: int, worker) -> None:
+        self._folder_info_workers.pop((category, int(request_seq)), None)
+        worker.deleteLater()
 
     def _on_folder_info_loaded(self, category: str, request_seq: int, state) -> None:
         if self._cleanup_in_progress:

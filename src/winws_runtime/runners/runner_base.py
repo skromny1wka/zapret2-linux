@@ -11,7 +11,7 @@ from log.log import log
 
 from .args_filters import apply_all_filters
 from .constants import SW_HIDE, CREATE_NO_WINDOW, STARTF_USESHOWWINDOW
-from .preset_runner_support import wait_for_process_exit
+from .preset_runner_support import launch_args_from_preset_text, wait_for_process_exit
 from winws_runtime.health.process_health_check import (
     check_process_health, get_last_crash_info, check_common_crash_causes,
     check_conflicting_processes, get_conflicting_processes_report, diagnose_startup_error,
@@ -172,6 +172,10 @@ class StrategyRunnerBase(ABC):
         from config.config import WINDIVERT_FILTER
 
         return resolve_args_paths(args, self.lists_dir, self.bin_dir, WINDIVERT_FILTER)
+
+    def _build_launch_args_from_preset_text(self, content: str) -> tuple[str, ...]:
+        """Собирает аргументы запуска и приводит пути к файлам к рабочим путям."""
+        return tuple(self._resolve_file_paths(launch_args_from_preset_text(content)))
 
     def _fast_cleanup_services(self):
         """Fast service cleanup via Win API (for normal startup)"""

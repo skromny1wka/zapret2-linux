@@ -49,17 +49,35 @@ class CustomDomainsPage(BasePage):
         self.open_file_btn = None
         self.reset_btn = None
         self.clear_btn = None
+        self._desc_label = None
+        self._add_card = None
+        self._editor_card = None
+        self._hint_label = None
+        self.domain_input = None
+        self.add_btn = None
+        self.text_edit = None
+        self.status_label = None
+        self._save_timer = None
         self._editor_load_request_seq = 0
         self._editor_load_worker = None
+        self._ui_built = False
+
+    def _ensure_ui_built(self) -> None:
+        if self._ui_built:
+            return
+        self._ui_built = True
         self._build_ui()
         self._apply_page_theme(force=True)
-        self._run_runtime_init_once()
 
     def _run_runtime_init_once(self) -> None:
         if self._runtime_initialized:
             return
         self._runtime_initialized = True
         QTimer.singleShot(0, lambda: (not self._cleanup_in_progress) and self._load_domains())
+
+    def on_page_activated(self) -> None:
+        self._ensure_ui_built()
+        self._run_runtime_init_once()
 
     def _tr(self, key: str, default: str) -> str:
         return tr_catalog(key, language=self._ui_language, default=default)
@@ -256,6 +274,7 @@ class CustomDomainsPage(BasePage):
         """Загружает домены из файла"""
         if self._cleanup_in_progress:
             return
+        self._ensure_ui_built()
         self._request_editor_text("domains")
 
     def _request_editor_text(self, kind: str) -> None:
@@ -464,6 +483,8 @@ class CustomDomainsPage(BasePage):
 
     def set_ui_language(self, language: str) -> None:
         super().set_ui_language(language)
+        if not self._ui_built:
+            return
 
         self._desc_label.setText(
             self._tr(
@@ -525,6 +546,7 @@ class CustomDomainsPage(BasePage):
     def cleanup(self) -> None:
         self._cleanup_in_progress = True
         try:
-            self._save_timer.stop()
+            if self._save_timer is not None:
+                self._save_timer.stop()
         except Exception:
             pass

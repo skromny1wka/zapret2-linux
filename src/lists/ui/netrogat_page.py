@@ -56,6 +56,11 @@ class NetrogatPage(BasePage):
         self._open_btn = None
         self._open_final_btn = None
         self._clear_btn = None
+        self.input = None
+        self.add_btn = None
+        self.text_edit = None
+        self.status_label = None
+        self._save_timer = None
         self._status_state = {
             "total": 0,
             "base": 0,
@@ -66,15 +71,24 @@ class NetrogatPage(BasePage):
         self._cleanup_in_progress = False
         self._editor_load_request_seq = 0
         self._editor_load_worker = None
+        self._ui_built = False
+
+    def _ensure_ui_built(self) -> None:
+        if self._ui_built:
+            return
+        self._ui_built = True
         self._build_ui()
         self._apply_page_theme(force=True)
-        self._run_runtime_init_once()
 
     def _run_runtime_init_once(self) -> None:
         if self._runtime_initialized:
             return
         self._runtime_initialized = True
         QTimer.singleShot(0, lambda: (not self._cleanup_in_progress) and self._load())
+
+    def on_page_activated(self) -> None:
+        self._ensure_ui_built()
+        self._run_runtime_init_once()
 
     def _tr(self, key: str, default: str, **kwargs) -> str:
         text = tr_catalog(key, language=self._ui_language, default=default)
@@ -260,6 +274,7 @@ class NetrogatPage(BasePage):
     def _load(self):
         if self._cleanup_in_progress:
             return
+        self._ensure_ui_built()
         self._request_editor_text("netrogat")
 
     def _request_editor_text(self, kind: str) -> None:
@@ -307,6 +322,8 @@ class NetrogatPage(BasePage):
 
     def set_ui_language(self, language: str) -> None:
         super().set_ui_language(language)
+        if not self._ui_built:
+            return
 
         if self._desc_label is not None:
             self._desc_label.setText(
@@ -550,6 +567,7 @@ class NetrogatPage(BasePage):
     def cleanup(self) -> None:
         self._cleanup_in_progress = True
         try:
-            self._save_timer.stop()
+            if self._save_timer is not None:
+                self._save_timer.stop()
         except Exception:
             pass

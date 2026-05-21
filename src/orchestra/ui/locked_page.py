@@ -165,7 +165,6 @@ class OrchestraLockedPage(BasePage):
 
         self._setup_ui()
         self._apply_page_theme(force=True)
-        self._run_runtime_init_once()
 
     def _run_runtime_init_once(self) -> None:
         if self._runtime_initialized:
@@ -380,7 +379,11 @@ class OrchestraLockedPage(BasePage):
             self._tr("page.orchestra.locked.button.refresh.tooltip", "Обновить"),
         )
 
-        self._refresh_data()
+        if self._runtime_initialized:
+            self._refresh_data()
+
+    def on_page_activated(self) -> None:
+        self._run_runtime_init_once()
 
     def _show_blocked_warning(self, domain: str, strategy: int):
         """

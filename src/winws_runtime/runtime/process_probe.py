@@ -89,6 +89,14 @@ def _normalize_path(path: str) -> str:
     text = str(path or "").strip()
     if not text:
         return ""
+    if text.startswith("\\\\?\\UNC\\"):
+        text = "\\\\" + text[8:]
+    elif text.startswith("\\\\?\\"):
+        text = text[4:]
+    elif text.startswith("\\??\\UNC\\"):
+        text = "\\\\" + text[8:]
+    elif text.startswith("\\??\\"):
+        text = text[4:]
     try:
         text = os.path.abspath(text)
     except Exception:

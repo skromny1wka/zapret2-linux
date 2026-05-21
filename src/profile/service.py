@@ -243,7 +243,6 @@ class ProfilePresetService:
             profile.persistent_key,
             tuple(strategy_entries),
         )
-        list_editor = self._list_editor_state_for_profile(profile)
         return ProfileSetupPayload(
             item=item,
             strategy_entries=strategy_entries,
@@ -258,7 +257,6 @@ class ProfilePresetService:
             in_range=winws2_editable.in_range,
             out_range=winws2_editable.out_range,
             current_strategy_state=strategy_states.get(item.strategy_id, ProfileStrategyState()),
-            list_editor=list_editor,
         )
 
     def set_profile_enabled(self, profile_key: str, enabled: bool) -> str | None:
@@ -400,6 +398,12 @@ class ProfilePresetService:
             return None
         reference = profile_list_file_reference(profile, self._lists_root())
         write_profile_list_file_text(self._lists_root(), reference, text)
+        return self._list_editor_state_for_profile(profile)
+
+    def get_profile_list_file_editor_state(self, profile_key: str) -> ProfileListFileEditorState | None:
+        profile = self._resolve_profile(profile_key)
+        if profile is None:
+            return None
         return self._list_editor_state_for_profile(profile)
 
     def set_profile_filter_kind(self, profile_key: str, filter_kind: str) -> str | None:

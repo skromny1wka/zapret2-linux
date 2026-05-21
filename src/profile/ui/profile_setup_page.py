@@ -397,7 +397,19 @@ class ProfileSetupPageBase(BasePage):
         self._loading = False
         self._setup_load_request_id = 0
         self._setup_load_worker = None
+        self._list_file_load_request_id = 0
+        self._list_file_load_worker = None
         self._payload = None
+        self._strategy_stack = None
+        self._strategy_tabs = None
+        self._strategy_list = None
+        self._strategy_tab = None
+        self._list_file_editor_placeholder = None
+        self._match_tab_placeholder = None
+        self._editor_tab_built = False
+        self._match_tab_built = False
+        self._list_file_dirty = True
+        self._match_text = None
         self._settings_container = None
         self._work_button = None
         self._notwork_button = None
@@ -511,9 +523,9 @@ class ProfileSetupPageBase(BasePage):
 
         self._strategy_stack = QStackedWidget(self)
         self._strategy_tabs = SegmentedWidget()
-        self._strategy_tabs.addItem("strategies", "Готовые стратегии", lambda: self._strategy_stack.setCurrentIndex(0))
-        self._strategy_tabs.addItem("editor", "Редактор", lambda: self._strategy_stack.setCurrentIndex(1))
-        self._strategy_tabs.addItem("match", "Когда применяется", lambda: self._strategy_stack.setCurrentIndex(2))
+        self._strategy_tabs.addItem("strategies", "Готовые стратегии", lambda: self._switch_strategy_tab(0))
+        self._strategy_tabs.addItem("editor", "Редактор", lambda: self._switch_strategy_tab(1))
+        self._strategy_tabs.addItem("match", "Когда применяется", lambda: self._switch_strategy_tab(2))
         self._strategy_tabs.setCurrentItem("strategies")
         set_tooltip(
             self._strategy_tabs,
@@ -525,7 +537,28 @@ class ProfileSetupPageBase(BasePage):
         self._strategy_list.strategy_activated.connect(self._on_strategy_list_activated)
         self._strategy_stack.addWidget(self._strategy_list)
 
-        editor_tab = QWidget(self)
+        self._list_file_editor_placeholder = QWidget(self)
+        self._strategy_stack.addWidget(self._list_file_editor_placeholder)
+
+        self._match_tab_placeholder = QWidget(self)
+        self._strategy_stack.addWidget(self._match_tab_placeholder)
+
+        self.layout.addWidget(self._strategy_stack, 1)
+
+    def _switch_strategy_tab(self, index: int) -> None:
+        if index == 1:
+            self._ensure_editor_tab_built()
+            self._request_list_file_editor_state()
+        elif index == 2:
+            self._ensure_match_tab_built()
+            self._apply_match_tab_payload()
+        self._strategy_stack.setCurrentIndex(index)
+
+    def _ensure_editor_tab_built(self) -> None:
+        if self._editor_tab_built:
+            return
+        self._editor_tab_built = True
+        editor_tab = self._list_file_editor_placeholder
         self._list_file_editor_tab = editor_tab
         editor_layout = QVBoxLayout(editor_tab)
         editor_layout.setContentsMargins(0, 0, 0, 0)
@@ -555,36 +588,39 @@ class ProfileSetupPageBase(BasePage):
         self._list_file_save_button = PushButton("Сохранить список", icon=FluentIcon.SAVE)
         self._list_file_save_button.clicked.connect(self._on_list_file_save_clicked)
         editor_actions_layout.addWidget(self._list_file_save_button)
-        self._list_file_status_label = CaptionLabel("")
+        self._list_file_status_label = CaptionLabel("Загрузка файла списка...")
         self._list_file_status_label.setWordWrap(True)
         editor_actions_layout.addWidget(self._list_file_status_label, 1)
         editor_layout.addWidget(editor_actions)
-
-        self._strategy_stack.addWidget(editor_tab)
         self._refresh_list_file_editor_style(has_error=False)
 
-        match_tab = QWidget(self)
+    def _ensure_match_tab_built(self) -> None:
+        if self._match_tab_built:
+            return
+        self._match_tab_built = True
+        match_tab = self._match_tab_placeholder
         match_layout = QVBoxLayout(match_tab)
         match_layout.setContentsMargins(0, 0, 0, 0)
         match_layout.setSpacing(10)
         match_layout.addWidget(BodyLabel("Условия и готовая стратегия"))
         self._match_text = PlainTextEdit()
         self._match_text.setReadOnly(True)
-        self._match_text.setMinimumHeight(180)
+        self._match_text.setMinimumHeight(280)
         set_tooltip(
             self._match_text,
             "Подробности текущего profile: условия применения и выбранная готовая стратегия.",
         )
-        match_layout.addWidget(self._match_text)
+        match_layout.addWidget(self._match_text, 1)
 
         match_layout.addWidget(BodyLabel("Текст profile в текущем preset"))
         self._raw_profile_text = PlainTextEdit()
-        self._raw_profile_text.setMinimumHeight(300)
+        self._raw_profile_text.setMinimumHeight(150)
+        self._raw_profile_text.setMaximumHeight(220)
         set_tooltip(
             self._raw_profile_text,
             "Сырой текст profile. Сохраняется только в текущий preset и не меняет пользовательский шаблон.",
         )
-        match_layout.addWidget(self._raw_profile_text, 1)
+        match_layout.addWidget(self._raw_profile_text)
 
         raw_actions = QWidget(match_tab)
         raw_actions_layout = QHBoxLayout(raw_actions)
@@ -606,42 +642,80 @@ class ProfileSetupPageBase(BasePage):
         feedback_actions_layout.setSpacing(12)
 
         self._work_button = PushButton("Работает", icon=FluentIcon.ACCEPT)
-        set_tooltip(
-            self._work_button,
-            "Пометить текущую готовую стратегию как рабочую для этого profile.",
-        )
+        set_tooltip(self._work_button, "Пометить текущую готовую стратегию как рабочую для этого profile.")
         self._work_button.clicked.connect(lambda: self._set_current_strategy_feedback(rating="work"))
         feedback_actions_layout.addWidget(self._work_button)
 
         self._notwork_button = PushButton("Не работает", icon=FluentIcon.CLOSE)
-        set_tooltip(
-            self._notwork_button,
-            "Пометить текущую готовую стратегию как нерабочую для этого profile.",
-        )
+        set_tooltip(self._notwork_button, "Пометить текущую готовую стратегию как нерабочую для этого profile.")
         self._notwork_button.clicked.connect(lambda: self._set_current_strategy_feedback(rating="notwork"))
         feedback_actions_layout.addWidget(self._notwork_button)
 
         self._favorite_button = PushButton("В избранное", icon=FluentIcon.HEART)
-        set_tooltip(
-            self._favorite_button,
-            "Добавить текущую готовую стратегию в избранное или убрать её оттуда.",
-        )
+        set_tooltip(self._favorite_button, "Добавить текущую готовую стратегию в избранное или убрать её оттуда.")
         self._favorite_button.clicked.connect(self._toggle_current_strategy_favorite)
         feedback_actions_layout.addWidget(self._favorite_button)
 
         self._clear_feedback_button = PushButton("Убрать оценку", icon=FluentIcon.RETURN)
-        set_tooltip(
-            self._clear_feedback_button,
-            "Очистить вашу оценку для текущей готовой стратегии.",
-        )
+        set_tooltip(self._clear_feedback_button, "Очистить вашу оценку для текущей готовой стратегии.")
         self._clear_feedback_button.clicked.connect(lambda: self._set_current_strategy_feedback(rating=""))
         feedback_actions_layout.addWidget(self._clear_feedback_button)
         feedback_actions_layout.addStretch(1)
         match_layout.addWidget(feedback_actions)
+        self._apply_match_tab_payload()
 
-        self._strategy_stack.addWidget(match_tab)
+    def _apply_match_tab_payload(self) -> None:
+        payload = self._payload
+        if payload is None or not self._match_tab_built:
+            return
+        item = payload.item
+        if self._match_text is not None:
+            self._match_text.setPlainText(_match_tab_text(payload))
+        if self._raw_profile_text is not None:
+            self._raw_profile_text.setPlainText(str(getattr(payload, "raw_profile_text", "") or ""))
+            raw_editable = bool(getattr(item, "in_preset", False))
+            self._raw_profile_text.setReadOnly(not raw_editable)
+        if self._raw_profile_save_button is not None:
+            self._raw_profile_save_button.setEnabled(bool(getattr(item, "in_preset", False)))
+        self._apply_feedback_buttons(payload)
 
-        self.layout.addWidget(self._strategy_stack, 1)
+    def _request_list_file_editor_state(self) -> None:
+        if not self._editor_tab_built or not self._profile_key:
+            return
+        worker = self._list_file_load_worker
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    return
+            except Exception:
+                return
+        if self._list_file_status_label is not None:
+            self._list_file_status_label.setText("Загрузка файла списка...")
+        self._list_file_load_request_id += 1
+        request_id = self._list_file_load_request_id
+        worker = self._controller.create_list_file_load_worker(request_id, self._profile_key, self)
+        self._list_file_load_worker = worker
+        worker.loaded.connect(self._on_list_file_editor_state_loaded)
+        worker.failed.connect(self._on_list_file_editor_state_failed)
+        worker.finished.connect(lambda w=worker: self._on_list_file_worker_finished(w))
+        worker.start()
+
+    def _on_list_file_editor_state_loaded(self, request_id: int, state) -> None:
+        if request_id != self._list_file_load_request_id:
+            return
+        self._list_file_dirty = False
+        self._apply_list_file_editor_state(state)
+
+    def _on_list_file_editor_state_failed(self, request_id: int, error: str) -> None:
+        if request_id != self._list_file_load_request_id:
+            return
+        if self._list_file_status_label is not None:
+            self._list_file_status_label.setText(f"Ошибка загрузки файла списка: {error}")
+
+    def _on_list_file_worker_finished(self, worker) -> None:
+        if self._list_file_load_worker is worker:
+            self._list_file_load_worker = None
+        worker.deleteLater()
 
     def _fill_range_combo(self, combo: CompactDisplayComboBox) -> None:
         combo.addItem("a — всегда", userData="a", compactText="a")
@@ -899,26 +973,21 @@ class ProfileSetupPageBase(BasePage):
                 self._delete_user_profile_button.setVisible(bool(_user_profile_id_from_payload(self._profile_key, payload)))
             self._apply_editable_settings(payload)
 
-            self._match_text.setPlainText(_match_tab_text(payload))
-            if self._raw_profile_text is not None:
-                self._raw_profile_text.setPlainText(str(getattr(payload, "raw_profile_text", "") or ""))
-                raw_editable = bool(getattr(item, "in_preset", False))
-                self._raw_profile_text.setReadOnly(not raw_editable)
-            if self._raw_profile_save_button is not None:
-                self._raw_profile_save_button.setEnabled(bool(getattr(item, "in_preset", False)))
-            self._apply_list_file_editor_payload(payload)
             self._strategy_list.set_rows(
                 entries=payload.strategy_entries,
                 states=payload.strategy_states,
                 current_strategy_id=item.strategy_id or "none",
             )
-            self._apply_feedback_buttons(payload)
+            self._list_file_dirty = True
+            if self._editor_tab_built and self._strategy_stack.currentIndex() == 1:
+                self._request_list_file_editor_state()
+            if self._match_tab_built:
+                self._apply_match_tab_payload()
             self._rebuild_breadcrumb()
         finally:
             self._loading = False
 
-    def _apply_list_file_editor_payload(self, payload) -> None:
-        state = getattr(payload, "list_editor", None)
+    def _apply_list_file_editor_state(self, state) -> None:
         kind = str(getattr(state, "kind", "") or "").strip().lower()
         display_path = str(getattr(state, "display_path", "") or "").strip()
         text = str(getattr(state, "text", "") or "")
@@ -986,7 +1055,9 @@ class ProfileSetupPageBase(BasePage):
                 profile_key=self._profile_key,
                 text=self._list_file_text.toPlainText(),
             )
-            if state is not None and self._list_file_status_label is not None:
+            if state is not None:
+                self._apply_list_file_editor_state(state)
+            if self._list_file_status_label is not None:
                 self._list_file_status_label.setText("Список сохранён.")
             self.reload_current_profile()
             self._on_profile_changed_callback(self._profile_key, "list_file")

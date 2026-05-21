@@ -174,6 +174,11 @@ class ListsEditorController:
 
         return ListsEditorTextLoadWorker(request_id, self, kind, parent)
 
+    def create_folder_info_load_worker(self, category: str, request_id: int, parent=None):
+        from lists.editor_load_worker import ListsFolderInfoLoadWorker
+
+        return ListsFolderInfoLoadWorker(category, request_id, self, parent)
+
     def save_text(self, kind: str, text: str):
         return save_editor_text(self._lists, kind, text)
 

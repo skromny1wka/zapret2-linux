@@ -8,6 +8,11 @@ def load_profile_setup(*, profile_feature, launch_method: str, profile_key: str)
     return profile_feature.get_profile_setup(launch_method, profile_key)
 
 
+def load_profile_list_file_editor_state(*, profile_feature, launch_method: str, profile_key: str):
+    """Загружает файл списка для вкладки «Редактор»."""
+    return profile_feature.get_profile_list_file_editor_state(launch_method, profile_key)
+
+
 def save_winws2_profile_settings(
     *,
     profile_feature,

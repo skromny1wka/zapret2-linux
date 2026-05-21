@@ -117,30 +117,36 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
     def test_profile_setup_page_has_raw_profile_editor_for_current_preset(self) -> None:
         build = inspect.getsource(ProfileSetupPageBase._build_content)
-        apply_payload = inspect.getsource(ProfileSetupPageBase._apply_payload)
+        ensure_match = inspect.getsource(ProfileSetupPageBase._ensure_match_tab_built)
+        apply_match = inspect.getsource(ProfileSetupPageBase._apply_match_tab_payload)
         handler = inspect.getsource(ProfileSetupPageBase._on_raw_profile_save_clicked)
 
-        self.assertIn("_raw_profile_text", build)
-        self.assertIn("Сохранить текст profile", build)
-        self.assertIn("in_preset", apply_payload)
+        self.assertNotIn("self._raw_profile_text = PlainTextEdit()", build)
+        self.assertIn("_raw_profile_text", ensure_match)
+        self.assertIn("Сохранить текст profile", ensure_match)
+        self.assertIn("in_preset", apply_match)
         self.assertIn("save_raw_profile_text", handler)
         self.assertIn("Текст profile обновлён только в текущем preset", handler)
 
     def test_profile_setup_page_has_list_file_editor_as_second_tab(self) -> None:
         build = inspect.getsource(ProfileSetupPageBase._build_content)
+        ensure_editor = inspect.getsource(ProfileSetupPageBase._ensure_editor_tab_built)
         apply_payload = inspect.getsource(ProfileSetupPageBase._apply_payload)
+        switch_tab = inspect.getsource(ProfileSetupPageBase._switch_strategy_tab)
         save_handler = inspect.getsource(ProfileSetupPageBase._on_list_file_save_clicked)
         validation = inspect.getsource(ProfileSetupPageBase._render_list_file_validation)
 
         self.assertIn('addItem("editor", "Редактор"', build)
-        self.assertIn('setCurrentIndex(1)', build)
-        self.assertIn("_list_file_text", build)
-        self.assertIn("_apply_list_file_editor_payload", apply_payload)
+        self.assertNotIn("self._list_file_text = PlainTextEdit()", build)
+        self.assertIn("_ensure_editor_tab_built", switch_tab)
+        self.assertIn("_request_list_file_editor_state", switch_tab)
+        self.assertIn("_list_file_text", ensure_editor)
+        self.assertNotIn("_apply_list_file_editor_state", apply_payload)
         self.assertIn("save_list_file_text", save_handler)
         self.assertIn("Неверные строки", validation)
 
     def test_profile_setup_page_keeps_editor_tab_when_profile_has_no_filter_choice(self) -> None:
-        apply_editor = inspect.getsource(ProfileSetupPageBase._apply_list_file_editor_payload)
+        apply_editor = inspect.getsource(ProfileSetupPageBase._apply_list_file_editor_state)
         build = inspect.getsource(ProfileSetupPageBase._build_content)
         apply_settings = inspect.getsource(ProfileSetupPageBase._apply_editable_settings)
 
