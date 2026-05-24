@@ -170,7 +170,6 @@ class PresetSetupPageBase(BasePage):
     def _on_profile_payload_loaded(self, request_id: int, payload) -> None:
         if request_id != self._profile_load_request_id or self._cleanup_in_progress:
             return
-        self._hide_loading_skeleton()
         self._profile_payload_loaded_once = True
         self._profile_payload_dirty = False
         self._apply_payload(payload)
@@ -200,6 +199,7 @@ class PresetSetupPageBase(BasePage):
         self._show_profile_normalization_info(payload)
         self._clear_dynamic_widgets()
         if not payload.items:
+            self._hide_loading_skeleton()
             self._show_empty_state(
                 "В выбранном пресете нет профилей, которые можно показать на этой странице. "
                 "Попробуйте другой пресет или добавьте нужный профиль."
@@ -227,6 +227,7 @@ class PresetSetupPageBase(BasePage):
         self._profiles_list = profiles_list
         self._content_host_layout.addWidget(profiles_list, 1)
         self._empty_state_label = None
+        self._hide_loading_skeleton()
         self._log_ui_timing("profile_ui.profile_list.attach", attach_started_at)
         self._log_ui_timing("profile_ui.apply_payload.total", total_started_at)
 

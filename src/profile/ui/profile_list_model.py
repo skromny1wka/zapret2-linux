@@ -45,26 +45,38 @@ class ProfileListModel(QAbstractListModel):
         self._active_profile_types: set[str] = {"all"}
         self._search_query = ""
 
-    def set_profiles(self, items: tuple[Any, ...]) -> None:
+    def set_profiles(
+        self,
+        items: tuple[Any, ...],
+        *,
+        active_profile_types: set[str] | None = None,
+        search_query: str | None = None,
+    ) -> None:
         display_items = build_profile_display_items(tuple(items or ()))
+        active = _normalized_profile_types(
+            self._active_profile_types if active_profile_types is None else active_profile_types
+        )
+        normalized_search = self._search_query if search_query is None else _normalized_search_query(search_query)
         self.beginResetModel()
         self._all_items = display_items
         self._profile_items = {item.key: item for item in display_items}
         self._group_expanded = _initial_group_expanded(display_items)
+        self._active_profile_types = active
+        self._search_query = normalized_search
         self._rows = self._build_rows()
         self.endResetModel()
 
     def set_active_profile_types(self, profile_types: set[str]) -> None:
-        active = {str(value) for value in (profile_types or {"all"}) if str(value or "").strip()}
-        if not active:
-            active = {"all"}
+        active = _normalized_profile_types(profile_types)
+        if self._active_profile_types == active:
+            return
         self.beginResetModel()
         self._active_profile_types = active
         self._rows = self._build_rows()
         self.endResetModel()
 
     def set_search_query(self, query: str) -> None:
-        normalized = " ".join(str(query or "").strip().lower().split())
+        normalized = _normalized_search_query(query)
         if self._search_query == normalized:
             return
         self.beginResetModel()
@@ -348,6 +360,17 @@ def _row_for_profile(item: ProfileDisplayItem) -> dict[str, Any]:
         "icon_color": icon.color if item.in_preset else "#888888",
         "tooltip": tooltip,
     }
+
+
+def _normalized_profile_types(profile_types: set[str] | None) -> set[str]:
+    active = {str(value) for value in (profile_types or {"all"}) if str(value or "").strip()}
+    if not active:
+        active = {"all"}
+    return active
+
+
+def _normalized_search_query(query: str | None) -> str:
+    return " ".join(str(query or "").strip().lower().split())
 
 
 def _grouped_items(items: tuple[ProfileDisplayItem, ...]) -> dict[str, list[ProfileDisplayItem]]:

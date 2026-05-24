@@ -146,6 +146,13 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("profile_feature.sources.build", source)
         self.assertIn("profile_feature.profile_list_item.build", source)
 
+    def test_profile_worker_yields_during_large_payload_builds(self) -> None:
+        source = inspect.getsource(ProfilePresetService._list_profiles_locked)
+        helper_source = inspect.getsource(ProfilePresetService._yield_profile_payload_worker)
+
+        self.assertIn("_yield_profile_payload_worker", source)
+        self.assertIn("time.sleep(0)", helper_source)
+
     def test_profile_service_serializes_profile_list_snapshot_builds(self) -> None:
         source = inspect.getsource(ProfilePresetService.list_profiles)
 

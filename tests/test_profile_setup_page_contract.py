@@ -95,6 +95,19 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertIn("QStyledItemDelegate", delegate_source)
         self.assertIn("ListView", view_source)
 
+    def test_profile_list_builds_model_in_one_reset(self) -> None:
+        from profile.ui.profile_list_model import ProfileListModel
+
+        list_source = inspect.getsource(ProfilesList.build_profiles)
+        model_source = inspect.getsource(ProfileListModel.set_profiles)
+
+        self.assertIn("active_profile_types=", list_source)
+        self.assertIn("search_query=", list_source)
+        self.assertNotIn("set_active_profile_types(self._active_profile_types)", list_source)
+        self.assertNotIn("set_search_query(self._search_query)", list_source)
+        self.assertIn("active_profile_types", model_source)
+        self.assertIn("search_query", model_source)
+
     def test_profile_list_does_not_own_page_background_color(self) -> None:
         list_source = inspect.getsource(ProfilesList._build_ui)
 
@@ -450,10 +463,12 @@ class ProfileSetupPageContractTests(unittest.TestCase):
     def test_preset_setup_page_does_not_show_loading_placeholder_text(self) -> None:
         shell_builder = inspect.getsource(build_profile_shell)
         request_profiles = inspect.getsource(PresetSetupPageBase._request_profiles_payload)
+        payload_loaded = inspect.getsource(PresetSetupPageBase._on_profile_payload_loaded)
         clear_dynamic_widgets = inspect.getsource(PresetSetupPageBase._clear_dynamic_widgets)
 
         self.assertNotIn("Загрузка профилей выбранного пресета", shell_builder)
         self.assertNotIn("self._loading_label.show()", request_profiles)
+        self.assertNotIn("_hide_loading_skeleton()", payload_loaded)
         self.assertIn("preserved_widgets = 1 if self._loading_skeleton is not None else 0", clear_dynamic_widgets)
 
     def test_preset_setup_page_uses_visual_profile_loading_skeleton(self) -> None:
@@ -471,7 +486,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertIn("_visible_row_count", skeleton_source)
         self.assertNotIn("setMinimumHeight(self._rows", skeleton_source)
         self.assertIn("_show_loading_skeleton()", request_profiles)
-        self.assertIn("_hide_loading_skeleton()", payload_loaded)
+        self.assertIn("_hide_loading_skeleton()", inspect.getsource(PresetSetupPageBase._apply_payload))
         self.assertIn("_hide_loading_skeleton()", payload_failed)
 
     def test_profile_setup_page_has_update_user_profile_action(self) -> None:

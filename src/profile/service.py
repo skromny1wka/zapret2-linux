@@ -153,7 +153,8 @@ class ProfilePresetService:
         self._log_timing("profile_feature.sources.build", sources_started_at)
 
         items_started_at = time.perf_counter()
-        for source in sources:
+        for index, source in enumerate(sources):
+            self._yield_profile_payload_worker(index)
             item = self._item_for_profile(
                 source.profile,
                 catalogs=catalogs,
@@ -177,6 +178,11 @@ class ProfilePresetService:
         self._profile_list_snapshot_revision = list_revision
         self._log_timing("profile_feature.list_profiles.total", total_started_at)
         return payload
+
+    @staticmethod
+    def _yield_profile_payload_worker(index: int) -> None:
+        if index > 0 and index % 64 == 0:
+            time.sleep(0)
 
     def count_enabled_profiles(self) -> int:
         preset, _manifest = self.load_selected_preset()
