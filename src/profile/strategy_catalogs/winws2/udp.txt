@@ -22,24 +22,6 @@ description = Базовая стратегия для многих игр
 --payload=all
 --lua-desync=fake:repeats=6:blob=fake_default_quic
 
-[fake_2_n2_google]
-name = fake_2_n2_google
-author = community
-label = game
-description = Базовая стратегия для многих игр
-blobs = quic_google
---payload=all
---lua-desync=fake:blob=quic_google:repeats=6
-
-[fake_2_n2_test]
-name = fake_2_n2_test
-author = community
-label = recommended
-description = 2 повтора с quic_test_00.bin, cutoff n2
-blobs = quic_google
---payload=all
---lua-desync=fake:blob=quic_google:repeats=2
-
 [fake_4_google]
 name = Fake x4 Google
 author = community
@@ -273,14 +255,6 @@ description = Fake с tamper и AutoTTL=2 для DHT
 --lua-desync=fake:blob=fake_default_quic:repeats=11:ip_autottl=2,3-20:ip6_autottl=2,3-20
 --lua-desync=dht_dn:dn=2
 
-[fake_11_quic_bin]
-name = fake 11 повторов (Google QUIC)
-author = hz
-description = 11 повтора с Google QUIC и cutoff после 11 пакетов
-blobs = quic_google
---payload=all
---lua-desync=fake:blob=quic_google:repeats=11
-
 [fake_repeat_2_quic]
 name = fake 2 повторов (fake_quic.bin)
 author = hz
@@ -376,13 +350,6 @@ blobs = quic_google
 --lua-desync=fake:blob=quic_google:repeats=11
 --lua-desync=udplen:increment=15
 
-[fake_quic_google_6_quic_initial]
-name = Fake QUIC Google x6 quic_initial
-author = community
-blobs = quic_google
---payload=quic_initial
---lua-desync=fake:blob=quic_google:repeats=6
-
 [fake_quic_google_10]
 name = Fake QUIC Google x10
 author = community
@@ -414,13 +381,6 @@ name = Fake TLS Max
 author = community
 blobs = tls_max
 --lua-desync=fake:blob=tls_max
-
-[fake_quic_google_11_quic_initial]
-name = Fake QUIC Google x11 quic_initial
-author = community
-blobs = quic_google
---payload=quic_initial
---lua-desync=fake:blob=quic_google:repeats=11
 
 [fake_quic_google_2]
 name = Fake QUIC Google x2

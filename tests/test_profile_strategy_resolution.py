@@ -64,7 +64,7 @@ class ProfileStrategyResolutionTests(unittest.TestCase):
                 for catalog_name, entries in catalogs.items():
                     seen: dict[tuple[str, ...], str] = {}
                     for strategy_id, entry in entries.items():
-                        identity = _normalize_lines(entry.args.splitlines())
+                        identity = _ready_strategy_identity(engine, entry.args.splitlines())
                         previous_id = seen.get(identity)
                         if previous_id is not None:
                             duplicate_groups.append(f"{catalog_name}: {previous_id} = {strategy_id}")
@@ -83,6 +83,13 @@ class ProfileStrategyResolutionTests(unittest.TestCase):
         self.assertIn(catalog, self.catalogs)
         strategy_id, _strategy_name = _resolve_strategy(profile, _basic_strategy_entries(profile, self.catalogs))
         return strategy_id
+
+
+def _ready_strategy_identity(engine: str, lines) -> tuple[str, ...]:
+    normalized = _normalize_lines(lines)
+    if engine == "winws2":
+        return tuple(line for line in normalized if line.lower().startswith("--lua-desync="))
+    return normalized
 
 
 if __name__ == "__main__":
