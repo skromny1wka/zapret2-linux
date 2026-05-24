@@ -34,8 +34,7 @@ class ProfileIconTests(unittest.TestCase):
         )
 
         self.assertEqual(first, second)
-        self.assertTrue(first.icon_name.startswith("simple:"))
-        self.assertTrue(first.icon_name.endswith(":EX"))
+        self.assertEqual(first.icon_name, "profile-initials:EX")
 
     def test_hoster_without_brand_icon_gets_named_fallback_color(self) -> None:
         icon = resolve_profile_icon(
@@ -43,9 +42,58 @@ class ProfileIconTests(unittest.TestCase):
             ("--filter-tcp=80,443", "--ipset=lists/ipset-cloudflare.txt"),
         )
 
-        self.assertTrue(icon.icon_name.startswith("simple:"))
-        self.assertTrue(icon.icon_name.endswith(":CL"))
+        self.assertEqual(icon.icon_name, "simple:cloudflare:CF")
         self.assertEqual(icon.color, "#F38020")
+
+    def test_service_alias_uses_same_brand_icon(self) -> None:
+        icon = resolve_profile_icon(
+            "youtube.com (RTMPS Россия)",
+            ("--filter-tcp=443", "--hostlist=lists/youtubeQ.txt"),
+        )
+
+        self.assertEqual(icon.icon_name, "simple:youtube:YT")
+        self.assertEqual(icon.color, "#FF0000")
+
+    def test_display_name_can_identify_service_when_domain_bundle_is_ambiguous(self) -> None:
+        icon = resolve_profile_icon(
+            "youtube.com (RTMPS Россия)",
+            ("--filter-tcp=443", "--hostlist-domains=www.xvideos.com,xvideos-cdn.com"),
+        )
+
+        self.assertEqual(icon.icon_name, "simple:youtube:YT")
+
+    def test_cloudflare_variants_use_cloudflare_icon(self) -> None:
+        icon = resolve_profile_icon(
+            "Cloudflare IPv6 legacy TCP",
+            ("--filter-tcp=443", "--ipset=lists/cloudflare-ipset_v6.txt"),
+        )
+
+        self.assertEqual(icon.icon_name, "simple:cloudflare:CF")
+        self.assertEqual(icon.color, "#F38020")
+
+    def test_general_lists_use_meaningful_generic_icon(self) -> None:
+        icon = resolve_profile_icon(
+            "General list TCP",
+            ("--filter-tcp=80,443", "--hostlist=lists/list-general.txt"),
+        )
+
+        self.assertEqual(icon.icon_name, "fa5s.list-ul")
+
+    def test_blacklist_uses_blocking_icon_even_with_domain_bundle(self) -> None:
+        icon = resolve_profile_icon(
+            "Russia blacklist TCP wide",
+            (
+                "--filter-tcp=80,443",
+                "--hostlist-domains=awsglobalaccelerator.com,cloudfront.net,amazon.com,amazonaws.com,awsstatic.com",
+            ),
+        )
+
+        self.assertEqual(icon.icon_name, "fa5s.shield-alt")
+
+    def test_voice_profile_uses_voice_icon_from_display_name(self) -> None:
+        icon = resolve_profile_icon("Голосовые звонки/чаты", ("--filter-udp=50000-51000",))
+
+        self.assertEqual(icon.icon_name, "fa5s.microphone")
 
 
 if __name__ == "__main__":

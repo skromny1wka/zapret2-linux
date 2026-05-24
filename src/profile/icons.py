@@ -32,6 +32,49 @@ _KNOWN_ICONS: dict[str, ProfileIconSpec] = {
     "itch": ProfileIconSpec("simple:itchdotio:IT", "#FA5C5C"),
     "google": ProfileIconSpec("simple:google:GO", "#4285F4"),
     "amazon": ProfileIconSpec("simple:amazon:AM", "#FF9900"),
+    "cloudflare": ProfileIconSpec("simple:cloudflare:CF", "#F38020"),
+    "ovh": ProfileIconSpec("simple:ovh:OV", "#123F6D"),
+    "warp": ProfileIconSpec("simple:cloudflare:CF", "#F6821F"),
+    "roblox": ProfileIconSpec("simple:roblox:RB", "#E2231A"),
+    "lol": ProfileIconSpec("simple:leagueoflegends:LO", "#C89B3C"),
+    "riot": ProfileIconSpec("simple:riotgames:RI", "#D13639"),
+    "valorant": ProfileIconSpec("simple:valorant:VA", "#FA4454"),
+    "deepseek": ProfileIconSpec("simple:deepseek:DS", "#4D6BFE"),
+    "obsidian": ProfileIconSpec("simple:obsidian:OB", "#7C3AED"),
+    "rutracker": ProfileIconSpec("fa5s.link", "#6AA2FF"),
+    "rutor": ProfileIconSpec("fa5s.link", "#6AA2FF"),
+    "timeweb": ProfileIconSpec("fa5s.server", "#2F80ED"),
+    "zapretkvn": ProfileIconSpec("fa5s.server", "#31C48D"),
+    "tankix": ProfileIconSpec("fa5s.gamepad", "#8B5CF6"),
+    "porn": ProfileIconSpec("fa5s.user-shield", "#EC4899"),
+    "all": ProfileIconSpec("fa5s.globe", "#60A5FA"),
+    "general": ProfileIconSpec("fa5s.list-ul", "#94A3B8"),
+    "faceinsta": ProfileIconSpec("fa5s.users", "#E4405F"),
+    "myhostlist": ProfileIconSpec("fa5s.list-ul", "#94A3B8"),
+    "mycdnlist": ProfileIconSpec("fa5s.cloud", "#60A5FA"),
+    "ntc": ProfileIconSpec("fa5s.globe", "#60A5FA"),
+    "z-library": ProfileIconSpec("fa5s.book", "#22C55E"),
+    "net-cdn77": ProfileIconSpec("fa5s.cloud", "#60A5FA"),
+}
+
+_ICON_ALIASES: dict[str, str] = {
+    "youtube-v2": "youtube",
+    "youtubeq": "youtube",
+    "youtubegv": "youtube",
+    "russia-youtubeq": "youtube",
+    "russia-youtube-rtmps": "youtube",
+    "russia-discord": "discord",
+    "cloudflare-ipset": "cloudflare",
+    "cloudflare-ipset-v6": "cloudflare",
+    "cloudflare1": "cloudflare",
+    "com-cloudflarecp": "cloudflare",
+    "txrevive": "cloudflare",
+    "lol-ru": "lol",
+    "lol-euw": "lol",
+    "com-leagueoflegends": "lol",
+    "com-riotcdn": "riot",
+    "com-valorant": "valorant",
+    "com-z-library": "z-library",
 }
 
 _NAMED_COLORS: dict[str, str] = {
@@ -59,37 +102,78 @@ _FALLBACK_PALETTE: tuple[str, ...] = (
     "#EAB308",
 )
 
-_FALLBACK_SIMPLE_ICON_SLUGS: tuple[str, ...] = (
-    "simpleicons",
-    "abstract",
-    "codementor",
-    "codecrafters",
-    "codeforces",
-    "codesandbox",
-    "codepen",
-    "polymerproject",
-)
-
 
 def resolve_profile_icon(display_name: object, match_lines: tuple[str, ...] | list[str] = ()) -> ProfileIconSpec:
-    identity = _profile_identity(display_name, tuple(match_lines or ()))
-    if identity in _KNOWN_ICONS:
-        return _KNOWN_ICONS[identity]
+    match_tuple = tuple(match_lines or ())
+    identities = _profile_identities(display_name, match_tuple)
+    for identity in identities:
+        icon = _explicit_icon_for_identity(identity)
+        if icon is not None:
+            return icon
 
+    semantic_icon = _semantic_icon_from_text(display_name, match_tuple, identities)
+    if semantic_icon is not None:
+        return semantic_icon
+
+    identity = identities[0] if identities else "profile"
     color = _NAMED_COLORS.get(identity) or _color_from_seed(identity)
     initials = _initials_from_identity(identity)
-    return ProfileIconSpec(f"simple:{_simple_fallback_slug(identity)}:{initials}", color)
+    return ProfileIconSpec(f"profile-initials:{initials}", color)
 
 
 def _profile_identity(display_name: object, match_lines: tuple[str, ...]) -> str:
+    identities = _profile_identities(display_name, match_lines)
+    return identities[0] if identities else "profile"
+
+
+def _profile_identities(display_name: object, match_lines: tuple[str, ...]) -> tuple[str, ...]:
     candidates: list[str] = []
     candidates.extend(_resource_values(match_lines))
     candidates.append(str(display_name or ""))
+    identities: list[str] = []
     for candidate in candidates:
         normalized = _normalize_identity(candidate)
-        if normalized:
-            return normalized
-    return "profile"
+        if normalized and normalized not in identities:
+            identities.append(normalized)
+    return tuple(identities or ("profile",))
+
+
+def _explicit_icon_for_identity(identity: str) -> ProfileIconSpec | None:
+    key = _ICON_ALIASES.get(identity, identity)
+    return _KNOWN_ICONS.get(key)
+
+
+def _semantic_icon_from_text(
+    display_name: object,
+    match_lines: tuple[str, ...],
+    identities: tuple[str, ...],
+) -> ProfileIconSpec | None:
+    haystack = " ".join(
+        [
+            str(display_name or ""),
+            " ".join(str(line or "") for line in match_lines),
+            " ".join(identities),
+        ]
+    ).lower()
+    if any(token in haystack for token in ("blacklist", "rublacklist", "russia-blacklist")):
+        return ProfileIconSpec("fa5s.shield-alt", "#94A3B8")
+    if any(token in haystack for token in ("голос", "звон", "voice")):
+        return ProfileIconSpec("fa5s.microphone", "#38BDF8")
+    if any(token in haystack for token in ("league of legends", "riotgames", "riot games")):
+        return _KNOWN_ICONS["lol"]
+    if "valorant" in haystack:
+        return _KNOWN_ICONS["valorant"]
+    if "riot" in haystack:
+        return _KNOWN_ICONS["riot"]
+    if any(token in haystack for token in ("game", "games", "игр")):
+        return ProfileIconSpec("fa5s.gamepad", "#8B5CF6")
+    if "general" in haystack:
+        return _KNOWN_ICONS["general"]
+    if any(token in haystack for token in ("все сайты", "all sites")):
+        return _KNOWN_ICONS["all"]
+    if any(token in haystack for token in ("18+", "porn", "xvideos", "xnxx")):
+        return _KNOWN_ICONS["porn"]
+    return None
 
 
 def _resource_values(match_lines: tuple[str, ...]) -> list[str]:
@@ -135,11 +219,6 @@ def _initials_from_identity(identity: str) -> str:
 def _color_from_seed(seed: str) -> str:
     digest = hashlib.sha1(str(seed or "profile").encode("utf-8")).digest()
     return _FALLBACK_PALETTE[digest[0] % len(_FALLBACK_PALETTE)]
-
-
-def _simple_fallback_slug(seed: str) -> str:
-    digest = hashlib.sha1(str(seed or "profile").encode("utf-8")).digest()
-    return _FALLBACK_SIMPLE_ICON_SLUGS[digest[1] % len(_FALLBACK_SIMPLE_ICON_SLUGS)]
 
 
 __all__ = ["ProfileIconSpec", "resolve_profile_icon"]
