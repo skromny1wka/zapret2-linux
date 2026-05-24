@@ -109,6 +109,7 @@ def build_preset_raw_editor_page_kwargs(
     *,
     page_name: PageName,
     presets_feature,
+    runtime_feature,
     show_page,
     ui_state_store,
 ) -> dict:
@@ -117,6 +118,7 @@ def build_preset_raw_editor_page_kwargs(
         "presets_feature": presets_feature,
         "launch_method": method,
         "title": "Пресет Zapret 2" if method == ZAPRET2_MODE else "Пресет Zapret 1",
+        "runtime_feature": runtime_feature,
         "open_back": lambda m=method: show_page(
             resolve_preset_raw_editor_back_page_for_method(m),
             allow_internal=True,

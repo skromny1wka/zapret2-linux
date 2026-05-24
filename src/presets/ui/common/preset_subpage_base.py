@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from PyQt6.QtCore import QEvent, QTimer
@@ -55,6 +56,38 @@ def _make_menu_action(text: str, *, icon=None, parent=None):
     return action
 
 
+@dataclass(frozen=True, slots=True)
+class RuntimeToggleButtonPlan:
+    text: str
+    icon_name: str
+    should_stop: bool
+    enabled: bool
+
+
+def build_runtime_toggle_button_plan(
+    *,
+    launch_phase: str,
+    launch_running: bool,
+    launch_busy: bool,
+) -> RuntimeToggleButtonPlan:
+    phase = str(launch_phase or "").strip().lower()
+    should_stop = bool(launch_running) or phase in {"running", "stopping"}
+    transition = phase in {"autostart_pending", "starting", "stopping"} or bool(launch_busy)
+    if should_stop:
+        return RuntimeToggleButtonPlan(
+            text="Остановить",
+            icon_name="CANCEL",
+            should_stop=True,
+            enabled=not transition,
+        )
+    return RuntimeToggleButtonPlan(
+        text="Запустить",
+        icon_name="PLAY",
+        should_stop=False,
+        enabled=not transition,
+    )
+
+
 class _RenameDialog(MessageBoxBase):
     def __init__(self, current_name: str, existing_names: list[str], parent=None):
         if parent is not None and not parent.isWindow():
@@ -108,6 +141,7 @@ class PresetRawEditorPage(BasePage):
         title: str,
         open_back,
         open_root,
+        runtime_feature,
         ui_state_store,
     ):
         self._launch_method = str(launch_method or "").strip()
@@ -115,6 +149,7 @@ class PresetRawEditorPage(BasePage):
         super().__init__(self._title, "", parent)
         self._open_back_callback = open_back
         self._open_root_callback = open_root
+        self._runtime_feature = runtime_feature
         self._preset_name = ""
         self._preset_file_name = ""
         self._preset_path: Path | None = None
@@ -128,6 +163,7 @@ class PresetRawEditorPage(BasePage):
         self._footer_text = ""
         self._content_publish_pending = False
         self._app_event_filter_installed = False
+        self._runtime_toggle_should_stop = False
 
         self._controller = RawPresetEditorController(
             presets_feature=presets_feature,
@@ -294,6 +330,12 @@ class PresetRawEditorPage(BasePage):
         self.openExternalButton.setIcon(_fluent_icon("FOLDER"))
         self.openExternalButton.clicked.connect(self._open_external)
         actions_layout.addWidget(self.openExternalButton)
+
+        self.runtimeToggleButton = PushButton("Запустить", self)
+        self.runtimeToggleButton.setIcon(_fluent_icon("PLAY"))
+        self.runtimeToggleButton.clicked.connect(self._toggle_runtime)
+        actions_layout.addWidget(self.runtimeToggleButton)
+
         actions_layout.addStretch(1)
         self.add_widget(actions)
 
@@ -490,6 +532,7 @@ class PresetRawEditorPage(BasePage):
                 self._on_ui_state_changed,
                 fields={
                     "launch_method",
+                    "launch_phase",
                     "launch_running",
                     "launch_busy",
                     "launch_busy_text",
@@ -528,7 +571,48 @@ class PresetRawEditorPage(BasePage):
     def _on_ui_state_changed(self, state, _changed_fields: frozenset[str]) -> None:
         if self._cleanup_in_progress:
             return
+        self._render_runtime_toggle(state)
         self._render_footer_status(state)
+
+    def _render_runtime_toggle(self, state=None) -> None:
+        button = getattr(self, "runtimeToggleButton", None)
+        if button is None:
+            return
+        store = self._ui_state_store
+        if state is None and store is not None:
+            try:
+                state = store.snapshot()
+            except Exception:
+                state = None
+        launch_phase = str(getattr(state, "launch_phase", "") or "") if state is not None else ""
+        launch_running = bool(getattr(state, "launch_running", False)) if state is not None else False
+        launch_busy = bool(getattr(state, "launch_busy", False)) if state is not None else False
+        plan = build_runtime_toggle_button_plan(
+            launch_phase=launch_phase,
+            launch_running=launch_running,
+            launch_busy=launch_busy,
+        )
+        button.setText(plan.text)
+        button.setIcon(_fluent_icon(plan.icon_name))
+        button.setEnabled(plan.enabled and self._runtime_feature is not None)
+        self._runtime_toggle_should_stop = plan.should_stop
+
+    def _toggle_runtime(self) -> None:
+        runtime = self._runtime_feature
+        if runtime is None:
+            self._show_error("Управление Zapret сейчас недоступно.")
+            return
+        self._commit_pending_content_change()
+        try:
+            if bool(getattr(self, "_runtime_toggle_should_stop", False)):
+                runtime.stop()
+            else:
+                if not runtime.is_available():
+                    self._show_error("Запуск ещё готовится. Попробуйте ещё раз через пару секунд.")
+                    return
+                runtime.start(launch_method=self._launch_method)
+        except Exception as e:
+            self._show_error(str(e))
 
     def _render_footer_status(self, state=None) -> None:
         store = self._ui_state_store

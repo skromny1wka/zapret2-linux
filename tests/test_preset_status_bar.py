@@ -152,6 +152,35 @@ class PresetStatusBarPlanTests(unittest.TestCase):
         self.assertEqual(presets_list.minimumHeight(), expected_height)
         self.assertEqual(presets_list.maximumHeight(), expected_height)
 
+    def test_raw_editor_runtime_toggle_uses_single_button_plan(self) -> None:
+        from presets.ui.common.preset_subpage_base import build_runtime_toggle_button_plan
+
+        stopped_plan = build_runtime_toggle_button_plan(
+            launch_phase="stopped",
+            launch_running=False,
+            launch_busy=False,
+        )
+        running_plan = build_runtime_toggle_button_plan(
+            launch_phase="running",
+            launch_running=True,
+            launch_busy=False,
+        )
+        stopping_plan = build_runtime_toggle_button_plan(
+            launch_phase="stopping",
+            launch_running=True,
+            launch_busy=True,
+        )
+
+        self.assertEqual(stopped_plan.text, "Запустить")
+        self.assertFalse(stopped_plan.should_stop)
+        self.assertTrue(stopped_plan.enabled)
+        self.assertEqual(running_plan.text, "Остановить")
+        self.assertTrue(running_plan.should_stop)
+        self.assertTrue(running_plan.enabled)
+        self.assertEqual(stopping_plan.text, "Остановить")
+        self.assertTrue(stopping_plan.should_stop)
+        self.assertFalse(stopping_plan.enabled)
+
 
 if __name__ == "__main__":
     unittest.main()
