@@ -72,6 +72,17 @@ class ProfileStrategyResolutionTests(unittest.TestCase):
                         seen[identity] = strategy_id
                 self.assertEqual(duplicate_groups, [])
 
+    def test_winws2_catalogs_contain_only_lua_desync_args(self) -> None:
+        invalid_lines: list[str] = []
+        for path in sorted(Path("src/profile/strategy_catalogs/winws2").glob("*.txt")):
+            invalid_lines.extend(
+                f"{path.name}:{line_number}: {line.strip()}"
+                for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1)
+                if line.strip().startswith("--") and not line.strip().startswith("--lua-desync=")
+            )
+
+        self.assertEqual(invalid_lines, [])
+
     def test_catalog_entry_contains_strategy_visual_description(self) -> None:
         entry = self.catalogs["tcp"]["stock_default_v5_11"]
 

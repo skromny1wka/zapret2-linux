@@ -45,13 +45,8 @@ name = IPv4+IPv6 DUP AutoTTL
 author = Community
 label = recommended
 description = Раздельная обработка IPv4 и IPv6 с DUP и AutoTTL
---filter-l7=stun,discord,wireguard
---filter-l3=ipv4
 --lua-desync=send:repeats=2:ip_autottl=0,3-20
 --lua-desync=fake:blob=fake_default_udp:ip_autottl=0,3-20
---new
---filter-l7=stun,discord,wireguard
---filter-l3=ipv6
 --lua-desync=send:repeats=2:ip6_autottl=0,3-20
 --lua-desync=fake:blob=fake_default_udp:ip6_autottl=0,3-20
 
@@ -199,7 +194,6 @@ name = IPSET Fake+Tamper x11 (DHT)
 author = community
 label = game
 description = UDP с fake+tamper для DHT, 11 повторов
---payload=dht
 --lua-desync=fake:blob=fake_default_quic:repeats=11:ip_autottl=2,3-20:ip6_autottl=2,3-20
 --lua-desync=dht_dn:dn=2
 
@@ -338,7 +332,6 @@ author = community
 label = recommended
 description = Fake с tamper для DHT, 11 повторов
 blobs = quic_google
---payload=dht
 --lua-desync=fake:blob=quic_google:repeats=11
 --lua-desync=dht_dn:dn=2
 

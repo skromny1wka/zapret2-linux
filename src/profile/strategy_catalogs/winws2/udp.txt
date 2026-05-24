@@ -3,7 +3,6 @@ name = Dronator 4.3
 author = Dronator
 label = stable
 description = fake stun 0x0
---payload=all
 --lua-desync=fake:blob=0x00
 
 [fake_blob_quic_google_repeats_10_autottl]
@@ -11,7 +10,6 @@ name = Fake Blob QUIC Google Repeats 10 Autottl (alt v11)
 author = Flowseal
 label = stable
 description = fake quic_google с 10 повторами и авто TTL
---payload=all
 --lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=10:payload=all
 
 [fake_2_n2]
@@ -19,7 +17,6 @@ name = fake_2_n2
 author = community
 label = game
 description = Базовая стратегия для многих игр
---payload=all
 --lua-desync=fake:repeats=6:blob=fake_default_quic
 
 [fake_4_google]
@@ -27,7 +24,6 @@ name = Fake x4 Google
 author = community
 description = 4 повтора с Google QUIC
 blobs = quic_google
---payload=all
 --lua-desync=fake:blob=quic_google:repeats=4
 
 [fake_4_quic1]
@@ -35,7 +31,6 @@ name = Fake x4 QUIC1
 author = community
 description = 4 повтора с quic_1.bin
 blobs = quic1
---payload=all
 --lua-desync=fake:blob=quic1:repeats=4
 
 [general_bf_32]
@@ -44,7 +39,6 @@ author = community
 label = recommended
 description = Для Battlefield 6
 blobs = quic_google
---payload=all
 --lua-desync=fake:blob=quic_google:repeats=9:ip_autottl=2,3-20:ip6_autottl=2,3-20:payload=all
 
 [ipset_fake_12_n3]
@@ -53,7 +47,6 @@ author = community
 label = game
 description = UDP 443+ с ipset-all, 12 повторов, cutoff n3
 blobs = quic_google
---payload=all
 --lua-desync=fake:blob=quic_google:repeats=12:ip_autottl=2,3-20:ip6_autottl=2,3-20:payload=all
 
 [ipset_fake_10_n2]
@@ -62,7 +55,6 @@ author = community
 label = game
 description = UDP 443+ с ipset-all, 10 повторов, cutoff n2
 blobs = quic_google
---payload=all
 --lua-desync=fake:blob=quic_google:repeats=10:ip_autottl=2,3-20:ip6_autottl=2,3-20:payload=all
 
 [ipset_fake_14_n3]
@@ -71,7 +63,6 @@ author = community
 label = game
 description = UDP 443+ с ipset-all, 14 повторов, cutoff n3
 blobs = quic_google
---payload=all
 --lua-desync=fake:blob=quic_google:repeats=14:ip_autottl=2,3-20:ip6_autottl=2,3-20:payload=all
 
 [ipset_fake_tamper_11]
@@ -79,7 +70,6 @@ name = IPSET Fake+Tamper x11 (DHT)
 author = community
 label = game
 description = UDP с fake+tamper для DHT, 11 повторов
---payload=dht
 --lua-desync=fake:blob=fake_default_quic:repeats=11:ip_autottl=2,3-20:ip6_autottl=2,3-20:payload=all
 --lua-desync=dht_dn:dn=2
 
@@ -89,7 +79,6 @@ author = community
 label = game
 description = UDP 443+ с ipset-all, quic_6.bin, TTL 7
 blobs = quic6
---payload=all
 --lua-desync=fake:blob=quic6:repeats=2:ip_ttl=7:ip6_ttl=7:payload=all
 
 [fake_2_n2_test_2]
@@ -98,7 +87,6 @@ author = community
 label = recommended
 description = 2 повтора с quic_test_00.bin, cutoff n2
 blobs = quic_test
---payload=all
 --lua-desync=fake:blob=quic_test:repeats=2:payload=all
 
 [fake_11_simple]
@@ -106,7 +94,6 @@ name = Fake x11 Simple
 author = community
 label = stable
 description = Простая стратегия с 11 повторами fake
---payload=all
 --lua-desync=fake:blob=fake_default_quic:repeats=11:payload=all
 
 [fake_15_ttl0_md5sig]
@@ -114,7 +101,6 @@ name = Fake x15 TTL0 MD5sig
 author = community
 description = 15 повторов, TTL 0, md5sig+badsum
 blobs = quic_google
---payload=all
 --lua-desync=fake:blob=quic_google:repeats=15:ip_ttl=0:ip6_ttl=0:badsum:payload=all
 
 [fake_6_google]
@@ -122,7 +108,6 @@ name = Fake x6 Google
 author = community
 description = 6 повторов с Google QUIC
 blobs = quic_google
---payload=all
 --lua-desync=fake:blob=quic_google:repeats=6:payload=all
 
 [fake_ipfrag2_quic5]
@@ -130,7 +115,6 @@ name = Fake+IPFrag2 QUIC5
 author = community
 description = Fake с IP фрагментацией, quic_5.bin
 blobs = quic5
---payload=all
 --lua-desync=fake:blob=quic5:repeats=3:payload=all
 --lua-desync=send:ipfrag:ipfrag_pos_udp=8
 --lua-desync=drop
@@ -140,7 +124,6 @@ name = Fake+IPFrag2 QUIC3
 author = community
 description = Fake с IP фрагментацией, quic_3.bin
 blobs = quic3
---payload=all
 --lua-desync=fake:blob=quic3:repeats=2:payload=all
 --lua-desync=send:ipfrag:ipfrag_pos_udp=8
 --lua-desync=drop
@@ -150,7 +133,6 @@ name = Fake+IPFrag2 QUIC7
 author = community
 description = Fake с IP фрагментацией, quic_7.bin
 blobs = quic7
---payload=all
 --lua-desync=fake:blob=quic7:repeats=3
 --lua-desync=send:ipfrag:ipfrag_pos_udp=8
 --lua-desync=drop
@@ -160,7 +142,6 @@ name = Fake+UDPLen+2 QUIC3
 author = community
 description = Fake с изменением длины UDP +2
 blobs = quic3
---payload=all
 --lua-desync=fake:blob=quic3:repeats=2
 --lua-desync=udplen:increment=2
 
@@ -169,7 +150,6 @@ name = Fake+UDPLen+4 QUIC3
 author = community
 description = Fake с изменением длины UDP +4, quic_3.bin
 blobs = quic3
---payload=all
 --lua-desync=fake:blob=quic3:repeats=2
 --lua-desync=udplen:increment=4
 
@@ -178,7 +158,6 @@ name = Fake+UDPLen+4 QUIC4
 author = community
 description = Fake с изменением длины UDP +4, quic_4.bin
 blobs = quic4
---payload=all
 --lua-desync=fake:blob=quic4:repeats=2
 --lua-desync=udplen:increment=4
 
@@ -187,7 +166,6 @@ name = Fake+UDPLen+8 Pattern1
 author = community
 description = UDPLen +8 с паттерном 0x0F0F0E0F
 blobs = quic6
---payload=all
 --lua-desync=fake:blob=quic6:repeats=2
 --lua-desync=udplen:increment=8:pattern=0x0F0F0E0F
 
@@ -196,7 +174,6 @@ name = Fake+UDPLen+8 Pattern1 AutoTTL
 author = community
 description = UDPLen +8 с паттерном и AutoTTL
 blobs = quic6
---payload=all
 --lua-desync=fake:blob=quic6:repeats=2:ip_autottl=-1,3-20:ip6_autottl=-1,3-20
 --lua-desync=udplen:increment=8:pattern=0x0F0F0E0F
 
@@ -205,7 +182,6 @@ name = Fake+UDPLen+8 Pattern2
 author = community
 description = UDPLen +8 с паттерном 0x0E0F0E0F
 blobs = quic7
---payload=all
 --lua-desync=fake:blob=quic7:repeats=2
 --lua-desync=udplen:increment=8:pattern=0x0E0F0E0F
 
@@ -214,7 +190,6 @@ name = Fake+UDPLen+8 Pattern3
 author = community
 description = UDPLen +8 с паттерном 0xFEA82025
 blobs = quic4
---payload=all
 --lua-desync=fake:blob=quic4:repeats=2
 --lua-desync=udplen:increment=8:pattern=0xFEA82025
 
@@ -223,7 +198,6 @@ name = Fake+UDPLen+25
 author = community
 description = Fake с большим изменением длины UDP +25
 blobs = quic5
---payload=all
 --lua-desync=fake:blob=quic5:repeats=2
 --lua-desync=udplen:increment=25
 
@@ -232,7 +206,6 @@ name = Fake+UDPLen+25 x10
 author = community
 description = Fake с изменением длины UDP +25, 10 повторов
 blobs = quic_google
---payload=all
 --lua-desync=fake:blob=quic_google:repeats=10
 --lua-desync=udplen:increment=25
 
@@ -242,7 +215,6 @@ author = community
 label = recommended
 description = Fake с tamper для DHT, 11 повторов
 blobs = quic_google
---payload=dht
 --lua-desync=fake:blob=quic_google:repeats=11
 --lua-desync=dht_dn:dn=2
 
@@ -251,7 +223,6 @@ name = Fake+Tamper x11 AutoTTL (DHT)
 author = community
 label = recommended
 description = Fake с tamper и AutoTTL=2 для DHT
---payload=dht
 --lua-desync=fake:blob=fake_default_quic:repeats=11:ip_autottl=2,3-20:ip6_autottl=2,3-20
 --lua-desync=dht_dn:dn=2
 
@@ -260,7 +231,6 @@ name = fake 2 повторов (fake_quic.bin)
 author = hz
 description = 2 повтора с fake_quic.bin
 blobs = fake_quic
---payload=all
 --lua-desync=fake:blob=fake_quic:repeats=2
 
 [fake_6_1]
@@ -269,7 +239,6 @@ author = hz
 label = recommended
 description = Стандартная стратегия с другим Fake QUIC
 blobs = quic1
---payload=all
 --lua-desync=fake:blob=quic1:repeats=6
 
 [fake_6_vk_com]
@@ -278,7 +247,6 @@ author = hz
 label = recommended
 description = Стандартная стратегия для Discord Voice с другим QUIC от VK
 blobs = quic_vk
---payload=all
 --lua-desync=fake:blob=quic_vk:repeats=6
 
 [fake_8_google]
@@ -287,7 +255,6 @@ author = hz
 label = recommended
 description = Стандартная стратегия для Discord Voice
 blobs = quic_google
---payload=all
 --lua-desync=fake:blob=quic_google:repeats=8
 
 [fake_10_pattern]
@@ -296,7 +263,6 @@ author = hz
 label = recommended
 description = Стандартная стратегия для Discord Voice с доп. улучшениями
 blobs = quic_google
---payload=all
 --lua-desync=fake:blob=quic_google:repeats=6
 --lua-desync=udplen:increment=10:pattern=0xDEADBEEF
 
@@ -306,7 +272,6 @@ author = hz
 label = recommended
 description = Потом опишу подробнее
 blobs = quic2
---payload=all
 --lua-desync=fake:blob=quic2:repeats=7
 --lua-desync=udplen:increment=5:pattern=0xDEADBEEF
 
@@ -316,7 +281,6 @@ author = hz
 label = recommended
 description = Потом опишу подробнее
 blobs = quic_test
---payload=all
 --lua-desync=fake:blob=quic_test:repeats=7
 --lua-desync=udplen:increment=10:pattern=0xDEADBEEF
 
@@ -326,7 +290,6 @@ author = hz
 label = recommended
 description = Потом опишу подробнее
 blobs = quic_google
---payload=all
 --lua-desync=fake:blob=quic_google:repeats=7
 --lua-desync=udplen:increment=10:pattern=0xDEADBEEF
 
@@ -336,7 +299,6 @@ author = hz
 label = recommended
 description = Потом опишу подробнее
 blobs = quic2
---payload=all
 --lua-desync=fake:blob=quic2:repeats=8
 --lua-desync=udplen:increment=10:pattern=0xDEADBEEF
 
@@ -346,7 +308,6 @@ author = hz
 label = recommended
 description = Потом опишу подробнее
 blobs = quic_google
---payload=all
 --lua-desync=fake:blob=quic_google:repeats=11
 --lua-desync=udplen:increment=15
 
@@ -354,7 +315,6 @@ blobs = quic_google
 name = Fake QUIC Google x10
 author = community
 blobs = quic_google
---payload=all
 --lua-desync=fake:blob=quic_google:repeats=10
 
 [fake_quic_google_11]
@@ -367,7 +327,6 @@ blobs = quic_google
 name = Fake QUIC Google x12
 author = community
 blobs = quic_google
---payload=all
 --lua-desync=fake:blob=quic_google:repeats=12
 
 [fake_quic_google_6]
@@ -391,26 +350,22 @@ blobs = quic_google
 [fake_6_fake_default_udp]
 name = Fake x6 fake_default_udp
 author = community
---payload=all
 --lua-desync=fake:repeats=6:blob=fake_default_udp
 
 [pass]
 name = pass
---payload=all
 --lua-desync=pass
 
 [fake_quic_google_2_all]
 name = Fake QUIC Google x2 payload=all (in args)
 author = community
 blobs = quic_google
---payload=all
 --lua-desync=fake:blob=quic_google:repeats=2:payload=all
 
 [fake_quic6_autottl_udplen]
 name = Fake QUIC6 AutoTTL + UDPLen out_range
 author = community
 blobs = quic6
---payload=all
 --lua-desync=fake:blob=quic6:repeats=2:ip_autottl=-1,3-20:ip6_autottl=-1,3-20:payload=all
 --lua-desync=udplen:increment=8:pattern=0x0F0F0E0F
 

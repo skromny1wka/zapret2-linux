@@ -611,7 +611,6 @@ name = Dronatar 4.2 (без tls_mod)
 author = Dronatar
 label = recommended
 description = fake blob=0x00, repeats=6 - без модификации TLS
---filter-l7=tls
 --lua-desync=fake:blob=0x00000000000000000000000000000000:repeats=6:tcp_ts_up
 
 [dronatar_4_2_tlsmod]
@@ -620,7 +619,6 @@ author = Dronatar
 label = recommended
 description = fake tls14, repeats=6 с tls_mod=rnd,dupsid
 blobs = tls14
---filter-l7=tls
 --lua-desync=fake:blob=tls14:repeats=6:tls_mod=rnd,dupsid:tcp_ts_up
 
 [multidisorder_badseq_pos]
@@ -1069,7 +1067,6 @@ description = Потом опишу подробнее
 [fake_fakedsplit_autottl_2]
 name = fake fakedsplit badseq (рекомендуется для 80 порта)
 author = hz
---payload=http_req
 --lua-desync=fake:blob=fake_default_http:ip_autottl=2,3-20:ip6_autottl=2,3-20:tcp_ack=-66000:tcp_ts_up
 --lua-desync=fakedsplit:ip_autottl=2,3-20:ip6_autottl=2,3-20:tcp_ack=-66000:tcp_ts_up
 
@@ -2002,7 +1999,6 @@ name = payload tls_client_hello + fake tls_google x6 ts-600000 + fakedsplit x6 t
 author = builtin
 label = stock
 description = Автодобавлено для распознавания встроенного пресета general ALT (game filter).txt (list_general_tcp)
---payload=tls_client_hello
 --lua-desync=fake:blob=tls_google:repeats=6:tcp_ts=-600000
 --lua-desync=fakedsplit:pattern=0x00:repeats=6:tcp_ts=-600000
 
@@ -2019,7 +2015,6 @@ name = payload tls_client_hello,http_req + fake tls_google x8 ts-600000 + multis
 author = builtin
 label = stock
 description = Автодобавлено для распознавания встроенного пресета general ALT11.txt (googlevideo_tcp)
---payload=tls_client_hello,http_req
 --lua-desync=fake:blob=tls_google:repeats=8:tcp_ts=-600000
 --lua-desync=multisplit:pos=2:seqovl=681:seqovl_pattern=tls_google:repeats=8:tcp_ts=-600000
 
@@ -2036,7 +2031,6 @@ name = payload tls_client_hello,http_req + fake tls_google x6 seq1000 + multispl
 author = builtin
 label = stock
 description = Автодобавлено для распознавания встроенного пресета general ALT4 (game filter).txt (discord_tcp)
---payload=tls_client_hello,http_req
 --lua-desync=fake:blob=tls_google:repeats=6:tcp_seq=1000
 --lua-desync=multisplit:pos=2
 
@@ -2088,18 +2082,11 @@ blobs = tls1
 --lua-desync=fake:blob=tls1:tls_mod=rnd,dupsid:tcp_md5:ip_autottl=-1,3-20
 --lua-desync=multidisorder_legacy:pos=1,midsld:ip_autottl=-1,3-20:ip6_autottl=-1,3-20
 
-[ipcache_hostname]
-name = IP cache hostname
-author = community
---ipcache-hostname
-
 [fake_tls_max_6_ts_http_ts]
 name = Fake TLS Max x6 TS + HTTP TS
 author = community
 blobs = tls_max,fake_default_http
---payload=tls_client_hello
 --lua-desync=fake:blob=tls_max:repeats=6:tcp_ts=-600000
---payload=http_req
 --lua-desync=fake:blob=fake_default_http:repeats=6:tcp_ts=-600000
 
 [fake_11_tls_google_tcp_md5_hostfakesplit_multi]
@@ -2118,11 +2105,8 @@ author = community
 name = Fake TLS google TS + HTTP TS + FakedSplit all payloads
 author = community
 blobs = tls_google,fake_default_http
---payload=tls_client_hello
 --lua-desync=fake:blob=tls_google:repeats=6:tcp_ts=-600000
---payload=http_req
 --lua-desync=fake:blob=fake_default_http:repeats=6:tcp_ts=-600000
---payload=tls_client_hello,http_req
 --lua-desync=fakedsplit:pattern=0x00:repeats=6:tcp_ts=-600000
 
 [fake_tls14_multidisorder_legacy_ip6hbh_flood]
@@ -2152,41 +2136,35 @@ blobs = fake_default_tls
 name = Fake QUIC Google x10 AutoTTL payload=all (ipset_zapretkvn TCP catalog)
 author = community
 blobs = quic_google
---payload=all
 --lua-desync=fake:blob=quic_google:ip_autottl=-2,3-20:ip6_autottl=-2,3-20:repeats=10:payload=all
 
 [fake_quic_google_12_all_tcp]
 name = Fake QUIC Google x12 payload=all (ipset_zapretkvn TCP catalog)
 author = community
 blobs = quic_google
---payload=all
 --lua-desync=fake:blob=quic_google:repeats=12
 
 [fake_quic_google_10_all_tcp]
 name = Fake QUIC Google x10 payload=all (ipset_zapretkvn TCP catalog)
 author = community
 blobs = quic_google
---payload=all
 --lua-desync=fake:blob=quic_google:repeats=10
 
 [fake_quic_google_12_autottl2_all_tcp]
 name = Fake QUIC Google x12 AutoTTL2 payload=all in args (ipset_zapretkvn)
 author = community
 blobs = quic_google
---payload=all
 --lua-desync=fake:blob=quic_google:repeats=12:ip_autottl=2,3-20:ip6_autottl=2,3-20:payload=all
 
 [fake_quic_google_2_all_tcp]
 name = Fake QUIC Google x2 payload=all (ipset_zapretkvn TCP catalog)
 author = community
 blobs = quic_google
---payload=all
 --lua-desync=fake:blob=quic_google:repeats=2
 
 [fake_quic2_udplen_deadbeef_tcp]
 name = Fake quic2 x7 + UDPLen deadbeef (ipset_zapretkvn TCP catalog)
 author = community
 blobs = quic2
---payload=all
 --lua-desync=fake:blob=quic2:repeats=7
 --lua-desync=udplen:increment=5:pattern=0xDEADBEEF
