@@ -5,7 +5,7 @@ import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 
 PROJECT_SRC = Path(__file__).resolve().parents[1] / "src"
@@ -201,6 +201,71 @@ class PresetSidebarNavigationTests(unittest.TestCase):
             self.assertIn(page_name, root_plan.page_names)
             self.assertFalse(visibility[page_name])
 
+    def test_initial_sidebar_build_skips_hidden_other_mode_items(self) -> None:
+        from app.page_names import PageName
+        from settings.mode import ZAPRET2_MODE
+        import ui.navigation.sidebar_builder as sidebar_builder
+
+        class FakeNavigationInterface:
+            def __init__(self) -> None:
+                self.headers = []
+
+            def addItemHeader(self, text, position):
+                header = SimpleNamespace(text=text, position=position)
+                self.headers.append(header)
+                return header
+
+            def setMinimumExpandWidth(self, width) -> None:
+                self.minimum_expand_width = width
+
+        added_pages: list[PageName] = []
+        session = SimpleNamespace(
+            nav_scroll_position=None,
+            ui_language="ru",
+            sidebar_search_widget_cls=None,
+            nav_items={},
+            nav_headers=[],
+            nav_header_by_group={},
+            nav_mode_visibility={},
+            nav_search_query="",
+            sidebar_search_nav_widget=None,
+            sidebar_search_model=None,
+            sidebar_search_completer=None,
+            sidebar_search_titlebar_attached=False,
+            pages={},
+        )
+        window = SimpleNamespace(
+            ui_session=session,
+            navigationInterface=FakeNavigationInterface(),
+            get_launch_method=lambda: ZAPRET2_MODE,
+        )
+
+        with (
+            patch.object(
+                sidebar_builder,
+                "_schedule_sidebar_search_after_interactive",
+                side_effect=lambda current_window: None,
+            ),
+            patch.object(
+                sidebar_builder,
+                "_schedule_hidden_mode_nav_items_after_interactive",
+                side_effect=lambda current_window: None,
+            ),
+            patch.object(
+                sidebar_builder,
+                "add_nav_item",
+                side_effect=lambda current_window, page_name, *_args, **_kwargs: added_pages.append(page_name),
+            ),
+        ):
+            sidebar_builder.init_navigation(window)
+
+        self.assertIn(PageName.ZAPRET2_MODE_CONTROL, added_pages)
+        self.assertIn(PageName.ZAPRET2_USER_PRESETS, added_pages)
+        self.assertIn(PageName.ZAPRET2_PRESET_SETUP, added_pages)
+        self.assertNotIn(PageName.ZAPRET1_MODE_CONTROL, added_pages)
+        self.assertNotIn(PageName.ZAPRET1_USER_PRESETS, added_pages)
+        self.assertNotIn(PageName.ZAPRET1_PRESET_SETUP, added_pages)
+
     def test_mode_switch_reuses_hidden_other_mode_items(self) -> None:
         from app.page_names import PageName
         from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE
@@ -317,6 +382,56 @@ class PresetSidebarNavigationTests(unittest.TestCase):
 
             self.assertEqual(len(scheduled), 1)
             self.assertGreaterEqual(scheduled[0][0], 500)
+            self.assertEqual(installed, [])
+
+            scheduled[0][1]()
+
+        self.assertEqual(installed, [window])
+
+    def test_hidden_mode_sidebar_items_are_delayed_until_interactive_ready(self) -> None:
+        import ui.navigation.sidebar_builder as sidebar_builder
+
+        class Signal:
+            def __init__(self) -> None:
+                self._callbacks = []
+
+            def connect(self, callback) -> None:
+                self._callbacks.append(callback)
+
+            def emit(self) -> None:
+                for callback in list(self._callbacks):
+                    callback("ui_ready")
+
+        signal = Signal()
+        window = SimpleNamespace(
+            ui_session=SimpleNamespace(),
+            startup_state=SimpleNamespace(interactive_logged=False),
+            startup_interactive_ready=signal,
+            log_startup_metric=Mock(),
+        )
+        scheduled = []
+        installed = []
+
+        with (
+            patch.object(
+                sidebar_builder.QTimer,
+                "singleShot",
+                side_effect=lambda delay_ms, callback: scheduled.append((int(delay_ms), callback)),
+            ),
+            patch.object(
+                sidebar_builder,
+                "_install_hidden_mode_nav_items",
+                side_effect=lambda current_window: installed.append(current_window),
+            ),
+        ):
+            sidebar_builder._schedule_hidden_mode_nav_items_after_interactive(window)
+            self.assertEqual(scheduled, [])
+            self.assertEqual(installed, [])
+
+            signal.emit()
+
+            self.assertEqual(len(scheduled), 1)
+            self.assertGreaterEqual(scheduled[0][0], 1000)
             self.assertEqual(installed, [])
 
             scheduled[0][1]()

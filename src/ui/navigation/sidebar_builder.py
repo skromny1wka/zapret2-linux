@@ -22,6 +22,7 @@ from ui.window_ui_session import get_window_ui_session
 
 
 SIDEBAR_SEARCH_AFTER_INTERACTIVE_MS = 1_000
+SIDEBAR_HIDDEN_MODE_ITEMS_AFTER_INTERACTIVE_MS = 1_600
 
 
 def _get_page_host(window):
@@ -247,6 +248,87 @@ def _schedule_sidebar_search_after_interactive(window) -> None:
         _schedule()
 
 
+def _install_hidden_mode_nav_items(window) -> None:
+    import time as _time
+
+    started_at = _time.perf_counter()
+    session = get_window_ui_session(window)
+    if session is None:
+        return
+
+    try:
+        method = window.get_launch_method()
+    except Exception:
+        method = None
+    visibility_by_page = get_nav_visibility(method)
+    added_count = 0
+
+    for page_name, should_show in visibility_by_page.items():
+        if bool(should_show):
+            continue
+        if page_name in session.nav_items:
+            continue
+        add_nav_item(
+            window,
+            page_name,
+            session.nav_scroll_position,
+            initial_visible=False,
+            insert_index=_resolve_scroll_insert_index(window, page_name, method),
+            pump_ui=False,
+        )
+        if page_name in session.nav_items:
+            added_count += 1
+            session.nav_mode_visibility[page_name] = False
+
+    if added_count:
+        apply_nav_visibility_filter(window)
+    try:
+        window.log_startup_metric(
+            "StartupHiddenModeNavReady",
+            f"{added_count} items, {(_time.perf_counter() - started_at) * 1000:.0f}ms",
+        )
+    except Exception:
+        pass
+
+
+def _schedule_hidden_mode_nav_items_after_interactive(window) -> None:
+    session = get_window_ui_session(window)
+    if session is None:
+        return
+
+    scheduled = False
+
+    def _schedule(*_args) -> None:
+        nonlocal scheduled
+        if scheduled:
+            return
+        scheduled = True
+        try:
+            window.log_startup_metric(
+                "StartupHiddenModeNavQueued",
+                f"{SIDEBAR_HIDDEN_MODE_ITEMS_AFTER_INTERACTIVE_MS}ms after interactive",
+            )
+        except Exception:
+            pass
+        QTimer.singleShot(
+            SIDEBAR_HIDDEN_MODE_ITEMS_AFTER_INTERACTIVE_MS,
+            lambda: _install_hidden_mode_nav_items(window),
+        )
+
+    try:
+        if bool(getattr(window.startup_state, "interactive_logged", False)):
+            _schedule()
+            return
+    except Exception:
+        _schedule()
+        return
+
+    try:
+        window.startup_interactive_ready.connect(_schedule)
+    except Exception:
+        _schedule()
+
+
 def init_navigation(window) -> None:
     session = get_window_ui_session(window)
     if session is None:
@@ -277,6 +359,7 @@ def init_navigation(window) -> None:
     nav = window.navigationInterface
 
     _schedule_sidebar_search_after_interactive(window)
+    _schedule_hidden_mode_nav_items_after_interactive(window)
 
     for group_plan in build_sidebar_group_plans(current_method):
         if group_plan.header_key:
@@ -288,6 +371,8 @@ def init_navigation(window) -> None:
             session.nav_headers.append((header, group_plan.page_names, group_plan.header_key))
 
         for page_name in group_plan.page_names:
+            if not bool(initial_visibility.get(page_name, True)):
+                continue
             _add(page_name)
 
     for hidden in get_hidden_pages_for_method(current_method):

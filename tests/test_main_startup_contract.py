@@ -321,6 +321,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
                     "[12:00:02] [⏱ STARTUP] ⏱ Startup StartupPostInitDeferredStart: 2300ms | zapret2_mode",
                     "[12:00:02] [⏱ STARTUP] ⏱ Startup StartupNetworkDataWarmupQueued: 2400ms | 1200ms after interactive",
                     "[12:00:02] [⏱ STARTUP] ⏱ Startup StartupSidebarSearchQueued: 2500ms | 1000ms after interactive",
+                    "[12:00:02] [⏱ STARTUP] ⏱ Startup StartupHiddenModeNavQueued: 2800ms | 1600ms after interactive",
                 )
             )
         )
