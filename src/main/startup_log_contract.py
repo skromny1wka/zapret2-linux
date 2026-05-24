@@ -8,6 +8,7 @@ from pathlib import Path
 
 _STARTUP_METRIC_RE = re.compile(r"\bStartup (?P<marker>Startup[A-Za-z0-9]+):\s+(?P<ms>\d+)ms\b")
 _PAGE_LIFECYCLE_WARMUP_RE = re.compile(r"\bPageLifecycle:\s+(?P<page>[A-Z0-9_]+)\s+warmup\s+(?P<ms>\d+)ms\b")
+_STARTUP_PAGE_WARMUP_MARKER_RE = re.compile(r"^StartupPage[A-Za-z0-9]+WarmupQueued$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,7 +79,7 @@ def _first_metric(metrics: tuple[StartupMetric, ...], marker: str) -> StartupMet
 def _must_start_after_interactive(marker: str) -> bool:
     if marker in _AFTER_INTERACTIVE_MARKERS:
         return True
-    return marker.startswith("StartupPage") and marker.endswith("WarmupQueued")
+    return False
 
 
 def validate_startup_log_contract(text: str) -> StartupLogContractResult:
@@ -120,6 +121,12 @@ def validate_startup_log_contract(text: str) -> StartupLogContractResult:
         return StartupLogContractResult(ok=False, errors=tuple(errors), warnings=tuple(warnings))
 
     for metric in metrics:
+        if _STARTUP_PAGE_WARMUP_MARKER_RE.match(metric.marker):
+            errors.append(
+                f"{metric.marker} ставит GUI-прогрев страницы во время startup, строка {metric.line_number}. "
+                "Во время запуска можно греть только данные через backend-кэш."
+            )
+            continue
         if not _must_start_after_interactive(metric.marker):
             continue
         if metric.elapsed_ms < interactive.elapsed_ms:

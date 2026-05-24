@@ -318,7 +318,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
                     "[12:00:02] [⏱ STARTUP] ⏱ Startup StartupCoreReady: 1800ms | startup_coordinator",
                     "[12:00:02] [⏱ STARTUP] ⏱ Startup StartupPostInit: 1900ms | post_init_scheduled",
                     "[12:00:02] [⏱ STARTUP] ⏱ Startup StartupPostInitDeferredStart: 2300ms | zapret2_mode",
-                    "[12:00:02] [⏱ STARTUP] ⏱ Startup StartupPageNetworkWarmupQueued: 2400ms | NETWORK",
+                    "[12:00:02] [⏱ STARTUP] ⏱ Startup StartupNetworkDataWarmupQueued: 2400ms | 1200ms after interactive",
                 )
             )
         )
@@ -356,6 +356,22 @@ class StartupRuntimeSetupTests(unittest.TestCase):
 
         self.assertFalse(result.ok)
         self.assertTrue(any("GUI-прогрев страницы" in error for error in result.errors))
+
+    def test_startup_log_contract_rejects_startup_page_warmup_queue(self) -> None:
+        from main.startup_log_contract import validate_startup_log_contract
+
+        result = validate_startup_log_contract(
+            "\n".join(
+                (
+                    "[12:00:00] [⏱ STARTUP] ⏱ Startup StartupTTFF: 1000ms | first showEvent",
+                    "[12:00:01] [⏱ STARTUP] ⏱ Startup StartupInteractive: 1300ms | ui_ready",
+                    "[12:00:10] [⏱ STARTUP] ⏱ Startup StartupPageNetworkWarmupQueued: 9000ms | NETWORK",
+                )
+            )
+        )
+
+        self.assertFalse(result.ok)
+        self.assertTrue(any("Во время запуска можно греть только данные" in error for error in result.errors))
 
     def test_dns_feature_exposes_startup_dns_entrypoint(self) -> None:
         from app.feature_facades.dns import build_dns_feature
@@ -1135,34 +1151,6 @@ class StartupRuntimeSetupTests(unittest.TestCase):
 
         routed_show_page.assert_called_once_with(window, PageName.SERVERS, allow_internal=True)
 
-    def test_page_warmup_uses_loaded_page_without_creating_gui(self) -> None:
-        from app.page_names import PageName
-        from ui.page_warmup import warm_page
-
-        page = SimpleNamespace(warmup_initial_load=Mock(return_value=True))
-        page_host = SimpleNamespace(get_loaded_page=Mock(return_value=page), ensure_page=Mock(), show_page=Mock())
-        window = SimpleNamespace(ui_session=SimpleNamespace(page_host=page_host))
-
-        self.assertTrue(warm_page(window, PageName.HOSTS))
-
-        page_host.get_loaded_page.assert_called_once_with(PageName.HOSTS)
-        page_host.ensure_page.assert_not_called()
-        page_host.show_page.assert_not_called()
-        page.warmup_initial_load.assert_called_once_with()
-
-    def test_page_warmup_skips_unloaded_page_without_creating_gui(self) -> None:
-        from app.page_names import PageName
-        from ui.page_warmup import warm_page
-
-        page_host = SimpleNamespace(get_loaded_page=Mock(return_value=None), ensure_page=Mock(), show_page=Mock())
-        window = SimpleNamespace(ui_session=SimpleNamespace(page_host=page_host))
-
-        self.assertFalse(warm_page(window, PageName.NETWORK))
-
-        page_host.get_loaded_page.assert_called_once_with(PageName.NETWORK)
-        page_host.ensure_page.assert_not_called()
-        page_host.show_page.assert_not_called()
-
     def test_control_start_waits_until_runtime_is_available(self) -> None:
         from presets.ui.control import control_page_shared
         from presets.ui.control.control_page_shared import ControlPageActionMixin
@@ -1199,7 +1187,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         self.assertEqual(page.loading_calls[-1], (False, ""))
         self.assertIn("Подготовка запуска...", page.status_calls)
 
-    def test_post_startup_tasks_install_page_warmup(self) -> None:
+    def test_post_startup_tasks_do_not_install_gui_page_warmup(self) -> None:
         from main import post_startup
         from main.post_startup import PostStartupDeps, install_post_startup_tasks
 
@@ -1228,7 +1216,6 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             patch.object(post_startup, "install_lists_check"),
             patch.object(post_startup, "install_dns_startup"),
             patch.object(post_startup, "install_dns_page_data_warmup"),
-            patch.object(post_startup, "install_page_warmup") as install_page_warmup,
             patch.object(post_startup, "install_profile_warmup"),
             patch.object(post_startup, "install_update_check"),
             patch.object(post_startup, "install_cpu_diagnostic"),
@@ -1237,10 +1224,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         ):
             install_post_startup_tasks(deps)
 
-        install_page_warmup.assert_called_once_with(
-            startup_host,
-            log_startup_metric=log_startup_metric,
-        )
+        self.assertFalse(hasattr(post_startup, "install_page_warmup"))
 
     def test_post_startup_tasks_install_profile_warmup(self) -> None:
         from main import post_startup
@@ -1271,7 +1255,6 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             patch.object(post_startup, "install_lists_check"),
             patch.object(post_startup, "install_dns_startup"),
             patch.object(post_startup, "install_dns_page_data_warmup"),
-            patch.object(post_startup, "install_page_warmup"),
             patch.object(post_startup, "install_profile_warmup") as install_profile_warmup,
             patch.object(post_startup, "install_update_check"),
             patch.object(post_startup, "install_cpu_diagnostic"),
@@ -1315,7 +1298,6 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             patch.object(post_startup, "install_lists_check"),
             patch.object(post_startup, "install_dns_startup"),
             patch.object(post_startup, "install_dns_page_data_warmup") as install_dns_page_data_warmup,
-            patch.object(post_startup, "install_page_warmup"),
             patch.object(post_startup, "install_profile_warmup"),
             patch.object(post_startup, "install_update_check"),
             patch.object(post_startup, "install_cpu_diagnostic"),
@@ -1363,7 +1345,6 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             patch.object(post_startup, "install_dns_startup"),
             patch.object(post_startup, "install_dns_page_data_warmup"),
             patch.object(post_startup, "install_backend_page_data_warmup") as install_backend_page_data_warmup,
-            patch.object(post_startup, "install_page_warmup"),
             patch.object(post_startup, "install_profile_warmup"),
             patch.object(post_startup, "install_update_check"),
             patch.object(post_startup, "install_cpu_diagnostic"),
@@ -1499,191 +1480,6 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         )
         metric.assert_any_call("StartupProfileWarmupQueued", "1800ms after interactive")
         metric.assert_any_call("StartupProfileWarmupStarted", "zapret1_mode, zapret2_mode")
-
-    def test_page_warmup_plan_covers_visible_pages_and_excludes_only_entry_page(self) -> None:
-        from app.page_names import PageName
-        from main.post_startup_page_warmup import page_warmup_plan_for_method
-
-        page_names = [spec.page_name for spec in page_warmup_plan_for_method("zapret2_mode")]
-
-        self.assertNotIn(PageName.ZAPRET2_MODE_CONTROL, page_names)
-        self.assertIn(PageName.NETWORK, page_names)
-        self.assertIn(PageName.ZAPRET2_USER_PRESETS, page_names)
-        self.assertIn(PageName.ZAPRET2_PRESET_SETUP, page_names)
-        self.assertIn(PageName.AUTOSTART, page_names)
-        self.assertIn(PageName.TELEGRAM_PROXY, page_names)
-        self.assertIn(PageName.HOSTS, page_names)
-        self.assertIn(PageName.BLOCKCHECK, page_names)
-        self.assertIn(PageName.APPEARANCE, page_names)
-        self.assertIn(PageName.PREMIUM, page_names)
-        self.assertIn(PageName.LOGS, page_names)
-        self.assertIn(PageName.ABOUT, page_names)
-
-    def test_page_warmup_prioritizes_slow_common_pages(self) -> None:
-        from app.page_names import PageName
-        from main.post_startup_page_warmup import page_warmup_plan_for_method
-
-        specs = page_warmup_plan_for_method("zapret2_mode")
-        page_names = [spec.page_name for spec in specs]
-
-        self.assertLess(page_names.index(PageName.LOGS), page_names.index(PageName.AUTOSTART))
-        self.assertLess(page_names.index(PageName.PREMIUM), page_names.index(PageName.AUTOSTART))
-        self.assertLess(page_names.index(PageName.APPEARANCE), page_names.index(PageName.AUTOSTART))
-        self.assertLess(page_names.index(PageName.NETWORK), page_names.index(PageName.AUTOSTART))
-        self.assertEqual(page_names[:2], [PageName.ZAPRET2_USER_PRESETS, PageName.ZAPRET2_PRESET_SETUP])
-        self.assertEqual(specs[0].delay_ms, 8000)
-        self.assertTrue(all(spec.delay_ms == 1500 for spec in specs[1:]))
-
-    def test_page_warmup_uses_spec_delay_and_metric(self) -> None:
-        from app.page_names import PageName
-        from main import post_startup_page_warmup
-        from main.post_startup_page_warmup import PageWarmupSpec, install_page_warmup
-
-        class Signal:
-            def __init__(self) -> None:
-                self._callback = None
-
-            def connect(self, callback) -> None:
-                self._callback = callback
-
-            def emit(self, value: str = "") -> None:
-                self._callback(value)
-
-        signal = Signal()
-        startup_host = SimpleNamespace(
-            startup_post_init_ready=signal,
-            startup_state=SimpleNamespace(post_init_ready=False),
-            is_alive=Mock(return_value=True),
-            warm_page=Mock(return_value=True),
-        )
-        metric = Mock()
-        delays: list[int] = []
-        plan = (
-            PageWarmupSpec(
-                page_name=PageName.HOSTS,
-                delay_ms=1234,
-                metric_name="StartupPageHostsWarmupQueued",
-                budget_ms=300,
-            ),
-        )
-
-        with patch.object(
-            post_startup_page_warmup,
-            "schedule_after",
-            side_effect=lambda delay_ms, callback: delays.append(delay_ms) or callback(),
-        ):
-            install_page_warmup(
-                startup_host,
-                log_startup_metric=metric,
-                plan=plan,
-            )
-            signal.emit("post_init")
-
-        self.assertEqual(delays, [1234])
-        startup_host.warm_page.assert_called_once_with(PageName.HOSTS)
-        metric.assert_called_once_with("StartupPageHostsWarmupQueued", "HOSTS, 1234ms after post-init")
-
-    def test_page_warmup_continues_queue_after_failure(self) -> None:
-        from app.page_names import PageName
-        from main import post_startup_page_warmup
-        from main.post_startup_page_warmup import PageWarmupSpec, install_page_warmup
-
-        class Signal:
-            def __init__(self) -> None:
-                self._callback = None
-
-            def connect(self, callback) -> None:
-                self._callback = callback
-
-            def emit(self, value: str = "") -> None:
-                self._callback(value)
-
-        signal = Signal()
-        startup_host = SimpleNamespace(
-            startup_post_init_ready=signal,
-            startup_state=SimpleNamespace(post_init_ready=False),
-            is_alive=Mock(return_value=True),
-            warm_page=Mock(side_effect=[RuntimeError("boom"), True]),
-        )
-        metric = Mock()
-        delays: list[int] = []
-        plan = (
-            PageWarmupSpec(PageName.HOSTS, delay_ms=10, metric_name="HostsWarmupQueued", budget_ms=300),
-            PageWarmupSpec(PageName.LOGS, delay_ms=20, metric_name="LogsWarmupQueued", budget_ms=300),
-        )
-
-        with patch.object(
-            post_startup_page_warmup,
-            "schedule_after",
-            side_effect=lambda delay_ms, callback: delays.append(delay_ms) or callback(),
-        ):
-            install_page_warmup(startup_host, log_startup_metric=metric, plan=plan)
-            signal.emit("post_init")
-
-        self.assertEqual(delays, [10, 20])
-        self.assertEqual(
-            [recorded_call.args[0] for recorded_call in startup_host.warm_page.call_args_list],
-            [PageName.HOSTS, PageName.LOGS],
-        )
-        self.assertEqual(
-            [recorded_call.args for recorded_call in metric.call_args_list],
-            [
-                ("HostsWarmupQueued", "HOSTS, 10ms after post-init"),
-                ("LogsWarmupQueued", "LOGS, 20ms after previous GUI warmup"),
-            ],
-        )
-
-    def test_page_warmup_logs_warning_when_spec_budget_is_exceeded(self) -> None:
-        from app.page_names import PageName
-        from main import post_startup_page_warmup
-        from main.post_startup_page_warmup import PageWarmupSpec, install_page_warmup
-
-        class Signal:
-            def __init__(self) -> None:
-                self._callback = None
-
-            def connect(self, callback) -> None:
-                self._callback = callback
-
-            def emit(self, value: str = "") -> None:
-                self._callback(value)
-
-        signal = Signal()
-        startup_host = SimpleNamespace(
-            startup_post_init_ready=signal,
-            startup_state=SimpleNamespace(post_init_ready=False),
-            is_alive=Mock(return_value=True),
-            warm_page=Mock(return_value=True),
-        )
-        plan = (
-            PageWarmupSpec(
-                PageName.HOSTS,
-                delay_ms=10,
-                metric_name="HostsWarmupQueued",
-                budget_ms=100,
-            ),
-        )
-
-        with (
-            patch.object(
-                post_startup_page_warmup,
-                "schedule_after",
-                side_effect=lambda _delay_ms, callback: callback(),
-            ),
-            patch.object(post_startup_page_warmup.time, "perf_counter", side_effect=[1.0, 1.2]),
-            patch.object(post_startup_page_warmup, "log") as log_mock,
-        ):
-            install_page_warmup(startup_host, log_startup_metric=Mock(), plan=plan)
-            signal.emit("post_init")
-
-        self.assertTrue(
-            any(
-                recorded_call.args[1] == "WARNING"
-                and "HOSTS" in recorded_call.args[0]
-                and "100ms" in recorded_call.args[0]
-                for recorded_call in log_mock.call_args_list
-            )
-        )
 
     def test_win11_radio_option_recommended_badge_does_not_require_global_flag(self) -> None:
         import ui.widgets.win11_controls as win11_controls

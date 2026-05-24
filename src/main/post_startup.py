@@ -58,12 +58,6 @@ def install_deferred_maintenance(*args, **kwargs):
     return install(*args, **kwargs)
 
 
-def install_page_warmup(*args, **kwargs):
-    from main.post_startup_page_warmup import install_page_warmup as install
-
-    return install(*args, **kwargs)
-
-
 def install_profile_warmup(*args, **kwargs):
     from main.post_startup_profile_warmup import install_profile_warmup as install
 
@@ -141,10 +135,6 @@ def install_post_startup_tasks(deps: PostStartupDeps) -> None:
             logs_feature=deps.logs_feature,
             log_startup_metric=deps.log_startup_metric,
         )
-    install_page_warmup(
-        startup_host,
-        log_startup_metric=deps.log_startup_metric,
-    )
     install_profile_warmup(
         startup_host,
         profile_feature=deps.profile_feature,

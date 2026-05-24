@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ui.page_warmup import warm_page
 from ui.window_adapter import get_loaded_page, show_page
 
 
@@ -45,9 +44,6 @@ class PostStartupHost:
 
     def show_page(self, page_name) -> None:
         show_page(self._window, page_name)
-
-    def warm_page(self, page_name) -> bool:
-        return bool(warm_page(self._window, page_name))
 
     def get_loaded_page(self, page_name):
         return get_loaded_page(self._window, page_name)
