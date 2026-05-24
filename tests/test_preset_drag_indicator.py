@@ -60,6 +60,7 @@ class PresetDragIndicatorTests(unittest.TestCase):
         self.assertIn('marker.get("mode") == "after"', delegate_source)
         self.assertIn("drag_marker_visible", delegate_source)
         self.assertIn("active=is_active and not drag_marker_visible", delegate_source)
+        self.assertIn("show_active_marker=False", delegate_source)
 
     def test_model_moves_preset_row_without_full_reload(self) -> None:
         model = PresetListModel()

@@ -393,6 +393,7 @@ class PresetListDelegate(QStyledItemDelegate):
             active=is_active and not drag_marker_visible,
             hovered=bool(hovered),
             pressed=pressed,
+            show_active_marker=False,
         )
         bg = row_paint.background
 

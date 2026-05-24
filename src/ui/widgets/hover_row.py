@@ -29,6 +29,7 @@ def paint_profile_hover_row(
     pressed: bool = False,
     selected: bool = False,
     fill_idle: bool = True,
+    show_active_marker: bool = True,
 ) -> HoverRowPaintResult:
     """
     Рисует общий фон строки списка.
@@ -56,7 +57,7 @@ def paint_profile_hover_row(
         painter.setBrush(background)
         painter.drawRoundedRect(rect, 10, 10)
 
-    if active:
+    if active and show_active_marker:
         marker_rect = QRect(rect.left() + 6, rect.top() + 6, 4, max(12, rect.height() - 12))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(to_qcolor(tokens.accent_hex, "#5caee8"))
