@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QWidget
 
 from log.log import log
@@ -18,6 +19,9 @@ from app.page_names import PageName
 from ui.startup_ui_metrics import pump_startup_ui
 from app.text_catalog import tr as tr_catalog
 from ui.window_ui_session import get_window_ui_session
+
+
+SIDEBAR_SEARCH_AFTER_INTERACTIVE_MS = 1_000
 
 
 def _get_page_host(window):
@@ -83,6 +87,7 @@ def add_nav_item(
     *,
     initial_visible: bool | None = None,
     insert_index: int | None = None,
+    pump_ui: bool = False,
 ) -> None:
     session = get_window_ui_session(window)
     if session is None:
@@ -158,12 +163,22 @@ def add_nav_item(
     else:
         log(f"[NAV] addSubInterface returned None for {page_name.name} - not in nav_items!", "WARNING")
 
-    pump_startup_ui(window)
+    if pump_ui:
+        pump_startup_ui(window)
 
 
-def init_navigation(window) -> None:
+def _install_sidebar_search(window) -> None:
+    import time as _time
+
+    started_at = _time.perf_counter()
     session = get_window_ui_session(window)
     if session is None:
+        return
+    if session.sidebar_search_nav_widget is not None:
+        return
+
+    widget_cls = session.sidebar_search_widget_cls
+    if widget_cls is None:
         return
 
     from ui.navigation.search import (
@@ -172,6 +187,70 @@ def init_navigation(window) -> None:
         setup_sidebar_search_completer,
         update_titlebar_search_width,
     )
+
+    session.sidebar_search_nav_widget = widget_cls()
+    session.sidebar_search_nav_widget.textChanged.connect(
+        lambda text, current_window=window: on_sidebar_search_changed(current_window, text)
+    )
+    session.sidebar_search_nav_widget.set_placeholder_text(
+        tr_catalog("sidebar.search.placeholder", language=session.ui_language)
+    )
+    setup_sidebar_search_completer(window)
+    attach_sidebar_search_to_titlebar(window)
+    update_titlebar_search_width(window)
+    try:
+        window.log_startup_metric(
+            "StartupSidebarSearchReady",
+            f"{(_time.perf_counter() - started_at) * 1000:.0f}ms",
+        )
+    except Exception:
+        pass
+
+
+def _schedule_sidebar_search_after_interactive(window) -> None:
+    session = get_window_ui_session(window)
+    if session is None:
+        return
+    if session.sidebar_search_widget_cls is None:
+        return
+
+    scheduled = False
+
+    def _schedule(*_args) -> None:
+        nonlocal scheduled
+        if scheduled:
+            return
+        scheduled = True
+        try:
+            window.log_startup_metric(
+                "StartupSidebarSearchQueued",
+                f"{SIDEBAR_SEARCH_AFTER_INTERACTIVE_MS}ms after interactive",
+            )
+        except Exception:
+            pass
+        QTimer.singleShot(
+            SIDEBAR_SEARCH_AFTER_INTERACTIVE_MS,
+            lambda: _install_sidebar_search(window),
+        )
+
+    try:
+        if bool(getattr(window.startup_state, "interactive_logged", False)):
+            _schedule()
+            return
+    except Exception:
+        _schedule()
+        return
+
+    try:
+        window.startup_interactive_ready.connect(_schedule)
+    except Exception:
+        _schedule()
+
+
+def init_navigation(window) -> None:
+    session = get_window_ui_session(window)
+    if session is None:
+        return
 
     pos_scroll = session.nav_scroll_position
     current_method = window.get_launch_method()
@@ -197,18 +276,7 @@ def init_navigation(window) -> None:
 
     nav = window.navigationInterface
 
-    widget_cls = session.sidebar_search_widget_cls
-    if widget_cls is not None:
-        session.sidebar_search_nav_widget = widget_cls()
-        session.sidebar_search_nav_widget.textChanged.connect(
-            lambda text, current_window=window: on_sidebar_search_changed(current_window, text)
-        )
-        session.sidebar_search_nav_widget.set_placeholder_text(
-            tr_catalog("sidebar.search.placeholder", language=session.ui_language)
-        )
-        setup_sidebar_search_completer(window)
-        attach_sidebar_search_to_titlebar(window)
-        update_titlebar_search_width(window)
+    _schedule_sidebar_search_after_interactive(window)
 
     for group_plan in build_sidebar_group_plans(current_method):
         if group_plan.header_key:
@@ -273,6 +341,7 @@ def sync_nav_visibility(window, method: str | None = None) -> None:
                 session.nav_scroll_position,
                 initial_visible=False,
                 insert_index=_resolve_scroll_insert_index(window, page_name, method),
+                pump_ui=True,
             )
             item = session.nav_items.get(page_name)
 

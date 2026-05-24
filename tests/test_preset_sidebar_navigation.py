@@ -5,6 +5,7 @@ import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 
 PROJECT_SRC = Path(__file__).resolve().parents[1] / "src"
@@ -243,6 +244,57 @@ class PresetSidebarNavigationTests(unittest.TestCase):
         self.assertTrue(snapshots)
         for old_visible, new_visible in snapshots:
             self.assertFalse(old_visible and new_visible)
+
+    def test_sidebar_search_is_delayed_until_interactive_ready(self) -> None:
+        import ui.navigation.sidebar_builder as sidebar_builder
+
+        class Signal:
+            def __init__(self) -> None:
+                self._callbacks = []
+
+            def connect(self, callback) -> None:
+                self._callbacks.append(callback)
+
+            def emit(self) -> None:
+                for callback in list(self._callbacks):
+                    callback("ui_ready")
+
+        signal = Signal()
+        window = SimpleNamespace(
+            ui_session=SimpleNamespace(
+                sidebar_search_widget_cls=object,
+            ),
+            startup_state=SimpleNamespace(interactive_logged=False),
+            startup_interactive_ready=signal,
+        )
+        scheduled = []
+        installed = []
+
+        with (
+            patch.object(
+                sidebar_builder.QTimer,
+                "singleShot",
+                side_effect=lambda delay_ms, callback: scheduled.append((int(delay_ms), callback)),
+            ),
+            patch.object(
+                sidebar_builder,
+                "_install_sidebar_search",
+                side_effect=lambda current_window: installed.append(current_window),
+            ),
+        ):
+            sidebar_builder._schedule_sidebar_search_after_interactive(window)
+            self.assertEqual(scheduled, [])
+            self.assertEqual(installed, [])
+
+            signal.emit()
+
+            self.assertEqual(len(scheduled), 1)
+            self.assertGreaterEqual(scheduled[0][0], 500)
+            self.assertEqual(installed, [])
+
+            scheduled[0][1]()
+
+        self.assertEqual(installed, [window])
 
 
 if __name__ == "__main__":

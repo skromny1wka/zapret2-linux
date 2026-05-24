@@ -48,6 +48,8 @@ _AFTER_INTERACTIVE_MARKERS: frozenset[str] = frozenset(
         "StartupBackendPageDataWarmupStarted",
         "StartupProfileWarmupQueued",
         "StartupProfileWarmupStarted",
+        "StartupSidebarSearchQueued",
+        "StartupSidebarSearchReady",
     }
 )
 
