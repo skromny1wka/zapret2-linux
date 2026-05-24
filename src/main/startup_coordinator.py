@@ -11,7 +11,6 @@ from settings.mode import normalize_launch_method
 
 TASK_LAUNCH_RUNTIME_API = "launch_runtime_api"
 TASK_LAUNCH_RUNTIME = "launch_runtime"
-TASK_INTERACTIVE_READY = "interactive_ready"
 TASK_PROCESS_MONITOR = "process_monitor"
 TASK_CORE_STARTUP = "core_startup"
 TASK_THEME_MANAGER = "theme_manager"
@@ -34,7 +33,6 @@ class StartupWindowShell:
 
     start_in_tray: bool
     set_status: Callable[[str], None]
-    mark_startup_interactive: Callable[[str], None]
     mark_startup_core_ready: Callable[[str], None]
     mark_startup_post_init_done: Callable[[str], None]
     init_theme_manager: Callable[[], None]
@@ -119,12 +117,6 @@ class StartupCoordinator:
                 "launch runtime",
                 self.runtime.init_launch_runtime,
                 lambda exc: f"Ошибка runtime запуска: {exc}",
-            ),
-            (
-                TASK_INTERACTIVE_READY,
-                "interactive ready",
-                self._mark_interactive_ready,
-                None,
             ),
         ]
 
@@ -237,10 +229,6 @@ class StartupCoordinator:
                 except Exception:
                     pass
             return False
-
-    def _mark_interactive_ready(self):
-        """Фиксирует момент, когда минимальный контур окна уже готов к кликам."""
-        self.window_shell.mark_startup_interactive("startup_minimal_ready")
 
     def _finalize_startup_core(self):
         """Фиксирует готовность основного startup-контура."""

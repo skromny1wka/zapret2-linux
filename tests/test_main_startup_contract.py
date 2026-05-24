@@ -84,6 +84,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
 
         self.assertTrue(coordinator._post_init_scheduled)
         self.assertEqual(runtime.autostart_calls, ["zapret2_mode"])
+        window_shell.mark_startup_interactive.assert_not_called()
         window_shell.mark_startup_post_init_done.assert_called_once()
         self.assertIn(startup_coordinator.STARTUP_STEP_GAP_MS, timer_delays)
         self.assertIn(startup_coordinator.STARTUP_DPI_AUTOSTART_DELAY_MS, timer_delays)
@@ -1528,7 +1529,6 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         window = SimpleNamespace(
             start_in_tray=False,
             set_status=Mock(),
-            mark_startup_interactive=Mock(),
             mark_startup_core_ready=Mock(),
             mark_startup_post_init_done=Mock(),
             log_startup_metric=Mock(),

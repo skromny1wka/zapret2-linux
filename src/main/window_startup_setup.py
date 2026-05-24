@@ -37,7 +37,6 @@ def attach_startup_deps_to_window(window, features) -> WindowStartupRuntime:
         window_shell = StartupWindowShell(
             start_in_tray=bool(window.start_in_tray),
             set_status=window.set_status,
-            mark_startup_interactive=window.mark_startup_interactive,
             mark_startup_core_ready=window.mark_startup_core_ready,
             mark_startup_post_init_done=_mark_startup_post_init_done,
             init_theme_manager=lambda: init_theme_manager(window),
