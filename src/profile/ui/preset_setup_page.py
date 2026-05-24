@@ -49,7 +49,7 @@ class PresetSetupPageBase(BasePage):
         self._profiles_list: ProfilesList | None = None
         self._empty_state_label = None
         self._content_host_layout = None
-        self._loading_label = None
+        self._loading_skeleton = None
         self._expand_btn = None
         self._collapse_btn = None
         self._request_btn = None
@@ -97,7 +97,7 @@ class PresetSetupPageBase(BasePage):
         self._info_btn = shell.info_btn
         self._profile_search_input = shell.profile_search_input
         self._content_host_layout = shell.content_host_layout
-        self._loading_label = shell.loading_label
+        self._loading_skeleton = shell.loading_skeleton
 
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)
@@ -159,6 +159,7 @@ class PresetSetupPageBase(BasePage):
         self._profile_load_request_id += 1
         request_id = self._profile_load_request_id
         self._clear_dynamic_widgets()
+        self._show_loading_skeleton()
         worker = self._profile.create_profile_list_load_worker(request_id, self.launch_method, self)
         self._profile_load_worker = worker
         worker.loaded.connect(self._on_profile_payload_loaded)
@@ -169,8 +170,7 @@ class PresetSetupPageBase(BasePage):
     def _on_profile_payload_loaded(self, request_id: int, payload) -> None:
         if request_id != self._profile_load_request_id or self._cleanup_in_progress:
             return
-        if self._loading_label is not None:
-            self._loading_label.hide()
+        self._hide_loading_skeleton()
         self._profile_payload_loaded_once = True
         self._profile_payload_dirty = False
         self._apply_payload(payload)
@@ -179,8 +179,7 @@ class PresetSetupPageBase(BasePage):
         if request_id != self._profile_load_request_id or self._cleanup_in_progress:
             return
         self._profile_payload_dirty = True
-        if self._loading_label is not None:
-            self._loading_label.hide()
+        self._hide_loading_skeleton()
         log(f"{self.__class__.__name__}: не удалось прочитать профили: {error}", "ERROR")
         self._show_empty_state(
             "Не удалось показать профили выбранного пресета. "
@@ -272,7 +271,7 @@ class PresetSetupPageBase(BasePage):
     def _clear_dynamic_widgets(self) -> None:
         if self._content_host_layout is None:
             return
-        preserved_widgets = 1 if self._loading_label is not None else 0
+        preserved_widgets = 1 if self._loading_skeleton is not None else 0
         while self._content_host_layout.count() > preserved_widgets:
             item = self._content_host_layout.takeAt(preserved_widgets)
             widget = item.widget() if item is not None else None
@@ -280,6 +279,16 @@ class PresetSetupPageBase(BasePage):
                 widget.deleteLater()
         self._profiles_list = None
         self._empty_state_label = None
+
+    def _show_loading_skeleton(self) -> None:
+        if self._loading_skeleton is None:
+            return
+        self._loading_skeleton.start()
+
+    def _hide_loading_skeleton(self) -> None:
+        if self._loading_skeleton is None:
+            return
+        self._loading_skeleton.stop()
 
     def _show_empty_state(self, text: str) -> None:
         self._clear_dynamic_widgets()

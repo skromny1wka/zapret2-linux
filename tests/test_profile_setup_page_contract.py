@@ -385,7 +385,18 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         self.assertNotIn("Загрузка профилей выбранного пресета", shell_builder)
         self.assertNotIn("self._loading_label.show()", request_profiles)
-        self.assertIn("preserved_widgets = 1 if self._loading_label is not None else 0", clear_dynamic_widgets)
+        self.assertIn("preserved_widgets = 1 if self._loading_skeleton is not None else 0", clear_dynamic_widgets)
+
+    def test_preset_setup_page_uses_visual_profile_loading_skeleton(self) -> None:
+        shell_builder = inspect.getsource(build_profile_shell)
+        request_profiles = inspect.getsource(PresetSetupPageBase._request_profiles_payload)
+        payload_loaded = inspect.getsource(PresetSetupPageBase._on_profile_payload_loaded)
+        payload_failed = inspect.getsource(PresetSetupPageBase._on_profile_payload_failed)
+
+        self.assertIn("ProfileLoadingSkeleton", shell_builder)
+        self.assertIn("_show_loading_skeleton()", request_profiles)
+        self.assertIn("_hide_loading_skeleton()", payload_loaded)
+        self.assertIn("_hide_loading_skeleton()", payload_failed)
 
     def test_profile_setup_page_has_update_user_profile_action(self) -> None:
         build = inspect.getsource(ProfileSetupPageBase._build_content)
