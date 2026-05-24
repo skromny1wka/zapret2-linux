@@ -37,6 +37,7 @@ def handle_item_dropped_action(
     destination_kind: str,
     destination_id: str,
     destination_folder_key: str = "",
+    apply_preset_move_locally_fn=None,
     storage_api,
     refresh_presets_view_from_cache_fn,
     log_fn,
@@ -51,7 +52,18 @@ def handle_item_dropped_action(
         )
         if moved:
             log_fn(f"Элемент '{source_id}' перенесён перетаскиванием", "INFO")
-            refresh_presets_view_from_cache_fn()
+            applied_locally = False
+            if callable(apply_preset_move_locally_fn):
+                applied_locally = bool(
+                    apply_preset_move_locally_fn(
+                        source_id,
+                        destination_kind,
+                        destination_id,
+                        destination_folder_key,
+                    )
+                )
+            if not applied_locally:
+                refresh_presets_view_from_cache_fn()
     except Exception as exc:
         log_fn(f"Ошибка перетаскивания элемента: {exc}", "ERROR")
 

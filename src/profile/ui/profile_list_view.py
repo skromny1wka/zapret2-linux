@@ -62,8 +62,8 @@ class ProfileListView(ListView):
     profile_activated = pyqtSignal(str)
     profile_context_requested = pyqtSignal(str, QPoint)
     folder_context_requested = pyqtSignal(str, QPoint)
-    profile_move_requested = pyqtSignal(str, str)
-    profile_move_after_requested = pyqtSignal(str, str)
+    profile_move_requested = pyqtSignal(str, str, str)
+    profile_move_after_requested = pyqtSignal(str, str, str)
     profile_move_to_folder_requested = pyqtSignal(str, str)
     profile_move_to_end_requested = pyqtSignal(str)
 
@@ -82,10 +82,10 @@ class ProfileListView(ListView):
         self.setProperty(PROFILE_DROP_MARKER_PROPERTY, marker)
         self.viewport().update()
 
-    def _drop_target_at(self, point: QPoint) -> tuple[dict[str, object], str]:
+    def _drop_target_at(self, point: QPoint) -> tuple[dict[str, object], str, str]:
         drop_index = self.indexAt(point)
         if not drop_index.isValid():
-            return {"marker": {"row": -1, "mode": ""}, "destination_kind": "end", "destination_row": -1}, ""
+            return {"marker": {"row": -1, "mode": ""}, "destination_kind": "end", "destination_row": -1}, "", ""
         destination_kind = str(drop_index.data(ProfileListModel.KindRole) or "")
         rect = self.visualRect(drop_index)
         target = profile_drop_target_for_position(
@@ -96,10 +96,15 @@ class ProfileListView(ListView):
             row_height=rect.height(),
         )
         if target["destination_kind"] in {"profile", "profile_after"}:
-            return target, str(drop_index.data(ProfileListModel.ProfileKeyRole) or "")
+            return (
+                target,
+                str(drop_index.data(ProfileListModel.ProfileKeyRole) or ""),
+                str(drop_index.data(ProfileListModel.GroupRole) or ""),
+            )
         if target["destination_kind"] == "folder":
-            return target, str(drop_index.data(ProfileListModel.GroupRole) or "")
-        return target, ""
+            group_key = str(drop_index.data(ProfileListModel.GroupRole) or "")
+            return target, group_key, group_key
+        return target, "", ""
 
     def wheelEvent(self, event):  # noqa: N802
         scrollbar = self.verticalScrollBar()
@@ -195,7 +200,7 @@ class ProfileListView(ListView):
 
     def dragMoveEvent(self, event):  # noqa: N802
         if event.mimeData().hasFormat(ProfileListModel.MIME_TYPE):
-            target, _destination_id = self._drop_target_at(event.position().toPoint())
+            target, _destination_id, _destination_group_key = self._drop_target_at(event.position().toPoint())
             self.set_drop_marker_payload(dict(target.get("marker") or {}))
             event.acceptProposedAction()
             return
@@ -216,7 +221,7 @@ class ProfileListView(ListView):
             event.ignore()
             return
 
-        target, destination_id = self._drop_target_at(event.position().toPoint())
+        target, destination_id, destination_group_key = self._drop_target_at(event.position().toPoint())
         destination_kind = str(target.get("destination_kind") or "")
         if destination_kind == "folder" and destination_id:
             self.profile_move_to_folder_requested.emit(source_key, destination_id)
@@ -224,12 +229,12 @@ class ProfileListView(ListView):
             event.acceptProposedAction()
             return
         if destination_kind == "profile" and destination_id and destination_id != source_key:
-            self.profile_move_requested.emit(source_key, destination_id)
+            self.profile_move_requested.emit(source_key, destination_id, destination_group_key)
             self.set_drop_marker(-1, "")
             event.acceptProposedAction()
             return
         if destination_kind == "profile_after" and destination_id and destination_id != source_key:
-            self.profile_move_after_requested.emit(source_key, destination_id)
+            self.profile_move_after_requested.emit(source_key, destination_id, destination_group_key)
             self.set_drop_marker(-1, "")
             event.acceptProposedAction()
             return

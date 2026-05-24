@@ -367,6 +367,75 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertIn(("profile", "profile:0"), rows)
         self.assertNotIn(("profile", "profile:1"), rows)
 
+    def test_profile_model_moves_profile_without_reloading_payload(self) -> None:
+        from profile.ui.profile_list_model import ProfileListModel
+
+        moved = SimpleNamespace(
+            key="profile:0",
+            persistent_key="p0",
+            profile_index=0,
+            display_name="Discord",
+            enabled=True,
+            in_preset=True,
+            strategy_id="fake",
+            strategy_name="Fake",
+            match_lines=("--filter-udp=443-65535", "--hostlist=lists/discord.txt"),
+            list_type="hostlist",
+            rating="",
+            favorite=False,
+            group="discord",
+            group_name="Discord",
+            order=0,
+            order_is_manual=False,
+            group_collapsed=False,
+        )
+        destination = SimpleNamespace(
+            key="profile:1",
+            persistent_key="p1",
+            profile_index=1,
+            display_name="YouTube",
+            enabled=True,
+            in_preset=True,
+            strategy_id="none",
+            strategy_name="Стратегия не выбрана",
+            match_lines=("--filter-tcp=443", "--hostlist=lists/youtube.txt"),
+            list_type="hostlist",
+            rating="",
+            favorite=False,
+            group="youtube",
+            group_name="YouTube",
+            order=0,
+            order_is_manual=False,
+            group_collapsed=False,
+        )
+
+        model = ProfileListModel()
+        model.set_profiles((moved, destination))
+
+        self.assertTrue(model.move_profile("profile:0", "profile_after", "profile:1", "youtube"))
+
+        rows = [
+            (
+                model.index(row, 0).data(ProfileListModel.KindRole),
+                model.index(row, 0).data(ProfileListModel.GroupRole),
+                model.index(row, 0).data(ProfileListModel.ProfileKeyRole),
+            )
+            for row in range(model.rowCount())
+        ]
+
+        self.assertNotIn(("profile", "discord", "profile:0"), rows)
+        self.assertIn(("profile", "youtube", "profile:0"), rows)
+        self.assertLess(rows.index(("profile", "youtube", "profile:1")), rows.index(("profile", "youtube", "profile:0")))
+
+    def test_profile_drag_handlers_update_current_list_without_full_refresh(self) -> None:
+        before_handler = inspect.getsource(PresetSetupPageBase._on_profile_move_requested)
+        after_handler = inspect.getsource(PresetSetupPageBase._on_profile_move_after_requested)
+
+        self.assertIn("_apply_profile_move_locally", before_handler)
+        self.assertIn("_apply_profile_move_locally", after_handler)
+        self.assertNotIn("refresh_from_preset_switch()", before_handler)
+        self.assertNotIn("refresh_from_preset_switch()", after_handler)
+
     def test_profile_setup_shell_has_search_input_for_all_profiles(self) -> None:
         build_content = inspect.getsource(PresetSetupPageBase._build_content)
         apply_payload = inspect.getsource(PresetSetupPageBase._apply_payload)

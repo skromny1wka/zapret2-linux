@@ -621,6 +621,27 @@ class UserPresetsPageBase(BasePage):
     def _refresh_presets_view_from_cache(self) -> None:
         self._runtime_service.refresh_presets_view_from_cache()
 
+    def _apply_preset_move_locally(
+        self,
+        file_name: str,
+        destination_kind: str,
+        destination_id: str = "",
+        destination_folder_key: str = "",
+    ) -> bool:
+        if self._presets_model is None:
+            return False
+        moved = self._presets_model.move_preset(
+            file_name,
+            destination_kind,
+            destination_id,
+            destination_folder_key,
+        )
+        if moved:
+            self._runtime_service.ensure_preset_list_current_index()
+            self._update_presets_view_height()
+            self._schedule_layout_resync()
+        return moved
+
     def _rebuild_presets_rows(self, all_presets: dict[str, dict[str, object]], *, started_at: float | None = None) -> None:
         rebuild_presets_rows(
             runtime_service=self._runtime_service,
@@ -733,6 +754,7 @@ class UserPresetsPageBase(BasePage):
             destination_kind=destination_kind,
             destination_id=destination_id,
             destination_folder_key=destination_folder_key,
+            apply_preset_move_locally_fn=self._apply_preset_move_locally,
             storage_api=self._storage_api(),
             refresh_presets_view_from_cache_fn=self._refresh_presets_view_from_cache,
             log_fn=log,

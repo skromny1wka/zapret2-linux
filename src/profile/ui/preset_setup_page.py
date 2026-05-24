@@ -425,39 +425,81 @@ class PresetSetupPageBase(BasePage):
             log(f"{self.__class__.__name__}: не удалось удалить пользовательский profile: {exc}", "ERROR")
             InfoBar.error(title="Ошибка", content=str(exc), parent=self.window())
 
-    def _on_profile_move_requested(self, source_profile_key: str, destination_profile_key: str) -> None:
+    def _apply_profile_move_locally(
+        self,
+        source_profile_key: str,
+        destination_kind: str,
+        destination_profile_key: str = "",
+        destination_group_key: str = "",
+    ) -> None:
+        if self._profiles_list is not None and self._profiles_list.move_profile_locally(
+            source_profile_key,
+            destination_kind,
+            destination_profile_key,
+            destination_group_key,
+        ):
+            return
+        self.refresh_from_preset_switch()
+
+    def _on_profile_move_requested(
+        self,
+        source_profile_key: str,
+        destination_profile_key: str,
+        destination_group_key: str = "",
+    ) -> None:
         try:
-            self._profile.move_profile_before(
+            moved = self._profile.move_profile_before(
                 self.launch_method,
                 source_profile_key,
                 destination_profile_key,
+                destination_folder_key=destination_group_key,
             )
-            self.refresh_from_preset_switch()
+            if moved:
+                self._apply_profile_move_locally(
+                    source_profile_key,
+                    "profile",
+                    destination_profile_key,
+                    destination_group_key,
+                )
         except Exception as exc:
             log(f"{self.__class__.__name__}: не удалось переместить профиль: {exc}", "ERROR")
 
-    def _on_profile_move_after_requested(self, source_profile_key: str, destination_profile_key: str) -> None:
+    def _on_profile_move_after_requested(
+        self,
+        source_profile_key: str,
+        destination_profile_key: str,
+        destination_group_key: str = "",
+    ) -> None:
         try:
-            self._profile.move_profile_after(
+            moved = self._profile.move_profile_after(
                 self.launch_method,
                 source_profile_key,
                 destination_profile_key,
+                destination_folder_key=destination_group_key,
             )
-            self.refresh_from_preset_switch()
+            if moved:
+                self._apply_profile_move_locally(
+                    source_profile_key,
+                    "profile_after",
+                    destination_profile_key,
+                    destination_group_key,
+                )
         except Exception as exc:
             log(f"{self.__class__.__name__}: не удалось переместить профиль ниже: {exc}", "ERROR")
 
     def _on_profile_move_to_end_requested(self, profile_key: str) -> None:
         try:
-            self._profile.move_profile_to_end(self.launch_method, profile_key)
-            self.refresh_from_preset_switch()
+            moved = self._profile.move_profile_to_end(self.launch_method, profile_key)
+            if moved:
+                self._apply_profile_move_locally(profile_key, "end")
         except Exception as exc:
             log(f"{self.__class__.__name__}: не удалось переместить профиль в конец: {exc}", "ERROR")
 
     def _on_profile_move_to_folder_requested(self, profile_key: str, folder_key: str) -> None:
         try:
-            self._profile.move_profile_to_folder(self.launch_method, profile_key, folder_key)
-            self.refresh_from_preset_switch()
+            moved = self._profile.move_profile_to_folder(self.launch_method, profile_key, folder_key)
+            if moved:
+                self._apply_profile_move_locally(profile_key, "folder", destination_group_key=folder_key)
         except Exception as exc:
             log(f"{self.__class__.__name__}: не удалось переместить профиль в папку: {exc}", "ERROR")
 

@@ -39,6 +39,14 @@ class ProfileDragIndicatorTests(unittest.TestCase):
         self.assertIn("dragLeaveEvent", view_source)
         self.assertIn("self.set_drop_marker(-1, \"\")", view_source)
 
+    def test_view_sends_destination_group_with_row_drop(self) -> None:
+        view_source = inspect.getsource(profile_list_view.ProfileListView)
+
+        self.assertIn("profile_move_requested = pyqtSignal(str, str, str)", view_source)
+        self.assertIn("profile_move_after_requested = pyqtSignal(str, str, str)", view_source)
+        self.assertIn("ProfileListModel.GroupRole", view_source)
+        self.assertIn("destination_group_key", view_source)
+
     def test_delegate_draws_folder_and_before_row_drop_markers(self) -> None:
         delegate_source = inspect.getsource(profile_list_delegate.ProfileListDelegate)
 

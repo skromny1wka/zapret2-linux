@@ -199,12 +199,15 @@ class ProfileFeature:
         launch_method: str,
         source_profile_key: str,
         destination_profile_key: str,
+        *,
+        destination_folder_key: str = "",
     ) -> str | None:
         return self._commands().move_profile_before(
             self,
             launch_method,
             source_profile_key,
             destination_profile_key,
+            destination_folder_key=destination_folder_key,
         )
 
     def move_profile_after(
@@ -212,12 +215,15 @@ class ProfileFeature:
         launch_method: str,
         source_profile_key: str,
         destination_profile_key: str,
+        *,
+        destination_folder_key: str = "",
     ) -> str | None:
         return self._commands().move_profile_after(
             self,
             launch_method,
             source_profile_key,
             destination_profile_key,
+            destination_folder_key=destination_folder_key,
         )
 
     def move_profile_to_end(self, launch_method: str, profile_key: str) -> str | None:

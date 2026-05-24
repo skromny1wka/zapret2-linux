@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from typing import Any
 
 from PyQt6.QtCore import QAbstractListModel, QMimeData, QModelIndex, Qt
@@ -94,6 +95,82 @@ class ProfileListModel(QAbstractListModel):
 
     def profile_item_for_key(self, profile_key: str):
         return self._profile_items.get(str(profile_key or "").strip())
+
+    def move_profile(
+        self,
+        source_profile_key: str,
+        destination_kind: str,
+        destination_profile_key: str = "",
+        destination_group_key: str = "",
+    ) -> bool:
+        source_key = str(source_profile_key or "").strip()
+        kind = str(destination_kind or "").strip()
+        if not source_key:
+            return False
+        source = self._profile_items.get(source_key)
+        if source is None:
+            return False
+
+        destination = self._profile_items.get(str(destination_profile_key or "").strip())
+        if kind in {"profile", "profile_after"}:
+            if destination is None or destination.key == source.key:
+                return False
+            target_group = str(destination_group_key or destination.group or source.group or "common")
+        elif kind == "folder":
+            target_group = str(destination_group_key or "").strip()
+        elif kind == "end":
+            target_group = str(destination_group_key or source.group or "common").strip()
+        else:
+            return False
+        if not target_group:
+            return False
+
+        group_name = _group_name_for_key(target_group, self._all_items)
+        source_for_target = replace(source, group=target_group, group_name=group_name, order_is_manual=True)
+        target_items = [
+            item
+            for item in sorted(self._all_items, key=profile_display_sort_key)
+            if item.key != source_key and str(item.group or "common") == target_group
+        ]
+
+        if kind == "profile":
+            insert_index = next((index for index, item in enumerate(target_items) if item.key == destination.key), -1)
+            if insert_index < 0:
+                return False
+            target_items.insert(insert_index, source_for_target)
+        elif kind == "profile_after":
+            insert_index = next((index for index, item in enumerate(target_items) if item.key == destination.key), -1)
+            if insert_index < 0:
+                return False
+            target_items.insert(insert_index + 1, source_for_target)
+        else:
+            target_items.append(source_for_target)
+
+        target_order = {item.key: index for index, item in enumerate(target_items)}
+        next_items: list[ProfileDisplayItem] = []
+        for item in self._all_items:
+            if item.key == source_key and item.key not in target_order:
+                continue
+            if item.key in target_order:
+                next_items.append(
+                    replace(
+                        source_for_target if item.key == source_key else item,
+                        group=target_group,
+                        group_name=group_name,
+                        order=target_order[item.key],
+                        order_is_manual=True,
+                    )
+                )
+            else:
+                next_items.append(item)
+
+        self.beginResetModel()
+        self._all_items = tuple(next_items)
+        self._profile_items = {item.key: item for item in self._all_items}
+        self._group_expanded.setdefault(target_group, True)
+        self._rows = self._build_rows()
+        self.endResetModel()
+        return True
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         if parent.isValid():
@@ -298,6 +375,17 @@ def _ordered_group_keys(grouped: dict[str, list[ProfileDisplayItem]]) -> list[st
         if isinstance(folder, dict)
     }
     return sorted(grouped, key=lambda key: (order_by_key.get(str(key), 10_000), str(key).lower()))
+
+
+def _group_name_for_key(group_key: str, items: tuple[ProfileDisplayItem, ...]) -> str:
+    key = str(group_key or "").strip() or "common"
+    for item in tuple(items or ()):
+        if str(item.group or "common") == key and str(item.group_name or "").strip():
+            return str(item.group_name or "").strip()
+    folder = build_default_profile_folders().get("folders", {}).get(key)
+    if isinstance(folder, dict):
+        return str(folder.get("name") or key)
+    return key.title()
 
 
 def _folder_order(value: object) -> int:

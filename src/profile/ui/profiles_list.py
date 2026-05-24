@@ -16,8 +16,8 @@ from ui.widgets.fluent_scrollbar import install_fluent_scrollbars
 class ProfilesList(QWidget):
     profile_selected = pyqtSignal(str)
     profile_context_requested = pyqtSignal(str, QPoint)
-    profile_move_requested = pyqtSignal(str, str)
-    profile_move_after_requested = pyqtSignal(str, str)
+    profile_move_requested = pyqtSignal(str, str, str)
+    profile_move_after_requested = pyqtSignal(str, str, str)
     profile_move_to_folder_requested = pyqtSignal(str, str)
     profile_move_to_end_requested = pyqtSignal(str)
     folder_context_requested = pyqtSignal(str, QPoint)
@@ -100,6 +100,20 @@ class ProfilesList(QWidget):
 
     def profile_item_for_key(self, profile_key: str):
         return self._model.profile_item_for_key(profile_key)
+
+    def move_profile_locally(
+        self,
+        source_profile_key: str,
+        destination_kind: str,
+        destination_profile_key: str = "",
+        destination_group_key: str = "",
+    ) -> bool:
+        return self._model.move_profile(
+            source_profile_key,
+            destination_kind,
+            destination_profile_key,
+            destination_group_key,
+        )
 
     def set_search_query(self, query: str) -> None:
         self._search_query = str(query or "")

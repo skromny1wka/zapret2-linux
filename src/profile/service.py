@@ -516,14 +516,22 @@ class ProfilePresetService:
         duplicate_index = index + 1
         return preset.profiles[duplicate_index].key if 0 <= duplicate_index < len(preset.profiles) else None
 
-    def move_profile_before(self, source_profile_key: str, destination_profile_key: str) -> str | None:
+    def move_profile_before(
+        self,
+        source_profile_key: str,
+        destination_profile_key: str,
+        *,
+        destination_folder_key: str = "",
+    ) -> str | None:
         sources = self._profile_sources_for_folder_order()
         source = _find_profile_list_source(sources, source_profile_key)
         destination = _find_profile_list_source(sources, destination_profile_key)
         if source is None or destination is None:
             return None
         folder_state = load_profile_folder_state()
-        destination_folder_key, _folder_name, _order = profile_folder_for_profile(destination.profile, folder_state)
+        destination_folder_key = str(destination_folder_key or "").strip()
+        if not destination_folder_key:
+            destination_folder_key, _folder_name, _order = profile_folder_for_profile(destination.profile, folder_state)
         ordered_keys = _profile_order_keys_for_folder(
             sources,
             folder_state,
@@ -539,14 +547,22 @@ class ProfilePresetService:
         self._invalidate_profile_list_snapshot()
         return source.key
 
-    def move_profile_after(self, source_profile_key: str, destination_profile_key: str) -> str | None:
+    def move_profile_after(
+        self,
+        source_profile_key: str,
+        destination_profile_key: str,
+        *,
+        destination_folder_key: str = "",
+    ) -> str | None:
         sources = self._profile_sources_for_folder_order()
         source = _find_profile_list_source(sources, source_profile_key)
         destination = _find_profile_list_source(sources, destination_profile_key)
         if source is None or destination is None:
             return None
         folder_state = load_profile_folder_state()
-        destination_folder_key, _folder_name, _order = profile_folder_for_profile(destination.profile, folder_state)
+        destination_folder_key = str(destination_folder_key or "").strip()
+        if not destination_folder_key:
+            destination_folder_key, _folder_name, _order = profile_folder_for_profile(destination.profile, folder_state)
         ordered_keys = _profile_order_keys_for_folder(
             sources,
             folder_state,

@@ -4,6 +4,7 @@ import inspect
 import unittest
 
 from ui.presets_menu import delegate as preset_delegate
+from ui.presets_menu.model import PresetListModel
 from ui.presets_menu import view as preset_view
 
 
@@ -59,6 +60,48 @@ class PresetDragIndicatorTests(unittest.TestCase):
         self.assertIn('marker.get("mode") == "after"', delegate_source)
         self.assertIn("drag_marker_visible", delegate_source)
         self.assertIn("active=is_active and not drag_marker_visible", delegate_source)
+
+    def test_model_moves_preset_row_without_full_reload(self) -> None:
+        model = PresetListModel()
+        model.set_rows(
+            [
+                {"kind": "folder", "folder_key": "common", "name": "Общие", "count": 1, "is_collapsed": False},
+                {"kind": "preset", "file_name": "A.txt", "name": "A", "folder_key": "common"},
+                {"kind": "folder", "folder_key": "game-filter", "name": "Game filter", "count": 1, "is_collapsed": False},
+                {"kind": "preset", "file_name": "B.txt", "name": "B", "folder_key": "game-filter"},
+            ]
+        )
+
+        self.assertTrue(model.move_preset("A.txt", "preset_after", "B.txt", "game-filter"))
+
+        rows = [
+            (
+                model.index(row, 0).data(PresetListModel.KindRole),
+                model.index(row, 0).data(PresetListModel.FolderKeyRole),
+                model.index(row, 0).data(PresetListModel.FileNameRole),
+                model.index(row, 0).data(PresetListModel.CountRole),
+            )
+            for row in range(model.rowCount())
+        ]
+
+        self.assertIn(("preset", "game-filter", "A.txt", 0), rows)
+        self.assertNotIn(("preset", "common", "A.txt", 0), rows)
+        self.assertIn(("folder", "common", "", 0), rows)
+        self.assertIn(("folder", "game-filter", "", 2), rows)
+
+    def test_model_keeps_folder_count_when_preset_moves_inside_same_folder(self) -> None:
+        model = PresetListModel()
+        model.set_rows(
+            [
+                {"kind": "folder", "folder_key": "common", "name": "Общие", "count": 2, "is_collapsed": False},
+                {"kind": "preset", "file_name": "A.txt", "name": "A", "folder_key": "common"},
+                {"kind": "preset", "file_name": "B.txt", "name": "B", "folder_key": "common"},
+            ]
+        )
+
+        self.assertTrue(model.move_preset("A.txt", "preset_after", "B.txt", "common"))
+
+        self.assertEqual(model.index(0, 0).data(PresetListModel.CountRole), 2)
 
 
 if __name__ == "__main__":

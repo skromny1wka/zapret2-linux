@@ -44,6 +44,58 @@ class PresetListModel(QAbstractListModel):
                 return row_index
         return -1
 
+    def move_preset(
+        self,
+        file_name: str,
+        destination_kind: str,
+        destination_id: str = "",
+        destination_folder_key: str = "",
+    ) -> bool:
+        source_name = str(file_name or "").strip()
+        kind = str(destination_kind or "").strip()
+        source_index = self.find_preset_row(source_name)
+        if source_index < 0:
+            return False
+
+        destination_index = self.find_preset_row(destination_id) if destination_id else -1
+        if kind in {"preset", "preset_after"} and destination_index < 0:
+            return False
+        if kind in {"preset", "preset_after"} and source_index == destination_index:
+            return False
+
+        rows = [dict(row) for row in self._rows]
+        source_row = rows.pop(source_index)
+        if destination_index > source_index:
+            destination_index -= 1
+
+        if kind in {"preset", "preset_after"}:
+            target_folder = str(destination_folder_key or rows[destination_index].get("folder_key") or "").strip()
+            insert_index = destination_index + (1 if kind == "preset_after" else 0)
+        elif kind == "folder":
+            target_folder = str(destination_folder_key or destination_id or "").strip()
+            insert_index = _folder_insert_index(rows, target_folder)
+        elif kind == "end":
+            target_folder = str(destination_folder_key or source_row.get("folder_key") or "").strip()
+            insert_index = _folder_insert_index(rows, target_folder)
+        else:
+            return False
+        if not target_folder:
+            return False
+
+        source_folder = str(source_row.get("folder_key") or "").strip()
+        source_row["folder_key"] = target_folder
+        if _folder_is_expanded(rows, target_folder):
+            rows.insert(insert_index, source_row)
+
+        if source_folder != target_folder:
+            _shift_folder_count(rows, source_folder, -1)
+            _shift_folder_count(rows, target_folder, 1)
+
+        self.beginResetModel()
+        self._rows = rows
+        self.endResetModel()
+        return True
+
     def update_preset_row(self, file_name: str, **changes) -> bool:
         row_index = self.find_preset_row(file_name)
         if row_index < 0:
@@ -184,6 +236,51 @@ class PresetListModel(QAbstractListModel):
             return bool(row.get("is_service", False))
 
         return None
+
+
+def _folder_is_expanded(rows: list[dict[str, object]], folder_key: str) -> bool:
+    for row in rows:
+        if str(row.get("kind") or "") != "folder":
+            continue
+        if str(row.get("folder_key") or "") == folder_key:
+            return not bool(row.get("is_collapsed", False))
+    return True
+
+
+def _folder_insert_index(rows: list[dict[str, object]], folder_key: str) -> int:
+    folder_index = -1
+    for index, row in enumerate(rows):
+        if str(row.get("kind") or "") == "folder" and str(row.get("folder_key") or "") == folder_key:
+            folder_index = index
+            break
+    if folder_index < 0:
+        return len(rows)
+    insert_index = folder_index + 1
+    while insert_index < len(rows):
+        row = rows[insert_index]
+        if str(row.get("kind") or "") == "folder":
+            break
+        if str(row.get("folder_key") or "") == folder_key:
+            insert_index += 1
+            continue
+        break
+    return insert_index
+
+
+def _shift_folder_count(rows: list[dict[str, object]], folder_key: str, delta: int) -> None:
+    key = str(folder_key or "").strip()
+    if not key or not delta:
+        return
+    for row in rows:
+        if str(row.get("kind") or "") != "folder":
+            continue
+        if str(row.get("folder_key") or "") != key:
+            continue
+        try:
+            row["count"] = max(0, int(row.get("count", 0) or 0) + int(delta))
+        except Exception:
+            row["count"] = max(0, int(delta))
+        return
 
 
 __all__ = ["PresetListModel"]

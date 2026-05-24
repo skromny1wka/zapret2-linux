@@ -190,10 +190,13 @@ def move_profile_before(
     launch_method: str,
     source_profile_key: str,
     destination_profile_key: str,
+    *,
+    destination_folder_key: str = "",
 ) -> str | None:
     return _profile_preset_service(profile_services, launch_method).move_profile_before(
         source_profile_key,
         destination_profile_key,
+        destination_folder_key=destination_folder_key,
     )
 
 
@@ -202,10 +205,13 @@ def move_profile_after(
     launch_method: str,
     source_profile_key: str,
     destination_profile_key: str,
+    *,
+    destination_folder_key: str = "",
 ) -> str | None:
     return _profile_preset_service(profile_services, launch_method).move_profile_after(
         source_profile_key,
         destination_profile_key,
+        destination_folder_key=destination_folder_key,
     )
 
 
