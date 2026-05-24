@@ -186,23 +186,23 @@ class PresetStatusIcon(QWidget):
         self._apply_mode_style(str(plan.mode or "neutral").strip().lower())
 
     def _apply_mode_style(self, mode: str) -> None:
-        try:
-            tokens = get_theme_tokens()
-            accent = tokens.accent_hex
-            is_light = bool(tokens.is_light)
-        except Exception:
-            accent = "#5caee8"
-            is_light = False
-
         if mode == "error":
-            color = "#d83b01"
+            background = "#d83b01"
         elif mode in {"success", "busy"}:
-            color = accent
+            background = "#2fb344"
         else:
-            color = "#5f6368" if is_light else "#b8b8b8"
+            try:
+                is_light = bool(get_theme_tokens().is_light)
+            except Exception:
+                is_light = False
+            background = "#5f6368" if is_light else "#6f7378"
 
         self.check_label.setStyleSheet(
-            f"color: {color}; font-size: {self._icon_size - 2}px; font-weight: 700;"
+            "color: #ffffff; "
+            f"background-color: {background}; "
+            f"border-radius: {self._icon_size // 2}px; "
+            f"font-size: {max(12, self._icon_size - 8)}px; "
+            "font-weight: 700;"
         )
 
 

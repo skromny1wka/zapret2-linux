@@ -133,6 +133,9 @@ class PresetStatusBarPlanTests(unittest.TestCase):
         self.assertEqual(icon.minimumHeight(), 28)
         self.assertEqual(icon.check_label.size().width(), 24)
         self.assertTrue(icon.check_label.isVisible())
+        self.assertIn("background-color: #2fb344", icon.check_label.styleSheet())
+        self.assertIn("border-radius: 12px", icon.check_label.styleSheet())
+        self.assertIn("color: #ffffff", icon.check_label.styleSheet())
 
     def test_raw_editor_runtime_toggle_uses_single_button_plan(self) -> None:
         from presets.ui.common.preset_subpage_base import build_runtime_toggle_button_plan
