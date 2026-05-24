@@ -646,6 +646,49 @@ class ProfileListPayloadTests(unittest.TestCase):
         self.assertTrue(moved_discord.order_is_manual)
         self.assertEqual(moved_discord.group, "youtube")
 
+    def test_profile_move_inside_folder_does_not_pull_other_default_groups(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            templates_dir = root / "profile" / "templates"
+            templates_dir.mkdir(parents=True)
+            (templates_dir / "all_profiles.txt").write_text("", encoding="utf-8")
+            source_text = "\n".join(
+                (
+                    "--filter-tcp=80,443",
+                    "--hostlist=lists/youtube.txt",
+                    "",
+                    "--new",
+                    "--filter-tcp=80,443",
+                    "--hostlist=lists/googlevideo.txt",
+                    "",
+                    "--new",
+                    "--filter-tcp=443",
+                    "--hostlist=lists/discord.txt",
+                    "",
+                )
+            )
+            store = _PresetStore(source_text)
+            feature = SimpleNamespace(
+                _presets_feature=store,
+                _app_paths=AppPaths(user_root=root, local_root=root),
+            )
+            service = ProfilePresetService(feature, "zapret2_mode")
+
+            with patch("settings.store.MAIN_DIRECTORY", str(root)):
+                payload = service.list_profiles()
+                youtube = next(item for item in payload.items if "youtube.txt" in " ".join(item.match_lines).lower())
+                googlevideo = next(item for item in payload.items if "googlevideo" in " ".join(item.match_lines).lower())
+                service.move_profile_after(googlevideo.key, youtube.key)
+                moved_payload = service.list_profiles()
+
+        moved_groups = {
+            " ".join(item.match_lines).lower(): item.group
+            for item in moved_payload.items
+        }
+        self.assertEqual(next(group for text, group in moved_groups.items() if "youtube.txt" in text), "youtube")
+        self.assertEqual(next(group for text, group in moved_groups.items() if "googlevideo" in text), "youtube")
+        self.assertEqual(next(group for text, group in moved_groups.items() if "discord" in text), "discord")
+
     def test_profile_folder_reset_rebuilds_cached_list_with_default_groups(self) -> None:
         from profile.folders import load_profile_folder_state, reset_profile_folders, save_profile_folder_state
 

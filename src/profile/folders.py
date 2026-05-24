@@ -143,6 +143,7 @@ def move_profile_before_in_folder_state(
     items = state.setdefault("items", {})
     destination_meta = items.setdefault(destination, {"folder_key": COMMON_FOLDER_KEY, "order": None, "rating": 0})
     folder_key = str(destination_folder_key or destination_meta.get("folder_key") or COMMON_FOLDER_KEY)
+    destination_meta["folder_key"] = folder_key
     source_meta = items.setdefault(source, {"folder_key": folder_key, "order": None, "rating": 0})
     source_meta["folder_key"] = folder_key
     keys = [key for key in keys if key != source]
@@ -170,6 +171,7 @@ def move_profile_after_in_folder_state(
     items = state.setdefault("items", {})
     destination_meta = items.setdefault(destination, {"folder_key": COMMON_FOLDER_KEY, "order": None, "rating": 0})
     folder_key = str(destination_folder_key or destination_meta.get("folder_key") or COMMON_FOLDER_KEY)
+    destination_meta["folder_key"] = folder_key
     source_meta = items.setdefault(source, {"folder_key": folder_key, "order": None, "rating": 0})
     source_meta["folder_key"] = folder_key
     keys = [key for key in keys if key != source]

@@ -524,10 +524,16 @@ class ProfilePresetService:
             return None
         folder_state = load_profile_folder_state()
         destination_folder_key, _folder_name, _order = profile_folder_for_profile(destination.profile, folder_state)
+        ordered_keys = _profile_order_keys_for_folder(
+            sources,
+            folder_state,
+            destination_folder_key,
+            source_key=source.profile.persistent_key,
+        )
         move_profile_before_in_folder_state(
             source.profile.persistent_key,
             destination.profile.persistent_key,
-            [item.profile.persistent_key for item in sources],
+            ordered_keys,
             destination_folder_key=destination_folder_key,
         )
         self._invalidate_profile_list_snapshot()
@@ -541,10 +547,16 @@ class ProfilePresetService:
             return None
         folder_state = load_profile_folder_state()
         destination_folder_key, _folder_name, _order = profile_folder_for_profile(destination.profile, folder_state)
+        ordered_keys = _profile_order_keys_for_folder(
+            sources,
+            folder_state,
+            destination_folder_key,
+            source_key=source.profile.persistent_key,
+        )
         move_profile_after_in_folder_state(
             source.profile.persistent_key,
             destination.profile.persistent_key,
-            [item.profile.persistent_key for item in sources],
+            ordered_keys,
             destination_folder_key=destination_folder_key,
         )
         self._invalidate_profile_list_snapshot()
@@ -557,9 +569,15 @@ class ProfilePresetService:
             return None
         folder_state = load_profile_folder_state()
         source_folder_key, _folder_name, _order = profile_folder_for_profile(source.profile, folder_state)
+        ordered_keys = _profile_order_keys_for_folder(
+            sources,
+            folder_state,
+            source_folder_key,
+            source_key=source.profile.persistent_key,
+        )
         move_profile_to_end_in_folder_state(
             source.profile.persistent_key,
-            [item.profile.persistent_key for item in sources],
+            ordered_keys,
             source_folder_key=source_folder_key,
         )
         self._invalidate_profile_list_snapshot()
@@ -571,10 +589,17 @@ class ProfilePresetService:
         target_folder = str(folder_key or "").strip()
         if source is None or not target_folder:
             return None
+        folder_state = load_profile_folder_state()
+        ordered_keys = _profile_order_keys_for_folder(
+            sources,
+            folder_state,
+            target_folder,
+            source_key=source.profile.persistent_key,
+        )
         move_profile_to_folder_in_folder_state(
             source.profile.persistent_key,
             target_folder,
-            [item.profile.persistent_key for item in sources],
+            ordered_keys,
         )
         self._invalidate_profile_list_snapshot()
         return source.key
@@ -928,6 +953,23 @@ def _profile_folder_state_revision(folder_state: dict[str, Any]) -> tuple[object
                 meta.get("order"),
             ))
     return tuple(folder_rows), tuple(item_rows)
+
+
+def _profile_order_keys_for_folder(sources, folder_state: dict[str, Any], folder_key: str, *, source_key: str = "") -> list[str]:
+    target_folder = str(folder_key or "").strip()
+    source = str(source_key or "").strip()
+    keys: list[str] = []
+    for item in tuple(sources or ()):
+        profile = getattr(item, "profile", None)
+        key = str(getattr(profile, "persistent_key", "") or "").strip()
+        if not key or key == source:
+            continue
+        item_folder_key, _folder_name, _order = profile_folder_for_profile(profile, folder_state)
+        if item_folder_key == target_folder:
+            keys.append(key)
+    if source and source not in keys:
+        keys.append(source)
+    return keys
 
 
 def _basic_strategy_entries(profile: Profile, catalogs: dict[str, dict[str, StrategyEntry]]) -> dict[str, StrategyEntry]:
