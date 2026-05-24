@@ -385,6 +385,14 @@ def _profile_editor_tab_title(payload) -> str:
     return "Редактор"
 
 
+def _list_file_entries_count(text: str) -> int:
+    return len([
+        line
+        for line in str(text or "").splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ])
+
+
 class ProfileSetupPageBase(BasePage):
     profile_ui_mode_override: str | None = None
     launch_method = ZAPRET2_MODE
@@ -433,6 +441,9 @@ class ProfileSetupPageBase(BasePage):
         self._raw_profile_text = None
         self._raw_profile_save_button = None
         self._list_file_title = None
+        self._list_file_base_title = None
+        self._list_file_base_text = None
+        self._list_file_user_title = None
         self._list_file_text = None
         self._list_file_editor_tab = None
         self._list_file_error_label = None
@@ -577,12 +588,31 @@ class ProfileSetupPageBase(BasePage):
         self._list_file_title = BodyLabel("Файл списка")
         editor_layout.addWidget(self._list_file_title)
 
+        self._list_file_base_title = CaptionLabel("База")
+        self._list_file_base_title.setWordWrap(True)
+        editor_layout.addWidget(self._list_file_base_title)
+
+        self._list_file_base_text = PlainTextEdit()
+        self._list_file_base_text.setReadOnly(True)
+        self._list_file_base_text.setMinimumHeight(180)
+        self._list_file_base_text.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
+        set_tooltip(
+            self._list_file_base_text,
+            "Системная часть списка. Она обновляется программой и показана только для просмотра.",
+        )
+        editor_layout.addWidget(self._list_file_base_text, 1)
+
+        self._list_file_user_title = CaptionLabel("Ваши записи")
+        self._list_file_user_title.setWordWrap(True)
+        editor_layout.addWidget(self._list_file_user_title)
+
         self._list_file_text = PlainTextEdit()
-        self._list_file_text.setMinimumHeight(520)
+        self._list_file_text.setMinimumHeight(320)
+        self._list_file_text.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self._list_file_text.textChanged.connect(self._on_list_file_text_changed)
         set_tooltip(
             self._list_file_text,
-            "Список доменов или IP-адресов из файла, который указан в текущем profile.",
+            "Пользовательская часть списка. Сохраняется в lists/user и добавляется к базе.",
         )
         editor_layout.addWidget(self._list_file_text, 1)
 
@@ -1017,6 +1047,10 @@ class ProfileSetupPageBase(BasePage):
         kind = str(getattr(state, "kind", "") or "").strip().lower()
         display_path = str(getattr(state, "display_path", "") or "").strip()
         text = str(getattr(state, "text", "") or "")
+        base_text = str(getattr(state, "base_text", "") or "")
+        user_text = str(getattr(state, "user_text", text) or "")
+        base_display_path = str(getattr(state, "base_display_path", "") or "").strip()
+        user_display_path = str(getattr(state, "user_display_path", display_path) or "").strip()
         editable = bool(getattr(state, "editable", False))
         error_text = str(getattr(state, "error_text", "") or "").strip()
         invalid_lines = tuple(getattr(state, "invalid_lines", ()) or ())
@@ -1027,10 +1061,31 @@ class ProfileSetupPageBase(BasePage):
             title = f"{display_path} ({'IPset' if kind == 'ipset' else 'Hostlist'})"
         if self._list_file_title is not None:
             self._list_file_title.setText(title)
+        if self._list_file_base_title is not None:
+            self._list_file_base_title.setVisible(editable)
+            self._list_file_base_title.setText(
+                f"База: {base_display_path}" if base_display_path else "База"
+            )
+        if self._list_file_base_text is not None:
+            self._list_file_base_text.setVisible(editable)
+            self._list_file_base_text.blockSignals(True)
+            try:
+                self._list_file_base_text.setPlainText(base_text)
+                if kind == "ipset":
+                    self._list_file_base_text.setPlaceholderText("В базе пока нет IP или подсетей.")
+                else:
+                    self._list_file_base_text.setPlaceholderText("В базе пока нет доменов.")
+            finally:
+                self._list_file_base_text.blockSignals(False)
+        if self._list_file_user_title is not None:
+            self._list_file_user_title.setVisible(editable)
+            self._list_file_user_title.setText(
+                f"Ваши записи: {user_display_path}" if user_display_path else "Ваши записи"
+            )
         if self._list_file_text is not None:
             self._list_file_text.blockSignals(True)
             try:
-                self._list_file_text.setPlainText(text)
+                self._list_file_text.setPlainText(user_text if editable else text)
                 self._list_file_text.setReadOnly(not editable)
                 if kind == "ipset":
                     self._list_file_text.setPlaceholderText("IP или подсети по одному на строку:\n1.2.3.4\n10.0.0.0/8")
@@ -1042,12 +1097,11 @@ class ProfileSetupPageBase(BasePage):
             self._list_file_save_button.setEnabled(editable and not invalid_lines)
         if self._list_file_status_label is not None:
             if editable:
-                lines_count = len([
-                    line
-                    for line in text.splitlines()
-                    if line.strip() and not line.strip().startswith("#")
-                ])
-                self._list_file_status_label.setText(f"Записей: {lines_count}")
+                base_count = _list_file_entries_count(base_text)
+                user_count = _list_file_entries_count(user_text)
+                self._list_file_status_label.setText(
+                    f"Записей всего: {base_count + user_count} • ваших: {user_count}"
+                )
             else:
                 self._list_file_status_label.setText(error_text or "Файл списка недоступен для редактирования.")
         self._render_list_file_validation(invalid_lines, fallback_error=error_text if not editable else "")
@@ -1066,12 +1120,15 @@ class ProfileSetupPageBase(BasePage):
             if invalid_lines:
                 self._list_file_status_label.setText("Исправьте ошибки перед сохранением.")
             else:
-                lines_count = len([
-                    line
-                    for line in self._list_file_text.toPlainText().splitlines()
-                    if line.strip() and not line.strip().startswith("#")
-                ])
-                self._list_file_status_label.setText(f"Записей: {lines_count} • есть несохранённые изменения")
+                user_count = _list_file_entries_count(self._list_file_text.toPlainText())
+                base_count = _list_file_entries_count(
+                    self._list_file_base_text.toPlainText()
+                    if self._list_file_base_text is not None
+                    else ""
+                )
+                self._list_file_status_label.setText(
+                    f"Записей всего: {base_count + user_count} • ваших: {user_count} • есть несохранённые изменения"
+                )
 
     def _on_list_file_save_clicked(self) -> None:
         if self._loading or not self._profile_key or self._list_file_text is None:
@@ -1161,6 +1218,8 @@ class ProfileSetupPageBase(BasePage):
                 border: 1px solid {error_color};
             }}
         """
+        if self._list_file_base_text is not None:
+            self._list_file_base_text.setStyleSheet(normal_style)
         self._list_file_text.setStyleSheet(error_style if has_error else normal_style)
         if self._list_file_error_label is not None:
             self._list_file_error_label.setStyleSheet(f"color: {error_color}; background: transparent;")

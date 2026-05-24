@@ -459,6 +459,8 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertIn("_ensure_editor_tab_built", switch_tab)
         self.assertIn("_request_list_file_editor_state", switch_tab)
         self.assertIn("_list_file_text", ensure_editor)
+        self.assertIn("_list_file_base_text", ensure_editor)
+        self.assertIn("Ваши записи", ensure_editor)
         self.assertNotIn("_apply_list_file_editor_state", apply_payload)
         self.assertIn("save_list_file_text", save_handler)
         self.assertIn("Неверные строки", validation)

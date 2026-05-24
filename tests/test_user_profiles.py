@@ -266,7 +266,9 @@ class UserProfilesTests(unittest.TestCase):
 
         self.assertIsNotNone(state)
         self.assertEqual(state.kind, "ipset")
-        self.assertEqual(state.display_path, "lists/user/ipset-my-site.txt")
+        self.assertEqual(state.display_path, "lists/ipset-my-site.txt")
+        self.assertEqual(state.user_display_path, "lists/user/ipset-my-site.txt")
+        self.assertEqual(state.user_text, "1.1.1.1\n")
         self.assertEqual(state.text, "1.1.1.1\n")
 
     def test_enabling_not_added_user_profile_uses_selected_ipset_variant(self) -> None:

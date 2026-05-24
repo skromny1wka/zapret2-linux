@@ -78,8 +78,12 @@ class ProfileListFileEditorTests(unittest.TestCase):
             self.assertIsNotNone(setup)
             self.assertIsNotNone(list_editor)
             self.assertEqual(list_editor.kind, "ipset")
-            self.assertEqual(list_editor.display_path, "lists/user/ipset-youtube.txt")
-            self.assertEqual(list_editor.text, "2.2.2.2\n")
+            self.assertEqual(list_editor.display_path, "lists/ipset-youtube.txt")
+            self.assertEqual(list_editor.base_display_path, "lists/base/ipset-youtube.txt")
+            self.assertEqual(list_editor.user_display_path, "lists/user/ipset-youtube.txt")
+            self.assertEqual(list_editor.base_text, "1.1.1.1\n")
+            self.assertEqual(list_editor.user_text, "2.2.2.2\n")
+            self.assertEqual(list_editor.text, "1.1.1.1\n2.2.2.2\n")
 
             saved = service.save_profile_list_file_text("profile:0", "8.8.8.8\n")
             saved_text = (lists_dir / "user" / "ipset-youtube.txt").read_text(encoding="utf-8")
@@ -107,7 +111,10 @@ class ProfileListFileEditorTests(unittest.TestCase):
             list_editor = service.get_profile_list_file_editor_state("profile:0")
 
             self.assertIsNotNone(list_editor)
-            self.assertEqual(list_editor.text, "")
+            self.assertEqual(list_editor.display_path, "lists/youtube.txt")
+            self.assertEqual(list_editor.base_text, "youtube.com\n")
+            self.assertEqual(list_editor.user_text, "")
+            self.assertEqual(list_editor.text, "youtube.com\n")
             self.assertEqual((lists_dir / "user" / "youtube.txt").read_text(encoding="utf-8"), "")
             self.assertEqual((lists_dir / "youtube.txt").read_text(encoding="utf-8"), "youtube.com\n")
 
@@ -156,8 +163,10 @@ class ProfileListFileEditorTests(unittest.TestCase):
             self.assertIsNotNone(list_editor)
             self.assertTrue(list_editor.editable)
             self.assertEqual(list_editor.kind, "ipset")
-            self.assertEqual(list_editor.display_path, "lists/user/ipset-ru.txt")
-            self.assertEqual(list_editor.text, "2.2.2.2\n")
+            self.assertEqual(list_editor.display_path, "lists/ipset-ru.txt")
+            self.assertEqual(list_editor.base_text, "1.1.1.1\n")
+            self.assertEqual(list_editor.user_text, "2.2.2.2\n")
+            self.assertEqual(list_editor.text, "1.1.1.1\n2.2.2.2\n")
 
     def test_service_exclusion_dns_file_is_not_gui_editable(self) -> None:
         preset = parse_preset_text(
@@ -190,7 +199,8 @@ class ProfileListFileEditorTests(unittest.TestCase):
         self.assertTrue(reference.editable)
         self.assertEqual(reference.kind, "hostlist")
         self.assertEqual(reference.file_name, "netrogat.txt")
-        self.assertEqual(reference.display_path, "lists/user/netrogat.txt")
+        self.assertEqual(reference.display_path, "lists/netrogat.txt")
+        self.assertEqual(reference.user_display_path, "lists/user/netrogat.txt")
 
 
 if __name__ == "__main__":

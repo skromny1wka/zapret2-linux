@@ -24,7 +24,7 @@ from .list_interpreter import build_profile_list_sources
 from .list_file_editor import (
     profile_list_file_exists,
     profile_list_file_reference,
-    read_profile_list_file_text,
+    read_profile_list_file_text_parts,
     validate_profile_list_file_text,
     write_profile_list_file_text,
 )
@@ -729,12 +729,16 @@ class ProfilePresetService:
 
     def _list_editor_state_for_profile(self, profile: Profile) -> ProfileListFileEditorState:
         reference = profile_list_file_reference(profile, self._lists_root())
-        text = read_profile_list_file_text(self._lists_root(), reference)
-        invalid_lines = validate_profile_list_file_text(reference.kind, text) if reference.editable else ()
+        text_parts = read_profile_list_file_text_parts(self._lists_root(), reference)
+        invalid_lines = validate_profile_list_file_text(reference.kind, text_parts.user_text) if reference.editable else ()
         return ProfileListFileEditorState(
             kind=reference.kind,
             display_path=reference.display_path,
-            text=text,
+            text=text_parts.final_text,
+            base_text=text_parts.base_text,
+            user_text=text_parts.user_text,
+            base_display_path=reference.base_display_path,
+            user_display_path=reference.user_display_path,
             editable=reference.editable,
             invalid_lines=invalid_lines,
             error_text=reference.error_text,
@@ -1016,8 +1020,6 @@ def _catalog_name_for_profile(profile: Profile) -> str:
 
 
 def _list_type(profile: Profile) -> str:
-    if _catalog_name_for_profile(profile) == "voice":
-        return "voice"
     has_hostlist = bool(profile.match.hostlist_lines or profile.match.hostlist_domains_lines)
     has_ipset = bool(profile.match.ipset_lines or profile.match.inline_ipset_lines)
     has_excludes = bool(profile.match.hostlist_exclude_lines or profile.match.ipset_exclude_lines)

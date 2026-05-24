@@ -6,11 +6,13 @@ from pathlib import Path
 import re
 
 from lists.core.layered_files import (
+    layered_list_file,
     profile_list_file_available,
     read_profile_user_list_text,
     safe_list_file_name,
     write_profile_user_list_text,
 )
+from lists.core.files import read_text_file_safe
 
 from .models import Profile
 
@@ -20,8 +22,17 @@ class ProfileListFileReference:
     kind: str = ""
     file_name: str = ""
     display_path: str = ""
+    base_display_path: str = ""
+    user_display_path: str = ""
     editable: bool = False
     error_text: str = ""
+
+
+@dataclass(frozen=True)
+class ProfileListFileText:
+    final_text: str = ""
+    base_text: str = ""
+    user_text: str = ""
 
 
 _FILE_MATCH_NAMES = {
@@ -71,7 +82,9 @@ def profile_list_file_reference(profile: Profile, lists_root: Path) -> ProfileLi
             return ProfileListFileReference(
                 kind=kind,
                 file_name=file_name,
-                display_path=f"lists/user/{file_name}",
+                display_path=f"lists/{file_name}",
+                base_display_path=f"lists/base/{file_name}",
+                user_display_path=f"lists/user/{file_name}",
                 editable=True,
             )
     return ProfileListFileReference(
@@ -81,9 +94,23 @@ def profile_list_file_reference(profile: Profile, lists_root: Path) -> ProfileLi
 
 
 def read_profile_list_file_text(lists_root: Path, reference: ProfileListFileReference) -> str:
+    return read_profile_list_file_text_parts(lists_root, reference).final_text
+
+
+def read_profile_list_file_text_parts(lists_root: Path, reference: ProfileListFileReference) -> ProfileListFileText:
     if not reference.editable or not reference.file_name:
-        return ""
-    return read_profile_user_list_text(lists_root, reference.file_name)
+        return ProfileListFileText()
+    paths = layered_list_file(lists_root, reference.file_name)
+    user_text = read_profile_user_list_text(lists_root, reference.file_name)
+    base_text = read_text_file_safe(str(paths.base_path)) or ""
+    final_text = read_text_file_safe(str(paths.final_path)) or ""
+    if not final_text and (base_text or user_text):
+        final_text = _join_visible_layers(base_text, user_text)
+    return ProfileListFileText(
+        final_text=final_text,
+        base_text=base_text,
+        user_text=user_text,
+    )
 
 
 def write_profile_list_file_text(lists_root: Path, reference: ProfileListFileReference, text: str) -> None:
@@ -153,3 +180,14 @@ def _valid_hostlist_line(line: str) -> bool:
         return False
     label_re = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$", re.IGNORECASE)
     return all(label_re.fullmatch(label or "") for label in labels)
+
+
+def _join_visible_layers(base_text: str, user_text: str) -> str:
+    chunks = []
+    for text in (base_text, user_text):
+        value = str(text or "").strip()
+        if value:
+            chunks.append(value)
+    if not chunks:
+        return ""
+    return "\n".join(chunks) + "\n"

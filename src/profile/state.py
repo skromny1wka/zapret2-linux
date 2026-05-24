@@ -11,6 +11,10 @@ class ProfileListFileEditorState:
     kind: str = ""
     display_path: str = ""
     text: str = ""
+    base_text: str = ""
+    user_text: str = ""
+    base_display_path: str = ""
+    user_display_path: str = ""
     editable: bool = False
     invalid_lines: tuple[tuple[int, str], ...] = ()
     error_text: str = ""
