@@ -16,7 +16,6 @@ from app.page_names import PageName
 from ui.page_performance import log_page_metric
 from ui.page_registry import get_page_performance_profile
 from ui.startup_ui_metrics import (
-    pump_startup_ui,
     record_startup_page_init_metric,
 )
 from ui.window_ui_session import get_window_ui_session
@@ -48,13 +47,11 @@ class WindowPageHost:
         started_at = _time.perf_counter()
         for page_name in page_names:
             self.ensure_page(page_name)
-            pump_startup_ui(self._window)
 
         log(
             f"⏱ Startup: _create_pages core {(_time.perf_counter() - started_at) * 1000:.0f}ms",
             "DEBUG",
         )
-        pump_startup_ui(self._window, force=True)
 
     def get_loaded_page(self, page_name: PageName) -> QWidget | None:
         return self.pages.get(page_name)

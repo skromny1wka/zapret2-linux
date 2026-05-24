@@ -907,6 +907,41 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         metric.assert_called_once_with("StartupContinueAfterUiReadyDispatch", "continue_startup_requested")
         window.mark_startup_interactive.assert_called_once_with("ui_ready")
 
+    def test_eager_page_creation_does_not_pump_qt_events_before_interactive(self) -> None:
+        import inspect
+        from app.page_names import PageName
+        from ui.page_host import WindowPageHost
+        import ui.page_host as page_host_module
+
+        calls: list[str] = []
+
+        class Page:
+            def objectName(self) -> str:
+                return "Page"
+
+            def setObjectName(self, _name: str) -> None:
+                pass
+
+        class Factory:
+            page_class_specs = {}
+
+            def create_page(self, page_name):
+                calls.append(f"create:{page_name.name}")
+                return SimpleNamespace(page=Page(), elapsed_ms=1)
+
+        host = WindowPageHost(SimpleNamespace(get_launch_method=lambda: "zapret2_mode"), Factory())
+
+        with (
+            patch.object(page_host_module, "apply_ui_language_to_page", side_effect=lambda *_args: None),
+            patch.object(page_host_module, "record_startup_page_init_metric", side_effect=lambda *_args: None),
+            patch.object(page_host_module, "log_page_metric", side_effect=lambda *_args, **_kwargs: None),
+        ):
+            host.create_eager_pages((PageName.ZAPRET2_MODE_CONTROL,))
+
+        self.assertEqual(calls, ["create:ZAPRET2_MODE_CONTROL"])
+        source = inspect.getsource(WindowPageHost.create_eager_pages)
+        self.assertNotIn("pump_startup_ui", source)
+
     def test_window_geometry_settings_are_read_once_for_startup_restore(self) -> None:
         from settings import store as settings_store
 
