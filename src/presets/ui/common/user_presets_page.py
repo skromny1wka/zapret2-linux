@@ -11,6 +11,9 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtWidgets import (
     QFileDialog,
+    QHBoxLayout,
+    QSizePolicy,
+    QWidget,
 )
 from ui.pages.base_page import BasePage
 from presets.ui.common.preset_actions_menu import show_preset_actions_menu
@@ -37,7 +40,7 @@ from presets.ui.common.user_presets_action_dispatch import (
 )
 from presets.ui.common.user_presets_build import build_user_presets_page_shell
 from presets.ui.common.preset_status_bar import (
-    PresetStatusBar,
+    PresetStatusIcon,
     build_runtime_preset_status_plan,
 )
 from presets.ui.common.user_presets_actions_workflow import (
@@ -160,7 +163,7 @@ class UserPresetsPageBase(BasePage):
         self._preset_search_input: Optional[LineEdit] = None
         self._toolbar_layout: Optional[PresetsToolbarLayout] = None
         self.open_folder_btn = None
-        self._preset_status_bar = None
+        self._preset_status_icon = None
 
         self._ui_state_store: Optional[MainWindowStateStore] = None
         self._ui_state_unsubscribe = None
@@ -252,8 +255,8 @@ class UserPresetsPageBase(BasePage):
         self._refresh_preset_status_bar(state)
 
     def _refresh_preset_status_bar(self, state: AppUiState | None = None) -> None:
-        bar = self._preset_status_bar
-        if bar is None:
+        icon = self._preset_status_icon
+        if icon is None:
             return
         if state is None and self._ui_state_store is not None:
             try:
@@ -269,7 +272,7 @@ class UserPresetsPageBase(BasePage):
             launch_busy_text=str(getattr(state, "launch_busy_text", "") or "") if state is not None else "",
             last_status_message=str(getattr(state, "last_status_message", "") or "") if state is not None else "",
         )
-        bar.set_plan(plan)
+        icon.set_plan(plan)
 
     def _is_builtin_preset_file(self, name: str) -> bool:
         return self._storage_api().is_builtin_preset_file_with_cache(
@@ -428,9 +431,7 @@ class UserPresetsPageBase(BasePage):
         self.presets_list = shell.presets_list
         self._presets_model = shell.presets_model
         self._presets_delegate = shell.presets_delegate
-        self._preset_status_bar = PresetStatusBar(self)
-        self._toolbar_layout.set_inline_widget(self._preset_status_bar, minimum_width=160)
-        self._toolbar_layout.refresh_for_viewport(self.viewport().width(), self.layout.contentsMargins())
+        self._install_title_status_icon()
 
         self.add_widget(shell.configs_card)
         self.add_spacing(12)
@@ -446,6 +447,26 @@ class UserPresetsPageBase(BasePage):
 
         # Make outer page scrolling feel less sluggish on long lists.
         self.verticalScrollBar().setSingleStep(48)
+
+    def _install_title_status_icon(self) -> None:
+        if self._preset_status_icon is not None:
+            return
+        title_index = self.layout.indexOf(self.title_label)
+        if title_index < 0:
+            return
+
+        self.layout.removeWidget(self.title_label)
+        self._title_status_header = QWidget(self.content)
+        self._title_status_header.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        title_layout = QHBoxLayout(self._title_status_header)
+        title_layout.setContentsMargins(0, 0, 0, 0)
+        title_layout.setSpacing(8)
+
+        self._preset_status_icon = PresetStatusIcon(self._title_status_header, size=24)
+        title_layout.addWidget(self._preset_status_icon, 0, Qt.AlignmentFlag.AlignVCenter)
+        title_layout.addWidget(self.title_label, 0, Qt.AlignmentFlag.AlignVCenter)
+        title_layout.addStretch(1)
+        self.layout.insertWidget(title_index, self._title_status_header)
 
     def _on_info_clicked(self) -> None:
         if MessageBox:

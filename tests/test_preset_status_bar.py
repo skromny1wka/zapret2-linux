@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import inspect
+import os
 import unittest
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE
 
@@ -33,6 +36,12 @@ class _StoppedRuntimeOwner:
 
 
 class PresetStatusBarPlanTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        from PyQt6.QtWidgets import QApplication
+
+        cls._app = QApplication.instance() or QApplication([])
+
     def test_spinner_import_is_static_for_packaged_build(self) -> None:
         import presets.ui.common.preset_status_bar as preset_status_bar
 
@@ -112,6 +121,18 @@ class PresetStatusBarPlanTests(unittest.TestCase):
         self.assertEqual(plan.text, "Пресет применён")
         self.assertEqual(plan.mode, "success")
         self.assertEqual(plan.indicator, "check")
+
+    def test_title_status_icon_is_icon_only_and_larger_than_text_bar_icon(self) -> None:
+        from presets.ui.common.preset_status_bar import PresetStatusIcon, build_preset_status_plan
+
+        icon = PresetStatusIcon(size=24)
+        icon.set_plan(build_preset_status_plan("applied", launch_method=ZAPRET2_MODE))
+
+        self.assertFalse(hasattr(icon, "text_label"))
+        self.assertEqual(icon.minimumWidth(), 28)
+        self.assertEqual(icon.minimumHeight(), 28)
+        self.assertEqual(icon.check_label.size().width(), 24)
+        self.assertTrue(icon.check_label.isVisible())
 
     def test_raw_editor_runtime_toggle_uses_single_button_plan(self) -> None:
         from presets.ui.common.preset_subpage_base import build_runtime_toggle_button_plan

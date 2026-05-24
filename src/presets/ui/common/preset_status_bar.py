@@ -149,8 +149,66 @@ class PresetStatusBar(QWidget):
         self.text_label.setStyleSheet(f"color: {color};")
 
 
+class PresetStatusIcon(QWidget):
+    def __init__(self, parent=None, *, size: int = 24):
+        super().__init__(parent)
+        self._icon_size = max(16, int(size))
+        box_size = self._icon_size + 4
+        self.setFixedSize(box_size, box_size)
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+
+        self.spinner = Win11Spinner(size=self._icon_size, parent=self)
+        self.spinner.hide()
+
+        self.check_label = QLabel("✓", self)
+        self.check_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.check_label.setFixedSize(self._icon_size, self._icon_size)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(self.spinner, 0, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.check_label, 0, Qt.AlignmentFlag.AlignCenter)
+
+        self.set_plan(build_preset_status_plan("neutral", launch_method=ZAPRET2_MODE))
+
+    def set_plan(self, plan: PresetStatusPlan) -> None:
+        indicator = str(plan.indicator or "none").strip().lower()
+        if indicator == "spinner":
+            self.check_label.hide()
+            self.spinner.start()
+        else:
+            self.spinner.stop()
+            self.check_label.setVisible(indicator == "check")
+
+        self.setToolTip(str(plan.text or ""))
+        self.setVisible(indicator in {"spinner", "check"})
+        self._apply_mode_style(str(plan.mode or "neutral").strip().lower())
+
+    def _apply_mode_style(self, mode: str) -> None:
+        try:
+            tokens = get_theme_tokens()
+            accent = tokens.accent_hex
+            is_light = bool(tokens.is_light)
+        except Exception:
+            accent = "#5caee8"
+            is_light = False
+
+        if mode == "error":
+            color = "#d83b01"
+        elif mode in {"success", "busy"}:
+            color = accent
+        else:
+            color = "#5f6368" if is_light else "#b8b8b8"
+
+        self.check_label.setStyleSheet(
+            f"color: {color}; font-size: {self._icon_size - 2}px; font-weight: 700;"
+        )
+
+
 __all__ = [
     "PresetStatusBar",
+    "PresetStatusIcon",
     "PresetStatusPlan",
     "build_preset_status_plan",
     "build_runtime_preset_status_plan",
