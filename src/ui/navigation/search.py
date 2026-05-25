@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from time import monotonic
 
 from PyQt6.QtCore import QModelIndex, Qt
 from PyQt6.QtGui import QStandardItem, QStandardItemModel
@@ -14,6 +15,7 @@ from ui.page_actions import switch_page_tab
 from app.page_names import PageName
 from app.search_index import (
     SearchEntry,
+    build_search_filter_text,
     build_preset_search_entries,
     build_profile_search_entries,
     find_search_entries,
@@ -21,6 +23,21 @@ from app.search_index import (
 )
 from settings.mode import is_preset_launch_method
 from ui.window_ui_session import get_window_ui_session
+
+
+_PAGE_ROLE = int(Qt.ItemDataRole.UserRole)
+_TAB_ROLE = _PAGE_ROLE + 1
+_QUERY_ROLE = _PAGE_ROLE + 2
+_SEARCH_TEXT_ROLE = _PAGE_ROLE + 3
+_RUNTIME_SEARCH_CACHE_SECONDS = 3.0
+
+
+class _SidebarSearchCompleter(QCompleter):
+    def pathFromIndex(self, index: QModelIndex) -> str:
+        display_text = index.data(int(Qt.ItemDataRole.DisplayRole))
+        if isinstance(display_text, str) and display_text:
+            return display_text
+        return super().pathFromIndex(index)
 
 
 @dataclass(frozen=True)
@@ -184,9 +201,10 @@ def setup_sidebar_search_completer(window) -> None:
         return
 
     session.sidebar_search_model = QStandardItemModel(window)
-    completer = QCompleter(session.sidebar_search_model, window)
+    completer = _SidebarSearchCompleter(session.sidebar_search_model, window)
     completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
     completer.setFilterMode(Qt.MatchFlag.MatchContains)
+    completer.setCompletionRole(_SEARCH_TEXT_ROLE)
     completer.setCompletionMode(QCompleter.CompletionMode.PopupCompletion)
     completer.setMaxVisibleItems(10)
     completer.activated[QModelIndex].connect(
@@ -245,16 +263,13 @@ def update_sidebar_search_suggestions(window) -> None:
             pass
         return
 
-    page_role = int(Qt.ItemDataRole.UserRole)
-    tab_role = page_role + 1
-    query_role = page_role + 2
-
     for match in matches:
         title, location = format_search_result(match.entry, language=session.ui_language)
         item = QStandardItem(f"{title} - {location}")
-        item.setData(match.entry.page_name.name, page_role)
-        item.setData(match.entry.tab_key or "", tab_role)
-        item.setData(match.entry.query_text or "", query_role)
+        item.setData(match.entry.page_name.name, _PAGE_ROLE)
+        item.setData(match.entry.tab_key or "", _TAB_ROLE)
+        item.setData(match.entry.query_text or "", _QUERY_ROLE)
+        item.setData(build_search_filter_text(match.entry, language=session.ui_language), _SEARCH_TEXT_ROLE)
         model.appendRow(item)
 
     if session.sidebar_search_nav_widget is not None and session.sidebar_search_nav_widget.isVisible():
@@ -315,13 +330,10 @@ def _search_target_from_index(index: QModelIndex) -> SidebarSearchTarget | None:
     if not index.isValid():
         return None
 
-    page_role = int(Qt.ItemDataRole.UserRole)
-    tab_role = page_role + 1
-    query_role = page_role + 2
     return _build_sidebar_search_target(
-        index.data(page_role),
-        index.data(tab_role),
-        index.data(query_role),
+        index.data(_PAGE_ROLE),
+        index.data(_TAB_ROLE),
+        index.data(_QUERY_ROLE),
     )
 
 
@@ -329,13 +341,10 @@ def _search_target_from_item(item: QStandardItem | None) -> SidebarSearchTarget 
     if item is None:
         return None
 
-    page_role = int(Qt.ItemDataRole.UserRole)
-    tab_role = page_role + 1
-    query_role = page_role + 2
     return _build_sidebar_search_target(
-        item.data(page_role),
-        item.data(tab_role),
-        item.data(query_role),
+        item.data(_PAGE_ROLE),
+        item.data(_TAB_ROLE),
+        item.data(_QUERY_ROLE),
     )
 
 
@@ -456,6 +465,13 @@ def _build_runtime_search_entries(window) -> tuple[SearchEntry, ...]:
         launch_method = ""
     if not is_preset_launch_method(launch_method):
         return ()
+    runtime_cache = getattr(session, "sidebar_search_runtime_cache", None)
+    if isinstance(runtime_cache, dict):
+        cached_item = runtime_cache.get(launch_method)
+        if cached_item is not None:
+            cached_at, cached_entries = cached_item
+            if monotonic() - float(cached_at) <= _RUNTIME_SEARCH_CACHE_SECONDS:
+                return cached_entries
 
     entries: list[SearchEntry] = []
     profile_loader = getattr(session, "sidebar_search_profile_loader", None)
@@ -468,7 +484,10 @@ def _build_runtime_search_entries(window) -> tuple[SearchEntry, ...]:
         manifests = _load_sidebar_search_objects(preset_loader, launch_method)
         entries.extend(build_preset_search_entries(launch_method, manifests))
 
-    return tuple(entries)
+    result = tuple(entries)
+    if isinstance(runtime_cache, dict):
+        runtime_cache[launch_method] = (monotonic(), result)
+    return result
 
 
 def _load_sidebar_search_objects(loader, launch_method: str) -> tuple[object, ...]:

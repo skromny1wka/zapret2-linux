@@ -37,6 +37,24 @@ class GlobalSearchIndexTests(unittest.TestCase):
 
         self.assertTrue(any(match.entry.page_name == PageName.PREMIUM for match in matches))
 
+    def test_search_filter_text_keeps_matched_page_body_text(self) -> None:
+        from app.page_names import PageName
+        from app.search_index import build_search_filter_text, find_search_entries
+        from settings.mode import ZAPRET2_MODE
+        from ui.navigation.schema import get_sidebar_search_pages_for_method
+
+        visible_pages = get_sidebar_search_pages_for_method(ZAPRET2_MODE, set(PageName))
+
+        matches = find_search_entries(
+            "премиум",
+            language="ru",
+            visible_pages=visible_pages,
+            max_results=10,
+        )
+        premium_match = next(match for match in matches if match.entry.page_name == PageName.PREMIUM)
+
+        self.assertIn("премиум", build_search_filter_text(premium_match.entry, language="ru").casefold())
+
     def test_profile_search_entries_use_profile_summary_not_list_contents(self) -> None:
         from app.page_names import PageName
         from app.search_index import build_profile_search_entries, find_search_entries

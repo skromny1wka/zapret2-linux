@@ -727,6 +727,33 @@ class PresetSidebarNavigationTests(unittest.TestCase):
         session.sidebar_search_profile_loader.assert_called_once_with(ZAPRET2_MODE)
         session.sidebar_search_preset_loader.assert_called_once_with(ZAPRET2_MODE)
 
+    def test_sidebar_search_reuses_runtime_entries_cache_while_typing(self) -> None:
+        from settings.mode import ZAPRET2_MODE
+        import ui.navigation.search as sidebar_search
+
+        profiles = (
+            SimpleNamespace(key="profile:0", display_name="Discord Voice"),
+        )
+        manifests = (
+            SimpleNamespace(file_name="gaming.txt", name="Gaming Preset"),
+        )
+        session = SimpleNamespace(
+            sidebar_search_profile_loader=Mock(return_value=profiles),
+            sidebar_search_preset_loader=Mock(return_value=manifests),
+            sidebar_search_runtime_cache={},
+        )
+        window = SimpleNamespace(
+            ui_session=session,
+            get_launch_method=lambda: ZAPRET2_MODE,
+        )
+
+        first_entries = sidebar_search._build_runtime_search_entries(window)
+        second_entries = sidebar_search._build_runtime_search_entries(window)
+
+        self.assertIs(first_entries, second_entries)
+        session.sidebar_search_profile_loader.assert_called_once_with(ZAPRET2_MODE)
+        session.sidebar_search_preset_loader.assert_called_once_with(ZAPRET2_MODE)
+
     def test_preset_setup_page_exposes_sidebar_search_handler(self) -> None:
         from profile.ui.preset_setup_page import PresetSetupPageBase
 

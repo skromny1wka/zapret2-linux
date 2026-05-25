@@ -337,6 +337,16 @@ def _iter_candidate_texts(entry: SearchEntry) -> Iterable[str]:
             yield text
 
 
+def build_search_filter_text(entry: SearchEntry, language: str | None = None) -> str:
+    texts: list[str] = []
+    title, location = format_search_result(entry, language=language)
+    for text in (title, location, *_iter_candidate_texts(entry)):
+        normalized = str(text or "").strip()
+        if normalized and normalized not in texts:
+            texts.append(normalized)
+    return " ".join(texts)
+
+
 def find_search_entries(
     query: str,
     language: str | None = None,

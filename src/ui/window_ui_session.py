@@ -45,6 +45,7 @@ class WindowUiSession:
     ui_bootstrap_bindings_connected: bool = False
     sidebar_search_profile_loader: Callable[[str], tuple[object, ...]] | None = None
     sidebar_search_preset_loader: Callable[[str], tuple[object, ...]] | None = None
+    sidebar_search_runtime_cache: dict[str, tuple[float, tuple[object, ...]]] = field(default_factory=dict)
 
 
 def get_window_ui_session(window) -> WindowUiSession | None:
