@@ -107,6 +107,18 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("QEvent.Type.MouseButtonPress", event_source)
         self.assertIn("installEventFilter", controller_source)
 
+    def test_raw_preset_editor_has_inline_text_search(self) -> None:
+        build_source = inspect.getsource(PresetRawEditorPage._build_ui)
+
+        self.assertTrue(hasattr(PresetRawEditorPage, "_search_preset_text"))
+        search_source = inspect.getsource(PresetRawEditorPage._search_preset_text)
+        self.assertIn("SearchLineEdit", build_source)
+        self.assertIn("self.searchInput.setPlaceholderText", build_source)
+        self.assertIn("actions_layout.addStretch(1)", build_source)
+        self.assertIn("actions_layout.addWidget(self.searchInput, 0)", build_source)
+        self.assertIn(".find(query", search_source)
+        self.assertIn("QTextDocument.FindFlag(0)", search_source)
+
     def test_refresh_after_switch_uses_profile_snapshot_not_full_list(self) -> None:
         source = inspect.getsource(display_state.resolve_profile_strategy_display_state)
 

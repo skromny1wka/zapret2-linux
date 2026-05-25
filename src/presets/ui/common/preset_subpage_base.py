@@ -4,10 +4,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from PyQt6.QtCore import QEvent, QTimer
+from PyQt6.QtGui import QTextCursor, QTextDocument
 from PyQt6.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QFileDialog
 
 from ui.pages.base_page import BasePage
-from ui.fluent_widgets import style_semantic_caption_label
+from ui.fluent_widgets import set_tooltip, style_semantic_caption_label
 from ui.popup_menu import exec_popup_menu
 from ui.smooth_scroll import apply_editor_smooth_scroll_preference
 from presets.ui.common.preset_status_bar import (
@@ -27,6 +28,7 @@ from qfluentwidgets import (
     PlainTextEdit,
     PushButton,
     RoundMenu,
+    SearchLineEdit,
     SimpleCardWidget,
     StrongBodyLabel,
     TransparentToolButton,
@@ -337,6 +339,16 @@ class PresetRawEditorPage(BasePage):
         actions_layout.addWidget(self.runtimeToggleButton)
 
         actions_layout.addStretch(1)
+        self.searchInput = SearchLineEdit(self)
+        self.searchInput.setPlaceholderText("Поиск по тексту пресета")
+        set_tooltip(self.searchInput, "Найти строку в тексте открытого пресета.")
+        self.searchInput.setClearButtonEnabled(True)
+        self.searchInput.setFixedHeight(34)
+        self.searchInput.setMinimumWidth(220)
+        self.searchInput.setMaximumWidth(300)
+        self.searchInput.setProperty("noDrag", True)
+        self.searchInput.textChanged.connect(self._search_preset_text)
+        actions_layout.addWidget(self.searchInput, 0)
         self.add_widget(actions)
 
         self.editor = PlainTextEdit(self)
@@ -448,6 +460,21 @@ class PresetRawEditorPage(BasePage):
         if self._raw_load_worker is worker:
             self._raw_load_worker = None
         worker.deleteLater()
+
+    def _search_preset_text(self, text: str) -> None:
+        editor = getattr(self, "editor", None)
+        if editor is None:
+            return
+        query = str(text or "")
+        cursor = editor.textCursor()
+        if not query.strip():
+            cursor.clearSelection()
+            editor.setTextCursor(cursor)
+            return
+
+        cursor.movePosition(QTextCursor.MoveOperation.Start)
+        editor.setTextCursor(cursor)
+        editor.find(query, QTextDocument.FindFlag(0))
 
     def _on_text_changed(self) -> None:
         if self._cleanup_in_progress:
