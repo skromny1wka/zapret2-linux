@@ -50,6 +50,7 @@ from qfluentwidgets import (
 
 
 STARTUP_DEFERRED_SECTIONS_AFTER_INTERACTIVE_MS = 8_000
+STARTUP_INITIAL_UI_STATE_AFTER_INTERACTIVE_MS = 350
 
 
 class ProfileUiModeDialog(MessageBoxBase):
@@ -207,6 +208,7 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         self._deferred_sections_hydrated = False
         self._startup_deferred_sections_waiting = False
         self._startup_top_summary_waiting = False
+        self._startup_initial_ui_state_waiting = False
         self._refresh_runtime = zapret2_page_runtime.create_refresh_runtime()
         self.profile_ui_mode_label = None
         self.profile_ui_mode_caption = None
@@ -349,6 +351,41 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         if self._cleanup_in_progress:
             return
         self.run_when_page_ready(self._refresh_top_summary_after_startup)
+
+    def _wait_for_startup_interactive_before_initial_ui_state(self) -> None:
+        if bool(self._startup_initial_ui_state_waiting):
+            return
+        self._startup_initial_ui_state_waiting = True
+        try:
+            signal = getattr(self.window(), "startup_interactive_ready", None)
+            signal.connect(
+                self._on_startup_interactive_ready_for_initial_ui_state,
+                Qt.ConnectionType.QueuedConnection,
+            )
+        except Exception:
+            QTimer.singleShot(
+                STARTUP_INITIAL_UI_STATE_AFTER_INTERACTIVE_MS,
+                self._request_initial_ui_state_after_startup,
+            )
+
+    def _on_startup_interactive_ready_for_initial_ui_state(self, *_args) -> None:
+        QTimer.singleShot(
+            STARTUP_INITIAL_UI_STATE_AFTER_INTERACTIVE_MS,
+            self._request_initial_ui_state_after_startup,
+        )
+
+    def _request_initial_ui_state_after_startup(self) -> None:
+        self._startup_initial_ui_state_waiting = False
+        if self._cleanup_in_progress:
+            return
+        store = self._ui_state_store
+        if store is None:
+            return
+        try:
+            state = store.snapshot()
+        except Exception:
+            return
+        self._on_ui_state_changed(state, frozenset())
 
     def _refresh_top_summary_after_startup(self) -> None:
         _t_summary = _time.perf_counter()
@@ -721,6 +758,7 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         self.stop_and_exit_btn.setEnabled(not loading)
 
     def bind_ui_state_store(self, store: MainWindowStateStore) -> None:
+        defer_initial_state = not self._startup_can_run_deferred_sections()
         bind_control_ui_state_store(
             self,
             store,
@@ -739,7 +777,10 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
                 "subscription_is_premium",
                 "subscription_days_remaining",
             },
+            emit_initial=not defer_initial_state,
         )
+        if defer_initial_state:
+            self._wait_for_startup_interactive_before_initial_ui_state()
 
     def _on_ui_state_changed(self, state: AppUiState, changed_fields: frozenset[str]) -> None:
         if self._cleanup_in_progress:

@@ -17,6 +17,7 @@ from presets import commands as preset_commands
 from presets.ui.common.preset_subpage_base import PresetRawEditorPage
 from presets.ui.common.user_presets_page import UserPresetsPageBase
 import presets.ui.control.additional_settings_runtime as control_additional_settings_runtime
+import presets.ui.control.control_page_shared as control_page_shared
 import presets.ui.control.zapret1.runtime_helpers as zapret1_runtime_helpers
 from presets.ui.control.zapret1.page import Zapret1ModeControlPage
 import presets.ui.control.zapret2.page_runtime as zapret2_page_runtime
@@ -57,6 +58,7 @@ import telegram_proxy.ui.settings_build as telegram_proxy_settings_build
 from telegram_proxy.ui.page import TelegramProxyPage
 from telegram_proxy.workers import TelegramProxyDiagnosticsWorker
 import ui.navigation.text_sync as navigation_text_sync
+from app.page_names import PageName
 from ui.widgets.win11_controls import Win11RadioOption
 from ui.page_host import WindowPageHost
 
@@ -611,6 +613,16 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("create_control_additional_settings_worker", zapret2_page_source)
         self.assertIn("launch_method=ZAPRET2_MODE", zapret2_page_source)
 
+    def test_zapret2_control_defers_initial_store_snapshot_during_startup(self) -> None:
+        helper_source = inspect.getsource(control_page_shared.bind_control_ui_state_store)
+        bind_source = inspect.getsource(Zapret2ModeControlPage.bind_ui_state_store)
+
+        self.assertIn("emit_initial: bool = True", helper_source)
+        self.assertIn("emit_initial=bool(emit_initial)", helper_source)
+        self.assertIn("defer_initial_state", bind_source)
+        self.assertIn("emit_initial=not defer_initial_state", bind_source)
+        self.assertIn("_wait_for_startup_interactive_before_initial_ui_state", bind_source)
+
     def test_raw_preset_editor_loads_file_through_worker(self) -> None:
         source = inspect.getsource(PresetRawEditorPage._load_file)
 
@@ -668,6 +680,24 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("animate=bool(first_show and use_nav_route)", show_source)
         self.assertIn("ensure.cached.language", ensure_source)
         self.assertIn("ensure.created.language", ensure_source)
+
+    def test_page_host_repeat_show_budget_allows_animated_navigation(self) -> None:
+        self.assertEqual(
+            WindowPageHost._show_budget_ms(
+                PageName.ZAPRET2_USER_PRESETS,
+                first_show=False,
+                use_nav_route=True,
+            ),
+            120,
+        )
+        self.assertEqual(
+            WindowPageHost._show_budget_ms(
+                PageName.ZAPRET2_USER_PRESETS,
+                first_show=False,
+                use_nav_route=False,
+            ),
+            40,
+        )
 
     def test_page_host_disables_qfluent_animation_for_direct_switch(self) -> None:
         class _FakeStack:

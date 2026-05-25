@@ -21,6 +21,9 @@ from ui.startup_ui_metrics import (
 from ui.window_ui_session import get_window_ui_session
 
 
+ANIMATED_NAV_REPEAT_SHOW_BUDGET_MS = 120
+
+
 class WindowPageHost:
     """Единая точка lifecycle для страниц окна.
 
@@ -40,6 +43,15 @@ class WindowPageHost:
         if elapsed_ms < int(threshold_ms):
             return
         log_page_metric(page_name, stage, elapsed_ms)
+
+    @staticmethod
+    def _show_budget_ms(page_name: PageName, *, first_show: bool, use_nav_route: bool) -> int:
+        profile = get_page_performance_profile(page_name)
+        if first_show:
+            return profile.first_show_budget_ms
+        if use_nav_route:
+            return max(profile.repeat_show_budget_ms, ANIMATED_NAV_REPEAT_SHOW_BUDGET_MS)
+        return profile.repeat_show_budget_ms
 
     def create_eager_pages(self, page_names: tuple[PageName, ...]) -> None:
         import time as _time
@@ -239,10 +251,10 @@ class WindowPageHost:
             page_name,
             "show.first" if first_show else "show.repeat",
             (_time.perf_counter() - started_at) * 1000,
-            budget_ms=(
-                get_page_performance_profile(page_name).first_show_budget_ms
-                if first_show
-                else get_page_performance_profile(page_name).repeat_show_budget_ms
+            budget_ms=self._show_budget_ms(
+                page_name,
+                first_show=first_show,
+                use_nav_route=use_nav_route,
             ),
         )
         return True

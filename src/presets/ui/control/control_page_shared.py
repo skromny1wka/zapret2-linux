@@ -122,6 +122,7 @@ def bind_control_ui_state_store(
     *,
     callback,
     fields: set[str] | frozenset[str],
+    emit_initial: bool = True,
 ) -> None:
     if owner._ui_state_store is store:
         return
@@ -137,7 +138,7 @@ def bind_control_ui_state_store(
     owner._ui_state_unsubscribe = store.subscribe(
         callback,
         fields=set(fields),
-        emit_initial=True,
+        emit_initial=bool(emit_initial),
     )
 
 
