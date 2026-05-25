@@ -155,6 +155,17 @@ class StartupAutostartTests(unittest.TestCase):
         self.assertIs(result, request)
         self.assertTrue(prepare.call_args.kwargs["skip_preset_prevalidation"])
 
+    def test_startup_manifest_cache_signature_does_not_read_preset_body(self) -> None:
+        import inspect
+        from presets.mode_coordinator import PresetModeCoordinator
+
+        source = inspect.getsource(PresetModeCoordinator._selected_manifest_cache_key)
+
+        self.assertIn("path_stat_signature(settings_path)", source)
+        self.assertIn("path_stat_signature(preset_path)", source)
+        self.assertNotIn("path_cache_signature(settings_path)", source)
+        self.assertNotIn("path_cache_signature(preset_path)", source)
+
     def test_startup_worker_rejects_preset_without_enabled_profiles_before_stop(self) -> None:
         from winws_runtime.runtime.start_workers import PresetLaunchStartWorker
 

@@ -13,7 +13,7 @@ from settings.mode import (
     normalize_launch_method,
 )
 
-from presets.cache_signatures import path_cache_signature
+from presets.cache_signatures import path_stat_signature
 from presets.file_store import PresetFileStore
 from presets.models import PresetManifest
 from presets.selection_service import PresetSelectionService
@@ -292,8 +292,8 @@ class PresetModeCoordinator:
             self._normalize_method(launch_method),
             engine,
             candidate.lower(),
-            *path_cache_signature(settings_path),
-            *path_cache_signature(preset_path),
+            *path_stat_signature(settings_path),
+            *path_stat_signature(preset_path),
         )
 
     def _selected_manifest_from_cache(

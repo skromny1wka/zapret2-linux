@@ -4,6 +4,17 @@ import hashlib
 from pathlib import Path
 
 
+def path_stat_signature(path: Path) -> tuple[object, ...]:
+    try:
+        stat = path.stat()
+        mtime_ns = int(getattr(stat, "st_mtime_ns", 0) or 0)
+        size = int(getattr(stat, "st_size", 0) or 0)
+    except Exception:
+        return (0, 0)
+
+    return (mtime_ns, size)
+
+
 def path_cache_signature(path: Path) -> tuple[object, ...]:
     try:
         stat = path.stat()
