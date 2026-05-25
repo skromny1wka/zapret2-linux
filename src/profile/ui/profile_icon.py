@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import OrderedDict
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QPixmap
 from PyQt6.QtSvg import QSvgRenderer
@@ -9,21 +11,29 @@ from ui.theme import get_cached_qta_pixmap
 
 _INITIALS_PREFIX = "profile-initials:"
 _SIMPLE_PREFIX = "simple:"
+_PROFILE_PIXMAP_CACHE_MAX = 256
+_PROFILE_PIXMAP_CACHE: OrderedDict[tuple[str, str, str, int], QPixmap] = OrderedDict()
 
 
 def profile_icon_pixmap(icon_name: str, *, color: str, size: int, theme_name: str = "") -> QPixmap:
     name = str(icon_name or "").strip()
     if name.startswith(_SIMPLE_PREFIX):
         slug, fallback = _parse_simple_icon_name(name)
-        pixmap = _simple_icon_pixmap(slug, color=str(color or ""), size=size)
+        pixmap = _cached_profile_pixmap("simple", slug, str(color or ""), size)
         if not pixmap.isNull():
             return pixmap
-        return _initials_pixmap(fallback or _initials_from_slug(slug), color=str(color or "#3B82F6"), size=size)
+        return _cached_profile_pixmap(
+            "initials",
+            fallback or _initials_from_slug(slug),
+            str(color or "#3B82F6"),
+            size,
+        )
     if name.startswith(_INITIALS_PREFIX):
-        return _initials_pixmap(
+        return _cached_profile_pixmap(
+            "initials",
             name.removeprefix(_INITIALS_PREFIX).strip() or "P",
-            color=str(color or "#3B82F6"),
-            size=size,
+            str(color or "#3B82F6"),
+            size,
         )
     return get_cached_qta_pixmap(name, color=color, size=size, theme_name=theme_name)
 
@@ -32,6 +42,32 @@ def _parse_simple_icon_name(icon_name: str) -> tuple[str, str]:
     payload = str(icon_name or "").removeprefix(_SIMPLE_PREFIX)
     slug, _sep, fallback = payload.partition(":")
     return slug.strip(), fallback.strip()
+
+
+def _cached_profile_pixmap(kind: str, value: str, color: str, size: int) -> QPixmap:
+    safe_size = max(12, int(size or 18))
+    cache_key = (str(kind or ""), str(value or ""), _valid_hex_color(color) or str(color or ""), safe_size)
+    cached = _PROFILE_PIXMAP_CACHE.get(cache_key)
+    if cached is not None and not cached.isNull():
+        _PROFILE_PIXMAP_CACHE.move_to_end(cache_key)
+        return QPixmap(cached)
+
+    if cache_key[0] == "simple":
+        pixmap = _simple_icon_pixmap(cache_key[1], color=cache_key[2], size=safe_size)
+    elif cache_key[0] == "initials":
+        pixmap = _initials_pixmap(cache_key[1], color=cache_key[2], size=safe_size)
+    else:
+        return QPixmap()
+
+    if pixmap.isNull():
+        return pixmap
+
+    _PROFILE_PIXMAP_CACHE[cache_key] = QPixmap(pixmap)
+    _PROFILE_PIXMAP_CACHE.move_to_end(cache_key)
+    while len(_PROFILE_PIXMAP_CACHE) > _PROFILE_PIXMAP_CACHE_MAX:
+        _PROFILE_PIXMAP_CACHE.popitem(last=False)
+
+    return pixmap
 
 
 def _simple_icon_pixmap(slug: str, *, color: str, size: int) -> QPixmap:

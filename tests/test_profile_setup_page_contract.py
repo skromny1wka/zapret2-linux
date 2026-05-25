@@ -182,6 +182,16 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         source = inspect.getsource(_badge_palette)
         self.assertNotIn("#00B900", source)
 
+    def test_profile_simple_icons_are_cached_for_fast_repaint(self) -> None:
+        from profile.ui import profile_icon
+
+        source = inspect.getsource(profile_icon.profile_icon_pixmap)
+        cache_source = inspect.getsource(profile_icon._cached_profile_pixmap)
+
+        self.assertIn("_cached_profile_pixmap", source)
+        self.assertIn("_PROFILE_PIXMAP_CACHE", cache_source)
+        self.assertIn("QPixmap(cached)", cache_source)
+
     def test_profile_delegate_dark_rows_use_screenshot_background_colors(self) -> None:
         from profile.ui.profile_list_delegate import _profile_row_background
         from ui.widgets.profile_row_style import PROFILE_ROW_BG_DARK, PROFILE_ROW_BG_DARK_HOVER
