@@ -1057,12 +1057,16 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         from presets.ui.control.zapret2 import page as zapret2_page
         from presets.ui.control.zapret2.page import Zapret2ModeControlPage
 
-        connected: list[object] = []
+        interactive_connected: list[object] = []
+        post_init_connected: list[object] = []
         scheduled: list[tuple[int, object]] = []
 
         class Signal:
+            def __init__(self, target: list[object]):
+                self._target = target
+
             def connect(self, callback, *_args, **_kwargs) -> None:
-                connected.append(callback)
+                self._target.append(callback)
 
         control_page = Zapret2ModeControlPage.__new__(Zapret2ModeControlPage)
         control_page._cleanup_in_progress = False
@@ -1077,8 +1081,9 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         control_page.run_when_page_ready = Mock(side_effect=lambda callback: callback() or True)
         control_page.window = Mock(
             return_value=SimpleNamespace(
-                startup_state=SimpleNamespace(interactive_logged=False),
-                startup_interactive_ready=Signal(),
+                startup_state=SimpleNamespace(interactive_logged=False, post_init_ready=False),
+                startup_interactive_ready=Signal(interactive_connected),
+                startup_post_init_ready=Signal(post_init_connected),
             )
         )
 
@@ -1086,7 +1091,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             Zapret2ModeControlPage._apply_pending_mode_refresh_if_ready(control_page)
 
         control_page.deferred_show_requested.emit.assert_not_called()
-        self.assertEqual(len(connected), 1)
+        self.assertEqual(len(interactive_connected), 1)
 
         control_page.window.return_value.startup_state.interactive_logged = True
         with patch.object(
@@ -1094,10 +1099,22 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             "singleShot",
             side_effect=lambda delay_ms, callback: scheduled.append((delay_ms, callback)),
         ):
-            connected[0]("ui_ready")
+            interactive_connected[0]("ui_ready")
+
+        self.assertEqual(scheduled, [])
+        self.assertEqual(len(post_init_connected), 1)
+        control_page.deferred_show_requested.emit.assert_not_called()
+
+        control_page.window.return_value.startup_state.post_init_ready = True
+        with patch.object(
+            zapret2_page.QTimer,
+            "singleShot",
+            side_effect=lambda delay_ms, callback: scheduled.append((delay_ms, callback)),
+        ):
+            post_init_connected[0]("post_init")
 
         self.assertEqual(len(scheduled), 1)
-        self.assertGreaterEqual(scheduled[0][0], zapret2_page.STARTUP_DEFERRED_SECTIONS_AFTER_INTERACTIVE_MS)
+        self.assertGreaterEqual(scheduled[0][0], zapret2_page.STARTUP_DEFERRED_SECTIONS_AFTER_POST_INIT_MS)
         control_page.deferred_show_requested.emit.assert_not_called()
         scheduled[0][1]()
 

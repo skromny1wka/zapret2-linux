@@ -50,6 +50,7 @@ from qfluentwidgets import (
 
 
 STARTUP_DEFERRED_SECTIONS_AFTER_INTERACTIVE_MS = 1_500
+STARTUP_DEFERRED_SECTIONS_AFTER_POST_INIT_MS = 5_000
 STARTUP_TOP_SUMMARY_AFTER_INTERACTIVE_MS = 350
 STARTUP_INITIAL_UI_STATE_AFTER_INTERACTIVE_MS = 350
 
@@ -295,6 +296,8 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             return True
         if not bool(getattr(state, "interactive_logged", False)):
             return False
+        if not bool(getattr(state, "post_init_ready", False)):
+            return False
         return bool(self._startup_deferred_sections_allowed)
 
     def _wait_for_startup_interactive_before_deferred_sections(self) -> None:
@@ -304,10 +307,10 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         try:
             state = getattr(self.window(), "startup_state", None)
             if state is not None and bool(getattr(state, "interactive_logged", False)):
-                QTimer.singleShot(
-                    STARTUP_DEFERRED_SECTIONS_AFTER_INTERACTIVE_MS,
-                    self._request_deferred_sections_after_startup,
-                )
+                if bool(getattr(state, "post_init_ready", False)):
+                    self._schedule_deferred_sections_after_post_init()
+                else:
+                    self._wait_for_startup_post_init_before_deferred_sections()
                 return
         except Exception:
             pass
@@ -324,8 +327,36 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             )
 
     def _on_startup_interactive_ready_for_deferred_sections(self, *_args) -> None:
+        if self._cleanup_in_progress:
+            return
+        try:
+            state = getattr(self.window(), "startup_state", None)
+            if state is not None and bool(getattr(state, "post_init_ready", False)):
+                self._schedule_deferred_sections_after_post_init()
+                return
+        except Exception:
+            pass
+        self._wait_for_startup_post_init_before_deferred_sections()
+
+    def _wait_for_startup_post_init_before_deferred_sections(self) -> None:
+        try:
+            signal = getattr(self.window(), "startup_post_init_ready", None)
+            signal.connect(
+                self._on_startup_post_init_ready_for_deferred_sections,
+                Qt.ConnectionType.QueuedConnection,
+            )
+        except Exception:
+            QTimer.singleShot(
+                STARTUP_DEFERRED_SECTIONS_AFTER_INTERACTIVE_MS,
+                self._request_deferred_sections_after_startup,
+            )
+
+    def _on_startup_post_init_ready_for_deferred_sections(self, *_args) -> None:
+        self._schedule_deferred_sections_after_post_init()
+
+    def _schedule_deferred_sections_after_post_init(self) -> None:
         QTimer.singleShot(
-            STARTUP_DEFERRED_SECTIONS_AFTER_INTERACTIVE_MS,
+            STARTUP_DEFERRED_SECTIONS_AFTER_POST_INIT_MS,
             self._request_deferred_sections_after_startup,
         )
 
