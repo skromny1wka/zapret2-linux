@@ -251,7 +251,6 @@ class UserPresetsRuntimeService:
                 page=page,
             )
             page.presets_list.viewport().update()
-            page.presets_list.viewport().repaint()
         return changed
 
     def apply_active_preset_marker(self, page=None) -> bool:

@@ -133,6 +133,12 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("adapter.load_all_metadata()", watcher_source)
         self.assertIn("UserPresetsMetadataLoadWorker", load_source)
 
+    def test_user_presets_active_marker_does_not_force_synchronous_repaint(self) -> None:
+        source = inspect.getsource(UserPresetsRuntimeService.apply_active_preset_marker_for_file)
+
+        self.assertIn("viewport().update()", source)
+        self.assertNotIn("viewport().repaint()", source)
+
     def test_profile_commands_reuse_service_cache(self) -> None:
         source = inspect.getsource(profile_commands._profile_preset_service)
 
