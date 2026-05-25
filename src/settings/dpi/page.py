@@ -1,7 +1,7 @@
 # settings/dpi/page.py
 """Страница настроек DPI"""
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame
 
 from ui.pages.base_page import BasePage
@@ -99,8 +99,6 @@ class DpiSettingsPage(BasePage):
         self.lock_successes_spin = None
         self.unlock_fails_spin = None
         self._settings_loaded = False
-        self._deferred_icons_scheduled = False
-        self._deferred_icons_loaded = False
         self._build_ui()
 
     def _tr(self, key: str, default: str, **kwargs) -> str:
@@ -164,7 +162,6 @@ class DpiSettingsPage(BasePage):
             icon_name="mdi.rocket-launch",
             recommended=True,
             recommended_badge=self._tr("page.dpi_settings.option.recommended", "рекомендуется"),
-            defer_icon=True,
         )
         self.method_zapret2_mode.clicked.connect(lambda: self._select_method(ZAPRET2_MODE))
         method_layout.addWidget(self.method_zapret2_mode)
@@ -174,7 +171,6 @@ class DpiSettingsPage(BasePage):
             *self._method_option_text(ORCHESTRA_MODE),
             icon_name="mdi.brain",
             icon_color="#9c27b0",
-            defer_icon=True,
         )
         self.method_orchestra.clicked.connect(lambda: self._select_method(ORCHESTRA_MODE))
         method_layout.addWidget(self.method_orchestra)
@@ -194,7 +190,6 @@ class DpiSettingsPage(BasePage):
             *self._method_option_text(ZAPRET1_MODE),
             icon_name="mdi.rocket-launch-outline",
             icon_color="#ff9800",
-            defer_icon=True,
         )
         self.method_zapret1_mode.clicked.connect(lambda: self._select_method(ZAPRET1_MODE))
         method_layout.addWidget(self.method_zapret1_mode)
@@ -313,25 +308,6 @@ class DpiSettingsPage(BasePage):
 
     def on_page_activated(self) -> None:
         self._run_runtime_init_once()
-        self._schedule_deferred_icons()
-
-    def _schedule_deferred_icons(self) -> None:
-        if self._deferred_icons_scheduled or self._deferred_icons_loaded:
-            return
-        self._deferred_icons_scheduled = True
-        QTimer.singleShot(120, self._load_deferred_icons)
-
-    def _load_deferred_icons(self) -> None:
-        self._deferred_icons_loaded = True
-        for option in (
-            self.method_zapret2_mode,
-            self.method_orchestra,
-            self.method_zapret1_mode,
-        ):
-            try:
-                option.ensure_icon_loaded()
-            except Exception:
-                pass
     
     def _update_method_selection(self, method: str):
         """Обновляет визуальное состояние выбора метода"""

@@ -760,16 +760,15 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
                 self.assertNotIn("self._run_runtime_init_once()", init_source)
                 self.assertIn("self._run_runtime_init_once()", activated_source)
 
-    def test_dpi_settings_page_defers_decorative_radio_icons(self) -> None:
+    def test_dpi_settings_page_keeps_radio_icons_visible_immediately(self) -> None:
         page_build_source = inspect.getsource(DpiSettingsPage._build_ui)
         activation_source = inspect.getsource(DpiSettingsPage.on_page_activated)
-        icon_source = inspect.getsource(DpiSettingsPage._schedule_deferred_icons)
         radio_source = inspect.getsource(Win11RadioOption.setSelected)
+        radio_init_source = inspect.getsource(Win11RadioOption.__init__)
 
-        self.assertIn("defer_icon=True", page_build_source)
-        self.assertIn("_schedule_deferred_icons()", activation_source)
-        self.assertIn("QTimer.singleShot", icon_source)
-        self.assertNotIn("get_cached_qta_pixmap", page_build_source)
+        self.assertNotIn("defer_icon=True", page_build_source)
+        self.assertNotIn("_schedule_deferred_icons()", activation_source)
+        self.assertNotIn("defer_icon", radio_init_source)
         self.assertIn("if self._selected == selected", radio_source)
 
     def test_dpi_settings_initial_load_reuses_initial_visibility(self) -> None:
