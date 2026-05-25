@@ -125,6 +125,15 @@
 
 --new
 
+--name=Telegram
+--filter-tcp=80,443,5222
+--ipset=lists/ipset-telegram.txt
+--out-range=-d10
+--payload=all
+--lua-desync=pass
+
+--new
+
 --name=Tanki X
 --filter-tcp=80,443,5050,8080
 --out-range=-n8
@@ -227,7 +236,7 @@
 
 --name=discord.media
 --filter-tcp=80,443,1080,2053,2083,2087,2096,8443
---hostlist-domains=discord.media
+--hostlist=lists/discord-media.txt
 --out-range=-d10
 --payload=tls_client_hello
 --lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2
@@ -254,7 +263,7 @@
 
 --name=ntc.party
 --filter-tcp=80,443
---hostlist-domains=ntc.party
+--hostlist=lists/ntcparty.txt
 --payload=tls_client_hello
 --out-range=-d9
 --lua-desync=multidisorder:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1

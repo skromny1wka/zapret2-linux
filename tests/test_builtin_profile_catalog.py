@@ -15,7 +15,7 @@ PRIVATE_ROOT = PUBLIC_ROOT.parent / "private_zapretgui"
 ALL_PROFILES_PATH = PRIVATE_ROOT / "resources" / "profile" / "templates" / "all_profiles.txt"
 WIDE_DISCORD_TCP_FILTER = "--filter-tcp=80,443,1080,2053,2083,2087,2096,8443"
 WIDE_DISCORD_PRIMARY_LINES = {
-    "--hostlist-domains=discord.media",
+    "--hostlist=lists/discord-media.txt",
     "--hostlist=lists/discord.txt",
     "--ipset=lists/ipset-discord.txt",
 }
@@ -171,7 +171,7 @@ class BuiltinProfileCatalogTests(unittest.TestCase):
         payload = service.list_profiles()
 
         discord_updates = _items_with_match_line(payload.items, "--hostlist=lists/discord-updates.txt")
-        discord_media = _items_with_match_line(payload.items, "--hostlist-domains=discord.media")
+        discord_media = _items_with_match_line(payload.items, "--hostlist=lists/discord-media.txt")
         self.assertTrue(discord_updates, "Default v5 должен распознать Discord Updates как profile из preset-а")
         self.assertTrue(discord_media, "Default v5 должен распознать discord.media как profile из preset-а")
         self.assertTrue(all(item.in_preset for item in discord_updates))

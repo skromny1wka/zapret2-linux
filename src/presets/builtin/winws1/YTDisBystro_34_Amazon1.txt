@@ -42,7 +42,7 @@
 --new
 
 --filter-tcp=443
---hostlist-domains=ntc.party
+--hostlist=lists/ntcparty.txt
 --hostlist=lists/russia-discord.txt
 --dpi-desync=multisplit
 --dpi-desync-split-seqovl=286

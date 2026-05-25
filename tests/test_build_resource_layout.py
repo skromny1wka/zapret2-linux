@@ -25,6 +25,19 @@ class BuildResourceLayoutTests(unittest.TestCase):
         self.assertIn(r'{#PRIVATERESOURCES}\profile\templates\*.txt', iss)
         self.assertNotIn(r'{#PUBLICSRC}\profile\templates\*.txt', iss)
 
+    def test_inno_copies_lists_to_base_without_nested_base_or_user_dirs(self) -> None:
+        iss = self._read_inno_script()
+        list_lines = [
+            line
+            for line in iss.splitlines()
+            if r'{#SOURCEPATH}\lists' in line and r'DestDir: "{app}\lists\base"' in line
+        ]
+
+        self.assertTrue(list_lines)
+        for line in list_lines:
+            self.assertNotIn("recursesubdirs", line)
+            self.assertNotIn("createallsubdirs", line)
+
     def test_inno_shortcuts_are_versioned_and_recreated_by_single_channel_owner(self) -> None:
         iss = self._read_inno_script()
 

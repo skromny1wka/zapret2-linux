@@ -127,7 +127,7 @@
 
 --name=discord.media
 --filter-tcp=80,443,1080,2053,2083,2087,2096,8443
---hostlist-domains=discord.media
+--hostlist=lists/discord-media.txt
 --out-range=-d2
 --lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2
 
@@ -161,7 +161,7 @@
 
 --name=ntc.party
 --filter-tcp=80,443
---hostlist-domains=ntc.party
+--hostlist=lists/ntcparty.txt
 --out-range=-d9
 --lua-desync=multidisorder:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1
 

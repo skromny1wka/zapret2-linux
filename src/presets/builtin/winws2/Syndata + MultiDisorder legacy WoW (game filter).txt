@@ -118,7 +118,7 @@
 
 --name=discord.media
 --filter-tcp=80,443,1080,2053,2083,2087,2096,8443
---hostlist-domains=discord.media
+--hostlist=lists/discord-media.txt
 --out-range=-d10
 --lua-desync=syndata
 --lua-desync=multidisorder_legacy:pos=1,midsld
@@ -153,7 +153,7 @@
 
 --name=ntc.party
 --filter-tcp=80,443
---hostlist-domains=ntc.party
+--hostlist=lists/ntcparty.txt
 --out-range=-d9
 --lua-desync=syndata
 --lua-desync=multidisorder_legacy:pos=1,midsld

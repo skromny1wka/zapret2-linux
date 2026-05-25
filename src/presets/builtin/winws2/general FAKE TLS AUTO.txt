@@ -113,7 +113,7 @@
 --name=discord.media
 --filter-tcp=80,443,1080,2053,2083,2087,2096,8443
 --out-range=-d10
---hostlist-domains=discord.media
+--hostlist=lists/discord-media.txt
 --lua-desync=fake:blob=0x00000000:repeats=11:tcp_ack=-66000:tcp_ts_up
 --lua-desync=fake:blob=fake_default_tls:tls_mod=rnd,dupsid,sni=www.google.com:repeats=11:tcp_ack=-66000:tcp_ts_up
 --lua-desync=multidisorder_legacy:pos=1,midsld:repeats=11
