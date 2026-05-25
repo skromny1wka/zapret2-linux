@@ -25,7 +25,6 @@ def serialize_preset(preset: Preset) -> str:
             if lines:
                 lines.append("")
             lines.append(profile.new_line)
-            lines.append("")
             skip_leading_blanks = True
         for segment in profile.segments:
             if skip_leading_blanks and not str(segment.text or "").strip():
@@ -344,10 +343,21 @@ def _unique_copy_name(preset: Preset, source: Profile) -> str:
 
 def _ensure_profile_boundaries(preset: Preset) -> None:
     for index, profile in enumerate(preset.profiles):
-        if index == 0 or str(profile.new_line or "").strip():
+        if index == 0:
+            profile.new_line = ""
+            continue
+        if _profile_has_name_directive(profile):
+            profile.new_line = "--new"
             continue
         name = str(profile.name or profile.display_name or f"profile {index + 1}").strip() or f"profile {index + 1}"
         profile.new_line = f"--new={name}"
+
+
+def _profile_has_name_directive(profile: Profile) -> bool:
+    return any(
+        segment.kind == "directive" and str(segment.name or "").strip().lower() == "--name"
+        for segment in profile.segments
+    )
 
 
 def _rename_profile_copy(profile: Profile, name: str) -> None:

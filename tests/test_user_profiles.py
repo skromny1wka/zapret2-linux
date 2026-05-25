@@ -374,7 +374,51 @@ class UserProfilesTests(unittest.TestCase):
         self.assertIn("--hostlist=lists/my-site.txt", preset.profiles[0].match.hostlist_lines)
         self.assertIn("--hostlist=lists/all.txt", preset.profiles[1].match.hostlist_lines)
         self.assertTrue(store.text.startswith("--name=My Site\n"))
-        self.assertIn("\n--new=All TCP\n", store.text)
+        self.assertIn("\n--new\n--name=All TCP\n", store.text)
+
+    def test_adding_and_deleting_profile_keeps_plain_profile_boundaries(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "profile" / "templates").mkdir(parents=True)
+            (root / "profile" / "templates" / "all_profiles.txt").write_text("", encoding="utf-8")
+            store = _PresetStore(
+                "\n".join(
+                    (
+                        "--name=Tanki X",
+                        "--filter-tcp=80,443-65535",
+                        "--hostlist=tankix.txt",
+                        "",
+                        "--out-range=-d8",
+                        "--lua-desync=tls_multisplit_sni:seqovl=652:seqovl_pattern=tls_google",
+                        "",
+                    )
+                )
+            )
+            feature = SimpleNamespace(
+                _presets_feature=store,
+                _app_paths=AppPaths(user_root=root, local_root=root),
+            )
+
+            with patch("settings.store.MAIN_DIRECTORY", str(root)):
+                profile_id = create_user_profile(feature._app_paths, name="youtube.com (интерфейс)", protocol="tcp", ports="80,443")
+                service = ProfilePresetService(feature, "zapret2_mode")
+                new_key = service.set_profile_enabled(f"template:user:{profile_id}", True)
+                after_add = store.text
+                self.assertTrue(service.delete_profile(new_key or ""))
+                after_delete = store.text
+                service.set_profile_enabled(f"template:user:{profile_id}", True)
+                after_add_again = store.text
+
+        self.assertIn("\n--new\n--name=Tanki X\n", after_add)
+        self.assertNotIn("--new=Tanki X", after_add)
+        self.assertNotIn("--new=youtube.com (интерфейс)", after_add)
+        self.assertNotIn("--new\n\n--name=", after_add)
+        self.assertTrue(after_delete.startswith("--name=Tanki X\n"))
+        self.assertNotIn("--new=Tanki X", after_delete)
+        self.assertEqual(after_add_again.count("--name=Tanki X"), 1)
+        self.assertEqual(after_add_again.count("--name=youtube.com (интерфейс)"), 1)
+        self.assertNotIn("--new=Tanki X", after_add_again)
+        self.assertNotIn("--new\n\n--name=", after_add_again)
 
     def test_update_user_profile_renames_files_and_updates_named_profiles_in_all_presets(self) -> None:
         with TemporaryDirectory() as temp_dir:
