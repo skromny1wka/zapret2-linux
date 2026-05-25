@@ -160,6 +160,7 @@ class Win11RadioOption(QWidget):
         icon_color: str = "",
         recommended: bool = False,
         recommended_badge: str = "рекомендуется",
+        defer_icon: bool = False,
         parent=None,
     ):
         super().__init__(parent)
@@ -176,6 +177,8 @@ class Win11RadioOption(QWidget):
         self._title_label = None
         self._desc_label = None
         self._applying_theme_styles = False
+        self._icon_loaded = False
+        self._defer_icon = bool(defer_icon)
         initial_tokens = get_theme_tokens()
 
         layout = QHBoxLayout(self)
@@ -190,7 +193,8 @@ class Win11RadioOption(QWidget):
             self._icon_label = QLabel()
             self._icon_label.setFixedSize(28, 28)
             layout.addWidget(self._icon_label)
-            self._refresh_icon(initial_tokens)
+            if not self._defer_icon:
+                self.ensure_icon_loaded(initial_tokens)
 
         text_layout = QVBoxLayout()
         text_layout.setSpacing(2)
@@ -253,12 +257,20 @@ class Win11RadioOption(QWidget):
         except Exception:
             return
 
+    def ensure_icon_loaded(self, tokens=None) -> None:
+        self._refresh_icon(tokens)
+        self._icon_loaded = True
+
     def _apply_theme_refresh(self, tokens=None, force: bool = False) -> None:
         _ = force
-        self._refresh_icon(tokens)
+        if self._icon_loaded or not self._defer_icon:
+            self._refresh_icon(tokens)
         self._update_style(tokens)
 
     def setSelected(self, selected: bool):
+        selected = bool(selected)
+        if self._selected == selected:
+            return
         self._selected = selected
         self._update_style()
 

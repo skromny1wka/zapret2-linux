@@ -1,7 +1,7 @@
 # settings/dpi/page.py
 """Страница настроек DPI"""
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame
 
 from ui.pages.base_page import BasePage
@@ -99,6 +99,8 @@ class DpiSettingsPage(BasePage):
         self.lock_successes_spin = None
         self.unlock_fails_spin = None
         self._settings_loaded = False
+        self._deferred_icons_scheduled = False
+        self._deferred_icons_loaded = False
         self._build_ui()
 
     def _tr(self, key: str, default: str, **kwargs) -> str:
@@ -162,6 +164,7 @@ class DpiSettingsPage(BasePage):
             icon_name="mdi.rocket-launch",
             recommended=True,
             recommended_badge=self._tr("page.dpi_settings.option.recommended", "рекомендуется"),
+            defer_icon=True,
         )
         self.method_zapret2_mode.clicked.connect(lambda: self._select_method(ZAPRET2_MODE))
         method_layout.addWidget(self.method_zapret2_mode)
@@ -170,7 +173,8 @@ class DpiSettingsPage(BasePage):
         self.method_orchestra = Win11RadioOption(
             *self._method_option_text(ORCHESTRA_MODE),
             icon_name="mdi.brain",
-            icon_color="#9c27b0"
+            icon_color="#9c27b0",
+            defer_icon=True,
         )
         self.method_orchestra.clicked.connect(lambda: self._select_method(ORCHESTRA_MODE))
         method_layout.addWidget(self.method_orchestra)
@@ -189,7 +193,8 @@ class DpiSettingsPage(BasePage):
         self.method_zapret1_mode = Win11RadioOption(
             *self._method_option_text(ZAPRET1_MODE),
             icon_name="mdi.rocket-launch-outline",
-            icon_color="#ff9800"
+            icon_color="#ff9800",
+            defer_icon=True,
         )
         self.method_zapret1_mode.clicked.connect(lambda: self._select_method(ZAPRET1_MODE))
         method_layout.addWidget(self.method_zapret1_mode)
@@ -296,8 +301,8 @@ class DpiSettingsPage(BasePage):
         try:
             initial = self._dpi_settings.load_initial_state()
             self._update_method_selection(initial.launch_method)
-            self._update_filters_visibility(initial.launch_method)
-            self._sync_visible_settings()
+            self._apply_visibility(initial.visibility)
+            self._sync_visible_settings(initial.launch_method, initial.visibility)
 
         except Exception as e:
             self._settings_loaded = False
@@ -308,6 +313,25 @@ class DpiSettingsPage(BasePage):
 
     def on_page_activated(self) -> None:
         self._run_runtime_init_once()
+        self._schedule_deferred_icons()
+
+    def _schedule_deferred_icons(self) -> None:
+        if self._deferred_icons_scheduled or self._deferred_icons_loaded:
+            return
+        self._deferred_icons_scheduled = True
+        QTimer.singleShot(120, self._load_deferred_icons)
+
+    def _load_deferred_icons(self) -> None:
+        self._deferred_icons_loaded = True
+        for option in (
+            self.method_zapret2_mode,
+            self.method_orchestra,
+            self.method_zapret1_mode,
+        ):
+            try:
+                option.ensure_icon_loaded()
+            except Exception:
+                pass
     
     def _update_method_selection(self, method: str):
         """Обновляет визуальное состояние выбора метода"""
@@ -319,9 +343,10 @@ class DpiSettingsPage(BasePage):
         """Обработчик выбора метода"""
         try:
             next_method = self._dpi_settings.apply_launch_method(method)
+            visibility = self._dpi_settings.describe_visibility(next_method)
             self._update_method_selection(next_method)
-            self._update_filters_visibility(next_method)
-            self._sync_visible_settings()
+            self._apply_visibility(visibility)
+            self._sync_visible_settings(next_method, visibility)
             self._runtime.handle_launch_method_changed(next_method, set_status=self._set_status)
             self._after_launch_method_changed(next_method)
         except Exception as e:
@@ -409,22 +434,26 @@ class DpiSettingsPage(BasePage):
         try:
             resolved_method = str(method or self._dpi_settings.get_launch_method()).strip().lower()
             visibility = self._dpi_settings.describe_visibility(resolved_method)
+            self._apply_visibility(visibility)
 
-            # Настройки оркестратора только для Python-оркестратора.
-            if visibility.show_orchestra_settings:
-                self._ensure_orchestra_settings_built()
-            if self.orchestra_settings_container is not None:
-                self.orchestra_settings_container.setVisible(visibility.show_orchestra_settings)
-
-        except:
+        except Exception:
             pass
 
-    def _sync_visible_settings(self) -> None:
+    def _apply_visibility(self, visibility) -> None:
+        # Настройки оркестратора строятся только когда этот режим действительно виден.
+        if visibility.show_orchestra_settings:
+            self._ensure_orchestra_settings_built()
+        if self.orchestra_settings_container is not None:
+            self.orchestra_settings_container.setVisible(visibility.show_orchestra_settings)
+
+    def _sync_visible_settings(self, method: str | None = None, visibility=None) -> None:
         try:
-            visibility = self._dpi_settings.describe_visibility(
-                self._dpi_settings.get_launch_method()
-            )
-            if visibility.show_orchestra_settings:
+            resolved_visibility = visibility
+            if resolved_visibility is None:
+                resolved_method = str(method or self._dpi_settings.get_launch_method()).strip().lower()
+                resolved_visibility = self._dpi_settings.describe_visibility(resolved_method)
+
+            if resolved_visibility.show_orchestra_settings:
                 self._ensure_orchestra_settings_built()
                 self._load_orchestra_settings(
                     self._dpi_settings.load_orchestra_settings()

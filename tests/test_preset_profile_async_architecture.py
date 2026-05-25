@@ -57,6 +57,7 @@ import telegram_proxy.ui.settings_build as telegram_proxy_settings_build
 from telegram_proxy.ui.page import TelegramProxyPage
 from telegram_proxy.workers import TelegramProxyDiagnosticsWorker
 import ui.navigation.text_sync as navigation_text_sync
+from ui.widgets.win11_controls import Win11RadioOption
 from ui.page_host import WindowPageHost
 
 
@@ -758,6 +759,26 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
                 self.assertNotIn("self._run_runtime_init_once()", init_source)
                 self.assertIn("self._run_runtime_init_once()", activated_source)
+
+    def test_dpi_settings_page_defers_decorative_radio_icons(self) -> None:
+        page_build_source = inspect.getsource(DpiSettingsPage._build_ui)
+        activation_source = inspect.getsource(DpiSettingsPage.on_page_activated)
+        icon_source = inspect.getsource(DpiSettingsPage._schedule_deferred_icons)
+        radio_source = inspect.getsource(Win11RadioOption.setSelected)
+
+        self.assertIn("defer_icon=True", page_build_source)
+        self.assertIn("_schedule_deferred_icons()", activation_source)
+        self.assertIn("QTimer.singleShot", icon_source)
+        self.assertNotIn("get_cached_qta_pixmap", page_build_source)
+        self.assertIn("if self._selected == selected", radio_source)
+
+    def test_dpi_settings_initial_load_reuses_initial_visibility(self) -> None:
+        load_source = inspect.getsource(DpiSettingsPage._load_settings)
+        sync_source = inspect.getsource(DpiSettingsPage._sync_visible_settings)
+
+        self.assertIn("initial.visibility", load_source)
+        self.assertIn("_sync_visible_settings(initial.launch_method, initial.visibility)", load_source)
+        self.assertIn("visibility=None", sync_source)
 
     def test_network_and_telegram_ui_do_not_create_python_threads(self) -> None:
         modules = (
