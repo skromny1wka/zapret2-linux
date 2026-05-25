@@ -1102,6 +1102,20 @@ class StartupRuntimeSetupTests(unittest.TestCase):
 
         control_page.deferred_show_requested.emit.assert_called_once()
 
+    def test_zapret2_control_initial_state_does_not_wait_for_deferred_sections(self) -> None:
+        from presets.ui.control.zapret2.page import Zapret2ModeControlPage
+
+        control_page = Zapret2ModeControlPage.__new__(Zapret2ModeControlPage)
+        control_page._startup_deferred_sections_allowed = False
+        control_page.window = Mock(
+            return_value=SimpleNamespace(
+                startup_state=SimpleNamespace(interactive_logged=True),
+            )
+        )
+
+        self.assertTrue(Zapret2ModeControlPage._startup_can_apply_initial_ui_state(control_page))
+        self.assertFalse(Zapret2ModeControlPage._startup_can_run_deferred_sections(control_page))
+
     def test_zapret2_control_defers_top_summary_data_until_startup_interactive(self) -> None:
         from app.state_store import AppUiState
         from presets.ui.control.zapret2 import page as zapret2_page
@@ -1157,7 +1171,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             connected[0]("ui_ready")
 
         self.assertEqual(len(scheduled), 1)
-        self.assertGreaterEqual(scheduled[0][0], 150)
+        self.assertGreaterEqual(scheduled[0][0], zapret2_page.STARTUP_TOP_SUMMARY_AFTER_INTERACTIVE_MS)
         scheduled[0][1]()
 
         control_page._presets.get_selected_source_preset_display.assert_called_once()

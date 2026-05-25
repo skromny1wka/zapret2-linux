@@ -49,7 +49,8 @@ from qfluentwidgets import (
 )
 
 
-STARTUP_DEFERRED_SECTIONS_AFTER_INTERACTIVE_MS = 8_000
+STARTUP_DEFERRED_SECTIONS_AFTER_INTERACTIVE_MS = 1_500
+STARTUP_TOP_SUMMARY_AFTER_INTERACTIVE_MS = 350
 STARTUP_INITIAL_UI_STATE_AFTER_INTERACTIVE_MS = 350
 
 
@@ -344,6 +345,15 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             return True
         return bool(getattr(state, "interactive_logged", False))
 
+    def _startup_can_apply_initial_ui_state(self) -> bool:
+        try:
+            state = getattr(self.window(), "startup_state", None)
+        except Exception:
+            return True
+        if state is None:
+            return True
+        return bool(getattr(state, "interactive_logged", False))
+
     def _wait_for_startup_interactive_before_top_summary(self) -> None:
         if bool(self._startup_top_summary_waiting):
             return
@@ -356,13 +366,13 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             )
         except Exception:
             QTimer.singleShot(
-                STARTUP_DEFERRED_SECTIONS_AFTER_INTERACTIVE_MS,
+                STARTUP_TOP_SUMMARY_AFTER_INTERACTIVE_MS,
                 self._request_top_summary_after_startup,
             )
 
     def _on_startup_interactive_ready_for_top_summary(self, *_args) -> None:
         QTimer.singleShot(
-            STARTUP_DEFERRED_SECTIONS_AFTER_INTERACTIVE_MS,
+            STARTUP_TOP_SUMMARY_AFTER_INTERACTIVE_MS,
             self._request_top_summary_after_startup,
         )
 
@@ -376,6 +386,16 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         if bool(self._startup_initial_ui_state_waiting):
             return
         self._startup_initial_ui_state_waiting = True
+        try:
+            state = getattr(self.window(), "startup_state", None)
+            if state is not None and bool(getattr(state, "interactive_logged", False)):
+                QTimer.singleShot(
+                    STARTUP_INITIAL_UI_STATE_AFTER_INTERACTIVE_MS,
+                    self._request_initial_ui_state_after_startup,
+                )
+                return
+        except Exception:
+            pass
         try:
             signal = getattr(self.window(), "startup_interactive_ready", None)
             signal.connect(
@@ -778,7 +798,7 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         self.stop_and_exit_btn.setEnabled(not loading)
 
     def bind_ui_state_store(self, store: MainWindowStateStore) -> None:
-        defer_initial_state = not self._startup_can_run_deferred_sections()
+        defer_initial_state = not self._startup_can_apply_initial_ui_state()
         bind_control_ui_state_store(
             self,
             store,
