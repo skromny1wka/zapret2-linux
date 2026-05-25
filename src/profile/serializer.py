@@ -25,6 +25,7 @@ def serialize_preset(preset: Preset) -> str:
             if lines:
                 lines.append("")
             lines.append(profile.new_line)
+            lines.append("")
             skip_leading_blanks = True
         for segment in profile.segments:
             if skip_leading_blanks and not str(segment.text or "").strip():
@@ -77,6 +78,10 @@ def with_profile_strategy_lines(preset: Preset, profile_index: int, strategy_lin
         kept.append(segment)
 
     insert_at = first_strategy_index if first_strategy_index is not None else len(kept)
+    if replacement_segments:
+        while insert_at > 0 and kept[insert_at - 1].kind == "blank":
+            del kept[insert_at - 1]
+            insert_at -= 1
     profile.segments = [*kept[:insert_at], *replacement_segments, *kept[insert_at:]]
     return _reparse(updated)
 
@@ -344,6 +349,7 @@ def _unique_copy_name(preset: Preset, source: Profile) -> str:
 def _ensure_profile_boundaries(preset: Preset) -> None:
     for index, profile in enumerate(preset.profiles):
         if index == 0:
+            _remove_leading_blank_segments(profile)
             profile.new_line = ""
             continue
         if _profile_has_name_directive(profile):
@@ -358,6 +364,11 @@ def _profile_has_name_directive(profile: Profile) -> bool:
         segment.kind == "directive" and str(segment.name or "").strip().lower() == "--name"
         for segment in profile.segments
     )
+
+
+def _remove_leading_blank_segments(profile: Profile) -> None:
+    while profile.segments and profile.segments[0].kind == "blank":
+        del profile.segments[0]
 
 
 def _rename_profile_copy(profile: Profile, name: str) -> None:

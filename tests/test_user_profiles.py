@@ -340,6 +340,62 @@ class UserProfilesTests(unittest.TestCase):
         self.assertLess(lines.index("--out-range=-d8"), lines.index("--lua-desync=fake"))
         self.assertIn("--lua-desync=fake", lines)
 
+    def test_applying_strategy_to_template_profile_removes_blank_before_strategy(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            templates_dir = root / "profile" / "templates"
+            templates_dir.mkdir(parents=True)
+            templates_dir.joinpath("all_profiles.txt").write_text(
+                "\n".join(
+                    (
+                        "--name=Speedtest",
+                        "--filter-tcp=443,8080",
+                        "--hostlist=lists/speedtest.txt",
+                        "",
+                    )
+                ),
+                encoding="utf-8",
+            )
+            catalogs_dir = root / "profile" / "strategy_catalogs" / "winws2"
+            catalogs_dir.mkdir(parents=True)
+            (catalogs_dir / "tcp.txt").write_text(
+                "\n".join(
+                    (
+                        "[tcp_md5]",
+                        "name = TCP MD5",
+                        "--lua-desync=multidisorder:pos=4:repeats=10:tcp_md5",
+                        "",
+                    )
+                ),
+                encoding="utf-8",
+            )
+            store = _PresetStore(
+                "\n".join(
+                    (
+                        "--name=youtube.com (интерфейс)",
+                        "--filter-tcp=80,443",
+                        "--hostlist=lists/youtube.txt",
+                        "--payload=tls_client_hello",
+                        "--out-range=-d8",
+                        "--lua-desync=multisplit:pos=2,midsld-2:seqovl=1:seqovl_pattern=tls7",
+                        "",
+                    )
+                )
+            )
+            feature = SimpleNamespace(
+                _presets_feature=store,
+                _app_paths=AppPaths(user_root=root, local_root=root),
+            )
+
+            with patch("settings.store.MAIN_DIRECTORY", str(root)):
+                service = ProfilePresetService(feature, "zapret2_mode")
+                new_key = service.apply_strategy("template:all_profiles:0", "tcp_md5")
+
+        self.assertEqual(new_key, "profile:0")
+        self.assertIn("--hostlist=lists/speedtest.txt\n--out-range=-d8", store.text)
+        self.assertNotIn("--hostlist=lists/speedtest.txt\n\n--out-range=-d8", store.text)
+        self.assertIn("\n--new\n\n--name=youtube.com (интерфейс)", store.text)
+
     def test_enabling_missing_profile_adds_it_to_top_of_preset(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -374,7 +430,7 @@ class UserProfilesTests(unittest.TestCase):
         self.assertIn("--hostlist=lists/my-site.txt", preset.profiles[0].match.hostlist_lines)
         self.assertIn("--hostlist=lists/all.txt", preset.profiles[1].match.hostlist_lines)
         self.assertTrue(store.text.startswith("--name=My Site\n"))
-        self.assertIn("\n--new\n--name=All TCP\n", store.text)
+        self.assertIn("\n--new\n\n--name=All TCP\n", store.text)
 
     def test_adding_and_deleting_profile_keeps_plain_profile_boundaries(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -409,16 +465,14 @@ class UserProfilesTests(unittest.TestCase):
                 service.set_profile_enabled(f"template:user:{profile_id}", True)
                 after_add_again = store.text
 
-        self.assertIn("\n--new\n--name=Tanki X\n", after_add)
+        self.assertIn("\n--new\n\n--name=Tanki X\n", after_add)
         self.assertNotIn("--new=Tanki X", after_add)
         self.assertNotIn("--new=youtube.com (интерфейс)", after_add)
-        self.assertNotIn("--new\n\n--name=", after_add)
         self.assertTrue(after_delete.startswith("--name=Tanki X\n"))
         self.assertNotIn("--new=Tanki X", after_delete)
         self.assertEqual(after_add_again.count("--name=Tanki X"), 1)
         self.assertEqual(after_add_again.count("--name=youtube.com (интерфейс)"), 1)
         self.assertNotIn("--new=Tanki X", after_add_again)
-        self.assertNotIn("--new\n\n--name=", after_add_again)
 
     def test_update_user_profile_renames_files_and_updates_named_profiles_in_all_presets(self) -> None:
         with TemporaryDirectory() as temp_dir:
