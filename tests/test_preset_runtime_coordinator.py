@@ -49,6 +49,34 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
         self.assertEqual(calls, [(ZAPRET2_MODE, "preset_content_changed", "Default v5.txt")])
         self.assertEqual(ui_state.content_revision, 1)
 
+    def test_active_preset_revision_is_published_after_click_event(self) -> None:
+        from core.runtime.preset_runtime_coordinator import PresetRuntimeCoordinator
+        from settings.mode import ZAPRET2_MODE
+
+        class _UiState:
+            def __init__(self) -> None:
+                self.active_revision = 0
+
+            def bump_active_preset_revision(self) -> None:
+                self.active_revision += 1
+
+        ui_state = _UiState()
+        coordinator = PresetRuntimeCoordinator(
+            presets_feature=SimpleNamespace(),
+            ui_state_store=ui_state,
+            get_launch_method=lambda: ZAPRET2_MODE,
+            get_active_preset_path=lambda: "",
+            refresh_after_switch=lambda: None,
+            request_runtime_content_apply=lambda *_args: True,
+        )
+        coordinator.setup_active_preset_file_watcher = lambda: None
+
+        coordinator.handle_preset_switched(ZAPRET2_MODE, "Default v5.txt")
+
+        self.assertEqual(ui_state.active_revision, 0)
+        self._app.processEvents()
+        self.assertEqual(ui_state.active_revision, 1)
+
     def test_raw_editor_can_save_active_preset_without_publishing_until_commit(self) -> None:
         from presets.raw_preset_editor_workflow import RawPresetEditorController
         from settings.mode import ZAPRET2_MODE

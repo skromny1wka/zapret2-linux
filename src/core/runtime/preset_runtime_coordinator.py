@@ -102,7 +102,7 @@ class PresetRuntimeCoordinator(QObject):
         try:
             store = self._ui_state_store
             if store is not None:
-                store.bump_active_preset_revision()
+                self._publish_active_preset_revision_deferred()
         except Exception:
             pass
         self.schedule_refresh_after_preset_switch()
@@ -117,7 +117,7 @@ class PresetRuntimeCoordinator(QObject):
         try:
             store = self._ui_state_store
             if store is not None:
-                store.bump_active_preset_revision()
+                self._publish_active_preset_revision_deferred()
         except Exception:
             pass
         self.schedule_refresh_after_preset_switch()
@@ -216,6 +216,21 @@ class PresetRuntimeCoordinator(QObject):
             store = self._ui_state_store
             if store is not None:
                 store.bump_preset_content_revision()
+        except Exception:
+            pass
+
+    def _publish_active_preset_revision_deferred(self) -> None:
+        """Будит UI-подписчиков после завершения текущего клика."""
+        try:
+            QTimer.singleShot(0, self._publish_active_preset_revision_now)
+        except Exception:
+            self._publish_active_preset_revision_now()
+
+    def _publish_active_preset_revision_now(self) -> None:
+        try:
+            store = self._ui_state_store
+            if store is not None:
+                store.bump_active_preset_revision()
         except Exception:
             pass
 
