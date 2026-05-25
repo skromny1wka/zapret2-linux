@@ -78,6 +78,7 @@ class UserPresetsListingApi(Protocol):
     def get_active_preset_name_light(self) -> str: ...
     def get_selected_source_preset_file_name_light(self) -> str: ...
     def get_presets_dir_light(self): ...
+    def get_cached_preset_list_metadata_light(self) -> dict[str, dict[str, object]] | None: ...
     def load_preset_list_metadata_light(self) -> dict[str, dict[str, object]]: ...
     def read_single_preset_list_metadata_light(self, file_name: str) -> tuple[str, dict[str, object]] | None: ...
     def resolve_display_name(self, reference: str) -> str: ...
@@ -282,6 +283,9 @@ class _UserPresetsListingApiImpl:
 
     def get_presets_dir_light(self):
         return self._runtime.get_presets_dir_light()
+
+    def get_cached_preset_list_metadata_light(self) -> dict[str, dict[str, object]] | None:
+        return self._runtime.get_cached_preset_list_metadata_light()
 
     def load_preset_list_metadata_light(self) -> dict[str, dict[str, object]]:
         return self._runtime.load_preset_list_metadata_light()
@@ -706,30 +710,12 @@ class UserPresetsPageRuntime:
             self._config.launch_method,
         )
 
+    def get_cached_preset_list_metadata_light(self) -> dict[str, dict[str, object]] | None:
+        cached = self._presets().get_cached_preset_list_metadata(self._config.launch_method)
+        return dict(cached) if cached else None
+
     def load_preset_list_metadata_light(self) -> dict[str, dict[str, object]]:
-        from presets.lightweight_metadata import build_lightweight_preset_metadata
-
-        metadata: dict[str, dict[str, object]] = {}
-
-        for entry in self.list_preset_entries_light():
-            file_name = str(entry.get("file_name") or "").strip()
-            display_name = str(entry.get("display_name") or file_name).strip()
-            kind = str(entry.get("kind") or "").strip() or "user"
-            is_builtin = bool(entry.get("is_builtin", False))
-            if not file_name:
-                continue
-            path = self._presets().get_preset_source_path_by_file_name(
-                self._config.launch_method,
-                file_name,
-            )
-            metadata[file_name] = build_lightweight_preset_metadata(
-                path,
-                display_name=display_name,
-                kind=kind,
-                is_builtin=is_builtin,
-            )
-
-        return metadata
+        return dict(self._presets().warm_preset_list_metadata_cache(self._config.launch_method) or {})
 
     def read_single_preset_list_metadata_light(self, file_name: str) -> tuple[str, dict[str, object]] | None:
         from presets.lightweight_metadata import build_lightweight_preset_metadata

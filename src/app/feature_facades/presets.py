@@ -9,6 +9,8 @@ class PresetsFeature:
     _services: Any = None
     _app_paths: Any = None
     _profile_feature: Any = None
+    _preset_list_metadata_cache: Any = None
+    _preset_list_metadata_lock: Any = None
 
     @staticmethod
     def _commands():
@@ -31,11 +33,100 @@ class PresetsFeature:
             self._services = self._commands().create_preset_services(self._app_paths)
         return self._services
 
+    def _metadata_cache(self) -> dict:
+        if self._preset_list_metadata_cache is None:
+            self._preset_list_metadata_cache = {}
+        return self._preset_list_metadata_cache
+
+    def _metadata_lock(self):
+        if self._preset_list_metadata_lock is None:
+            import threading
+
+            self._preset_list_metadata_lock = threading.RLock()
+        return self._preset_list_metadata_lock
+
     def attach_profile_feature(self, profile_feature) -> None:
         self._profile_feature = profile_feature
 
     def list_preset_manifests(self, launch_method: str):
         return self._commands().list_preset_manifests(launch_method, preset_services=self._preset_services())
+
+    def warm_preset_list_metadata_cache(self, launch_method: str):
+        signature, metadata = self._build_preset_list_metadata_snapshot(launch_method)
+        with self._metadata_lock():
+            self._metadata_cache()[str(launch_method or "").strip()] = (signature, dict(metadata))
+        return dict(metadata)
+
+    def get_cached_preset_list_metadata(self, launch_method: str):
+        method = str(launch_method or "").strip()
+        with self._metadata_lock():
+            cached = self._metadata_cache().get(method)
+        if cached is None:
+            return None
+        cached_signature, cached_metadata = cached
+        try:
+            signature = self._build_preset_list_metadata_signature(launch_method)
+        except Exception:
+            return None
+        if signature != cached_signature:
+            return None
+        return dict(cached_metadata)
+
+    def _build_preset_list_metadata_snapshot(self, launch_method: str):
+        from presets.lightweight_metadata import build_lightweight_preset_metadata
+
+        entries = self._preset_list_metadata_entries(launch_method)
+        metadata = {
+            file_name: build_lightweight_preset_metadata(
+                path,
+                display_name=display_name,
+                kind=kind,
+                is_builtin=is_builtin,
+            )
+            for file_name, display_name, kind, is_builtin, path, _stat_key in entries
+        }
+        signature = tuple((file_name, str(path), stat_key) for file_name, _display, _kind, _builtin, path, stat_key in entries)
+        return signature, metadata
+
+    def _build_preset_list_metadata_signature(self, launch_method: str):
+        return tuple(
+            (file_name, str(path), stat_key)
+            for file_name, _display, _kind, _builtin, path, stat_key in self._preset_list_metadata_entries(launch_method)
+        )
+
+    def _preset_list_metadata_entries(self, launch_method: str):
+        from settings.mode import engine_for_launch_method_or_none
+
+        method = str(launch_method or "").strip()
+        engine = engine_for_launch_method_or_none(method)
+        if engine is None:
+            return ()
+
+        services = self._preset_services()
+        engine_paths = services.app_paths.engine_paths(engine).ensure_directories()
+        entries = []
+        for manifest in self.list_preset_manifests(method):
+            file_name = str(getattr(manifest, "file_name", "") or "").strip()
+            if not file_name:
+                continue
+            display_name = str(getattr(manifest, "name", "") or file_name).strip()
+            kind = str(getattr(manifest, "kind", "") or "user").strip() or "user"
+            storage_scope = str(getattr(manifest, "storage_scope", "") or "").strip().lower()
+            is_builtin = kind.lower() == "builtin" or storage_scope == "builtin"
+            path = (engine_paths.builtin_presets_dir if storage_scope == "builtin" else engine_paths.user_presets_dir) / file_name
+            entries.append((file_name, display_name, kind, is_builtin, path, self._preset_file_stat_key(path)))
+        return tuple(entries)
+
+    @staticmethod
+    def _preset_file_stat_key(path) -> tuple[int, int]:
+        try:
+            stat_result = path.stat()
+            return (
+                int(getattr(stat_result, "st_mtime_ns", 0) or 0),
+                int(getattr(stat_result, "st_size", 0) or 0),
+            )
+        except Exception:
+            return (0, 0)
 
     def get_preset_manifest_by_file_name(self, launch_method: str, file_name: str):
         return self._commands().get_preset_manifest_by_file_name(launch_method, file_name, preset_services=self._preset_services())

@@ -17,6 +17,7 @@ class UserPresetsRuntimeAdapter:
     read_single_metadata: Callable[[str], tuple[str, dict[str, object]] | None]
     selected_source_file_name: Callable[[], str]
     presets_dir: Callable[[], Path]
+    cached_metadata: Callable[[], dict[str, dict[str, object]] | None]
     load_all_metadata: Callable[[], dict[str, dict[str, object]]]
     rebuild_rows: Callable[[dict[str, dict[str, object]], float | None], None]
     delete_preset_item_meta: Callable[[str], None]
@@ -506,6 +507,16 @@ class UserPresetsRuntimeService:
     def refresh_presets_view_if_possible(self, page=None) -> None:
         page = self._resolve_page(page)
         if self._cached_presets_metadata:
+            self._ui_dirty = False
+            self.refresh_presets_view_from_cache(page)
+            return
+        adapter = self._resolve_adapter()
+        try:
+            cached = adapter.cached_metadata()
+        except Exception:
+            cached = None
+        if cached:
+            self._cached_presets_metadata = dict(cached)
             self._ui_dirty = False
             self.refresh_presets_view_from_cache(page)
             return

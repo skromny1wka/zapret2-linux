@@ -64,6 +64,12 @@ def install_profile_warmup(*args, **kwargs):
     return install(*args, **kwargs)
 
 
+def install_user_presets_warmup(*args, **kwargs):
+    from main.post_startup_user_presets_warmup import install_user_presets_warmup as install
+
+    return install(*args, **kwargs)
+
+
 def install_telegram_proxy_startup(*args, **kwargs):
     from main.post_startup_proxy import install_telegram_proxy_startup as install
 
@@ -91,6 +97,7 @@ class PostStartupDeps:
     updater_feature: Any
     premium_feature: Any = None
     logs_feature: Any = None
+    presets_feature: Any = None
 
 
 def install_post_startup_tasks(deps: PostStartupDeps) -> None:
@@ -140,6 +147,12 @@ def install_post_startup_tasks(deps: PostStartupDeps) -> None:
         profile_feature=deps.profile_feature,
         log_startup_metric=deps.log_startup_metric,
     )
+    if deps.presets_feature is not None:
+        install_user_presets_warmup(
+            startup_host,
+            presets_feature=deps.presets_feature,
+            log_startup_metric=deps.log_startup_metric,
+        )
     deps.install_tray_post_startup()
     install_update_check(
         startup_host,

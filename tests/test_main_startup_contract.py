@@ -306,6 +306,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         self.assertNotIn("from main.post_startup_checks import", top_level)
         self.assertNotIn("from main.post_startup_dns_warmup import", top_level)
         self.assertNotIn("from main.post_startup_page_warmup import", top_level)
+        self.assertNotIn("from main.post_startup_user_presets_warmup import", top_level)
         self.assertNotIn("from main.post_startup_update import", top_level)
 
     def test_startup_log_contract_accepts_ui_before_runtime_order(self) -> None:
@@ -1362,6 +1363,76 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             log_startup_metric=log_startup_metric,
         )
 
+    def test_post_startup_tasks_install_user_presets_warmup(self) -> None:
+        from main import post_startup
+        from main.post_startup import PostStartupDeps, install_post_startup_tasks
+
+        startup_host = object()
+        presets_feature = object()
+        log_startup_metric = Mock()
+        deps = PostStartupDeps(
+            startup_host=startup_host,
+            profile_feature=object(),
+            presets_feature=presets_feature,
+            dns_feature=object(),
+            notify=Mock(),
+            notify_many=Mock(),
+            set_status=Mock(),
+            log_startup_metric=log_startup_metric,
+            start_proxy_if_enabled_async=Mock(),
+            startup_lists_check=Mock(),
+            apply_dns_on_startup_async=Mock(),
+            install_tray_post_startup=Mock(),
+            updater_feature=Mock(),
+        )
+
+        with (
+            patch.object(post_startup, "install_startup_checks"),
+            patch.object(post_startup, "install_deferred_maintenance"),
+            patch.object(post_startup, "install_telegram_proxy_startup"),
+            patch.object(post_startup, "install_lists_check"),
+            patch.object(post_startup, "install_dns_startup"),
+            patch.object(post_startup, "install_dns_page_data_warmup"),
+            patch.object(post_startup, "install_profile_warmup"),
+            patch.object(post_startup, "install_user_presets_warmup") as install_user_presets_warmup,
+            patch.object(post_startup, "install_update_check"),
+            patch.object(post_startup, "install_cpu_diagnostic"),
+            patch.object(post_startup, "install_qt_event_diagnostic_probe"),
+            patch.object(post_startup, "install_global_exception_handler"),
+        ):
+            install_post_startup_tasks(deps)
+
+        install_user_presets_warmup.assert_called_once_with(
+            startup_host,
+            presets_feature=presets_feature,
+            log_startup_metric=log_startup_metric,
+        )
+
+    def test_user_presets_runtime_uses_cached_metadata_before_worker(self) -> None:
+        from presets.user_presets_runtime_service import UserPresetsRuntimeAdapter, UserPresetsRuntimeService
+
+        rebuilt: list[dict[str, dict[str, object]]] = []
+        service = UserPresetsRuntimeService(scope_key="winws2")
+        page = SimpleNamespace(
+            isVisible=Mock(return_value=True),
+        )
+        adapter = UserPresetsRuntimeAdapter(
+            bulk_reset_running=Mock(return_value=False),
+            read_single_metadata=Mock(return_value=None),
+            selected_source_file_name=Mock(return_value="a.txt"),
+            presets_dir=Mock(),
+            cached_metadata=Mock(return_value={"a.txt": {"display_name": "A"}}),
+            load_all_metadata=Mock(return_value={}),
+            rebuild_rows=lambda metadata, _started_at=None: rebuilt.append(dict(metadata)),
+            delete_preset_item_meta=Mock(),
+        )
+        service.attach_page(page, adapter)
+
+        service.refresh_presets_view_if_possible(page)
+
+        self.assertEqual(rebuilt, [{"a.txt": {"display_name": "A"}}])
+        adapter.load_all_metadata.assert_not_called()
+
     def test_post_startup_tasks_install_dns_page_data_warmup(self) -> None:
         from main import post_startup
         from main.post_startup import PostStartupDeps, install_post_startup_tasks
@@ -1573,6 +1644,64 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         )
         metric.assert_any_call("StartupProfileWarmupQueued", "1800ms after interactive")
         metric.assert_any_call("StartupProfileWarmupStarted", "zapret1_mode, zapret2_mode")
+
+    def test_user_presets_warmup_runs_methods_in_parallel_after_interactive_ready(self) -> None:
+        from main import post_startup_user_presets_warmup
+        from main.post_startup_user_presets_warmup import install_user_presets_warmup
+
+        class Signal:
+            def __init__(self) -> None:
+                self._callback = None
+
+            def connect(self, callback) -> None:
+                self._callback = callback
+
+            def emit(self, value: str = "") -> None:
+                self._callback(value)
+
+        signal = Signal()
+        startup_host = SimpleNamespace(
+            startup_interactive_ready=signal,
+            startup_state=SimpleNamespace(interactive_logged=False),
+            is_alive=Mock(return_value=True),
+        )
+        presets_feature = SimpleNamespace(warm_preset_list_metadata_cache=Mock(return_value={"a.txt": {}}))
+        metric = Mock()
+        delays: list[int] = []
+        thread_names: list[str] = []
+
+        with (
+            patch.object(
+                post_startup_user_presets_warmup,
+                "schedule_after",
+                side_effect=lambda delay_ms, callback: delays.append(delay_ms) or callback(),
+            ),
+            patch.object(
+                post_startup_user_presets_warmup,
+                "start_daemon_thread",
+                side_effect=lambda name, target: thread_names.append(name) or target(),
+            ),
+            patch.object(
+                post_startup_user_presets_warmup,
+                "get_strategy_launch_method",
+                return_value="zapret1_mode",
+            ),
+        ):
+            install_user_presets_warmup(
+                startup_host,
+                presets_feature=presets_feature,
+                log_startup_metric=metric,
+            )
+            signal.emit("interactive")
+
+        self.assertEqual(delays, [1600])
+        self.assertEqual(thread_names, ["UserPresetsWarmup-zapret1_mode", "UserPresetsWarmup-zapret2_mode"])
+        self.assertEqual(
+            [recorded_call.args[0] for recorded_call in presets_feature.warm_preset_list_metadata_cache.call_args_list],
+            ["zapret1_mode", "zapret2_mode"],
+        )
+        metric.assert_any_call("StartupUserPresetsWarmupQueued", "1600ms after interactive")
+        metric.assert_any_call("StartupUserPresetsWarmupStarted", "zapret1_mode, zapret2_mode")
 
     def test_win11_radio_option_recommended_badge_does_not_require_global_flag(self) -> None:
         import ui.widgets.win11_controls as win11_controls

@@ -202,6 +202,7 @@ class UserPresetsPageBase(BasePage):
             read_single_metadata=self._listing_api().read_single_preset_list_metadata_light,
             selected_source_file_name=self._listing_api().get_selected_source_preset_file_name_light,
             presets_dir=self._listing_api().get_presets_dir_light,
+            cached_metadata=self._listing_api().get_cached_preset_list_metadata_light,
             load_all_metadata=self._listing_api().load_preset_list_metadata_light,
             rebuild_rows=lambda all_presets, started_at=None: self._rebuild_presets_rows(
                 all_presets,
