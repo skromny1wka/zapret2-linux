@@ -18,6 +18,7 @@ class ProfileShellWidgets:
     request_btn: object
     expand_btn: object
     collapse_btn: object
+    order_btn: object
     info_btn: object
     profile_search_input: object
     content_host: object
@@ -39,6 +40,7 @@ def build_profile_shell(
     on_add_user_profile,
     on_expand_all,
     on_collapse_all,
+    on_open_profile_order,
     on_show_info_popup,
     on_profile_search_text_changed,
 ) -> ProfileShellWidgets:
@@ -104,6 +106,19 @@ def build_profile_shell(
         )
     )
 
+    order_btn = PushButton(
+        tr_fn(_toolbar_key("order"), "Порядок в preset"),
+        icon=FluentIcon.MENU,
+    )
+    order_btn.clicked.connect(on_open_profile_order)
+    set_tooltip(
+        order_btn,
+        tr_fn(
+            _toolbar_key("order.description"),
+            "Открыть отдельный список для изменения реального порядка profile-ов внутри файла preset.",
+        )
+    )
+
     info_btn = PushButton(
         tr_fn(_toolbar_key("info"), "Что это такое?"),
         icon=FluentIcon.QUESTION,
@@ -131,6 +146,7 @@ def build_profile_shell(
         request_btn,
         expand_btn,
         collapse_btn,
+        order_btn,
         info_btn,
     ])
     toolbar_actions_bar.set_trailing_widget(profile_search_input, minimum_width=280)
@@ -152,6 +168,7 @@ def build_profile_shell(
         request_btn=request_btn,
         expand_btn=expand_btn,
         collapse_btn=collapse_btn,
+        order_btn=order_btn,
         info_btn=info_btn,
         profile_search_input=profile_search_input,
         content_host=content_host,

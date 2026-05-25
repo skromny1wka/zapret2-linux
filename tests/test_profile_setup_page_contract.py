@@ -531,6 +531,16 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertIn("set_search_query", apply_payload)
         self.assertIn("on_profile_search_text_changed=self._on_profile_search_text_changed", build_content)
 
+    def test_preset_setup_shell_has_separate_preset_order_button(self) -> None:
+        init_source = inspect.getsource(PresetSetupPageBase.__init__)
+        build_content = inspect.getsource(PresetSetupPageBase._build_content)
+        shell_builder = inspect.getsource(build_profile_shell)
+
+        self.assertIn("open_profile_order", init_source)
+        self.assertIn("on_open_profile_order=self._open_profile_order", build_content)
+        self.assertIn("Порядок в preset", shell_builder)
+        self.assertIn("order_btn", shell_builder)
+
     def test_preset_setup_page_does_not_show_loading_placeholder_text(self) -> None:
         shell_builder = inspect.getsource(build_profile_shell)
         request_profiles = inspect.getsource(PresetSetupPageBase._request_profiles_payload)
