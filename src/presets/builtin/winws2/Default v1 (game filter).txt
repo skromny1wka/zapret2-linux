@@ -134,6 +134,17 @@
 
 --new
 
+--name=ntc.party
+--filter-tcp=80,443
+--hostlist=lists/ntcparty.txt
+--out-range=-d9
+--payload=all
+--lua-desync=send:repeats=2
+--lua-desync=syndata:blob=tls_google
+--lua-desync=multisplit:pos=1:seqovl=740:seqovl_pattern=stun_pat
+
+--new
+
 --name=Tanki X
 --filter-tcp=80,443,5050,8080
 --out-range=-n8
@@ -257,17 +268,6 @@
 --out-range=-d8
 --payload=tls_client_hello
 --lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2
-
---new
-
---name=ntc.party
---filter-tcp=80,443
---hostlist=lists/ntcparty.txt
---out-range=-d9
---payload=tls_client_hello
---lua-desync=send:repeats=2
---lua-desync=syndata:blob=tls_google
---lua-desync=multisplit:pos=1:seqovl=740:seqovl_pattern=stun_pat
 
 --new
 
