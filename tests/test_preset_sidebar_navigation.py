@@ -417,7 +417,7 @@ class PresetSidebarNavigationTests(unittest.TestCase):
 
         self.assertEqual(nav.panel.collapse_calls, 1)
 
-    def test_initial_sidebar_build_disables_indicator_animation(self) -> None:
+    def test_initial_sidebar_build_keeps_indicator_animation_policy_untouched(self) -> None:
         from settings.mode import ZAPRET2_MODE
         import ui.navigation.sidebar_builder as sidebar_builder
 
@@ -476,7 +476,7 @@ class PresetSidebarNavigationTests(unittest.TestCase):
         ):
             sidebar_builder.init_navigation(window)
 
-        self.assertEqual(nav.panel.indicator_animation_values, [False])
+        self.assertEqual(nav.panel.indicator_animation_values, [])
 
     def test_sidebar_display_mode_change_is_saved(self) -> None:
         from settings.mode import ZAPRET2_MODE
