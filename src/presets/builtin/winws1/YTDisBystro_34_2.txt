@@ -8,7 +8,7 @@
 # === HTTPS YouTube ===
 --name=youtube.com (RTMPS Россия)
 --filter-tcp=80,443-65535
---ipset=lists/russia-youtube-rtmps.txt
+--ipset=lists/ipset-russia-youtube-rtmps.txt
 --dpi-desync=syndata
 --dpi-desync-fake-syndata=bin/syn_packet.bin
 --dup=2
