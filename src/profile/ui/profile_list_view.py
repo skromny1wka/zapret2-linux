@@ -58,6 +58,25 @@ def profile_drop_target_for_position(
     return {"marker": {"row": -1, "mode": ""}, "destination_kind": "end", "destination_row": -1}
 
 
+def profile_canonical_drop_target_for_next_row(
+    target: dict[str, object],
+    *,
+    next_row: int,
+    next_kind: str,
+) -> dict[str, object]:
+    if str((target or {}).get("destination_kind") or "") != "profile_after":
+        return dict(target or {})
+    if str(next_kind or "").strip() != "profile":
+        return dict(target or {})
+    try:
+        row_index = int(next_row)
+    except Exception:
+        row_index = -1
+    if row_index < 0:
+        return dict(target or {})
+    return {"marker": {"row": row_index, "mode": "before"}, "destination_kind": "profile", "destination_row": row_index}
+
+
 class ProfileListView(ListView):
     profile_activated = pyqtSignal(str)
     profile_context_requested = pyqtSignal(str, QPoint)
@@ -95,6 +114,17 @@ class ProfileListView(ListView):
             row_top=rect.top(),
             row_height=rect.height(),
         )
+        if target["destination_kind"] == "profile_after":
+            model = self.model()
+            next_row = drop_index.row() + 1
+            next_index = model.index(next_row, 0) if model is not None and next_row < model.rowCount() else None
+            if next_index is not None and next_index.isValid():
+                target = profile_canonical_drop_target_for_next_row(
+                    target,
+                    next_row=next_row,
+                    next_kind=str(next_index.data(ProfileListModel.KindRole) or ""),
+                )
+                drop_index = next_index if target["destination_kind"] == "profile" else drop_index
         if target["destination_kind"] in {"profile", "profile_after"}:
             return (
                 target,
@@ -259,6 +289,7 @@ def _profile_key_from_mime(mime) -> str:
 __all__ = [
     "PROFILE_DROP_MARKER_PROPERTY",
     "ProfileListView",
+    "profile_canonical_drop_target_for_next_row",
     "profile_drop_marker_for_target",
     "profile_drop_target_for_position",
 ]

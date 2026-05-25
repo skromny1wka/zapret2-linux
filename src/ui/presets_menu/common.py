@@ -67,6 +67,25 @@ def preset_drop_target_for_position(
     return {"marker": {"row": -1, "mode": ""}, "destination_kind": "end", "destination_row": -1}
 
 
+def preset_canonical_drop_target_for_next_row(
+    target: dict[str, object],
+    *,
+    next_row: int,
+    next_kind: str,
+) -> dict[str, object]:
+    if str((target or {}).get("destination_kind") or "") != "preset_after":
+        return dict(target or {})
+    if str(next_kind or "").strip() != "preset":
+        return dict(target or {})
+    try:
+        row_index = int(next_row)
+    except Exception:
+        row_index = -1
+    if row_index < 0:
+        return dict(target or {})
+    return {"marker": {"row": row_index, "mode": "before"}, "destination_kind": "preset", "destination_row": row_index}
+
+
 def tr_text(key: str, language: str, default: str, **kwargs) -> str:
     text = tr_catalog(key, language=language, default=default)
     if kwargs:
@@ -231,6 +250,7 @@ __all__ = [
     "make_menu_action",
     "normalize_preset_icon_color",
     "pick_contrast_color",
+    "preset_canonical_drop_target_for_next_row",
     "preset_drop_marker_for_target",
     "preset_drop_target_for_position",
     "to_qcolor",

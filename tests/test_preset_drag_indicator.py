@@ -4,6 +4,7 @@ import inspect
 import unittest
 
 from ui.presets_menu import delegate as preset_delegate
+from ui.presets_menu import common as preset_common
 from ui.presets_menu.model import PresetListModel
 from ui.presets_menu import view as preset_view
 from presets.ui.common.user_presets_page import UserPresetsPageBase
@@ -32,6 +33,24 @@ class PresetDragIndicatorTests(unittest.TestCase):
         self.assertEqual(
             preset_view.preset_drop_target_for_position(4, "preset", y=112, row_top=100, row_height=20),
             {"marker": {"row": 4, "mode": "after"}, "destination_kind": "preset_after", "destination_row": 4},
+        )
+
+    def test_adjacent_preset_gap_has_one_canonical_drop_target(self) -> None:
+        lower_half_target = preset_view.preset_drop_target_for_position(
+            4,
+            "preset",
+            y=112,
+            row_top=100,
+            row_height=20,
+        )
+
+        self.assertEqual(
+            preset_common.preset_canonical_drop_target_for_next_row(
+                lower_half_target,
+                next_row=5,
+                next_kind="preset",
+            ),
+            {"marker": {"row": 5, "mode": "before"}, "destination_kind": "preset", "destination_row": 5},
         )
 
     def test_view_clears_drop_marker_when_drag_finishes_or_leaves(self) -> None:

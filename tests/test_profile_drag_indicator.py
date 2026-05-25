@@ -31,6 +31,24 @@ class ProfileDragIndicatorTests(unittest.TestCase):
             {"marker": {"row": 4, "mode": "after"}, "destination_kind": "profile_after", "destination_row": 4},
         )
 
+    def test_adjacent_profile_gap_has_one_canonical_drop_target(self) -> None:
+        lower_half_target = profile_list_view.profile_drop_target_for_position(
+            4,
+            "profile",
+            y=112,
+            row_top=100,
+            row_height=20,
+        )
+
+        self.assertEqual(
+            profile_list_view.profile_canonical_drop_target_for_next_row(
+                lower_half_target,
+                next_row=5,
+                next_kind="profile",
+            ),
+            {"marker": {"row": 5, "mode": "before"}, "destination_kind": "profile", "destination_row": 5},
+        )
+
     def test_view_supports_folder_drop_and_clears_marker(self) -> None:
         view_source = inspect.getsource(profile_list_view.ProfileListView)
 

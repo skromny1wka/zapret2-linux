@@ -6,7 +6,12 @@ from PyQt6.QtCore import QPoint, Qt, pyqtSignal
 from PyQt6.QtGui import QDrag
 from PyQt6.QtWidgets import QApplication
 
-from .common import PRESET_DROP_MARKER_PROPERTY, preset_drop_marker_for_target, preset_drop_target_for_position
+from .common import (
+    PRESET_DROP_MARKER_PROPERTY,
+    preset_canonical_drop_target_for_next_row,
+    preset_drop_marker_for_target,
+    preset_drop_target_for_position,
+)
 from .model import PresetListModel
 from qfluentwidgets import ListView
 
@@ -47,6 +52,17 @@ class LinkedWheelListView(ListView):
             row_top=self.visualRect(drop_index).top(),
             row_height=self.visualRect(drop_index).height(),
         )
+        if target["destination_kind"] == "preset_after":
+            model = self.model()
+            next_row = drop_index.row() + 1
+            next_index = model.index(next_row, 0) if model is not None and next_row < model.rowCount() else None
+            if next_index is not None and next_index.isValid():
+                target = preset_canonical_drop_target_for_next_row(
+                    target,
+                    next_row=next_row,
+                    next_kind=str(next_index.data(PresetListModel.KindRole) or ""),
+                )
+                drop_index = next_index if target["destination_kind"] == "preset" else drop_index
         if target["destination_kind"] in {"preset", "preset_after"}:
             return (
                 target,
