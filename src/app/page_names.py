@@ -20,6 +20,7 @@ class PageName(Enum):
     ZAPRET2_PRESET_RAW_EDITOR = auto()
     ZAPRET2_PRESET_SETUP = auto()
     ZAPRET2_PROFILE_SETUP = auto()
+    ZAPRET2_PROFILE_ORDER = auto()
 
     # Zapret 1: зеркальный путь, отличается только strategy внутри profile
     ZAPRET1_MODE_CONTROL = auto()
@@ -27,6 +28,7 @@ class PageName(Enum):
     ZAPRET1_PRESET_RAW_EDITOR = auto()
     ZAPRET1_PRESET_SETUP = auto()
     ZAPRET1_PROFILE_SETUP = auto()
+    ZAPRET1_PROFILE_ORDER = auto()
 
     BLOBS = auto()                   # Блобы
     DPI_SETTINGS = auto()            # Настройки DPI

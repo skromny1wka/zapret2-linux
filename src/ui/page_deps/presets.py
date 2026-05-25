@@ -5,6 +5,7 @@ from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE
 from ui.navigation_pages import (
     resolve_preset_raw_editor_back_page_for_method,
     resolve_preset_raw_editor_root_page_for_method,
+    resolve_profile_order_page_for_method,
     resolve_profile_setup_root_page_for_method,
 )
 
@@ -48,11 +49,12 @@ def build_control_page_kwargs(
     }
 
 
-def build_preset_setup_page_kwargs(*, page_name: PageName, profile_feature, open_profile_setup, ui_state_store) -> dict:
+def build_preset_setup_page_kwargs(*, page_name: PageName, profile_feature, open_profile_setup, show_page, ui_state_store) -> dict:
     method = ZAPRET2_MODE if page_name == PageName.ZAPRET2_PRESET_SETUP else ZAPRET1_MODE
     return {
         "profile_feature": profile_feature,
         "open_profile_setup": lambda profile_key, m=method: open_profile_setup(m, profile_key),
+        "open_profile_order": lambda m=method: show_page(resolve_profile_order_page_for_method(m), allow_internal=True),
         "ui_state_store": ui_state_store,
     }
 
@@ -79,6 +81,30 @@ def build_profile_setup_page_kwargs(
             profile_key,
             change_kind,
         ),
+    }
+
+
+def build_profile_order_page_kwargs(
+    *,
+    page_name: PageName,
+    profile_feature,
+    show_page,
+) -> dict:
+    method = ZAPRET2_MODE if page_name == PageName.ZAPRET2_PROFILE_ORDER else ZAPRET1_MODE
+    profiles_page = (
+        PageName.ZAPRET2_PRESET_SETUP
+        if page_name == PageName.ZAPRET2_PROFILE_ORDER
+        else PageName.ZAPRET1_PRESET_SETUP
+    )
+    control_page = (
+        PageName.ZAPRET2_MODE_CONTROL
+        if page_name == PageName.ZAPRET2_PROFILE_ORDER
+        else PageName.ZAPRET1_MODE_CONTROL
+    )
+    return {
+        "profile_feature": profile_feature,
+        "open_profiles": lambda page=profiles_page: show_page(page, allow_internal=True),
+        "open_root": lambda page=control_page: show_page(page, allow_internal=True),
     }
 
 
@@ -135,6 +161,7 @@ __all__ = [
     "build_control_page_kwargs",
     "build_preset_raw_editor_page_kwargs",
     "build_preset_setup_page_kwargs",
+    "build_profile_order_page_kwargs",
     "build_profile_setup_page_kwargs",
     "build_user_presets_page_kwargs",
 ]

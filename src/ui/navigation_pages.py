@@ -21,6 +21,7 @@ class Winws2NavigationPages:
     user_presets_page: PageName
     preset_raw_editor_page: PageName
     profile_setup_page: PageName
+    profile_order_page: PageName
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,7 @@ class Winws1NavigationPages:
     user_presets_page: PageName
     preset_raw_editor_page: PageName
     profile_setup_page: PageName
+    profile_order_page: PageName
 
 
 def resolve_zapret2_navigation_pages() -> Winws2NavigationPages:
@@ -40,6 +42,7 @@ def resolve_zapret2_navigation_pages() -> Winws2NavigationPages:
         user_presets_page=PageName.ZAPRET2_USER_PRESETS,
         preset_raw_editor_page=PageName.ZAPRET2_PRESET_RAW_EDITOR,
         profile_setup_page=PageName.ZAPRET2_PROFILE_SETUP,
+        profile_order_page=PageName.ZAPRET2_PROFILE_ORDER,
     )
 
 
@@ -50,6 +53,7 @@ def resolve_zapret1_navigation_pages() -> Winws1NavigationPages:
         user_presets_page=PageName.ZAPRET1_USER_PRESETS,
         preset_raw_editor_page=PageName.ZAPRET1_PRESET_RAW_EDITOR,
         profile_setup_page=PageName.ZAPRET1_PROFILE_SETUP,
+        profile_order_page=PageName.ZAPRET1_PROFILE_ORDER,
     )
 
 
@@ -99,6 +103,11 @@ def resolve_profile_setup_page_for_method(method: str | None) -> PageName | None
     return pages.profile_setup_page if pages is not None else None
 
 
+def resolve_profile_order_page_for_method(method: str | None) -> PageName | None:
+    pages = _resolve_mode_navigation_pages(method)
+    return pages.profile_order_page if pages is not None else None
+
+
 def resolve_profile_setup_back_page_for_method(method: str | None) -> PageName:
     normalized = _normalize_navigation_method(method)
     pages = _resolve_mode_navigation_pages(normalized)
@@ -135,4 +144,11 @@ def get_profile_setup_pages() -> tuple[PageName, ...]:
     return (
         resolve_zapret2_navigation_pages().profile_setup_page,
         resolve_zapret1_navigation_pages().profile_setup_page,
+    )
+
+
+def get_profile_order_pages() -> tuple[PageName, ...]:
+    return (
+        resolve_zapret2_navigation_pages().profile_order_page,
+        resolve_zapret1_navigation_pages().profile_order_page,
     )

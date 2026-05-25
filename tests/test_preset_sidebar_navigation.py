@@ -71,8 +71,10 @@ class PresetSidebarNavigationTests(unittest.TestCase):
             frozenset(
                 {
                     PageName.ZAPRET2_PROFILE_SETUP,
+                    PageName.ZAPRET2_PROFILE_ORDER,
                     PageName.ZAPRET2_PRESET_RAW_EDITOR,
                     PageName.ZAPRET1_PROFILE_SETUP,
+                    PageName.ZAPRET1_PROFILE_ORDER,
                     PageName.ZAPRET1_PRESET_RAW_EDITOR,
                 }
             ),
@@ -81,6 +83,36 @@ class PresetSidebarNavigationTests(unittest.TestCase):
             spec = get_page_spec(page_name)
             self.assertFalse(spec.is_top_level)
             self.assertTrue(spec.is_hidden)
+
+    def test_profile_order_pages_are_hidden_children_of_preset_setup(self) -> None:
+        from app.page_names import PageName
+        from ui.navigation.schema import get_page_spec
+
+        winws2_spec = get_page_spec(PageName.ZAPRET2_PROFILE_ORDER)
+        winws1_spec = get_page_spec(PageName.ZAPRET1_PROFILE_ORDER)
+
+        self.assertEqual(winws2_spec.module_name, "profile.ui.profile_order_page")
+        self.assertEqual(winws2_spec.class_name, "Zapret2ProfileOrderPage")
+        self.assertEqual(winws2_spec.breadcrumb_parent, PageName.ZAPRET2_PRESET_SETUP)
+        self.assertFalse(winws2_spec.is_top_level)
+        self.assertTrue(winws2_spec.is_hidden)
+
+        self.assertEqual(winws1_spec.module_name, "profile.ui.profile_order_page")
+        self.assertEqual(winws1_spec.class_name, "Zapret1ProfileOrderPage")
+        self.assertEqual(winws1_spec.breadcrumb_parent, PageName.ZAPRET1_PRESET_SETUP)
+        self.assertFalse(winws1_spec.is_top_level)
+        self.assertTrue(winws1_spec.is_hidden)
+
+    def test_preset_setup_page_deps_open_profile_order_page(self) -> None:
+        import ui.page_deps.presets as preset_deps
+        import ui.page_composition as page_composition
+
+        deps_source = inspect.getsource(preset_deps.build_preset_setup_page_kwargs)
+        composition_source = inspect.getsource(page_composition)
+
+        self.assertIn("open_profile_order", deps_source)
+        self.assertIn("resolve_profile_order_page_for_method", deps_source)
+        self.assertIn("build_profile_order_page_kwargs", composition_source)
 
     def test_control_pages_do_not_build_preset_navigation_cards(self) -> None:
         from presets.ui.control.zapret1.page import Zapret1ModeControlPage

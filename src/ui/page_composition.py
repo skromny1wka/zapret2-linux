@@ -6,6 +6,7 @@ from ui.page_deps.presets import (
     build_control_page_kwargs,
     build_preset_raw_editor_page_kwargs,
     build_preset_setup_page_kwargs,
+    build_profile_order_page_kwargs,
     build_profile_setup_page_kwargs,
     build_user_presets_page_kwargs,
 )
@@ -45,13 +46,13 @@ PAGE_DEPS_BUILDERS: dict[PageName, PageDepsSpec] = {
     PageName.ZAPRET2_PRESET_SETUP: PageDepsSpec(
         build_preset_setup_page_kwargs,
         features=("profile",),
-        actions=("open_profile_setup",),
+        actions=("open_profile_setup", "show_page"),
         include_ui_state_store=True,
     ),
     PageName.ZAPRET1_PRESET_SETUP: PageDepsSpec(
         build_preset_setup_page_kwargs,
         features=("profile",),
-        actions=("open_profile_setup",),
+        actions=("open_profile_setup", "show_page"),
         include_ui_state_store=True,
     ),
     PageName.ZAPRET2_PROFILE_SETUP: PageDepsSpec(
@@ -63,6 +64,16 @@ PAGE_DEPS_BUILDERS: dict[PageName, PageDepsSpec] = {
         build_profile_setup_page_kwargs,
         features=("profile",),
         actions=("show_page", "on_profile_setup_changed"),
+    ),
+    PageName.ZAPRET2_PROFILE_ORDER: PageDepsSpec(
+        build_profile_order_page_kwargs,
+        features=("profile",),
+        actions=("show_page",),
+    ),
+    PageName.ZAPRET1_PROFILE_ORDER: PageDepsSpec(
+        build_profile_order_page_kwargs,
+        features=("profile",),
+        actions=("show_page",),
     ),
     PageName.ZAPRET2_USER_PRESETS: PageDepsSpec(
         build_user_presets_page_kwargs,
