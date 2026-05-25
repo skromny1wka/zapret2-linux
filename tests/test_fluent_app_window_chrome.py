@@ -37,6 +37,11 @@ class FluentAppWindowChromeTests(unittest.TestCase):
         self.assertNotIn("_set_handles_visible", source)
         self.assertFalse(hasattr(ZapretFluentWindow, "set_zoom_chrome_compact"))
 
+    def test_fluent_window_does_not_own_app_geometry_policy(self) -> None:
+        source = inspect.getsource(ZapretFluentWindow)
+
+        self.assertNotIn("setMinimumSize(", source)
+
     def test_titlebar_search_is_centered_in_the_whole_window(self) -> None:
         window = ZapretFluentWindow()
         search_widget = _SidebarSearchNavWidget()

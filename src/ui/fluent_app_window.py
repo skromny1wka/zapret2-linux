@@ -30,7 +30,6 @@ class ZapretFluentWindow(FluentWindow):
 
         super().__init__(parent)
         self.setWindowTitle(f"Zapret2 v{APP_VERSION}")
-        self.setMinimumSize(900, 500)
 
         # Set app icon
         icon_path = ICON_DEV_PATH if is_dev_build_channel() else ICON_PATH

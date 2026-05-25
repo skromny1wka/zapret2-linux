@@ -12,6 +12,11 @@ if str(PROJECT_SRC) not in sys.path:
 
 
 class WindowMetricsTests(unittest.TestCase):
+    def test_minimum_window_width_keeps_fluent_layout_usable(self) -> None:
+        import config.window_metrics as window_metrics
+
+        self.assertGreaterEqual(window_metrics.MIN_WIDTH, 900)
+
     def test_full_hd_screen_uses_1280_by_720_default_size(self) -> None:
         import config.window_metrics as window_metrics
 

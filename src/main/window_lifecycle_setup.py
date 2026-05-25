@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time as _time
 
-from config.window_metrics import HEIGHT, MIN_WIDTH, WIDTH
+from config.window_metrics import HEIGHT, MIN_HEIGHT, MIN_WIDTH, WIDTH
 from main.application_lifecycle import ApplicationLifecycle
 from main.application_lifecycle_port import build_application_lifecycle_window_port
 from main.runtime_state import log_startup_metric as emit_startup_metric
@@ -11,11 +11,11 @@ from ui.window_geometry_runtime import WindowGeometryRuntime
 
 
 def attach_window_lifecycle(window, features) -> None:
-    window.setMinimumSize(MIN_WIDTH, 400)
+    window.setMinimumSize(MIN_WIDTH, MIN_HEIGHT)
     window.window_geometry_runtime = WindowGeometryRuntime(
         window,
         min_width=MIN_WIDTH,
-        min_height=400,
+        min_height=MIN_HEIGHT,
         default_width=WIDTH,
         default_height=HEIGHT,
         close_state=window.close_state,

@@ -998,6 +998,37 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         self.assertTrue(geometry.maximized)
         get_geometry.assert_called_once_with()
 
+    def test_window_lifecycle_uses_canonical_minimum_size_for_restore_guard(self) -> None:
+        from config.window_metrics import MIN_HEIGHT, MIN_WIDTH
+        from main import window_lifecycle_setup
+
+        window = SimpleNamespace(
+            close_state=object(),
+            close_to_tray=Mock(),
+            exit_stop_dpi=Mock(),
+            exit_keep_dpi=Mock(),
+        )
+        window.setMinimumSize = Mock()
+        features = SimpleNamespace(
+            runtime=object(),
+            premium=object(),
+            telegram_proxy=object(),
+            tray=object(),
+        )
+
+        with (
+            patch.object(window_lifecycle_setup, "ApplicationLifecycle"),
+            patch.object(window_lifecycle_setup, "WindowCloseFlow"),
+            patch.object(window_lifecycle_setup, "build_application_lifecycle_window_port", return_value=object()),
+            patch.object(window_lifecycle_setup, "WindowGeometryRuntime") as geometry_runtime,
+        ):
+            window_lifecycle_setup.attach_window_lifecycle(window, features)
+
+        window.setMinimumSize.assert_called_once_with(MIN_WIDTH, MIN_HEIGHT)
+        geometry_runtime.assert_called_once()
+        self.assertEqual(geometry_runtime.call_args.kwargs["min_width"], MIN_WIDTH)
+        self.assertEqual(geometry_runtime.call_args.kwargs["min_height"], MIN_HEIGHT)
+
     def test_initial_ui_state_uses_single_settings_read_and_light_runtime_state_import(self) -> None:
         import inspect
         import app.initial_ui_state as initial_ui_state
