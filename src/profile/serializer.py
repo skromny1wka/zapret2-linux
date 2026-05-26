@@ -10,6 +10,13 @@ from .parser import parse_preset_text
 
 
 _STRATEGY_KINDS = {"strategy", "strategy_filter"}
+_LIST_FILE_MATCH_NAMES = {
+    "--hostlist",
+    "--ipset",
+    "--hostlist-exclude",
+    "--ipset-exclude",
+    "--hostlist-auto",
+}
 
 
 def serialize_preset(preset: Preset) -> str:
@@ -203,6 +210,7 @@ def append_profile_from_template(
         for segment in profile.segments
         if not (segment.kind == "directive" and segment.text.strip().lower() == "--skip")
     ]
+    _canonicalize_template_match_paths(profile)
     if not enabled:
         profile.segments.insert(_directive_insert_index(profile), ProfileSegment(kind="directive", text="--skip", name="--skip"))
     _ensure_safe_default_strategy(profile)
@@ -298,6 +306,29 @@ def _segment_for_strategy_line(engine: EngineName, line: str) -> ProfileSegment:
 def _segment_for_match_line(line: str) -> ProfileSegment:
     name, value = _split_option(line)
     return ProfileSegment(kind="match", text=line, name=name, value=value)
+
+
+def _canonicalize_template_match_paths(profile: Profile) -> None:
+    for segment in profile.segments:
+        name = str(segment.name or "").strip().lower()
+        if segment.kind != "match" or name not in _LIST_FILE_MATCH_NAMES:
+            continue
+        value = _lists_relative_value(str(segment.value or ""))
+        if value == str(segment.value or ""):
+            continue
+        segment.value = value
+        segment.text = f"{segment.name}={value}"
+
+
+def _lists_relative_value(value: str) -> str:
+    raw = str(value or "").strip()
+    clean = raw.strip('"').strip("'")
+    if not clean:
+        return raw
+    normalized = clean.replace("\\", "/")
+    if "/" in normalized or ":" in normalized or normalized.startswith("@"):
+        return raw
+    return f"lists/{clean}"
 
 
 def _directive_insert_index_for_segments(segments: list[ProfileSegment]) -> int:

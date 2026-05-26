@@ -157,11 +157,7 @@ class Winws2StrategyRunner(StrategyRunnerBase):
                 return [os.path.normpath(os.path.join(self.work_dir, v))]
 
             # Bare filename: try default_dir first (lists/bin/lua), then work_dir.
-            out: list[str] = []
-            if default_dir:
-                out.append(os.path.normpath(os.path.join(default_dir, v)))
-            out.append(os.path.normpath(os.path.join(self.work_dir, v)))
-            return out
+            return [os.path.normpath(os.path.join(self.work_dir, v))]
 
         def _exists_any(paths: list[str]) -> bool:
             for p in paths:
@@ -362,7 +358,6 @@ class Winws2StrategyRunner(StrategyRunnerBase):
 
             try:
                 normalized_text = self._prepare_preset_text_for_launch(source_content)
-                launch_args = self._build_launch_args_from_preset_text(normalized_text)
                 missing = self._collect_missing_preset_references_from_text(normalized_text)
                 validation_ok = not missing
                 validation_report = "" if validation_ok else self._build_validation_report(missing)
@@ -379,7 +374,7 @@ class Winws2StrategyRunner(StrategyRunnerBase):
                 preset_path=p,
                 cache_key=cache_key,
                 normalized_text=normalized_text,
-                launch_args=launch_args,
+                launch_args=(f"@{p}",),
                 validation_ok=validation_ok,
                 validation_report=validation_report,
             )

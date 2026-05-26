@@ -523,6 +523,32 @@ class UserProfilesTests(unittest.TestCase):
         self.assertTrue(store.text.startswith("--name=My Site\n"))
         self.assertIn("\n--new\n\n--name=All TCP\n", store.text)
 
+    def test_template_profile_bare_hostlist_is_saved_as_lists_relative_path(self) -> None:
+        from profile.serializer import append_profile_from_template, serialize_preset
+
+        preset = parse_preset_text(
+            "--filter-tcp=443\n--hostlist=lists/base.txt\n--lua-desync=pass\n",
+            engine="winws2",
+        )
+        template = parse_preset_text(
+            "\n".join(
+                (
+                    "--name=Tanki X",
+                    "--filter-tcp=80,443-65535",
+                    "--hostlist=tankix.txt",
+                    "--lua-desync=pass",
+                    "",
+                )
+            ),
+            engine="winws2",
+        ).profiles[0]
+
+        updated = append_profile_from_template(preset, template)
+
+        text = serialize_preset(updated)
+        self.assertIn("--hostlist=lists/tankix.txt", text)
+        self.assertNotIn("--hostlist=tankix.txt", text)
+
     def test_adding_and_deleting_profile_keeps_plain_profile_boundaries(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
