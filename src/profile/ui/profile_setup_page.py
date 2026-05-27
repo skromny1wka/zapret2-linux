@@ -464,6 +464,8 @@ class ProfileSetupPageBase(BasePage):
         self._setup_load_worker = None
         self._list_file_load_request_id = 0
         self._list_file_load_worker = None
+        self._list_file_save_request_id = 0
+        self._list_file_save_worker = None
         self._strategy_apply_request_id = 0
         self._strategy_apply_worker = None
         self._strategy_apply_worker_strategy_id = ""
@@ -1206,26 +1208,59 @@ class ProfileSetupPageBase(BasePage):
     def _on_list_file_save_clicked(self) -> None:
         if self._loading or not self._profile_key or self._list_file_text is None:
             return
-        try:
-            state = self._controller.save_list_file_text(
-                profile_key=self._profile_key,
-                text=self._list_file_text.toPlainText(),
-            )
-            if state is not None:
-                self._apply_list_file_editor_state(state)
-            if self._list_file_status_label is not None:
-                self._list_file_status_label.setText("Список сохранён.")
-            self.reload_current_profile()
-            self._on_profile_changed_callback(self._profile_key, "list_file")
-            InfoBar.success(
-                title="Список сохранён",
-                content="Файл списка обновлён.",
-                parent=self.window(),
-            )
-        except Exception as exc:
-            log(f"{self.__class__.__name__}: не удалось сохранить файл списка profile: {exc}", "ERROR")
-            self._render_list_file_validation((), fallback_error=str(exc))
-            InfoBar.error(title="Ошибка", content=str(exc), parent=self.window())
+        worker = self._list_file_save_worker
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    return
+            except Exception:
+                return
+        self._list_file_save_request_id += 1
+        request_id = self._list_file_save_request_id
+        if self._list_file_status_label is not None:
+            self._list_file_status_label.setText("Сохранение списка...")
+        if self._list_file_save_button is not None:
+            self._list_file_save_button.setEnabled(False)
+        worker = self._controller.create_list_file_save_worker(
+            request_id,
+            self._profile_key,
+            self._list_file_text.toPlainText(),
+            parent=self,
+        )
+        self._list_file_save_worker = worker
+        worker.saved.connect(self._on_list_file_save_finished)
+        worker.failed.connect(self._on_list_file_save_failed)
+        worker.finished.connect(lambda w=worker: self._on_list_file_save_worker_finished(w))
+        worker.start()
+
+    def _on_list_file_save_finished(self, request_id: int, state) -> None:
+        if request_id != self._list_file_save_request_id:
+            return
+        if state is not None:
+            self._apply_list_file_editor_state(state)
+        if self._list_file_status_label is not None:
+            self._list_file_status_label.setText("Список сохранён.")
+        self.reload_current_profile()
+        self._on_profile_changed_callback(self._profile_key, "list_file")
+        InfoBar.success(
+            title="Список сохранён",
+            content="Файл списка обновлён.",
+            parent=self.window(),
+        )
+
+    def _on_list_file_save_failed(self, request_id: int, error: str) -> None:
+        if request_id != self._list_file_save_request_id:
+            return
+        log(f"{self.__class__.__name__}: не удалось сохранить файл списка profile: {error}", "ERROR")
+        self._render_list_file_validation((), fallback_error=str(error))
+        if self._list_file_save_button is not None:
+            self._list_file_save_button.setEnabled(True)
+        InfoBar.error(title="Ошибка", content=str(error), parent=self.window())
+
+    def _on_list_file_save_worker_finished(self, worker) -> None:
+        if self._list_file_save_worker is worker:
+            self._list_file_save_worker = None
+        worker.deleteLater()
 
     def _render_list_file_validation(
         self,

@@ -60,6 +60,30 @@ class ProfileListFileLoadWorker(QThread):
         self.loaded.emit(self._request_id, state)
 
 
+class ProfileListFileSaveWorker(QThread):
+    saved = pyqtSignal(int, object)
+    failed = pyqtSignal(int, str)
+
+    def __init__(self, request_id: int, controller, profile_key: str, text: str, parent=None):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self._controller = controller
+        self._profile_key = str(profile_key or "").strip()
+        self._text = str(text or "")
+
+    def run(self) -> None:
+        try:
+            state = self._controller.save_list_file_text(
+                profile_key=self._profile_key,
+                text=self._text,
+            )
+        except Exception as exc:
+            log(f"ProfileListFileSaveWorker: не удалось сохранить файл списка profile: {exc}", "ERROR")
+            self.failed.emit(self._request_id, str(exc))
+            return
+        self.saved.emit(self._request_id, state)
+
+
 class ProfileStrategyApplyWorker(QThread):
     applied = pyqtSignal(int, str, str)
     failed = pyqtSignal(int, str)

@@ -63,6 +63,11 @@ class ProfileSetupController:
             parent=parent,
         )
 
+    def create_list_file_save_worker(self, request_id: int, profile_key: str, text: str, parent=None):
+        from profile.profile_setup_loader import ProfileListFileSaveWorker
+
+        return ProfileListFileSaveWorker(request_id, self, profile_key, text, parent)
+
     def create_strategy_apply_worker(self, request_id: int, *, profile_key: str, strategy_id: str, parent=None):
         from profile.profile_setup_loader import ProfileStrategyApplyWorker
 

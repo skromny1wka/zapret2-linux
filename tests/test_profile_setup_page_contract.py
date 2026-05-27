@@ -14,7 +14,7 @@ from profile.ui.profile_setup_page import (
     _match_tab_text,
     _profile_editor_tab_title,
 )
-from profile.profile_setup_loader import ProfileStrategyApplyWorker
+from profile.profile_setup_loader import ProfileListFileSaveWorker, ProfileStrategyApplyWorker
 from profile.state import ProfileListItem, ProfileSetupPayload
 from profile.strategy_state import ProfileStrategyState
 from profile.ui.preset_setup_page import PresetSetupPageBase, preset_setup_title_for_payload
@@ -782,8 +782,69 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertIn("_list_file_base_text", ensure_editor)
         self.assertIn("Ваши записи", ensure_editor)
         self.assertNotIn("_apply_list_file_editor_state", apply_payload)
-        self.assertIn("save_list_file_text", save_handler)
+        self.assertIn("create_list_file_save_worker", save_handler)
+        self.assertNotIn("save_list_file_text", save_handler)
         self.assertIn("Неверные строки", validation)
+
+    def test_list_file_save_starts_worker_without_saving_in_gui_thread(self) -> None:
+        class _Signal:
+            def __init__(self) -> None:
+                self.callbacks = []
+
+            def connect(self, callback) -> None:
+                self.callbacks.append(callback)
+
+        class _Worker:
+            def __init__(self) -> None:
+                self.saved = _Signal()
+                self.failed = _Signal()
+                self.finished = _Signal()
+                self.start = Mock()
+
+            def isRunning(self) -> bool:
+                return False
+
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._loading = False
+        page._profile_key = "profile-1"
+        page._list_file_text = SimpleNamespace(toPlainText=lambda: "example.com")
+        page._list_file_save_request_id = 0
+        page._list_file_save_worker = None
+        page._list_file_status_label = Mock()
+        page._list_file_save_button = Mock()
+        page._controller = Mock()
+        worker = _Worker()
+        page._controller.create_list_file_save_worker.return_value = worker
+        page._controller.save_list_file_text.side_effect = AssertionError("save must run in worker")
+
+        ProfileSetupPageBase._on_list_file_save_clicked(page)
+
+        page._controller.save_list_file_text.assert_not_called()
+        page._controller.create_list_file_save_worker.assert_called_once_with(
+            1,
+            "profile-1",
+            "example.com",
+            parent=page,
+        )
+        page._list_file_save_button.setEnabled.assert_called_once_with(False)
+        worker.start.assert_called_once()
+
+    def test_list_file_save_worker_emits_saved_state(self) -> None:
+        controller = Mock()
+        state = object()
+        controller.save_list_file_text.return_value = state
+        worker = ProfileListFileSaveWorker(3, controller, "profile-1", "example.com")
+        saved = []
+
+        worker.saved.connect(lambda request_id, emitted_state: saved.append((request_id, emitted_state)))
+
+        worker.run()
+
+        controller.save_list_file_text.assert_called_once_with(
+            profile_key="profile-1",
+            text="example.com",
+        )
+        self.assertEqual(saved, [(3, state)])
 
     def test_profile_setup_page_renames_editor_tab_for_exclusion_profiles(self) -> None:
         regular_payload = SimpleNamespace(
