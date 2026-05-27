@@ -548,6 +548,67 @@ class Winws2StrategyRunner(StrategyRunnerBase):
         )
         return self._compile_preset_artifact(artifact.preset_path)
 
+    def _artifact_for_handoff_locked(self, artifact: PreparedPresetArtifact) -> PreparedPresetArtifact:
+        """Build a temporary @config that can coexist with the old winws2 briefly."""
+        text = str(getattr(artifact, "normalized_text", "") or "").rstrip()
+        if not text:
+            return artifact
+        handoff_text = f"{text}\n--wf-dup-check=0\n"
+        at_config_path = self._write_winws2_at_config(artifact.preset_path, handoff_text)
+        return PreparedPresetArtifact(
+            preset_path=artifact.preset_path,
+            cache_key=None,
+            normalized_text=handoff_text,
+            launch_args=(f"@{at_config_path}",),
+            validation_ok=artifact.validation_ok,
+            validation_report=artifact.validation_report,
+        )
+
+    def _restore_process_state_locked(
+        self,
+        *,
+        process,
+        preset_path: str,
+        strategy_name: str | None,
+        strategy_args,
+    ) -> None:
+        self.running_process = process
+        self._preset_file_path = preset_path
+        self.current_launch_label = strategy_name
+        self.current_strategy_args = list(strategy_args or ())
+
+    def _stop_previous_process_after_handoff_locked(self, process, strategy_name: str, preset_path: str) -> None:
+        """Stop the old process after the replacement has already started."""
+        if process is None:
+            return
+        try:
+            pid = int(getattr(process, "pid", 0) or 0)
+        except Exception:
+            pid = 0
+        try:
+            if process.poll() is not None:
+                return
+        except Exception:
+            pass
+
+        label = str(strategy_name or "previous")
+        log(f"Preset switch handoff: stopping previous process '{label}' (PID: {pid})", "INFO")
+        try:
+            process.terminate()
+            if wait_for_process_exit(process, timeout=3.0):
+                log(f"Previous preset process stopped after handoff (PID: {pid})", "SUCCESS")
+                return
+
+            log("Previous preset process soft stop timeout after handoff, force killing", "WARNING")
+            process.kill()
+            if not wait_for_process_exit(process, timeout=1.0):
+                log(
+                    f"Previous preset process did not exit after handoff kill (PID: {pid}, preset={preset_path})",
+                    "WARNING",
+                )
+        except Exception as exc:
+            log(f"Error stopping previous process after preset handoff: {exc}", "WARNING")
+
     @staticmethod
     def _safe_file_sha1(path: str) -> str:
         try:
@@ -763,9 +824,6 @@ class Winws2StrategyRunner(StrategyRunnerBase):
                     self._set_last_error("Preset содержит ссылки на отсутствующие файлы", notify=False)
                 return False
 
-            if self.running_process and self.is_running():
-                self._stop_process_only_locked()
-
             artifact = self._refresh_artifact_if_source_changed_locked(artifact)
             if not artifact.validation_ok:
                 self._set_runner_state_locked(
@@ -785,13 +843,34 @@ class Winws2StrategyRunner(StrategyRunnerBase):
                     self._set_last_error("Preset содержит ссылки на отсутствующие файлы", notify=False)
                 return False
 
+            old_process = self.running_process if self.running_process and self.is_running() else None
+            old_preset_path = str(self._preset_file_path or "")
+            old_strategy_name = getattr(self, "current_launch_label", None)
+            old_strategy_args = tuple(getattr(self, "current_strategy_args", None) or ())
+
             self._preset_file_path = preset_path
+            spawn_artifact = self._artifact_for_handoff_locked(artifact) if old_process is not None else artifact
             success = self._spawn_process_locked(
-                artifact,
+                spawn_artifact,
                 strategy_name,
                 preset_switch=True,
                 notify_failure=False,
             )
+            if old_process is not None:
+                if success:
+                    self._stop_previous_process_after_handoff_locked(
+                        old_process,
+                        str(old_strategy_name or "unknown"),
+                        old_preset_path,
+                    )
+                else:
+                    self._restore_process_state_locked(
+                        process=old_process,
+                        preset_path=old_preset_path,
+                        strategy_name=old_strategy_name,
+                        strategy_args=old_strategy_args,
+                    )
+                    return False
             if not success:
                 success = self._retry_fast_switch_after_failed_spawn_locked(
                     artifact,

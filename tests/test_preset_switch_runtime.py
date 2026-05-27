@@ -116,37 +116,52 @@ class Winws2PresetSwitchTests(unittest.TestCase):
         self.assertNotIn("ConfigFileWatcher", combined_source)
         self.assertNotIn("_on_config_changed", combined_source)
 
-    def test_fast_switch_skips_standard_cleanup_until_spawn_fails(self) -> None:
+    def test_winws2_fast_switch_starts_new_process_before_stopping_old(self) -> None:
         from winws_runtime.runners.zapret2_runner import Winws2StrategyRunner
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             preset_path = Path(tmp_dir) / "selected.txt"
             preset_path.write_text("--wf-tcp-out=80", encoding="utf-8")
+            calls: list[str] = []
 
             runner = object.__new__(Winws2StrategyRunner)
             runner._state_lock = threading.RLock()
-            runner.running_process = Mock()
-            runner._preset_file_path = ""
+            runner.work_dir = tmp_dir
+            runner.running_process = Mock(pid=111)
+            runner.current_launch_label = "Old"
+            runner._preset_file_path = "old.txt"
+            runner.current_strategy_args = ["--wf-tcp-out=443"]
             runner._set_last_error = Mock()
             runner.is_running = Mock(return_value=True)
-            runner._stop_process_only_locked = Mock(return_value=True)
             runner._compile_preset_artifact = Mock(
                 return_value=SimpleNamespace(
                     validation_ok=True,
                     validation_report="",
                     preset_path=str(preset_path),
+                    cache_key=None,
+                    normalized_text="--wf-tcp-out=80\n",
+                    launch_args=("--wf-tcp-out=80",),
                 )
             )
-            runner._spawn_process_locked = Mock(return_value=True)
+            runner._spawn_process_locked = Mock(side_effect=lambda *_args, **_kwargs: calls.append("spawn") or True)
+            runner._stop_previous_process_after_handoff_locked = Mock(
+                side_effect=lambda *_args, **_kwargs: calls.append("stop_old")
+            )
+            runner._stop_process_only_locked = Mock()
             runner._perform_standard_windivert_cleanup = Mock()
             runner._ensure_windivert_ready_before_spawn = Mock(return_value=True)
 
             self.assertTrue(runner.switch_preset_file_fast(str(preset_path), "Selected"))
 
-            runner._stop_process_only_locked.assert_called_once()
+            self.assertEqual(calls, ["spawn", "stop_old"])
+            runner._stop_process_only_locked.assert_not_called()
             runner._perform_standard_windivert_cleanup.assert_not_called()
             runner._ensure_windivert_ready_before_spawn.assert_not_called()
             runner._spawn_process_locked.assert_called_once()
+            spawned_artifact = runner._spawn_process_locked.call_args.args[0]
+            handoff_config = Path(str(spawned_artifact.launch_args[0])[1:]).read_text(encoding="utf-8")
+            self.assertIn("--wf-tcp-out=80", handoff_config)
+            self.assertIn("--wf-dup-check=0", handoff_config)
 
     def test_fast_switch_does_not_need_runner_file_watcher(self) -> None:
         from winws_runtime.runners.zapret2_runner import Winws2StrategyRunner
@@ -185,6 +200,7 @@ class Winws2PresetSwitchTests(unittest.TestCase):
 
             runner = object.__new__(Winws2StrategyRunner)
             runner._state_lock = threading.RLock()
+            runner.work_dir = tmp_dir
             runner.running_process = Mock()
             runner._preset_file_path = ""
             runner._set_last_error = Mock()
@@ -198,6 +214,7 @@ class Winws2PresetSwitchTests(unittest.TestCase):
                     validation_report="",
                     preset_path=str(path),
                     cache_key=preset_cache_key(path),
+                    normalized_text=text,
                     launch_args=(text.strip(),),
                 )
 
@@ -205,19 +222,65 @@ class Winws2PresetSwitchTests(unittest.TestCase):
 
             runner.is_running = Mock(return_value=True)
 
-            def change_preset_before_spawn():
-                preset_path.write_text("--wf-tcp-out=443", encoding="utf-8")
-                return True
-
-            runner._stop_process_only_locked = Mock(side_effect=change_preset_before_spawn)
             runner._spawn_process_locked = Mock(return_value=True)
+            runner._stop_previous_process_after_handoff_locked = Mock()
+
+            def refresh_artifact(artifact):
+                preset_path.write_text("--wf-tcp-out=443", encoding="utf-8")
+                return runner._compile_preset_artifact(str(preset_path))
+
+            runner._refresh_artifact_if_source_changed_locked = Mock(side_effect=refresh_artifact)
 
             with patch("winws_runtime.runners.zapret2_runner.get_all_winws_process_pids", return_value=[]):
                 self.assertTrue(runner.switch_preset_file_fast(str(preset_path), "Selected"))
 
             self.assertEqual(runner._compile_preset_artifact.call_count, 2)
             spawned_artifact = runner._spawn_process_locked.call_args.args[0]
-            self.assertEqual(spawned_artifact.launch_args, ("--wf-tcp-out=443",))
+            self.assertIn("--wf-tcp-out=443", spawned_artifact.normalized_text)
+            self.assertIn("--wf-dup-check=0", spawned_artifact.normalized_text)
+
+    def test_winws2_handoff_failure_keeps_old_process_running(self) -> None:
+        from winws_runtime.runners.zapret2_runner import Winws2StrategyRunner
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            preset_path = Path(tmp_dir) / "selected.txt"
+            preset_path.write_text("--wf-tcp-out=80", encoding="utf-8")
+            old_process = Mock(pid=111)
+
+            runner = object.__new__(Winws2StrategyRunner)
+            runner._state_lock = threading.RLock()
+            runner.work_dir = tmp_dir
+            runner.running_process = old_process
+            runner.current_launch_label = "Old"
+            runner.current_strategy_args = ["--wf-tcp-out=443"]
+            runner._preset_file_path = "old.txt"
+            runner.last_error = None
+            runner._last_spawn_exit_code = None
+            runner._last_spawn_stderr = ""
+            runner._set_last_error = Mock()
+            runner.is_running = Mock(return_value=True)
+            runner._compile_preset_artifact = Mock(
+                return_value=SimpleNamespace(
+                    validation_ok=True,
+                    validation_report="",
+                    preset_path=str(preset_path),
+                    cache_key=None,
+                    normalized_text="--wf-tcp-out=80\n",
+                    launch_args=("--wf-tcp-out=80",),
+                )
+            )
+            runner._spawn_process_locked = Mock(return_value=False)
+            runner._stop_previous_process_after_handoff_locked = Mock()
+            runner._stop_process_only_locked = Mock()
+            runner._perform_standard_windivert_cleanup = Mock()
+
+            self.assertFalse(runner.switch_preset_file_fast(str(preset_path), "Selected"))
+
+            self.assertIs(runner.running_process, old_process)
+            self.assertEqual(runner.current_launch_label, "Old")
+            self.assertEqual(runner._preset_file_path, "old.txt")
+            runner._stop_previous_process_after_handoff_locked.assert_not_called()
+            runner._stop_process_only_locked.assert_not_called()
 
     def test_fast_switch_retries_winws2_conflict_inside_switch_without_full_start_fallback(self) -> None:
         from winws_runtime.runners.zapret2_runner import Winws2StrategyRunner
