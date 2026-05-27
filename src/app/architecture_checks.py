@@ -1160,6 +1160,73 @@ def check_no_hidden_winws2_launch_normalization(files: list[Path]) -> list[Probl
     )
 
 
+def check_preset_source_changes_have_single_runtime_owner(files: list[Path]) -> list[Problem]:
+    """UI/profile layers may save source presets, but runtime apply belongs to coordinator."""
+
+    scopes = [
+        path
+        for path in files
+        if _under(path, "src/presets/", "src/profile/", "src/blockcheck/")
+    ]
+    problems = _scan_lines(
+        scopes,
+        re.compile(
+            r"\b(?:apply_preset_content|request_preset_runtime_content_apply|switch_presets_async)\s*\("
+        ),
+        "изменение source preset не должно применять runtime напрямую; путь должен быть save -> preset_content_changed -> PresetRuntimeCoordinator -> LaunchRuntime",
+    )
+    user_presets_boundary = [
+        path
+        for path in files
+        if path.relative_to(REPO_ROOT).as_posix() == "src/presets/ui/common/user_presets_page.py"
+    ]
+    problems.extend(
+        _scan_lines(
+            user_presets_boundary,
+            re.compile(r"\bruntime_feature\b"),
+            "страница «Мои пресеты» не должна получать runtime_feature; она меняет только source preset и UI-список",
+        )
+    )
+    deps_path = SRC_ROOT / "ui" / "page_deps" / "presets.py"
+    if deps_path.exists():
+        tree = ast.parse(deps_path.read_text(encoding="utf-8", errors="replace"))
+        builder = next(
+            (
+                node
+                for node in ast.walk(tree)
+                if isinstance(node, ast.FunctionDef) and node.name == "build_user_presets_page_kwargs"
+            ),
+            None,
+        )
+        if builder is None:
+            problems.append(Problem(deps_path, 1, "build_user_presets_page_kwargs не найден"))
+        else:
+            arg_names = [arg.arg for arg in builder.args.args]
+            arg_names.extend(arg.arg for arg in builder.args.kwonlyargs)
+            if "runtime_feature" in arg_names:
+                problems.append(
+                    Problem(
+                        deps_path,
+                        getattr(builder, "lineno", 1),
+                        "build_user_presets_page_kwargs не должен получать runtime_feature",
+                        "runtime_feature",
+                    )
+                )
+            for node in ast.walk(builder):
+                if isinstance(node, ast.Dict):
+                    for key in node.keys:
+                        if isinstance(key, ast.Constant) and key.value == "runtime_feature":
+                            problems.append(
+                                Problem(
+                                    deps_path,
+                                    getattr(key, "lineno", getattr(builder, "lineno", 1)),
+                                    "kwargs страницы «Мои пресеты» не должны передавать runtime_feature",
+                                    '"runtime_feature"',
+                                )
+                            )
+    return problems
+
+
 def run_checks() -> list[Problem]:
     files = _python_files()
     problems: list[Problem] = []
@@ -1219,6 +1286,7 @@ def run_checks() -> list[Problem]:
     problems.extend(check_launch_preparation_does_not_mutate_source_preset())
     problems.extend(check_no_runtime_launch_preset_files(files))
     problems.extend(check_no_hidden_winws2_launch_normalization(files))
+    problems.extend(check_preset_source_changes_have_single_runtime_owner(files))
     return problems
 
 

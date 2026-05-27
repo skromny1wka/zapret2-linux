@@ -121,7 +121,6 @@ class UserPresetsPageBase(BasePage):
         parent=None,
         *,
         presets_feature,
-        runtime_feature,
         open_preset_raw_editor,
         external_actions_feature,
         ui_state_store,
@@ -134,7 +133,6 @@ class UserPresetsPageBase(BasePage):
             title_key=self._config.title_key,
         )
         self._presets_feature = presets_feature
-        self._runtime_feature = runtime_feature
         self._external_actions = external_actions_feature
         self._open_preset_raw_editor_callback = open_preset_raw_editor
         self._page_api = self._build_page_runtime().build_page_api()

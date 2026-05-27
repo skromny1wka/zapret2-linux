@@ -112,7 +112,6 @@ def build_user_presets_page_kwargs(
     *,
     page_name: PageName,
     presets_feature,
-    runtime_feature,
     external_actions_feature,
     open_preset_raw_editor,
     ui_state_store,
@@ -120,7 +119,6 @@ def build_user_presets_page_kwargs(
     method = ZAPRET2_MODE if page_name == PageName.ZAPRET2_USER_PRESETS else ZAPRET1_MODE
     return {
         "presets_feature": presets_feature,
-        "runtime_feature": runtime_feature,
         "open_preset_raw_editor": lambda preset_name, m=method: open_preset_raw_editor(
             m,
             preset_name,
