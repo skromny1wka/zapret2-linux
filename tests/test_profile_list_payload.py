@@ -45,6 +45,31 @@ class _FileBackedPresetStore:
         self.preset_path.write_text(text, encoding="utf-8")
 
 
+class _SwitchableFileBackedPresetStore:
+    def __init__(self, root: Path, files: dict[str, str], selected: str) -> None:
+        self.root = root
+        self.files = dict(files)
+        self.selected = selected
+        self.read_count_by_file: dict[str, int] = {}
+        for file_name, text in self.files.items():
+            (self.root / file_name).write_text(text, encoding="utf-8")
+
+    def get_selected_source_preset_manifest(self, _launch_method: str):
+        return SimpleNamespace(file_name=self.selected, name=Path(self.selected).stem)
+
+    def get_selected_source_path(self, _launch_method: str) -> Path:
+        return self.root / self.selected
+
+    def read_selected_preset_source(self, launch_method: str):
+        manifest = self.get_selected_source_preset_manifest(launch_method)
+        file_name = str(getattr(manifest, "file_name", "") or "")
+        self.read_count_by_file[file_name] = self.read_count_by_file.get(file_name, 0) + 1
+        return (self.root / file_name).read_text(encoding="utf-8"), manifest
+
+    def save_selected_preset_source(self, _launch_method: str, text: str) -> None:
+        (self.root / self.selected).write_text(text, encoding="utf-8")
+
+
 class _BlockingFileBackedPresetStore(_FileBackedPresetStore):
     def __init__(self, preset_path: Path, text: str) -> None:
         super().__init__(preset_path, text)
@@ -285,6 +310,80 @@ class ProfileListPayloadTests(unittest.TestCase):
         self.assertIs(second_payload, first_payload)
         self.assertEqual(store.read_count, 1)
         catalogs_loader.assert_called_once()
+
+    def test_cached_profile_payload_is_kept_per_selected_preset_revision(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            templates_dir = root / "profile" / "templates"
+            templates_dir.mkdir(parents=True)
+            (templates_dir / "all_profiles.txt").write_text("", encoding="utf-8")
+            store = _SwitchableFileBackedPresetStore(
+                root,
+                {
+                    "first.txt": "\n".join(("--filter-tcp=80", "--lua-desync=pass", "")),
+                    "second.txt": "\n".join(("--filter-tcp=443", "--lua-desync=pass", "")),
+                },
+                selected="first.txt",
+            )
+            feature = SimpleNamespace(
+                _presets_feature=store,
+                _app_paths=AppPaths(user_root=root, local_root=root),
+            )
+
+            with (
+                patch("settings.store.MAIN_DIRECTORY", str(root)),
+                patch("profile.service.load_strategy_catalogs", return_value={}) as catalogs_loader,
+            ):
+                service = ProfilePresetService(feature, "zapret2_mode")
+                first_payload = service.list_profiles()
+                store.selected = "second.txt"
+                second_payload = service.list_profiles()
+                store.selected = "first.txt"
+                cached_first_payload = service.get_cached_profile_list()
+
+        self.assertIs(cached_first_payload, first_payload)
+        self.assertIsNot(second_payload, first_payload)
+        self.assertEqual(store.read_count_by_file, {"first.txt": 1, "second.txt": 1})
+        self.assertEqual(catalogs_loader.call_count, 2)
+
+    def test_profile_payload_cache_drops_oldest_revision_after_limit(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            templates_dir = root / "profile" / "templates"
+            templates_dir.mkdir(parents=True)
+            (templates_dir / "all_profiles.txt").write_text("", encoding="utf-8")
+            store = _SwitchableFileBackedPresetStore(
+                root,
+                {
+                    "first.txt": "\n".join(("--filter-tcp=80", "--lua-desync=pass", "")),
+                    "second.txt": "\n".join(("--filter-tcp=443", "--lua-desync=pass", "")),
+                    "third.txt": "\n".join(("--filter-udp=50000-50100", "--lua-desync=pass", "")),
+                },
+                selected="first.txt",
+            )
+            feature = SimpleNamespace(
+                _presets_feature=store,
+                _app_paths=AppPaths(user_root=root, local_root=root),
+            )
+
+            with (
+                patch("settings.store.MAIN_DIRECTORY", str(root)),
+                patch("profile.service.PROFILE_LIST_PAYLOAD_CACHE_LIMIT", 2, create=True),
+                patch("profile.service.load_strategy_catalogs", return_value={}),
+            ):
+                service = ProfilePresetService(feature, "zapret2_mode")
+                service.list_profiles()
+                store.selected = "second.txt"
+                second_payload = service.list_profiles()
+                store.selected = "third.txt"
+                service.list_profiles()
+                store.selected = "first.txt"
+                evicted_first_payload = service.get_cached_profile_list()
+                store.selected = "second.txt"
+                cached_second_payload = service.get_cached_profile_list()
+
+        self.assertIsNone(evicted_first_payload)
+        self.assertIs(cached_second_payload, second_payload)
 
     def test_selected_preset_snapshot_changes_when_same_size_file_content_changes(self) -> None:
         with TemporaryDirectory() as temp_dir:

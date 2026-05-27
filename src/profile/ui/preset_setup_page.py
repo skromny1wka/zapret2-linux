@@ -154,13 +154,6 @@ class PresetSetupPageBase(BasePage):
     def _request_profiles_payload(self, *, force: bool = False) -> None:
         if self._cleanup_in_progress:
             return
-        worker = self._profile_load_worker
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    return
-            except Exception:
-                return
         if not force and self._profile_payload_loaded_once and not self._profile_payload_dirty:
             return
         self._profile_payload_dirty = True
@@ -168,6 +161,16 @@ class PresetSetupPageBase(BasePage):
         if cached_payload is not None:
             self._apply_cached_profile_payload(cached_payload)
             return
+        worker = self._profile_load_worker
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    if force:
+                        self._profile_payload_dirty = True
+                        self._profile_load_request_id += 1
+                    return
+            except Exception:
+                return
         self._profile_load_request_id += 1
         request_id = self._profile_load_request_id
         if self._profiles_list is None:
@@ -207,6 +210,8 @@ class PresetSetupPageBase(BasePage):
         if self._profile_load_worker is worker:
             self._profile_load_worker = None
         worker.deleteLater()
+        if self._profile_payload_dirty and not self._cleanup_in_progress:
+            self._schedule_profiles_payload_request(force=True)
 
     def _apply_payload(self, payload) -> None:
         if self._content_host_layout is None:

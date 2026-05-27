@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -57,6 +58,9 @@ from .editable_settings import (
 )
 
 
+PROFILE_LIST_PAYLOAD_CACHE_LIMIT = 24
+
+
 @dataclass(slots=True)
 class _SelectedPresetSnapshot:
     revision: tuple[object, ...]
@@ -75,6 +79,10 @@ class ProfilePresetService:
         self._selected_preset_snapshot: _SelectedPresetSnapshot | None = None
         self._profile_list_snapshot: ProfileListPayload | None = None
         self._profile_list_snapshot_revision: tuple[object, ...] | None = None
+        self._profile_list_snapshots_by_revision: OrderedDict[
+            tuple[object, ...],
+            ProfileListPayload,
+        ] = OrderedDict()
         self._profile_list_lock = threading.RLock()
 
     @property
@@ -126,12 +134,18 @@ class ProfilePresetService:
             return None
         try:
             snapshot = self._profile_list_snapshot
-            if snapshot is None or self._profile_list_snapshot_revision is None:
-                return None
             try:
                 list_revision = self._current_profile_list_revision()
             except Exception as exc:
                 log(f"profile_feature.list_profiles.cache_check_failed: {exc}", "DEBUG")
+                return None
+            revision_snapshot = self._profile_list_snapshots_by_revision.get(list_revision)
+            if revision_snapshot is not None:
+                self._profile_list_snapshots_by_revision.move_to_end(list_revision)
+                self._profile_list_snapshot = revision_snapshot
+                self._profile_list_snapshot_revision = list_revision
+                return revision_snapshot
+            if snapshot is None or self._profile_list_snapshot_revision is None:
                 return None
             if self._profile_list_snapshot_revision != list_revision:
                 return None
@@ -177,6 +191,13 @@ class ProfilePresetService:
         if snapshot is not None and self._profile_list_snapshot_revision == list_revision:
             self._log_timing("profile_feature.list_profiles.cached", total_started_at)
             return snapshot
+        revision_snapshot = self._profile_list_snapshots_by_revision.get(list_revision)
+        if revision_snapshot is not None:
+            self._profile_list_snapshots_by_revision.move_to_end(list_revision)
+            self._profile_list_snapshot = revision_snapshot
+            self._profile_list_snapshot_revision = list_revision
+            self._log_timing("profile_feature.list_profiles.cached", total_started_at)
+            return revision_snapshot
 
         preset, manifest = self._load_selected_preset_for_revision(preset_revision, manifest, source_text)
         normalize_started_at = time.perf_counter()
@@ -224,8 +245,16 @@ class ProfilePresetService:
         )
         self._profile_list_snapshot = payload
         self._profile_list_snapshot_revision = list_revision
+        self._remember_profile_list_snapshot(list_revision, payload)
         self._log_timing("profile_feature.list_profiles.total", total_started_at)
         return payload
+
+    def _remember_profile_list_snapshot(self, revision: tuple[object, ...], payload: ProfileListPayload) -> None:
+        self._profile_list_snapshots_by_revision[revision] = payload
+        self._profile_list_snapshots_by_revision.move_to_end(revision)
+        limit = max(1, int(PROFILE_LIST_PAYLOAD_CACHE_LIMIT))
+        while len(self._profile_list_snapshots_by_revision) > limit:
+            self._profile_list_snapshots_by_revision.popitem(last=False)
 
     @staticmethod
     def _yield_profile_payload_worker(index: int) -> None:
@@ -968,6 +997,7 @@ class ProfilePresetService:
     def _invalidate_profile_list_snapshot(self) -> None:
         self._profile_list_snapshot = None
         self._profile_list_snapshot_revision = None
+        self._profile_list_snapshots_by_revision.clear()
 
     def _current_selected_preset_file_name(self) -> str:
         file_name_getter = getattr(self._presets, "get_selected_source_preset_file_name", None)

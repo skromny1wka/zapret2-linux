@@ -92,6 +92,16 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_request_profiles_payload(force=True)", handler_source)
         self.assertIn("_ui_state_unsubscribe", cleanup_source)
 
+    def test_preset_setup_page_ignores_stale_profile_worker_after_preset_switch(self) -> None:
+        request_source = inspect.getsource(PresetSetupPageBase._request_profiles_payload)
+        finished_source = inspect.getsource(PresetSetupPageBase._on_profile_worker_finished)
+
+        running_branch = request_source.split("worker.isRunning():", 1)[1].split("return", 1)[0]
+        self.assertIn("if force:", running_branch)
+        self.assertIn("_profile_load_request_id += 1", running_branch)
+        self.assertIn("_profile_payload_dirty = True", running_branch)
+        self.assertIn("_schedule_profiles_payload_request(force=True)", finished_source)
+
     def test_raw_preset_editor_saves_without_runtime_publish_until_editor_is_left(self) -> None:
         save_source = inspect.getsource(PresetRawEditorPage._save_file)
         text_changed_source = inspect.getsource(PresetRawEditorPage._on_text_changed)
@@ -165,6 +175,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
         self.assertIn("get_cached_profile_list", source)
         self.assertIn("_apply_cached_profile_payload", source)
+        self.assertLess(source.index("get_cached_profile_list"), source.index("worker.isRunning()"))
         self.assertLess(source.index("get_cached_profile_list"), source.index("create_profile_list_load_worker"))
         self.assertNotIn("_show_loading_skeleton", source)
 
