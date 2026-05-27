@@ -23,7 +23,7 @@ from presets.user_presets_runtime_service import (
     UserPresetsRuntimeAdapter,
     UserPresetsRuntimeService,
 )
-from presets.user_presets_action_workers import UserPresetActivateWorker
+from presets.user_presets_action_workers import UserPresetActivateWorker, UserPresetItemActionWorker
 from presets.ui.common.user_presets_page_runtime import (
     UserPresetsPageRuntime,
     UserPresetsPageRuntimeConfig,
@@ -52,16 +52,12 @@ from presets.ui.common.user_presets_actions_workflow import (
     show_reset_all_result,
 )
 from presets.ui.common.user_presets_item_actions_workflow import (
-    delete_preset_action,
-    duplicate_preset_action,
-    export_preset_action,
     handle_item_dropped_action,
     move_preset_by_step_action,
     open_edit_preset_menu_action,
     open_new_configs_post_action,
     open_presets_info_action,
     rename_preset_action,
-    reset_preset_action,
     show_rating_menu_action,
     toggle_pin_preset_action,
 )
@@ -168,6 +164,8 @@ class UserPresetsPageBase(BasePage):
         self._preset_activate_worker = None
         self._preset_activate_request_id = 0
         self._pending_preset_activation: tuple[str, str] | None = None
+        self._preset_item_action_worker = None
+        self._preset_item_action_request_id = 0
         self._build_ui()
         self._after_ui_built()
         self.bind_ui_state_store(ui_state_store)
@@ -900,59 +898,162 @@ class UserPresetsPageBase(BasePage):
         )
 
     def _on_duplicate_preset(self, name: str):
-        duplicate_preset_action(
-            name=name,
-            resolve_display_name_fn=self._resolve_display_name,
-            actions_api=self._actions_api(),
-            runtime_service=self._runtime_service,
-            info_bar_cls=InfoBar,
-            tr_fn=self._tr,
-            parent_window=self.window(),
-            log_fn=log,
-            tr_prefix=self._config.tr_prefix,
+        display_name = self._resolve_display_name(name)
+        self._request_preset_item_action(
+            "duplicate",
+            file_name=name,
+            display_name=display_name,
         )
 
     def _on_reset_preset(self, name: str):
-        reset_preset_action(
-            name=name,
-            resolve_display_name_fn=self._resolve_display_name,
-            actions_api=self._actions_api(),
-            message_box_cls=MessageBox,
-            info_bar_cls=InfoBar,
-            tr_fn=self._tr,
-            parent_window=self.window(),
-            log_fn=log,
-            tr_prefix=self._config.tr_prefix,
+        display_name = self._resolve_display_name(name)
+        if MessageBox:
+            box = MessageBox(
+                self._tr(f"{self._config.tr_prefix}.dialog.reset_single.title", "Вернуть встроенный пресет?"),
+                self._tr(
+                    f"{self._config.tr_prefix}.dialog.reset_single.body",
+                    "Будет удалён ваш изменённый файл пресета «{name}».\n"
+                    "После этого снова появится встроенный пресет с тем же именем файла.\n"
+                    "Изменения в этом файле будут потеряны.",
+                    name=display_name,
+                ),
+                self.window(),
+            )
+            box.yesButton.setText(self._tr(f"{self._config.tr_prefix}.dialog.reset_single.button", "Вернуть встроенный"))
+            box.cancelButton.setText(self._tr(f"{self._config.tr_prefix}.dialog.button.cancel", "Отмена"))
+            if not box.exec():
+                return
+        self._request_preset_item_action(
+            "reset",
+            file_name=name,
+            display_name=display_name,
         )
 
     def _on_delete_preset(self, name: str):
-        delete_preset_action(
-            name=name,
-            resolve_display_name_fn=self._resolve_display_name,
-            storage_api=self._storage_api(),
-            actions_api=self._actions_api(),
-            runtime_service=self._runtime_service,
-            message_box_cls=MessageBox,
-            info_bar_cls=InfoBar,
-            tr_fn=self._tr,
-            parent_window=self.window(),
-            log_fn=log,
-            tr_prefix=self._config.tr_prefix,
+        display_name = self._resolve_display_name(name)
+        if not self._storage_api().is_builtin_preset_file(name) and MessageBox:
+            box = MessageBox(
+                self._tr(f"{self._config.tr_prefix}.dialog.delete_single.title", "Удалить пресет?"),
+                self._tr(
+                    f"{self._config.tr_prefix}.dialog.delete_single.body",
+                    "Пользовательский пресет «{name}» будет удалён.\n"
+                    "Изменения в нём будут потеряны.\n"
+                    "Вернуть его можно только создав новый пресет или импортировав txt-файл.",
+                    name=display_name,
+                ),
+                self.window(),
+            )
+            box.yesButton.setText(self._tr(f"{self._config.tr_prefix}.dialog.delete_single.button", "Удалить"))
+            box.cancelButton.setText(self._tr(f"{self._config.tr_prefix}.dialog.button.cancel", "Отмена"))
+            if not box.exec():
+                return
+        self._request_preset_item_action(
+            "delete",
+            file_name=name,
+            display_name=display_name,
         )
 
     def _on_export_preset(self, name: str):
-        export_preset_action(
-            page=self,
-            name=name,
-            resolve_display_name_fn=self._resolve_display_name,
-            file_dialog_cls=QFileDialog,
-            actions_api=self._actions_api(),
-            info_bar_cls=InfoBar,
-            tr_fn=self._tr,
-            parent_window=self.window(),
-            log_fn=log,
-            tr_prefix=self._config.tr_prefix,
+        display_name = self._resolve_display_name(name)
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            self._tr(f"{self._config.tr_prefix}.file_dialog.export_title", "Экспортировать пресет"),
+            f"{display_name}.txt",
+            "Файлы пресетов (*.txt);;Все файлы (*.*)",
         )
+        if not file_path:
+            return
+        self._request_preset_item_action(
+            "export",
+            file_name=name,
+            display_name=display_name,
+            file_path=file_path,
+        )
+
+    def create_preset_item_action_worker(
+        self,
+        request_id: int,
+        *,
+        action: str,
+        file_name: str,
+        display_name: str,
+        file_path: str = "",
+    ):
+        return UserPresetItemActionWorker(
+            request_id,
+            self._actions_api(),
+            action=action,
+            file_name=file_name,
+            display_name=display_name,
+            file_path=file_path,
+            parent=self,
+        )
+
+    def _request_preset_item_action(
+        self,
+        action: str,
+        *,
+        file_name: str,
+        display_name: str,
+        file_path: str = "",
+    ) -> None:
+        worker = self.__dict__.get("_preset_item_action_worker")
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    return
+            except Exception:
+                return
+        self._preset_item_action_request_id = int(getattr(self, "_preset_item_action_request_id", 0) or 0) + 1
+        request_id = self._preset_item_action_request_id
+        worker = self.create_preset_item_action_worker(
+            request_id,
+            action=str(action or ""),
+            file_name=str(file_name or ""),
+            display_name=str(display_name or ""),
+            file_path=str(file_path or ""),
+        )
+        self._preset_item_action_worker = worker
+        worker.completed.connect(self._on_preset_item_action_finished)
+        worker.failed.connect(self._on_preset_item_action_failed)
+        worker.finished.connect(lambda w=worker: self._on_preset_item_action_worker_finished(w))
+        worker.start()
+
+    def _on_preset_item_action_finished(self, request_id: int, action: str, result, context) -> None:
+        if request_id != int(getattr(self, "_preset_item_action_request_id", 0) or 0):
+            return
+        context = dict(context or {})
+        log(str(getattr(result, "log_message", "") or ""), str(getattr(result, "log_level", "") or "INFO"))
+        if action == "delete" and str(getattr(result, "error_code", "") or "") == "not_found":
+            # Файл уже исчез: синхронизируем локальное состояние списка, не показывая лишнюю ошибку.
+            self._runtime_service.recover_missing_deleted_preset(str(context.get("file_name") or ""))
+            return
+        if bool(getattr(result, "structure_changed", False)):
+            self._runtime_service.mark_presets_structure_changed()
+        level = str(getattr(result, "infobar_level", "") or "")
+        title = str(getattr(result, "infobar_title", "") or self._tr("common.error.title", "Ошибка"))
+        content = str(getattr(result, "infobar_content", "") or "")
+        if level == "success":
+            InfoBar.success(title=title, content=content, parent=self.window())
+        elif level == "warning":
+            InfoBar.warning(title=title, content=content, parent=self.window())
+        elif level == "error":
+            InfoBar.error(title=title, content=content, parent=self.window())
+
+    def _on_preset_item_action_failed(self, request_id: int, action: str, error: str) -> None:
+        if request_id != int(getattr(self, "_preset_item_action_request_id", 0) or 0):
+            return
+        log(f"Ошибка действия preset ({action}): {error}", "ERROR")
+        InfoBar.error(
+            title=self._tr("common.error.title", "Ошибка"),
+            content=self._tr(f"{self._config.tr_prefix}.error.generic", "Ошибка: {error}", error=error),
+            parent=self.window(),
+        )
+
+    def _on_preset_item_action_worker_finished(self, worker) -> None:
+        if self.__dict__.get("_preset_item_action_worker") is worker:
+            self._preset_item_action_worker = None
+        worker.deleteLater()
 
     def _open_presets_info(self):
         open_presets_info_action(

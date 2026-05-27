@@ -17,7 +17,7 @@ from presets import commands as preset_commands
 from presets.ui.common.preset_subpage_base import PresetRawEditorPage
 from presets.ui.common.user_presets_page import UserPresetsPageBase
 from presets.raw_preset_loader import RawPresetActionWorker, RawPresetActivateWorker, RawPresetSaveWorker
-from presets.user_presets_action_workers import UserPresetActivateWorker
+from presets.user_presets_action_workers import UserPresetActivateWorker, UserPresetItemActionWorker
 import presets.ui.control.additional_settings_runtime as control_additional_settings_runtime
 import presets.ui.control.control_page_shared as control_page_shared
 import presets.ui.control.zapret1.runtime_helpers as zapret1_runtime_helpers
@@ -163,6 +163,33 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_request_preset_activation", handler_source)
         self.assertIn("create_preset_activate_worker", request_source)
         self.assertIn("actions_api.activate_preset", worker_source)
+
+    def test_user_presets_item_file_actions_run_through_worker(self) -> None:
+        worker_source = inspect.getsource(UserPresetItemActionWorker.run)
+        request_source = inspect.getsource(UserPresetsPageBase._request_preset_item_action)
+
+        for method in (
+            UserPresetsPageBase._on_duplicate_preset,
+            UserPresetsPageBase._on_reset_preset,
+            UserPresetsPageBase._on_delete_preset,
+            UserPresetsPageBase._on_export_preset,
+        ):
+            source = inspect.getsource(method)
+            self.assertIn("_request_preset_item_action", source)
+            self.assertNotIn("duplicate_preset_action", source)
+            self.assertNotIn("reset_preset_action", source)
+            self.assertNotIn("delete_preset_action", source)
+            self.assertNotIn("export_preset_action", source)
+            self.assertNotIn(".duplicate_preset(", source)
+            self.assertNotIn(".reset_preset_to_builtin(", source)
+            self.assertNotIn(".delete_preset(", source)
+            self.assertNotIn(".export_preset(", source)
+
+        self.assertIn("create_preset_item_action_worker", request_source)
+        self.assertIn("actions_api.duplicate_preset", worker_source)
+        self.assertIn("actions_api.reset_preset_to_builtin", worker_source)
+        self.assertIn("actions_api.delete_preset", worker_source)
+        self.assertIn("actions_api.export_preset", worker_source)
 
     def test_profile_commands_reuse_service_cache(self) -> None:
         source = inspect.getsource(profile_commands._profile_preset_service)
