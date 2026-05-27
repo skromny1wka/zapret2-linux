@@ -83,8 +83,8 @@
 --name=youtube.com (интерфейс)
 --filter-tcp=80,443
 --hostlist=lists/youtube.txt
---payload=tls_client_hello
 --out-range=-d8
+--payload=tls_client_hello
 --lua-desync=multisplit:pos=2,midsld-2:seqovl=1:seqovl_pattern=tls7
 
 --new
