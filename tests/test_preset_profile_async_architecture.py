@@ -72,8 +72,9 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
         self.assertNotIn(".list_profiles(", refresh_source)
         self.assertIn("_request_profiles_payload(force=True)", refresh_source)
-        self.assertIn("_request_profiles_payload", activated_source)
+        self.assertIn("_schedule_profiles_payload_request", activated_source)
         self.assertNotIn("QTimer.singleShot(0, self._request_profiles_payload)", init_source)
+        self.assertIn("_request_profiles_payload", inspect.getsource(PresetSetupPageBase._schedule_profiles_payload_request))
         self.assertIn("_profile_payload_dirty", request_source)
         self.assertIn("_profile_payload_loaded_once", request_source)
 

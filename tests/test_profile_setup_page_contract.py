@@ -672,6 +672,15 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertNotIn("_hide_loading_skeleton()", payload_loaded)
         self.assertIn("while self._content_host_layout.count() > 0", clear_dynamic_widgets)
 
+    def test_preset_setup_activation_schedules_profile_refresh_after_lifecycle_returns(self) -> None:
+        activated_source = inspect.getsource(PresetSetupPageBase.on_page_activated)
+        schedule_source = inspect.getsource(PresetSetupPageBase._schedule_profiles_payload_request)
+
+        self.assertIn("_schedule_profiles_payload_request", activated_source)
+        self.assertNotIn("_request_profiles_payload()", activated_source)
+        self.assertIn("QTimer.singleShot", schedule_source)
+        self.assertIn("_request_profiles_payload", schedule_source)
+
     def test_preset_setup_page_does_not_use_profile_loading_skeleton(self) -> None:
         shell_builder = inspect.getsource(build_profile_shell)
         request_profiles = inspect.getsource(PresetSetupPageBase._request_profiles_payload)

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import time
 
+from PyQt6.QtCore import QTimer
+
 from log.log import log
 from profile.folders import set_profile_folder_collapsed
 from profile.match_filters import filter_values
@@ -69,7 +71,13 @@ class PresetSetupPageBase(BasePage):
         self.bind_ui_state_store(ui_state_store)
 
     def on_page_activated(self) -> None:
-        self._request_profiles_payload()
+        self._schedule_profiles_payload_request()
+
+    def _schedule_profiles_payload_request(self, *, force: bool = False) -> None:
+        try:
+            QTimer.singleShot(0, lambda: self._request_profiles_payload(force=force))
+        except Exception:
+            self._request_profiles_payload(force=force)
 
     def _build_content(self) -> None:
         shell = build_profile_shell(
