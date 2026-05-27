@@ -14,8 +14,8 @@ def install_backend_page_data_warmup(
     premium_feature,
     logs_feature,
     log_startup_metric,
-    delay_ms: int = 1_500,
-    premium_delay_ms: int = 14_000,
+    delay_ms: int = 8_000,
+    premium_delay_ms: int = 18_000,
 ) -> None:
     def _run_named_warmup(name: str, callback) -> None:
         started_at = time.perf_counter()

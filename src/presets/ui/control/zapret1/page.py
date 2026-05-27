@@ -592,6 +592,7 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         if (
             not changed
             or "active_preset_revision" in changed
+            or "current_strategy_summary" in changed
             or "preset_content_revision" in changed
             or "subscription_is_premium" in changed
             or "subscription_days_remaining" in changed

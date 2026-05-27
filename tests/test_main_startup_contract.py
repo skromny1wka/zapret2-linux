@@ -310,14 +310,17 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         self.assertNotIn("from main.post_startup_user_presets_warmup import", top_level)
         self.assertNotIn("from main.post_startup_update import", top_level)
 
-    def test_startup_audit_is_enabled_by_default_for_temporary_diagnostics(self) -> None:
+    def test_startup_audit_is_disabled_by_default_after_temporary_diagnostics(self) -> None:
         from main import startup_audit
 
         with patch.dict("os.environ", {}, clear=True), patch.object(sys, "argv", ["Zapret.exe"]):
-            self.assertTrue(startup_audit.is_startup_audit_enabled())
+            self.assertFalse(startup_audit.is_startup_audit_enabled())
 
         with patch.dict("os.environ", {"ZAPRET_STARTUP_AUDIT": "0"}, clear=True):
             self.assertFalse(startup_audit.is_startup_audit_enabled())
+
+        with patch.dict("os.environ", {}, clear=True), patch.object(sys, "argv", ["Zapret.exe", "--startup-audit"]):
+            self.assertTrue(startup_audit.is_startup_audit_enabled())
 
     def test_startup_metric_includes_memory_when_audit_is_enabled(self) -> None:
         from main import runtime_state
@@ -945,10 +948,62 @@ class StartupRuntimeSetupTests(unittest.TestCase):
 
             self.assertEqual(thread_names, [])
             self.assertEqual(len(scheduled), 1)
-            self.assertGreaterEqual(scheduled[0][0], 500)
+            self.assertGreaterEqual(scheduled[0][0], 6000)
 
             scheduled[0][1]()
             self.assertEqual(thread_names, ["StartupChecksWorker"])
+
+    def test_post_init_lists_and_telegram_are_delayed_past_dpi_start(self) -> None:
+        from main import post_startup_lists, post_startup_proxy
+        from main.post_startup_lists import install_lists_check
+        from main.post_startup_proxy import install_telegram_proxy_startup
+
+        class Signal:
+            def __init__(self) -> None:
+                self._callbacks: list[object] = []
+
+            def connect(self, callback) -> None:
+                self._callbacks.append(callback)
+
+            def emit(self, value: str = "") -> None:
+                for callback in list(self._callbacks):
+                    callback(value)
+
+        signal = Signal()
+        startup_host = SimpleNamespace(
+            startup_post_init_ready=signal,
+            startup_state=SimpleNamespace(post_init_ready=False),
+            is_alive=Mock(return_value=True),
+        )
+        scheduled: list[tuple[str, int, object]] = []
+
+        def schedule_lists(delay_ms, callback):
+            scheduled.append(("lists", delay_ms, callback))
+
+        def schedule_proxy(delay_ms, callback):
+            scheduled.append(("proxy", delay_ms, callback))
+
+        with (
+            patch.object(post_startup_lists, "schedule_after", side_effect=schedule_lists),
+            patch.object(post_startup_proxy, "schedule_after", side_effect=schedule_proxy),
+            patch.object(post_startup_lists, "start_daemon_thread"),
+            patch.object(post_startup_proxy, "start_daemon_thread"),
+        ):
+            install_lists_check(
+                startup_host,
+                startup_lists_check=Mock(),
+                log_startup_metric=Mock(),
+            )
+            install_telegram_proxy_startup(
+                startup_host,
+                start_proxy_if_enabled_async=Mock(),
+                log_startup_metric=Mock(),
+            )
+            signal.emit("post_init")
+
+        delays = {name: delay for name, delay, _callback in scheduled}
+        self.assertGreaterEqual(delays["proxy"], 6000)
+        self.assertGreaterEqual(delays["lists"], 7000)
 
     def test_deferred_init_marks_ui_interactive_before_delayed_runtime_continue(self) -> None:
         from PyQt6.QtCore import QTimer
@@ -1316,6 +1371,33 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         self.assertEqual(control_page._top_summary_profile_retry_count, 0)
         self.assertFalse(control_page._top_summary_profile_retry_pending)
 
+    def test_control_pages_refresh_top_summary_when_profile_summary_changes(self) -> None:
+        from app.state_store import AppUiState
+        from presets.ui.control.zapret1.page import Zapret1ModeControlPage
+        from presets.ui.control.zapret2.page import Zapret2ModeControlPage
+
+        for page_cls in (Zapret2ModeControlPage, Zapret1ModeControlPage):
+            with self.subTest(page_cls=page_cls.__name__):
+                control_page = page_cls.__new__(page_cls)
+                control_page._cleanup_in_progress = False
+                control_page._refresh_runtime = SimpleNamespace(additional_settings_dirty=False)
+                control_page._startup_can_refresh_top_summary = Mock(return_value=True)
+                control_page._refresh_top_summary = Mock()
+                control_page._wait_for_startup_interactive_before_top_summary = Mock()
+                control_page._sync_profile_ui_mode_from_settings = Mock()
+                control_page.set_loading = Mock()
+                control_page.update_status = Mock()
+                control_page.update_strategy = Mock()
+                control_page._refresh_last_status_message = Mock()
+
+                page_cls._on_ui_state_changed(
+                    control_page,
+                    AppUiState(current_strategy_summary="48 включено"),
+                    frozenset({"current_strategy_summary"}),
+                )
+
+                control_page._refresh_top_summary.assert_called_once()
+
     def test_window_page_actions_route_pages_through_adapter(self) -> None:
         from app.page_names import PageName
         from main import window_page_actions
@@ -1497,6 +1579,59 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             startup_host,
             profile_feature=profile_feature,
             log_startup_metric=log_startup_metric,
+            on_profile_warmup_ready=None,
+        )
+
+    def test_post_startup_profile_warmup_refreshes_profile_summary_after_ready(self) -> None:
+        from main import post_startup
+        from main.post_startup import PostStartupDeps, install_post_startup_tasks
+
+        startup_host = object()
+        profile_feature = object()
+        presets_feature = SimpleNamespace(refresh_profile_strategy_summary_in_store=Mock())
+        ui_state_store = object()
+        deps = PostStartupDeps(
+            startup_host=startup_host,
+            profile_feature=profile_feature,
+            presets_feature=presets_feature,
+            ui_state_store=ui_state_store,
+            dns_feature=object(),
+            notify=Mock(),
+            notify_many=Mock(),
+            set_status=Mock(),
+            log_startup_metric=Mock(),
+            start_proxy_if_enabled_async=Mock(),
+            startup_lists_check=Mock(),
+            apply_dns_on_startup_async=Mock(),
+            install_tray_post_startup=Mock(),
+            updater_feature=Mock(),
+        )
+
+        with (
+            patch.object(post_startup, "install_startup_checks"),
+            patch.object(post_startup, "install_deferred_maintenance"),
+            patch.object(post_startup, "install_telegram_proxy_startup"),
+            patch.object(post_startup, "install_lists_check"),
+            patch.object(post_startup, "install_dns_startup"),
+            patch.object(post_startup, "install_dns_page_data_warmup"),
+            patch.object(post_startup, "install_profile_warmup") as install_profile_warmup,
+            patch.object(post_startup, "install_user_presets_warmup"),
+            patch.object(post_startup, "install_update_check"),
+            patch.object(post_startup, "install_cpu_diagnostic"),
+            patch.object(post_startup, "install_qt_event_diagnostic_probe"),
+            patch.object(post_startup, "install_global_exception_handler"),
+        ):
+            install_post_startup_tasks(deps)
+
+        callback = install_profile_warmup.call_args.kwargs["on_profile_warmup_ready"]
+        self.assertIsNotNone(callback)
+
+        callback("zapret2_mode")
+
+        presets_feature.refresh_profile_strategy_summary_in_store.assert_called_once_with(
+            method="zapret2_mode",
+            profile_feature=profile_feature,
+            ui_state_store=ui_state_store,
         )
 
     def test_post_startup_tasks_install_user_presets_warmup(self) -> None:
@@ -1747,6 +1882,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         metric = Mock()
         delays: list[int] = []
         thread_names: list[str] = []
+        ready_methods: list[str] = []
 
         with (
             patch.object(
@@ -1769,11 +1905,13 @@ class StartupRuntimeSetupTests(unittest.TestCase):
                 startup_host,
                 profile_feature=profile_feature,
                 log_startup_metric=metric,
+                on_profile_warmup_ready=ready_methods.append,
             )
             signal.emit("interactive")
 
         self.assertEqual(delays, [9000, 18000])
         self.assertEqual(thread_names, ["ProfileWarmup-zapret1_mode", "ProfileWarmup-zapret2_mode"])
+        self.assertEqual(ready_methods, ["zapret1_mode", "zapret2_mode"])
         self.assertEqual(
             [recorded_call.args[0] for recorded_call in profile_feature.list_profiles.call_args_list],
             ["zapret1_mode", "zapret2_mode"],

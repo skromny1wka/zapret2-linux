@@ -41,8 +41,7 @@ def is_startup_audit_enabled() -> bool:
     if "--startup-audit" in args:
         return True
 
-    # Временно включено по умолчанию, чтобы собрать карту первого запуска.
-    return True
+    return False
 
 
 def audit_task_begin(name: str, kind: str = "task") -> int:

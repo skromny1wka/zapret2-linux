@@ -53,7 +53,7 @@ class BackendPageDataWarmupTests(unittest.TestCase):
             )
             signal.emit("interactive")
 
-        self.assertEqual(delays, [1500, 14000])
+        self.assertEqual(delays, [8000, 18000])
         self.assertEqual(
             thread_names,
             [
@@ -68,7 +68,7 @@ class BackendPageDataWarmupTests(unittest.TestCase):
         self.assertFalse(hasattr(startup_host, "warm_page"))
         metric.assert_any_call(
             "StartupBackendPageDataWarmupQueued",
-            "1500ms after interactive; premium 14000ms after interactive",
+            "8000ms after interactive; premium 18000ms after interactive",
         )
         metric.assert_any_call("StartupBackendPageDataWarmupStarted", "appearance, logs")
         metric.assert_any_call("StartupBackendPageDataWarmupStarted", "premium")

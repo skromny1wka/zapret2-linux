@@ -13,6 +13,7 @@ def build_application_post_startup_deps(*, window, app_runtime) -> PostStartupDe
         startup_host=build_post_startup_host(window),
         profile_feature=features.profile,
         presets_feature=features.presets,
+        ui_state_store=app_runtime.state.ui,
         dns_feature=features.dns,
         premium_feature=features.premium,
         logs_feature=features.logs,

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
+
+from PyQt6.QtCore import QObject, pyqtSignal
 
 from log.log import log
 from main.post_startup_gate import bind_startup_gate, is_startup_host_alive
@@ -10,6 +13,10 @@ from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE, is_preset_launch_method, n
 
 
 DEFAULT_PROFILE_WARMUP_METHODS: tuple[str, ...] = (ZAPRET2_MODE, ZAPRET1_MODE)
+
+
+class _ProfileWarmupBridge(QObject):
+    method_ready = pyqtSignal(str)
 
 
 def profile_warmup_methods(current_method: str) -> tuple[str, ...]:
@@ -26,7 +33,12 @@ def install_profile_warmup(
     log_startup_metric,
     delay_ms: int = 9_000,
     secondary_delay_ms: int = 18_000,
+    on_profile_warmup_ready: Callable[[str], None] | None = None,
 ) -> None:
+    warmup_bridge = _ProfileWarmupBridge()
+    if on_profile_warmup_ready is not None:
+        warmup_bridge.method_ready.connect(on_profile_warmup_ready)
+
     def _run_profile_warmup_method(method: str) -> None:
         if not is_startup_host_alive(startup_host):
             return
@@ -38,6 +50,13 @@ def install_profile_warmup(
             return
         elapsed_ms = (time.perf_counter() - started_at) * 1000.0
         log(f"Фоновый прогрев профилей {method}: {elapsed_ms:.1f}ms", "DEBUG")
+        if not is_startup_host_alive(startup_host):
+            return
+        if on_profile_warmup_ready is not None:
+            try:
+                warmup_bridge.method_ready.emit(method)
+            except Exception as exc:
+                log(f"Не удалось обновить UI после прогрева профилей {method}: {exc}", "DEBUG")
 
     def _start_profile_warmup(methods: tuple[str, ...]) -> None:
         log_startup_metric("StartupProfileWarmupStarted", ", ".join(methods))

@@ -20,12 +20,7 @@ def _auto_qt_event_diag_enabled() -> bool:
     raw = os.environ.get("ZAPRET_AUTO_QT_EVENT_DIAGNOSTIC")
     if raw is not None and str(raw).strip() != "":
         return str(raw).strip().lower() in {"1", "true", "yes", "on"}
-    try:
-        from config.build_info import CHANNEL
-
-        return str(CHANNEL or "").strip().lower() == "dev"
-    except Exception:
-        return False
+    return False
 
 
 class _QtEventDiagBridge(QObject):

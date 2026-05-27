@@ -6,6 +6,9 @@ from main.post_startup_proxy_workers import start_telegram_proxy_if_enabled
 from main.post_startup_threading import schedule_after, start_daemon_thread
 
 
+TELEGRAM_PROXY_STARTUP_DELAY_MS = 6_500
+
+
 def install_telegram_proxy_startup(
     startup_host,
     *,
@@ -25,7 +28,7 @@ def install_telegram_proxy_startup(
     def _schedule_telegram_proxy() -> None:
         if not is_startup_host_alive(startup_host):
             return
-        delay_ms = 1000
+        delay_ms = TELEGRAM_PROXY_STARTUP_DELAY_MS
         log(f"Telegram Proxy отложен на {delay_ms}ms после post-init", "DEBUG")
         log_startup_metric("StartupPostInitTelegramProxyQueued", f"{delay_ms}ms after post-init")
         schedule_after(

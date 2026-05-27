@@ -6,6 +6,9 @@ from main.post_startup_list_workers import run_startup_lists_check
 from main.post_startup_threading import schedule_after, start_daemon_thread
 
 
+LISTS_STARTUP_CHECK_DELAY_MS = 7_500
+
+
 def install_lists_check(
     startup_host,
     *,
@@ -25,7 +28,7 @@ def install_lists_check(
     def _schedule_lists_check() -> None:
         if not is_startup_host_alive(startup_host):
             return
-        delay_ms = 1000
+        delay_ms = LISTS_STARTUP_CHECK_DELAY_MS
         log(f"Проверки списков отложены на {delay_ms}ms после post-init", "DEBUG")
         log_startup_metric("StartupPostInitListsQueued", f"{delay_ms}ms after post-init")
         schedule_after(

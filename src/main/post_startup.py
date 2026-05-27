@@ -104,10 +104,18 @@ class PostStartupDeps:
     premium_feature: Any = None
     logs_feature: Any = None
     presets_feature: Any = None
+    ui_state_store: Any = None
 
 
 def install_post_startup_tasks(deps: PostStartupDeps) -> None:
     startup_host = deps.startup_host
+    on_profile_warmup_ready = None
+    if deps.presets_feature is not None and deps.ui_state_store is not None:
+        on_profile_warmup_ready = lambda method: deps.presets_feature.refresh_profile_strategy_summary_in_store(
+            method=method,
+            profile_feature=deps.profile_feature,
+            ui_state_store=deps.ui_state_store,
+        )
 
     install_startup_checks(
         startup_host,
@@ -152,6 +160,7 @@ def install_post_startup_tasks(deps: PostStartupDeps) -> None:
         startup_host,
         profile_feature=deps.profile_feature,
         log_startup_metric=deps.log_startup_metric,
+        on_profile_warmup_ready=on_profile_warmup_ready,
     )
     if deps.presets_feature is not None:
         install_user_presets_warmup(
