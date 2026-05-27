@@ -60,6 +60,30 @@ class ProfileListFileLoadWorker(QThread):
         self.loaded.emit(self._request_id, state)
 
 
+class ProfileListFileValidationWorker(QThread):
+    validated = pyqtSignal(int, str, str, object)
+    failed = pyqtSignal(int, str)
+
+    def __init__(self, request_id: int, controller, *, kind: str, text: str, parent=None):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self._controller = controller
+        self._kind = str(kind or "").strip()
+        self._text = str(text or "")
+
+    def run(self) -> None:
+        try:
+            invalid_lines = self._controller.validate_list_file_text(
+                kind=self._kind,
+                text=self._text,
+            )
+        except Exception as exc:
+            log(f"ProfileListFileValidationWorker: не удалось проверить файл списка profile: {exc}", "ERROR")
+            self.failed.emit(self._request_id, str(exc))
+            return
+        self.validated.emit(self._request_id, self._kind, self._text, tuple(invalid_lines or ()))
+
+
 class ProfileListFileSaveWorker(QThread):
     saved = pyqtSignal(int, object)
     failed = pyqtSignal(int, str)

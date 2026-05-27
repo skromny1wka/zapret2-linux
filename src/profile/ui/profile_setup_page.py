@@ -466,6 +466,9 @@ class ProfileSetupPageBase(BasePage):
         self._list_file_load_worker = None
         self._list_file_save_request_id = 0
         self._list_file_save_worker = None
+        self._list_file_validation_request_id = 0
+        self._list_file_validation_worker = None
+        self._pending_list_file_validation = None
         self._settings_save_request_id = 0
         self._settings_save_worker = None
         self._pending_settings_save = None
@@ -1194,10 +1197,57 @@ class ProfileSetupPageBase(BasePage):
     def _on_list_file_text_changed(self) -> None:
         if self._loading or self._list_file_text is None:
             return
-        invalid_lines = self._controller.validate_list_file_text(
-            kind=self._list_file_kind,
-            text=self._list_file_text.toPlainText(),
+        text = self._list_file_text.toPlainText()
+        if self._list_file_status_label is not None:
+            self._list_file_status_label.setText("Проверка списка...")
+        self._request_list_file_validation({
+            "kind": self._list_file_kind,
+            "text": text,
+        })
+
+    def _request_list_file_validation(self, request: dict) -> None:
+        worker = self.__dict__.get("_list_file_validation_worker")
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    self._pending_list_file_validation = dict(request)
+                    return
+            except Exception:
+                pass
+        self._start_list_file_validation_worker(request)
+
+    def _start_list_file_validation_worker(self, request: dict) -> None:
+        self._list_file_validation_request_id = int(getattr(self, "_list_file_validation_request_id", 0) or 0) + 1
+        request_id = self._list_file_validation_request_id
+        worker = self._controller.create_list_file_validation_worker(
+            request_id,
+            kind=str(request.get("kind") or ""),
+            text=str(request.get("text") or ""),
+            parent=self,
         )
+        self._list_file_validation_worker = worker
+        worker.validated.connect(self._on_list_file_validation_finished)
+        worker.failed.connect(self._on_list_file_validation_failed)
+        worker.finished.connect(lambda w=worker: self._on_list_file_validation_worker_finished(w))
+        worker.start()
+
+    def _on_list_file_validation_finished(
+        self,
+        request_id: int,
+        kind: str,
+        text: str,
+        invalid_lines,
+    ) -> None:
+        if request_id != int(getattr(self, "_list_file_validation_request_id", 0) or 0):
+            return
+        if self.__dict__.get("_pending_list_file_validation"):
+            return
+        if str(kind or "").strip() != str(getattr(self, "_list_file_kind", "") or "").strip():
+            return
+        current_text = self._list_file_text.toPlainText() if self._list_file_text is not None else ""
+        if str(text or "") != current_text:
+            return
+        invalid_lines = tuple(invalid_lines or ())
         self._render_list_file_validation(tuple(invalid_lines or ()))
         if self._list_file_save_button is not None:
             self._list_file_save_button.setEnabled(not invalid_lines and not self._list_file_text.isReadOnly())
@@ -1214,6 +1264,27 @@ class ProfileSetupPageBase(BasePage):
                 self._list_file_status_label.setText(
                     f"Записей всего: {base_count + user_count} • ваших: {user_count} • есть несохранённые изменения"
                 )
+
+    def _on_list_file_validation_failed(self, request_id: int, error: str) -> None:
+        if request_id != int(getattr(self, "_list_file_validation_request_id", 0) or 0):
+            return
+        log(f"{self.__class__.__name__}: не удалось проверить файл списка profile: {error}", "ERROR")
+        if self.__dict__.get("_pending_list_file_validation"):
+            return
+        self._render_list_file_validation((), fallback_error=str(error))
+        if self._list_file_save_button is not None:
+            self._list_file_save_button.setEnabled(False)
+        if self._list_file_status_label is not None:
+            self._list_file_status_label.setText("Ошибка проверки списка.")
+
+    def _on_list_file_validation_worker_finished(self, worker) -> None:
+        if self.__dict__.get("_list_file_validation_worker") is worker:
+            self._list_file_validation_worker = None
+        worker.deleteLater()
+        pending = self.__dict__.get("_pending_list_file_validation")
+        self._pending_list_file_validation = None
+        if pending:
+            self._start_list_file_validation_worker(pending)
 
     def _on_list_file_save_clicked(self) -> None:
         if self._loading or not self._profile_key or self._list_file_text is None:

@@ -16,6 +16,7 @@ from profile.ui.profile_setup_page import (
 )
 from profile.profile_setup_loader import (
     ProfileEnabledSaveWorker,
+    ProfileListFileValidationWorker,
     ProfileListFileSaveWorker,
     ProfileRawTextSaveWorker,
     ProfileSettingsSaveWorker,
@@ -982,6 +983,121 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             text="example.com",
         )
         self.assertEqual(saved, [(3, state)])
+
+    def test_list_file_validation_starts_worker_without_validating_in_gui_thread(self) -> None:
+        class _Signal:
+            def __init__(self) -> None:
+                self.callbacks = []
+
+            def connect(self, callback) -> None:
+                self.callbacks.append(callback)
+
+        class _Worker:
+            def __init__(self) -> None:
+                self.validated = _Signal()
+                self.failed = _Signal()
+                self.finished = _Signal()
+                self.start = Mock()
+
+            def isRunning(self) -> bool:
+                return False
+
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._loading = False
+        page._list_file_kind = "hostlist"
+        page._list_file_text = SimpleNamespace(toPlainText=lambda: "bad domain", isReadOnly=lambda: False)
+        page._list_file_base_text = SimpleNamespace(toPlainText=lambda: "base.example\n")
+        page._list_file_validation_request_id = 0
+        page._list_file_validation_worker = None
+        page._list_file_status_label = Mock()
+        page._list_file_save_button = Mock()
+        page._render_list_file_validation = Mock()
+        page._controller = Mock()
+        worker = _Worker()
+        page._controller.create_list_file_validation_worker.return_value = worker
+        page._controller.validate_list_file_text.side_effect = AssertionError("validation must run in worker")
+
+        ProfileSetupPageBase._on_list_file_text_changed(page)
+
+        page._controller.validate_list_file_text.assert_not_called()
+        page._controller.create_list_file_validation_worker.assert_called_once_with(
+            1,
+            kind="hostlist",
+            text="bad domain",
+            parent=page,
+        )
+        page._render_list_file_validation.assert_not_called()
+        page._list_file_status_label.setText.assert_called_once_with("Проверка списка...")
+        worker.start.assert_called_once()
+
+    def test_list_file_validation_finished_updates_editor_for_current_text(self) -> None:
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._list_file_kind = "hostlist"
+        page._list_file_validation_request_id = 1
+        page._pending_list_file_validation = None
+        page._list_file_text = SimpleNamespace(toPlainText=lambda: "bad domain", isReadOnly=lambda: False)
+        page._list_file_base_text = SimpleNamespace(toPlainText=lambda: "base.example\n")
+        page._list_file_status_label = Mock()
+        page._list_file_save_button = Mock()
+        page._render_list_file_validation = Mock()
+
+        ProfileSetupPageBase._on_list_file_validation_finished(
+            page,
+            1,
+            "hostlist",
+            "bad domain",
+            ((1, "bad domain"),),
+        )
+
+        page._render_list_file_validation.assert_called_once_with(((1, "bad domain"),))
+        page._list_file_save_button.setEnabled.assert_called_once_with(False)
+        page._list_file_status_label.setText.assert_called_once_with("Исправьте ошибки перед сохранением.")
+
+    def test_stale_list_file_validation_result_is_ignored(self) -> None:
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._list_file_kind = "hostlist"
+        page._list_file_validation_request_id = 1
+        page._pending_list_file_validation = None
+        page._list_file_text = SimpleNamespace(toPlainText=lambda: "new.example", isReadOnly=lambda: False)
+        page._list_file_base_text = SimpleNamespace(toPlainText=lambda: "")
+        page._list_file_status_label = Mock()
+        page._list_file_save_button = Mock()
+        page._render_list_file_validation = Mock()
+
+        ProfileSetupPageBase._on_list_file_validation_finished(
+            page,
+            1,
+            "hostlist",
+            "old invalid",
+            ((1, "old invalid"),),
+        )
+
+        page._render_list_file_validation.assert_not_called()
+        page._list_file_save_button.setEnabled.assert_not_called()
+        page._list_file_status_label.setText.assert_not_called()
+
+    def test_list_file_validation_worker_emits_invalid_lines(self) -> None:
+        controller = Mock()
+        controller.validate_list_file_text.return_value = ((2, "bad domain"),)
+        worker = ProfileListFileValidationWorker(4, controller, kind="hostlist", text="ok.example\nbad domain")
+        validated = []
+
+        worker.validated.connect(
+            lambda request_id, kind, text, invalid_lines: validated.append((
+                request_id,
+                kind,
+                text,
+                invalid_lines,
+            ))
+        )
+
+        worker.run()
+
+        controller.validate_list_file_text.assert_called_once_with(
+            kind="hostlist",
+            text="ok.example\nbad domain",
+        )
+        self.assertEqual(validated, [(4, "hostlist", "ok.example\nbad domain", ((2, "bad domain"),))])
 
     def test_profile_setup_page_renames_editor_tab_for_exclusion_profiles(self) -> None:
         regular_payload = SimpleNamespace(

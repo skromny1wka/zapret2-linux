@@ -68,6 +68,11 @@ class ProfileSetupController:
 
         return ProfileListFileSaveWorker(request_id, self, profile_key, text, parent)
 
+    def create_list_file_validation_worker(self, request_id: int, *, kind: str, text: str, parent=None):
+        from profile.profile_setup_loader import ProfileListFileValidationWorker
+
+        return ProfileListFileValidationWorker(request_id, self, kind=kind, text=text, parent=parent)
+
     def create_settings_save_worker(
         self,
         request_id: int,
