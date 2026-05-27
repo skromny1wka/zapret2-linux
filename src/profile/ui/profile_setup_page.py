@@ -469,6 +469,8 @@ class ProfileSetupPageBase(BasePage):
         self._settings_save_request_id = 0
         self._settings_save_worker = None
         self._pending_settings_save = None
+        self._raw_profile_save_request_id = 0
+        self._raw_profile_save_worker = None
         self._strategy_apply_request_id = 0
         self._strategy_apply_worker = None
         self._strategy_apply_worker_strategy_id = ""
@@ -1531,27 +1533,59 @@ class ProfileSetupPageBase(BasePage):
     def _on_raw_profile_save_clicked(self) -> None:
         if self._loading or not self._profile_key or self._raw_profile_text is None:
             return
-        try:
-            new_key = self._controller.save_raw_profile_text(
-                profile_key=self._profile_key,
-                raw_text=self._raw_profile_text.toPlainText(),
-            )
-            if new_key:
-                self._profile_key = new_key
-            self.reload_current_profile()
-            self._on_profile_changed_callback(self._profile_key, "raw_profile")
-            InfoBar.success(
-                title="Profile сохранён",
-                content="Текст profile обновлён только в текущем preset.",
-                parent=self.window(),
-            )
-        except Exception as exc:
-            log(f"{self.__class__.__name__}: не удалось сохранить сырой текст profile: {exc}", "ERROR")
-            InfoBar.error(
-                title="Ошибка",
-                content=str(exc),
-                parent=self.window(),
-            )
+        worker = self._raw_profile_save_worker
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    return
+            except Exception:
+                return
+        self._raw_profile_save_request_id += 1
+        request_id = self._raw_profile_save_request_id
+        if self._raw_profile_save_button is not None:
+            self._raw_profile_save_button.setEnabled(False)
+        worker = self._controller.create_raw_profile_save_worker(
+            request_id,
+            self._profile_key,
+            self._raw_profile_text.toPlainText(),
+            parent=self,
+        )
+        self._raw_profile_save_worker = worker
+        worker.saved.connect(self._on_raw_profile_save_finished)
+        worker.failed.connect(self._on_raw_profile_save_failed)
+        worker.finished.connect(lambda w=worker: self._on_raw_profile_save_worker_finished(w))
+        worker.start()
+
+    def _on_raw_profile_save_finished(self, request_id: int, profile_key: str) -> None:
+        if request_id != self._raw_profile_save_request_id:
+            return
+        new_key = str(profile_key or "").strip()
+        if new_key:
+            self._profile_key = new_key
+        self.reload_current_profile()
+        self._on_profile_changed_callback(self._profile_key, "raw_profile")
+        InfoBar.success(
+            title="Profile сохранён",
+            content="Текст profile обновлён только в текущем preset.",
+            parent=self.window(),
+        )
+
+    def _on_raw_profile_save_failed(self, request_id: int, error: str) -> None:
+        if request_id != self._raw_profile_save_request_id:
+            return
+        if self._raw_profile_save_button is not None:
+            self._raw_profile_save_button.setEnabled(True)
+        log(f"{self.__class__.__name__}: не удалось сохранить сырой текст profile: {error}", "ERROR")
+        InfoBar.error(
+            title="Ошибка",
+            content=str(error),
+            parent=self.window(),
+        )
+
+    def _on_raw_profile_save_worker_finished(self, worker) -> None:
+        if self._raw_profile_save_worker is worker:
+            self._raw_profile_save_worker = None
+        worker.deleteLater()
 
     def _on_enabled_changed(self, state: int) -> None:
         if self._loading or not self._profile_key:

@@ -92,6 +92,11 @@ class ProfileSetupController:
             parent=parent,
         )
 
+    def create_raw_profile_save_worker(self, request_id: int, profile_key: str, raw_text: str, parent=None):
+        from profile.profile_setup_loader import ProfileRawTextSaveWorker
+
+        return ProfileRawTextSaveWorker(request_id, self, profile_key, raw_text, parent)
+
     def create_strategy_apply_worker(self, request_id: int, *, profile_key: str, strategy_id: str, parent=None):
         from profile.profile_setup_loader import ProfileStrategyApplyWorker
 

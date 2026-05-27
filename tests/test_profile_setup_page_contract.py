@@ -14,7 +14,12 @@ from profile.ui.profile_setup_page import (
     _match_tab_text,
     _profile_editor_tab_title,
 )
-from profile.profile_setup_loader import ProfileListFileSaveWorker, ProfileSettingsSaveWorker, ProfileStrategyApplyWorker
+from profile.profile_setup_loader import (
+    ProfileListFileSaveWorker,
+    ProfileRawTextSaveWorker,
+    ProfileSettingsSaveWorker,
+    ProfileStrategyApplyWorker,
+)
 from profile.state import ProfileListItem, ProfileSetupPayload
 from profile.strategy_state import ProfileStrategyState
 from profile.ui.preset_setup_page import PresetSetupPageBase, preset_setup_title_for_payload
@@ -755,13 +760,73 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         ensure_match = inspect.getsource(ProfileSetupPageBase._ensure_match_tab_built)
         apply_match = inspect.getsource(ProfileSetupPageBase._apply_match_tab_payload)
         handler = inspect.getsource(ProfileSetupPageBase._on_raw_profile_save_clicked)
+        saved_handler = inspect.getsource(ProfileSetupPageBase._on_raw_profile_save_finished)
 
         self.assertNotIn("self._raw_profile_text = PlainTextEdit()", build)
         self.assertIn("_raw_profile_text", ensure_match)
         self.assertIn("Сохранить текст profile", ensure_match)
         self.assertIn("in_preset", apply_match)
-        self.assertIn("save_raw_profile_text", handler)
-        self.assertIn("Текст profile обновлён только в текущем preset", handler)
+        self.assertIn("create_raw_profile_save_worker", handler)
+        self.assertNotIn("save_raw_profile_text", handler)
+        self.assertIn("Текст profile обновлён только в текущем preset", saved_handler)
+
+    def test_raw_profile_save_starts_worker_without_saving_in_gui_thread(self) -> None:
+        class _Signal:
+            def __init__(self) -> None:
+                self.callbacks = []
+
+            def connect(self, callback) -> None:
+                self.callbacks.append(callback)
+
+        class _Worker:
+            def __init__(self) -> None:
+                self.saved = _Signal()
+                self.failed = _Signal()
+                self.finished = _Signal()
+                self.start = Mock()
+
+            def isRunning(self) -> bool:
+                return False
+
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._loading = False
+        page._profile_key = "profile-1"
+        page._raw_profile_text = SimpleNamespace(toPlainText=lambda: "--new\n--lua-desync=fake")
+        page._raw_profile_save_request_id = 0
+        page._raw_profile_save_worker = None
+        page._raw_profile_save_button = Mock()
+        page._controller = Mock()
+        worker = _Worker()
+        page._controller.create_raw_profile_save_worker.return_value = worker
+        page._controller.save_raw_profile_text.side_effect = AssertionError("raw save must run in worker")
+
+        ProfileSetupPageBase._on_raw_profile_save_clicked(page)
+
+        page._controller.save_raw_profile_text.assert_not_called()
+        page._controller.create_raw_profile_save_worker.assert_called_once_with(
+            1,
+            "profile-1",
+            "--new\n--lua-desync=fake",
+            parent=page,
+        )
+        page._raw_profile_save_button.setEnabled.assert_called_once_with(False)
+        worker.start.assert_called_once()
+
+    def test_raw_profile_save_worker_emits_new_profile_key(self) -> None:
+        controller = Mock()
+        controller.save_raw_profile_text.return_value = "profile-2"
+        worker = ProfileRawTextSaveWorker(7, controller, "profile-1", "--new\n")
+        saved = []
+
+        worker.saved.connect(lambda request_id, profile_key: saved.append((request_id, profile_key)))
+
+        worker.run()
+
+        controller.save_raw_profile_text.assert_called_once_with(
+            profile_key="profile-1",
+            raw_text="--new\n",
+        )
+        self.assertEqual(saved, [(7, "profile-2")])
 
     def test_profile_setup_page_has_list_file_editor_as_second_tab(self) -> None:
         build = inspect.getsource(ProfileSetupPageBase._build_content)

@@ -125,6 +125,30 @@ class ProfileSettingsSaveWorker(QThread):
         self.saved.emit(self._request_id, str(profile_key or ""))
 
 
+class ProfileRawTextSaveWorker(QThread):
+    saved = pyqtSignal(int, str)
+    failed = pyqtSignal(int, str)
+
+    def __init__(self, request_id: int, controller, profile_key: str, raw_text: str, parent=None):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self._controller = controller
+        self._profile_key = str(profile_key or "").strip()
+        self._raw_text = str(raw_text or "")
+
+    def run(self) -> None:
+        try:
+            profile_key = self._controller.save_raw_profile_text(
+                profile_key=self._profile_key,
+                raw_text=self._raw_text,
+            )
+        except Exception as exc:
+            log(f"ProfileRawTextSaveWorker: не удалось сохранить сырой текст profile: {exc}", "ERROR")
+            self.failed.emit(self._request_id, str(exc))
+            return
+        self.saved.emit(self._request_id, str(profile_key or ""))
+
+
 class ProfileStrategyApplyWorker(QThread):
     applied = pyqtSignal(int, str, str)
     failed = pyqtSignal(int, str)
