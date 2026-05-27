@@ -175,6 +175,48 @@ class Winws2PresetSwitchTests(unittest.TestCase):
             with patch("winws_runtime.runners.zapret2_runner.get_all_winws_process_pids", return_value=[]):
                 self.assertTrue(runner.switch_preset_file_fast(str(preset_path), "Selected"))
 
+    def test_winws2_fast_switch_rebuilds_artifact_if_preset_changes_before_spawn(self) -> None:
+        from winws_runtime.runners.preset_runner_support import preset_cache_key
+        from winws_runtime.runners.zapret2_runner import Winws2StrategyRunner
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            preset_path = Path(tmp_dir) / "selected.txt"
+            preset_path.write_text("--wf-tcp-out=80", encoding="utf-8")
+
+            runner = object.__new__(Winws2StrategyRunner)
+            runner._state_lock = threading.RLock()
+            runner.running_process = None
+            runner._preset_file_path = ""
+            runner._set_last_error = Mock()
+            runner._perform_standard_windivert_cleanup = Mock()
+            runner._ensure_windivert_ready_before_spawn = Mock(return_value=True)
+
+            def compile_artifact(path: str):
+                text = Path(path).read_text(encoding="utf-8")
+                return SimpleNamespace(
+                    validation_ok=True,
+                    validation_report="",
+                    preset_path=str(path),
+                    cache_key=preset_cache_key(path),
+                    launch_args=(text.strip(),),
+                )
+
+            runner._compile_preset_artifact = Mock(side_effect=compile_artifact)
+
+            def change_preset_before_spawn():
+                preset_path.write_text("--wf-tcp-out=443", encoding="utf-8")
+                return True
+
+            runner._ensure_windivert_ready_before_spawn.side_effect = change_preset_before_spawn
+            runner._spawn_process_locked = Mock(return_value=True)
+
+            with patch("winws_runtime.runners.zapret2_runner.get_all_winws_process_pids", return_value=[]):
+                self.assertTrue(runner.switch_preset_file_fast(str(preset_path), "Selected"))
+
+            self.assertEqual(runner._compile_preset_artifact.call_count, 2)
+            spawned_artifact = runner._spawn_process_locked.call_args.args[0]
+            self.assertEqual(spawned_artifact.launch_args, ("--wf-tcp-out=443",))
+
     def test_fast_switch_retries_winws2_conflict_inside_switch_without_full_start_fallback(self) -> None:
         from winws_runtime.runners.zapret2_runner import Winws2StrategyRunner
 
@@ -262,6 +304,49 @@ class Winws2PresetSwitchTests(unittest.TestCase):
             self.assertEqual(runner._spawn_process_locked.call_count, 2)
             runner._start_from_preset_file_locked.assert_not_called()
             runner._prepare_cleanup_before_spawn_locked.assert_called_once_with(retry_count=1)
+
+    def test_winws1_fast_switch_rebuilds_artifact_if_preset_changes_before_spawn(self) -> None:
+        from winws_runtime.runners.preset_runner_support import preset_cache_key
+        from winws_runtime.runners.zapret1_runner import Winws1StrategyRunner
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            preset_path = Path(tmp_dir) / "selected.txt"
+            preset_path.write_text("--wf-tcp=80", encoding="utf-8")
+
+            runner = object.__new__(Winws1StrategyRunner)
+            runner.winws_exe = "winws.exe"
+            runner._state_lock = threading.RLock()
+            runner.running_process = None
+            runner._preset_file_path = ""
+            runner._set_last_error = Mock()
+            runner._prepare_cleanup_before_spawn_locked = Mock()
+            runner._ensure_windivert_ready_before_spawn = Mock(return_value=True)
+
+            def compile_artifact(path: str):
+                text = Path(path).read_text(encoding="utf-8")
+                return SimpleNamespace(
+                    validation_ok=True,
+                    validation_report="",
+                    preset_path=str(path),
+                    cache_key=preset_cache_key(path),
+                    launch_args=(text.strip(),),
+                )
+
+            runner._compile_preset_artifact = Mock(side_effect=compile_artifact)
+
+            def change_preset_before_spawn():
+                preset_path.write_text("--wf-tcp=443", encoding="utf-8")
+                return True
+
+            runner._ensure_windivert_ready_before_spawn.side_effect = change_preset_before_spawn
+            runner._spawn_process_locked = Mock(return_value=True)
+
+            with patch("winws_runtime.runners.zapret1_runner.get_process_pids_by_name", return_value=[]):
+                self.assertTrue(runner.switch_preset_file_fast(str(preset_path), "Selected"))
+
+            self.assertEqual(runner._compile_preset_artifact.call_count, 2)
+            spawned_artifact = runner._spawn_process_locked.call_args.args[0]
+            self.assertEqual(spawned_artifact.launch_args, ("--wf-tcp=443",))
 
 
 if __name__ == "__main__":

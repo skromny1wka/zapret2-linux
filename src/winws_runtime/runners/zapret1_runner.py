@@ -196,6 +196,24 @@ class Winws1StrategyRunner(StrategyRunnerBase):
             return False
         return is_process_alive_with_expected_name(pid, self.winws_exe)
 
+    def _refresh_artifact_if_source_changed_locked(
+        self,
+        artifact: PreparedPresetArtifact,
+    ) -> PreparedPresetArtifact:
+        artifact_key = getattr(artifact, "cache_key", None)
+        if artifact_key is None:
+            return artifact
+
+        current_key = preset_cache_key(artifact.preset_path)
+        if current_key == artifact_key:
+            return artifact
+
+        log(
+            f"Preset changed before winws spawn, rebuilding launch args: {artifact.preset_path}",
+            "INFO",
+        )
+        return self._compile_preset_artifact(artifact.preset_path)
+
     def _spawn_process_locked(
         self,
         artifact: PreparedPresetArtifact,
@@ -353,6 +371,19 @@ class Winws1StrategyRunner(StrategyRunnerBase):
                 self._last_spawn_exit_code = 34
                 self._last_spawn_stderr = "windivert: readiness probe failed before fast switch spawn"
                 self._set_last_error("WinDivert ещё не готов к открытию фильтра", notify=False)
+                return False
+
+            artifact = self._refresh_artifact_if_source_changed_locked(artifact)
+            if not artifact.validation_ok:
+                self._set_runner_state_locked(
+                    PresetRunnerState.FAILED,
+                    preset_path=preset_path,
+                    strategy_name=strategy_name,
+                    error=artifact.validation_report,
+                    reason="manual_switch_recompile_failed",
+                    publish_failure=False,
+                )
+                self._set_last_error(artifact.validation_report, notify=False)
                 return False
 
             self._preset_file_path = preset_path
