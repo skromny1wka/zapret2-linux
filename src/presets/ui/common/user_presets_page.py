@@ -26,6 +26,7 @@ from presets.user_presets_runtime_service import (
 from presets.user_presets_action_workers import (
     UserPresetActivateWorker,
     UserPresetBulkActionWorker,
+    UserPresetEditActionWorker,
     UserPresetItemActionWorker,
 )
 from presets.ui.common.user_presets_page_runtime import (
@@ -49,8 +50,6 @@ from presets.ui.common.preset_status_bar import (
 )
 from presets.ui.common.user_presets_actions_workflow import (
     restore_reset_all_button_label,
-    show_inline_action_create,
-    show_inline_action_rename,
     show_reset_all_result,
 )
 from presets.ui.common.user_presets_item_actions_workflow import (
@@ -171,6 +170,8 @@ class UserPresetsPageBase(BasePage):
         self._preset_bulk_action_worker = None
         self._preset_bulk_action_request_id = 0
         self._preset_bulk_action_kind = ""
+        self._preset_edit_action_worker = None
+        self._preset_edit_action_request_id = 0
         self._build_ui()
         self._after_ui_built()
         self.bind_ui_state_store(ui_state_store)
@@ -550,33 +551,113 @@ class UserPresetsPageBase(BasePage):
         )
 
     def _show_inline_action_create(self):
-        show_inline_action_create(
-            dialog_cls=self._config.create_dialog_cls,
-            parent_window=self.window(),
-            language=self._ui_language,
-            actions_api=self._actions_api(),
-            runtime_service=self._runtime_service,
-            log_fn=log,
-            info_bar_cls=InfoBar,
-            tr_fn=self._tr,
-            tr_prefix=self._config.tr_prefix,
+        dlg = self._config.create_dialog_cls([], self.window(), language=self._ui_language)
+        if not dlg.exec():
+            return
+        name = dlg.nameEdit.text().strip()
+        if not name:
+            return
+        self._request_preset_edit_action(
+            "create",
+            name=name,
+            from_current=getattr(dlg, "_source", "current") == "current",
         )
 
     def _show_inline_action_rename(self, current_name: str):
-        show_inline_action_rename(
+        display_name = self._resolve_display_name(current_name)
+        if self._is_builtin_preset_file(current_name):
+            InfoBar.warning(
+                title=self._tr("common.error.title", "Ошибка"),
+                content="Встроенный пресет нельзя переименовать. Можно создать копию и работать уже с ней.",
+                parent=self.window(),
+            )
+            return
+        dlg = self._config.rename_dialog_cls(display_name, [], self.window(), language=self._ui_language)
+        if not dlg.exec():
+            return
+        new_name = dlg.nameEdit.text().strip()
+        if not new_name or new_name == display_name:
+            return
+        self._request_preset_edit_action(
+            "rename",
             current_name=current_name,
-            resolve_display_name_fn=self._resolve_display_name,
-            is_builtin_preset_file_fn=self._is_builtin_preset_file,
-            dialog_cls=self._config.rename_dialog_cls,
-            parent_window=self.window(),
-            language=self._ui_language,
-            actions_api=self._actions_api(),
-            runtime_service=self._runtime_service,
-            log_fn=log,
-            info_bar_cls=InfoBar,
-            tr_fn=self._tr,
-            tr_prefix=self._config.tr_prefix,
+            new_name=new_name,
         )
+
+    def create_preset_edit_action_worker(
+        self,
+        request_id: int,
+        *,
+        action: str,
+        name: str = "",
+        current_name: str = "",
+        new_name: str = "",
+        from_current: bool = False,
+    ):
+        return UserPresetEditActionWorker(
+            request_id,
+            self._actions_api(),
+            action=action,
+            name=name,
+            current_name=current_name,
+            new_name=new_name,
+            from_current=from_current,
+            parent=self,
+        )
+
+    def _request_preset_edit_action(
+        self,
+        action: str,
+        *,
+        name: str = "",
+        current_name: str = "",
+        new_name: str = "",
+        from_current: bool = False,
+    ) -> None:
+        worker = self.__dict__.get("_preset_edit_action_worker")
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    return
+            except Exception:
+                return
+        self._preset_edit_action_request_id = int(getattr(self, "_preset_edit_action_request_id", 0) or 0) + 1
+        request_id = self._preset_edit_action_request_id
+        worker = self.create_preset_edit_action_worker(
+            request_id,
+            action=str(action or ""),
+            name=str(name or ""),
+            current_name=str(current_name or ""),
+            new_name=str(new_name or ""),
+            from_current=bool(from_current),
+        )
+        self._preset_edit_action_worker = worker
+        worker.completed.connect(self._on_preset_edit_action_finished)
+        worker.failed.connect(self._on_preset_edit_action_failed)
+        worker.finished.connect(lambda w=worker: self._on_preset_edit_action_worker_finished(w))
+        worker.start()
+
+    def _on_preset_edit_action_finished(self, request_id: int, _action: str, result, _context) -> None:
+        if request_id != int(getattr(self, "_preset_edit_action_request_id", 0) or 0):
+            return
+        if bool(getattr(result, "structure_changed", False)):
+            self._runtime_service.mark_presets_structure_changed()
+        log(str(getattr(result, "log_message", "") or ""), str(getattr(result, "log_level", "") or "INFO"))
+
+    def _on_preset_edit_action_failed(self, request_id: int, action: str, error: str, _context) -> None:
+        if request_id != int(getattr(self, "_preset_edit_action_request_id", 0) or 0):
+            return
+        log(f"Ошибка действия preset ({action}): {error}", "ERROR")
+        InfoBar.error(
+            title=self._tr("common.error.title", "Ошибка"),
+            content=self._tr(f"{self._config.tr_prefix}.error.generic", "Ошибка: {error}", error=error),
+            parent=self.window(),
+        )
+
+    def _on_preset_edit_action_worker_finished(self, worker) -> None:
+        if self.__dict__.get("_preset_edit_action_worker") is worker:
+            self._preset_edit_action_worker = None
+        worker.deleteLater()
 
     def _on_create_clicked(self):
         self._show_inline_action_create()

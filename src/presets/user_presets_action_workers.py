@@ -124,8 +124,61 @@ class UserPresetBulkActionWorker(QThread):
         self.completed.emit(self._request_id, self._action, result, context)
 
 
+class UserPresetEditActionWorker(QThread):
+    completed = pyqtSignal(int, str, object, object)
+    failed = pyqtSignal(int, str, str, object)
+
+    def __init__(
+        self,
+        request_id: int,
+        actions_api,
+        *,
+        action: str,
+        name: str = "",
+        current_name: str = "",
+        new_name: str = "",
+        from_current: bool = False,
+        parent=None,
+    ):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self.actions_api = actions_api
+        self._action = str(action or "").strip()
+        self._name = str(name or "").strip()
+        self._current_name = str(current_name or "").strip()
+        self._new_name = str(new_name or "").strip()
+        self._from_current = bool(from_current)
+
+    def run(self) -> None:
+        context = {
+            "name": self._name,
+            "current_name": self._current_name,
+            "new_name": self._new_name,
+            "from_current": self._from_current,
+        }
+        try:
+            if self._action == "create":
+                result = self.actions_api.create_preset(
+                    name=self._name,
+                    from_current=self._from_current,
+                )
+            elif self._action == "rename":
+                result = self.actions_api.rename_preset(
+                    current_name=self._current_name,
+                    new_name=self._new_name,
+                )
+            else:
+                raise ValueError(f"Неизвестное действие редактирования preset: {self._action}")
+        except Exception as exc:
+            log(f"UserPresetEditActionWorker: действие {self._action} не выполнено: {exc}", "ERROR")
+            self.failed.emit(self._request_id, self._action, str(exc), context)
+            return
+        self.completed.emit(self._request_id, self._action, result, context)
+
+
 __all__ = [
     "UserPresetActivateWorker",
     "UserPresetBulkActionWorker",
+    "UserPresetEditActionWorker",
     "UserPresetItemActionWorker",
 ]

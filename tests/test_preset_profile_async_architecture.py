@@ -211,6 +211,26 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("actions_api.import_preset_from_file", worker_source)
         self.assertIn("actions_api.reset_all_presets", worker_source)
 
+    def test_user_presets_create_and_rename_run_through_worker(self) -> None:
+        create_source = inspect.getsource(UserPresetsPageBase._show_inline_action_create)
+        rename_source = inspect.getsource(UserPresetsPageBase._show_inline_action_rename)
+
+        self.assertTrue(hasattr(user_presets_action_workers, "UserPresetEditActionWorker"))
+        worker_source = inspect.getsource(user_presets_action_workers.UserPresetEditActionWorker.run)
+        request_source = inspect.getsource(UserPresetsPageBase._request_preset_edit_action)
+
+        for source in (create_source, rename_source):
+            body_source = "\n".join(source.splitlines()[1:])
+            self.assertIn("_request_preset_edit_action", source)
+            self.assertNotIn("show_inline_action_create(", body_source)
+            self.assertNotIn("show_inline_action_rename(", body_source)
+            self.assertNotIn(".create_preset(", source)
+            self.assertNotIn(".rename_preset(", source)
+
+        self.assertIn("create_preset_edit_action_worker", request_source)
+        self.assertIn("actions_api.create_preset", worker_source)
+        self.assertIn("actions_api.rename_preset", worker_source)
+
     def test_profile_commands_reuse_service_cache(self) -> None:
         source = inspect.getsource(profile_commands._profile_preset_service)
 
