@@ -15,6 +15,7 @@ from profile.ui.profile_setup_page import (
     _profile_editor_tab_title,
 )
 from profile.profile_setup_loader import (
+    ProfileEnabledSaveWorker,
     ProfileListFileSaveWorker,
     ProfileRawTextSaveWorker,
     ProfileSettingsSaveWorker,
@@ -827,6 +828,76 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             raw_text="--new\n",
         )
         self.assertEqual(saved, [(7, "profile-2")])
+
+    def test_enabled_change_starts_worker_without_saving_in_gui_thread(self) -> None:
+        class _Signal:
+            def __init__(self) -> None:
+                self.callbacks = []
+
+            def connect(self, callback) -> None:
+                self.callbacks.append(callback)
+
+        class _Worker:
+            def __init__(self) -> None:
+                self.saved = _Signal()
+                self.failed = _Signal()
+                self.finished = _Signal()
+                self.start = Mock()
+
+            def isRunning(self) -> bool:
+                return False
+
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._loading = False
+        page._profile_key = "profile-1"
+        page._enabled_save_request_id = 0
+        page._enabled_save_worker = None
+        page._enabled_checkbox = Mock()
+        page._current_filter_kind = lambda: "hostlist"
+        page._current_filter_value = lambda: "lists/youtube.txt"
+        page._controller = Mock()
+        worker = _Worker()
+        page._controller.create_enabled_save_worker.return_value = worker
+        page._controller.set_enabled.side_effect = AssertionError("enabled save must run in worker")
+
+        ProfileSetupPageBase._on_enabled_changed(page, 2)
+
+        page._controller.set_enabled.assert_not_called()
+        page._controller.create_enabled_save_worker.assert_called_once_with(
+            1,
+            profile_key="profile-1",
+            enabled=True,
+            filter_kind="hostlist",
+            filter_value="lists/youtube.txt",
+            parent=page,
+        )
+        page._enabled_checkbox.setEnabled.assert_called_once_with(False)
+        worker.start.assert_called_once()
+
+    def test_enabled_save_worker_emits_new_profile_key(self) -> None:
+        controller = Mock()
+        controller.set_enabled.return_value = "profile-2"
+        worker = ProfileEnabledSaveWorker(
+            8,
+            controller,
+            profile_key="profile-1",
+            enabled=False,
+            filter_kind="hostlist",
+            filter_value="lists/youtube.txt",
+        )
+        saved = []
+
+        worker.saved.connect(lambda request_id, profile_key, enabled: saved.append((request_id, profile_key, enabled)))
+
+        worker.run()
+
+        controller.set_enabled.assert_called_once_with(
+            profile_key="profile-1",
+            enabled=False,
+            filter_kind="hostlist",
+            filter_value="lists/youtube.txt",
+        )
+        self.assertEqual(saved, [(8, "profile-2", False)])
 
     def test_profile_setup_page_has_list_file_editor_as_second_tab(self) -> None:
         build = inspect.getsource(ProfileSetupPageBase._build_content)

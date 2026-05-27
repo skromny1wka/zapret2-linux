@@ -97,6 +97,28 @@ class ProfileSetupController:
 
         return ProfileRawTextSaveWorker(request_id, self, profile_key, raw_text, parent)
 
+    def create_enabled_save_worker(
+        self,
+        request_id: int,
+        *,
+        profile_key: str,
+        enabled: bool,
+        filter_kind: str = "",
+        filter_value: str = "",
+        parent=None,
+    ):
+        from profile.profile_setup_loader import ProfileEnabledSaveWorker
+
+        return ProfileEnabledSaveWorker(
+            request_id,
+            self,
+            profile_key=profile_key,
+            enabled=enabled,
+            filter_kind=filter_kind,
+            filter_value=filter_value,
+            parent=parent,
+        )
+
     def create_strategy_apply_worker(self, request_id: int, *, profile_key: str, strategy_id: str, parent=None):
         from profile.profile_setup_loader import ProfileStrategyApplyWorker
 

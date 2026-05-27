@@ -149,6 +149,44 @@ class ProfileRawTextSaveWorker(QThread):
         self.saved.emit(self._request_id, str(profile_key or ""))
 
 
+class ProfileEnabledSaveWorker(QThread):
+    saved = pyqtSignal(int, str, bool)
+    failed = pyqtSignal(int, str)
+
+    def __init__(
+        self,
+        request_id: int,
+        controller,
+        *,
+        profile_key: str,
+        enabled: bool,
+        filter_kind: str = "",
+        filter_value: str = "",
+        parent=None,
+    ):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self._controller = controller
+        self._profile_key = str(profile_key or "").strip()
+        self._enabled = bool(enabled)
+        self._filter_kind = str(filter_kind or "").strip()
+        self._filter_value = str(filter_value or "").strip()
+
+    def run(self) -> None:
+        try:
+            profile_key = self._controller.set_enabled(
+                profile_key=self._profile_key,
+                enabled=self._enabled,
+                filter_kind=self._filter_kind,
+                filter_value=self._filter_value,
+            )
+        except Exception as exc:
+            log(f"ProfileEnabledSaveWorker: не удалось изменить состояние profile: {exc}", "ERROR")
+            self.failed.emit(self._request_id, str(exc))
+            return
+        self.saved.emit(self._request_id, str(profile_key or ""), self._enabled)
+
+
 class ProfileStrategyApplyWorker(QThread):
     applied = pyqtSignal(int, str, str)
     failed = pyqtSignal(int, str)
