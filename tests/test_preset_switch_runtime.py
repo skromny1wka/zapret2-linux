@@ -70,6 +70,18 @@ class Winws2PresetSwitchTests(unittest.TestCase):
             )
         )
 
+    def test_runner_state_allows_handoff_start_from_running(self) -> None:
+        from winws_runtime.runners.preset_runner_support import PresetRunnerState, PresetRunnerStateMachine
+
+        machine = PresetRunnerStateMachine()
+        machine.transition(PresetRunnerState.STARTING, preset_path="old.txt", strategy_name="Old")
+        machine.transition(PresetRunnerState.RUNNING, preset_path="old.txt", strategy_name="Old", pid=111)
+
+        snapshot = machine.transition(PresetRunnerState.STARTING, preset_path="new.txt", strategy_name="New")
+
+        self.assertEqual(snapshot.state, PresetRunnerState.STARTING)
+        self.assertEqual(snapshot.preset_path, "new.txt")
+
     def test_winws2_launch_logs_exact_command_and_at_config(self) -> None:
         from winws_runtime.runners.zapret2_runner import Winws2StrategyRunner
 

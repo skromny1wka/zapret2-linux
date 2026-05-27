@@ -634,6 +634,12 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertNotIn("_add_profile_item_locally", duplicate_handler)
         self.assertNotIn("_remove_profile_item_locally", delete_handler)
 
+    def test_strategy_list_repaints_viewport_rect_after_current_strategy_changes(self) -> None:
+        source = inspect.getsource(ProfileStrategyListWidget.set_current_strategy_id)
+
+        self.assertIn("viewport().update", source)
+        self.assertNotIn("_list.update(self._list.visualItemRect", source)
+
     def test_profile_setup_shell_has_search_input_for_all_profiles(self) -> None:
         build_content = inspect.getsource(PresetSetupPageBase._build_content)
         apply_payload = inspect.getsource(PresetSetupPageBase._apply_payload)
@@ -922,7 +928,6 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._controller.apply_strategy.assert_not_called()
         page.reload_current_profile.assert_not_called()
         page._on_profile_changed_callback.assert_not_called()
-
 
 if __name__ == "__main__":
     unittest.main()

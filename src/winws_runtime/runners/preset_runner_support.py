@@ -97,7 +97,12 @@ class PresetRunnerStateMachine:
         PresetRunnerState.IDLE: {PresetRunnerState.STARTING, PresetRunnerState.FAILED},
         PresetRunnerState.STOPPING: {PresetRunnerState.IDLE, PresetRunnerState.STARTING, PresetRunnerState.FAILED},
         PresetRunnerState.STARTING: {PresetRunnerState.RUNNING, PresetRunnerState.FAILED, PresetRunnerState.IDLE},
-        PresetRunnerState.RUNNING: {PresetRunnerState.STOPPING, PresetRunnerState.FAILED, PresetRunnerState.IDLE},
+        PresetRunnerState.RUNNING: {
+            PresetRunnerState.STARTING,
+            PresetRunnerState.STOPPING,
+            PresetRunnerState.FAILED,
+            PresetRunnerState.IDLE,
+        },
         PresetRunnerState.FAILED: {PresetRunnerState.IDLE, PresetRunnerState.STARTING},
     }
 

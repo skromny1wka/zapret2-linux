@@ -302,7 +302,7 @@ class ProfileStrategyListWidget(QWidget):
                 item.setSelected(True)
             else:
                 item.setSelected(False)
-            self._list.update(self._list.visualItemRect(item))
+            self._list.viewport().update(self._list.visualItemRect(item))
 
     def _rebuild_tree(self) -> None:
         search_text = self._search.text().strip().lower()
