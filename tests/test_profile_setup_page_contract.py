@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 from profile.ui.profile_setup_page import (
     CompactDisplayComboBox,
@@ -22,6 +22,7 @@ from profile.profile_setup_loader import (
     ProfileSettingsSaveWorker,
     ProfileStrategyFeedbackSaveWorker,
     ProfileStrategyApplyWorker,
+    ProfileUserProfileCreateWorker,
     ProfileUserProfileDeleteWorker,
     ProfileUserProfileUpdateWorker,
 )
@@ -79,8 +80,129 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertIn("FluentIcon.ADD", shell_builder)
         self.assertIn("toolbar_actions_bar.set_buttons", shell_builder)
         self.assertIn("CreateUserProfileDialog", handler)
-        self.assertIn("create_user_profile", handler)
-        self.assertIn("refresh_from_preset_switch", handler)
+        self.assertIn("_request_user_profile_create", handler)
+        self.assertNotIn("_profile.create_user_profile", handler)
+
+    def test_preset_setup_user_profile_actions_start_workers_without_direct_profile_calls(self) -> None:
+        class _Signal:
+            def __init__(self) -> None:
+                self.callbacks = []
+
+            def connect(self, callback) -> None:
+                self.callbacks.append(callback)
+
+        class _CreateWorker:
+            def __init__(self) -> None:
+                self.created = _Signal()
+                self.failed = _Signal()
+                self.finished = _Signal()
+                self.start = Mock()
+
+            def isRunning(self) -> bool:
+                return False
+
+        class _UpdateWorker:
+            def __init__(self) -> None:
+                self.updated = _Signal()
+                self.failed = _Signal()
+                self.finished = _Signal()
+                self.start = Mock()
+
+            def isRunning(self) -> bool:
+                return False
+
+        class _DeleteWorker:
+            def __init__(self) -> None:
+                self.deleted = _Signal()
+                self.failed = _Signal()
+                self.finished = _Signal()
+                self.start = Mock()
+
+            def isRunning(self) -> bool:
+                return False
+
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._profile = Mock()
+        page._profile.create_user_profile.side_effect = AssertionError("create must run in worker")
+        page._profile.update_user_profile.side_effect = AssertionError("update must run in worker")
+        page._profile.delete_user_profile.side_effect = AssertionError("delete must run in worker")
+        page._user_profile_create_request_id = 0
+        page._user_profile_create_worker = None
+        page._user_profile_update_request_id = 0
+        page._user_profile_update_worker = None
+        page._user_profile_delete_request_id = 0
+        page._user_profile_delete_worker = None
+        page._set_user_profile_actions_enabled = Mock()
+        create_worker = _CreateWorker()
+        update_worker = _UpdateWorker()
+        delete_worker = _DeleteWorker()
+        page._create_user_profile_create_worker = Mock(return_value=create_worker)
+        page._create_user_profile_update_worker = Mock(return_value=update_worker)
+        page._create_user_profile_delete_worker = Mock(return_value=delete_worker)
+
+        PresetSetupPageBase._request_user_profile_create(
+            page,
+            name="YouTube",
+            protocol="TCP",
+            ports="443",
+        )
+        PresetSetupPageBase._request_user_profile_update(
+            page,
+            "user-1",
+            name="YouTube",
+            protocol="TCP",
+            ports="443",
+        )
+        PresetSetupPageBase._request_user_profile_delete(page, "user-1")
+
+        page._profile.create_user_profile.assert_not_called()
+        page._profile.update_user_profile.assert_not_called()
+        page._profile.delete_user_profile.assert_not_called()
+        page._create_user_profile_create_worker.assert_called_once_with(
+            1,
+            name="YouTube",
+            protocol="TCP",
+            ports="443",
+        )
+        page._create_user_profile_update_worker.assert_called_once_with(
+            1,
+            profile_id="user-1",
+            name="YouTube",
+            protocol="TCP",
+            ports="443",
+        )
+        page._create_user_profile_delete_worker.assert_called_once_with(1, profile_id="user-1")
+        self.assertEqual(page._set_user_profile_actions_enabled.call_args_list, [
+            call(False),
+            call(False),
+            call(False),
+        ])
+        create_worker.start.assert_called_once()
+        update_worker.start.assert_called_once()
+        delete_worker.start.assert_called_once()
+
+    def test_preset_setup_user_profile_create_worker_emits_profile_id(self) -> None:
+        profile = Mock()
+        profile.create_user_profile.return_value = "user-1"
+        worker = ProfileUserProfileCreateWorker(
+            5,
+            profile,
+            name="YouTube",
+            protocol="TCP",
+            ports="443",
+        )
+        created = []
+
+        worker.created.connect(lambda request_id, profile_id: created.append((request_id, profile_id)))
+
+        worker.run()
+
+        profile.create_user_profile.assert_called_once_with(
+            name="YouTube",
+            protocol="TCP",
+            ports="443",
+        )
+        self.assertEqual(created, [(5, "user-1")])
 
     def test_profile_rows_have_context_menu_path(self) -> None:
         list_source = inspect.getsource(ProfilesList)

@@ -211,6 +211,41 @@ class ProfileEnabledSaveWorker(QThread):
         self.saved.emit(self._request_id, str(profile_key or ""), self._enabled)
 
 
+class ProfileUserProfileCreateWorker(QThread):
+    created = pyqtSignal(int, str)
+    failed = pyqtSignal(int, str)
+
+    def __init__(
+        self,
+        request_id: int,
+        profile,
+        *,
+        name: str,
+        protocol: str,
+        ports: str,
+        parent=None,
+    ):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self._profile = profile
+        self._name = str(name or "").strip()
+        self._protocol = str(protocol or "").strip()
+        self._ports = str(ports or "").strip()
+
+    def run(self) -> None:
+        try:
+            profile_id = self._profile.create_user_profile(
+                name=self._name,
+                protocol=self._protocol,
+                ports=self._ports,
+            )
+        except Exception as exc:
+            log(f"ProfileUserProfileCreateWorker: не удалось создать пользовательский profile: {exc}", "ERROR")
+            self.failed.emit(self._request_id, str(exc))
+            return
+        self.created.emit(self._request_id, str(profile_id or ""))
+
+
 class ProfileUserProfileUpdateWorker(QThread):
     updated = pyqtSignal(int, str, int)
     failed = pyqtSignal(int, str)

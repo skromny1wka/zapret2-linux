@@ -9,6 +9,11 @@ from profile.folders import set_profile_folder_collapsed
 from profile.match_filters import filter_values
 from profile.ui.profile_context_menu import ProfileContextMenuActions, show_profile_context_menu
 from profile.ui.profile_folder_menu import show_profile_folder_menu
+from profile.profile_setup_loader import (
+    ProfileUserProfileCreateWorker,
+    ProfileUserProfileDeleteWorker,
+    ProfileUserProfileUpdateWorker,
+)
 from profile.ui.profiles_list import ProfilesList
 from profile.ui.shell import build_profile_shell
 from profile.ui.user_profile_dialog import CreateUserProfileDialog
@@ -62,6 +67,12 @@ class PresetSetupPageBase(BasePage):
         self._toolbar_actions_bar = None
         self._profile_load_request_id = 0
         self._profile_load_worker = None
+        self._user_profile_create_request_id = 0
+        self._user_profile_create_worker = None
+        self._user_profile_update_request_id = 0
+        self._user_profile_update_worker = None
+        self._user_profile_delete_request_id = 0
+        self._user_profile_delete_worker = None
         self._profile_payload_loaded_once = False
         self._profile_payload_dirty = True
         self._cleanup_in_progress = False
@@ -459,22 +470,12 @@ class PresetSetupPageBase(BasePage):
         if not dialog.exec():
             return
         name, protocol, ports = dialog.values()
-        try:
-            changed = self._profile.update_user_profile(
-                profile_id,
-                name=name,
-                protocol=protocol,
-                ports=ports,
-            )
-            InfoBar.success(
-                title="Profile изменён",
-                content=f"Обновлено profile-ов в preset-ах: {changed}.",
-                parent=self.window(),
-            )
-            self.refresh_from_preset_switch()
-        except Exception as exc:
-            log(f"{self.__class__.__name__}: не удалось изменить пользовательский profile: {exc}", "ERROR")
-            InfoBar.error(title="Ошибка", content=str(exc), parent=self.window())
+        self._request_user_profile_update(
+            profile_id,
+            name=name,
+            protocol=protocol,
+            ports=ports,
+        )
 
     def _delete_user_profile_from_menu(self, profile_key: str) -> None:
         if self._profiles_list is None:
@@ -495,17 +496,184 @@ class PresetSetupPageBase(BasePage):
         dialog.cancelButton.setText("Отмена")
         if not dialog.exec():
             return
-        try:
-            changed = self._profile.delete_user_profile(profile_id)
-            InfoBar.success(
-                title="Profile удалён",
-                content=f"Удалено profile-ов из preset-ов: {changed}.",
-                parent=self.window(),
-            )
-            self.refresh_from_preset_switch()
-        except Exception as exc:
-            log(f"{self.__class__.__name__}: не удалось удалить пользовательский profile: {exc}", "ERROR")
-            InfoBar.error(title="Ошибка", content=str(exc), parent=self.window())
+        self._request_user_profile_delete(profile_id)
+
+    def _set_user_profile_actions_enabled(self, enabled: bool) -> None:
+        if self._add_profile_btn is not None:
+            self._add_profile_btn.setEnabled(enabled)
+
+    def _user_profile_operation_running(self) -> bool:
+        for worker in (
+            self.__dict__.get("_user_profile_create_worker"),
+            self.__dict__.get("_user_profile_update_worker"),
+            self.__dict__.get("_user_profile_delete_worker"),
+        ):
+            if worker is None:
+                continue
+            try:
+                if worker.isRunning():
+                    return True
+            except Exception:
+                return True
+        return False
+
+    def _create_user_profile_create_worker(self, request_id: int, *, name: str, protocol: str, ports: str):
+        return ProfileUserProfileCreateWorker(
+            request_id,
+            self._profile,
+            name=name,
+            protocol=protocol,
+            ports=ports,
+            parent=self,
+        )
+
+    def _create_user_profile_update_worker(
+        self,
+        request_id: int,
+        *,
+        profile_id: str,
+        name: str,
+        protocol: str,
+        ports: str,
+    ):
+        return ProfileUserProfileUpdateWorker(
+            request_id,
+            self._profile,
+            profile_id=profile_id,
+            name=name,
+            protocol=protocol,
+            ports=ports,
+            parent=self,
+        )
+
+    def _create_user_profile_delete_worker(self, request_id: int, *, profile_id: str):
+        return ProfileUserProfileDeleteWorker(
+            request_id,
+            self._profile,
+            profile_id=profile_id,
+            parent=self,
+        )
+
+    def _request_user_profile_create(self, *, name: str, protocol: str, ports: str) -> None:
+        if self._user_profile_operation_running():
+            return
+        self._user_profile_create_request_id = int(getattr(self, "_user_profile_create_request_id", 0) or 0) + 1
+        request_id = self._user_profile_create_request_id
+        self._set_user_profile_actions_enabled(False)
+        worker = self._create_user_profile_create_worker(
+            request_id,
+            name=name,
+            protocol=protocol,
+            ports=ports,
+        )
+        self._user_profile_create_worker = worker
+        worker.created.connect(self._on_user_profile_create_finished)
+        worker.failed.connect(self._on_user_profile_create_failed)
+        worker.finished.connect(lambda w=worker: self._on_user_profile_create_worker_finished(w))
+        worker.start()
+
+    def _on_user_profile_create_finished(self, request_id: int, _profile_id: str) -> None:
+        if request_id != int(getattr(self, "_user_profile_create_request_id", 0) or 0):
+            return
+        InfoBar.success(
+            title="Profile добавлен",
+            content="Он появился в общем списке и пока выключен во всех preset-ах.",
+            parent=self.window(),
+        )
+        self.refresh_from_preset_switch()
+
+    def _on_user_profile_create_failed(self, request_id: int, error: str) -> None:
+        if request_id != int(getattr(self, "_user_profile_create_request_id", 0) or 0):
+            return
+        log(f"{self.__class__.__name__}: не удалось создать пользовательский profile: {error}", "ERROR")
+        InfoBar.error(title="Ошибка", content=str(error), parent=self.window())
+
+    def _on_user_profile_create_worker_finished(self, worker) -> None:
+        if self.__dict__.get("_user_profile_create_worker") is worker:
+            self._user_profile_create_worker = None
+        worker.deleteLater()
+        if not self._user_profile_operation_running():
+            self._set_user_profile_actions_enabled(True)
+
+    def _request_user_profile_update(self, profile_id: str, *, name: str, protocol: str, ports: str) -> None:
+        profile_id = str(profile_id or "").strip()
+        if not profile_id or self._user_profile_operation_running():
+            return
+        self._user_profile_update_request_id = int(getattr(self, "_user_profile_update_request_id", 0) or 0) + 1
+        request_id = self._user_profile_update_request_id
+        self._set_user_profile_actions_enabled(False)
+        worker = self._create_user_profile_update_worker(
+            request_id,
+            profile_id=profile_id,
+            name=name,
+            protocol=protocol,
+            ports=ports,
+        )
+        self._user_profile_update_worker = worker
+        worker.updated.connect(self._on_user_profile_update_finished)
+        worker.failed.connect(self._on_user_profile_update_failed)
+        worker.finished.connect(lambda w=worker: self._on_user_profile_update_worker_finished(w))
+        worker.start()
+
+    def _on_user_profile_update_finished(self, request_id: int, _profile_id: str, changed: int) -> None:
+        if request_id != int(getattr(self, "_user_profile_update_request_id", 0) or 0):
+            return
+        InfoBar.success(
+            title="Profile изменён",
+            content=f"Обновлено profile-ов в preset-ах: {int(changed or 0)}.",
+            parent=self.window(),
+        )
+        self.refresh_from_preset_switch()
+
+    def _on_user_profile_update_failed(self, request_id: int, error: str) -> None:
+        if request_id != int(getattr(self, "_user_profile_update_request_id", 0) or 0):
+            return
+        log(f"{self.__class__.__name__}: не удалось изменить пользовательский profile: {error}", "ERROR")
+        InfoBar.error(title="Ошибка", content=str(error), parent=self.window())
+
+    def _on_user_profile_update_worker_finished(self, worker) -> None:
+        if self.__dict__.get("_user_profile_update_worker") is worker:
+            self._user_profile_update_worker = None
+        worker.deleteLater()
+        if not self._user_profile_operation_running():
+            self._set_user_profile_actions_enabled(True)
+
+    def _request_user_profile_delete(self, profile_id: str) -> None:
+        profile_id = str(profile_id or "").strip()
+        if not profile_id or self._user_profile_operation_running():
+            return
+        self._user_profile_delete_request_id = int(getattr(self, "_user_profile_delete_request_id", 0) or 0) + 1
+        request_id = self._user_profile_delete_request_id
+        self._set_user_profile_actions_enabled(False)
+        worker = self._create_user_profile_delete_worker(request_id, profile_id=profile_id)
+        self._user_profile_delete_worker = worker
+        worker.deleted.connect(self._on_user_profile_delete_finished)
+        worker.failed.connect(self._on_user_profile_delete_failed)
+        worker.finished.connect(lambda w=worker: self._on_user_profile_delete_worker_finished(w))
+        worker.start()
+
+    def _on_user_profile_delete_finished(self, request_id: int, _profile_id: str, changed: int) -> None:
+        if request_id != int(getattr(self, "_user_profile_delete_request_id", 0) or 0):
+            return
+        InfoBar.success(
+            title="Profile удалён",
+            content=f"Удалено profile-ов из preset-ов: {int(changed or 0)}.",
+            parent=self.window(),
+        )
+        self.refresh_from_preset_switch()
+
+    def _on_user_profile_delete_failed(self, request_id: int, error: str) -> None:
+        if request_id != int(getattr(self, "_user_profile_delete_request_id", 0) or 0):
+            return
+        log(f"{self.__class__.__name__}: не удалось удалить пользовательский profile: {error}", "ERROR")
+        InfoBar.error(title="Ошибка", content=str(error), parent=self.window())
+
+    def _on_user_profile_delete_worker_finished(self, worker) -> None:
+        if self.__dict__.get("_user_profile_delete_worker") is worker:
+            self._user_profile_delete_worker = None
+        worker.deleteLater()
+        if not self._user_profile_operation_running():
+            self._set_user_profile_actions_enabled(True)
 
     def _apply_profile_move_locally(
         self,
@@ -657,21 +825,7 @@ class PresetSetupPageBase(BasePage):
         if not dialog.exec():
             return
         name, protocol, ports = dialog.values()
-        try:
-            self._profile.create_user_profile(name=name, protocol=protocol, ports=ports)
-            InfoBar.success(
-                title="Profile добавлен",
-                content="Он появился в общем списке и пока выключен во всех preset-ах.",
-                parent=self.window(),
-            )
-            self.refresh_from_preset_switch()
-        except Exception as exc:
-            log(f"{self.__class__.__name__}: не удалось создать пользовательский profile: {exc}", "ERROR")
-            InfoBar.error(
-                title="Ошибка",
-                content=str(exc),
-                parent=self.window(),
-            )
+        self._request_user_profile_create(name=name, protocol=protocol, ports=ports)
 
 
 class Zapret2PresetSetupPage(PresetSetupPageBase):
