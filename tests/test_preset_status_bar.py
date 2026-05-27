@@ -35,6 +35,18 @@ class _StoppedRuntimeOwner:
         return False
 
 
+class _RunningRuntimeOwner(_StoppedRuntimeOwner):
+    def __init__(self) -> None:
+        super().__init__()
+        self.pending_switch_calls = 0
+
+    def is_running(self) -> bool:
+        return True
+
+    def _process_pending_presets_switch(self) -> None:
+        self.pending_switch_calls += 1
+
+
 class PresetStatusBarPlanTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -128,6 +140,51 @@ class PresetStatusBarPlanTests(unittest.TestCase):
             owner._runtime_service_obj.busy_calls,
             [(True, "Применяем пресет..."), (False, "")],
         )
+
+    def test_stale_preset_switch_finish_does_not_clear_busy_or_status(self) -> None:
+        from unittest.mock import patch
+        from winws_runtime.runtime.restart_flow import handle_presets_switch_finished
+
+        owner = _RunningRuntimeOwner()
+        owner._presets_switch_requested_generation = 7
+        owner._presets_switch_completed_generation = 5
+
+        with (
+            patch("winws_runtime.runtime.restart_flow.QTimer.singleShot") as single_shot,
+            patch("winws_runtime.runtime.restart_flow.set_runtime_owner_status") as set_status,
+            patch("winws_runtime.runtime.restart_flow.maybe_restart_discord_after_runtime_apply") as maybe_restart,
+        ):
+            single_shot.side_effect = lambda _delay, callback: callback()
+
+            handle_presets_switch_finished(owner, True, "", 6, ZAPRET2_MODE, False)
+
+        self.assertEqual(owner._runtime_service_obj.busy_calls, [])
+        self.assertEqual(owner._presets_switch_completed_generation, 6)
+        self.assertEqual(owner.pending_switch_calls, 1)
+        single_shot.assert_called_once()
+        set_status.assert_not_called()
+        maybe_restart.assert_not_called()
+
+    def test_current_preset_switch_finish_clears_busy_and_sets_status(self) -> None:
+        from unittest.mock import patch
+        from winws_runtime.runtime.restart_flow import handle_presets_switch_finished
+
+        owner = _RunningRuntimeOwner()
+        owner._presets_switch_requested_generation = 7
+        owner._presets_switch_completed_generation = 6
+
+        with (
+            patch("winws_runtime.runtime.restart_flow.QTimer.singleShot") as single_shot,
+            patch("winws_runtime.runtime.restart_flow.set_runtime_owner_status") as set_status,
+            patch("winws_runtime.runtime.restart_flow.maybe_restart_discord_after_runtime_apply") as maybe_restart,
+        ):
+            handle_presets_switch_finished(owner, True, "", 7, ZAPRET2_MODE, False)
+
+        self.assertEqual(owner._runtime_service_obj.busy_calls, [(False, "")])
+        self.assertEqual(owner._presets_switch_completed_generation, 7)
+        single_shot.assert_not_called()
+        set_status.assert_called_once_with(owner, "✅ Пресет успешно применён")
+        maybe_restart.assert_called_once_with(owner, skip_first_start=False)
 
     def test_selected_status_names_winws_when_process_is_not_running(self) -> None:
         from presets.ui.common.preset_status_bar import build_preset_status_plan

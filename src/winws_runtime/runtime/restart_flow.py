@@ -217,19 +217,24 @@ def process_pending_restart_request(runtime_owner) -> None:
 
 def handle_presets_switch_finished(runtime_owner, success, error_message, generation, launch_method, skipped_as_stale) -> None:
     try:
-        runtime_owner._runtime_service().set_busy(False)
-
+        requested_generation = int(runtime_owner._presets_switch_requested_generation or 0)
+        finished_generation = int(generation or 0)
         runtime_owner._presets_switch_completed_generation = max(
             int(runtime_owner._presets_switch_completed_generation or 0),
-            int(generation or 0),
+            finished_generation,
         )
 
-        if skipped_as_stale:
+        stale_finish = bool(skipped_as_stale) or finished_generation < requested_generation
+        if stale_finish:
             log(
                 f"Preset mode switch поколения {generation} пропущен как устаревший ({launch_method})",
                 "DEBUG",
             )
-        elif success:
+            return
+
+        runtime_owner._runtime_service().set_busy(False)
+
+        if success:
             log(
                 f"Preset mode switch успешно завершён, поколение {generation} ({launch_method})",
                 "INFO",
