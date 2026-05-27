@@ -844,7 +844,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         )
         self.assertEqual(moved, [(9, "before", "profile-1", "profile-2", "youtube", "profile-1")])
 
-    def test_profile_context_actions_sync_current_list_without_rebuilding_model(self) -> None:
+    def test_profile_context_actions_refresh_current_list_through_worker(self) -> None:
         enable_handler = inspect.getsource(PresetSetupPageBase._set_profile_enabled_from_menu)
         duplicate_handler = inspect.getsource(PresetSetupPageBase._duplicate_profile_from_menu)
         delete_handler = inspect.getsource(PresetSetupPageBase._delete_profile_from_menu)
@@ -861,10 +861,32 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertNotIn("_profile.set_profile_enabled", enable_handler)
         self.assertNotIn("_profile.duplicate_profile", duplicate_handler)
         self.assertNotIn("_profile.delete_profile", delete_handler)
-        self.assertIn("update_profiles", sync_handler)
+        self.assertIn("_schedule_profiles_payload_request(force=True)", sync_handler)
+        self.assertNotIn(".list_profiles(", sync_handler)
+        self.assertNotIn("update_profiles", sync_handler)
         self.assertNotIn("build_profiles", sync_handler)
         self.assertNotIn("_add_profile_item_locally", duplicate_handler)
         self.assertNotIn("_remove_profile_item_locally", delete_handler)
+
+    def test_profile_list_local_refresh_helpers_do_not_read_profiles_in_gui_thread(self) -> None:
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._profile = Mock()
+        page._profile.list_profiles.side_effect = AssertionError("list must load in worker")
+        page._profile.get_profile_setup.side_effect = AssertionError("profile setup must load in worker")
+        page._profile_payload_dirty = False
+        page._schedule_profiles_payload_request = Mock()
+
+        PresetSetupPageBase._sync_profile_list_locally(page)
+        PresetSetupPageBase._refresh_profile_item_locally(page, "profile-1", "profile-1")
+        PresetSetupPageBase._add_profile_item_locally(page, "profile-1")
+
+        page._profile.list_profiles.assert_not_called()
+        page._profile.get_profile_setup.assert_not_called()
+        self.assertTrue(page._profile_payload_dirty)
+        self.assertEqual(
+            page._schedule_profiles_payload_request.call_args_list,
+            [call(force=True), call(force=True), call(force=True)],
+        )
 
     def test_profile_context_actions_start_worker_without_direct_profile_calls(self) -> None:
         class _Signal:

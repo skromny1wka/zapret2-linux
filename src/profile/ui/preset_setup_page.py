@@ -464,45 +464,16 @@ class PresetSetupPageBase(BasePage):
         )
 
     def _sync_profile_list_locally(self) -> None:
-        profiles_list = self._profiles_list
-        if profiles_list is None:
-            self.refresh_from_preset_switch()
-            return
-        try:
-            payload = self._profile.list_profiles(self.launch_method)
-        except Exception as exc:
-            log(f"{self.__class__.__name__}: не удалось обновить текущий список profile: {exc}", "ERROR")
-            self.refresh_from_preset_switch()
-            return
-        if not getattr(payload, "items", ()):
-            self.refresh_from_preset_switch()
-            return
-        self._profile_payload_loaded_once = True
-        self._profile_payload_dirty = False
-        self._profile_load_request_id += 1
-        self._apply_selected_preset_title(payload)
-        self._show_profile_normalization_info(payload)
-        profiles_list.update_profiles(tuple(payload.items))
-        profiles_list.set_search_query(self._profile_search_query)
+        self._profile_payload_dirty = True
+        self._schedule_profiles_payload_request(force=True)
 
     def _refresh_profile_item_locally(self, old_profile_key: str, profile_key: str) -> None:
-        setup = self._profile.get_profile_setup(self.launch_method, profile_key)
-        if setup is not None and self._profiles_list is not None:
-            if self._profiles_list.replace_profile_item(old_profile_key, setup.item):
-                return
-            if str(old_profile_key or "") != str(profile_key or "") and self._profiles_list.add_profile_item(setup.item):
-                return
-        self.refresh_from_preset_switch()
+        self._profile_payload_dirty = True
+        self._schedule_profiles_payload_request(force=True)
 
     def _add_profile_item_locally(self, profile_key: str | None) -> None:
-        key = str(profile_key or "").strip()
-        if not key:
-            self.refresh_from_preset_switch()
-            return
-        setup = self._profile.get_profile_setup(self.launch_method, key)
-        if setup is not None and self._profiles_list is not None and self._profiles_list.add_profile_item(setup.item):
-            return
-        self.refresh_from_preset_switch()
+        self._profile_payload_dirty = True
+        self._schedule_profiles_payload_request(force=True)
 
     def _remove_profile_item_locally(self, profile_key: str) -> None:
         if self._profiles_list is not None and self._profiles_list.remove_profile_item(profile_key):
