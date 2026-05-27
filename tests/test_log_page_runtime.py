@@ -2,40 +2,17 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from log.commands import build_tail_start_plan, build_winws_output_plan
-
-
-class _FakeDirectRunner:
-    def __init__(self, process: object) -> None:
-        self._process = process
-
-    def is_running(self) -> bool:
-        return True
-
-    def get_process(self) -> object:
-        return self._process
-
-    def get_current_strategy_info(self) -> dict:
-        return {"name": "Default v5"}
+from app.feature_facades.logs import LogsFeature
+from log.commands import build_tail_start_plan
 
 
 class LogPageRuntimeTests(unittest.TestCase):
-    def test_winws_output_plan_does_not_give_log_page_process_pipe_ownership(self) -> None:
-        process = object()
-        runner = _FakeDirectRunner(process)
+    def test_logs_feature_has_no_live_winws_output_api(self) -> None:
+        feature = LogsFeature()
 
-        plan = build_winws_output_plan(
-            launch_method="zapret2_mode",
-            orchestra_runner=None,
-            direct_runner=runner,
-            process_pid=24680,
-            language="ru",
-        )
-
-        self.assertEqual(plan.action, "status_only")
-        self.assertIsNone(plan.process)
-        self.assertIn("24680", plan.status_text)
-        self.assertIn("Default v5", plan.status_text)
+        self.assertFalse(hasattr(feature, "start_winws_output_worker"))
+        self.assertFalse(hasattr(feature, "create_winws_output_worker"))
+        self.assertFalse(hasattr(feature, "build_winws_output_plan"))
 
     def test_tail_plan_does_not_reload_unchanged_log_history(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

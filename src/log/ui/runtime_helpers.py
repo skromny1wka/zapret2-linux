@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import html
-
 
 def render_send_status_label(*, label, text: str, tone: str, theme_tokens) -> None:
     if label is None:
@@ -87,10 +85,3 @@ def clear_errors(*, errors_text, errors_count_label, tr_fn) -> int:
         tr_fn("page.logs.errors.count", "Ошибок: {count}").format(count=0)
     )
     return 0
-
-
-def format_winws_output_line(*, text: str, stream_type: str, stdout_color: str, stderr_color: str) -> str:
-    safe_text = html.escape(text)
-    if stream_type == "stderr":
-        return f'<span style="color: {stderr_color};">{safe_text}</span>'
-    return f'<span style="color: {stdout_color};">{safe_text}</span>'

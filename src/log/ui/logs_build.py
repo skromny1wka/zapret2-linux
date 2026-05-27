@@ -7,12 +7,8 @@ from qfluentwidgets import FluentIcon
 from ui.log_limits import (
     ERROR_LOG_VIEW_MAX_LINES,
     MAIN_LOG_VIEW_MAX_LINES,
-    WINWS_OUTPUT_MAX_LINES,
     apply_text_line_limit,
 )
-
-from settings.mode import EXE_NAME_WINWS1
-
 
 @dataclass(slots=True)
 class LogsPrimaryTabWidgets:
@@ -38,12 +34,6 @@ class LogsSecondaryPanelsWidgets:
     errors_count_label: object
     clear_errors_btn: object
     errors_text: object
-    winws_card: object
-    terminal_icon_label: object
-    winws_title_label: object
-    winws_status_label: object
-    clear_winws_btn: object
-    winws_text: object
 
 
 def build_logs_primary_tab_ui(
@@ -199,7 +189,6 @@ def build_logs_secondary_panels_ui(
     errors_text_max_height: int,
     on_clear_errors,
     on_update_errors_height,
-    on_clear_winws_output,
 ) -> LogsSecondaryPanelsWidgets:
     errors_card = settings_card_cls()
     errors_layout = qvbox_layout_cls()
@@ -242,49 +231,6 @@ def build_logs_secondary_panels_ui(
     errors_card.add_layout(errors_layout)
     parent_layout.addWidget(errors_card)
 
-    winws_card = settings_card_cls()
-    winws_layout = qvbox_layout_cls()
-    winws_header = qhbox_layout_cls()
-
-    terminal_icon = qlabel_cls()
-    winws_header.addWidget(terminal_icon)
-
-    winws_title_label = strong_body_label_cls(
-        tr_catalog_fn(
-            "page.logs.winws.title_template",
-            language=ui_language,
-            default="Вывод {exe_name}",
-        ).format(exe_name=EXE_NAME_WINWS1)
-    )
-    winws_header.addWidget(winws_title_label)
-    winws_header.addSpacing(16)
-
-    winws_status_label = caption_label_cls(
-        tr_catalog_fn("page.logs.winws.status.not_running", language=ui_language, default="Процесс не запущен")
-    )
-    winws_header.addWidget(winws_status_label)
-    winws_header.addStretch()
-
-    clear_winws_btn = fluent_push_button_cls(
-        tr_catalog_fn("page.logs.button.clear", language=ui_language, default="Очистить"),
-        icon=FluentIcon.DELETE,
-    )
-    clear_winws_btn.clicked.connect(on_clear_winws_output)
-    winws_header.addWidget(clear_winws_btn)
-
-    winws_layout.addLayout(winws_header)
-
-    winws_text = text_edit_cls()
-    winws_text.setReadOnly(True)
-    winws_text.setLineWrapMode(text_edit_cls.LineWrapMode.NoWrap)
-    winws_text.setFont(qfont_cls("Consolas", 9))
-    winws_text.setFixedHeight(150)
-    apply_text_line_limit(winws_text, WINWS_OUTPUT_MAX_LINES)
-    winws_layout.addWidget(winws_text)
-
-    winws_card.add_layout(winws_layout)
-    parent_layout.addWidget(winws_card)
-
     return LogsSecondaryPanelsWidgets(
         errors_card=errors_card,
         warning_icon_label=warning_icon,
@@ -292,10 +238,4 @@ def build_logs_secondary_panels_ui(
         errors_count_label=errors_count_label,
         clear_errors_btn=clear_errors_btn,
         errors_text=errors_text,
-        winws_card=winws_card,
-        terminal_icon_label=terminal_icon,
-        winws_title_label=winws_title_label,
-        winws_status_label=winws_status_label,
-        clear_winws_btn=clear_winws_btn,
-        winws_text=winws_text,
     )

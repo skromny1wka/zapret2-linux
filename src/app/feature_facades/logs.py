@@ -32,12 +32,6 @@ class LogsFeature:
     def consume_warmed_page_data(self):
         return self._commands().consume_warmed_page_data()
 
-    def resolve_winws_exe_name(self, launch_method: str) -> str:
-        return self._commands().resolve_winws_exe_name(launch_method)
-
-    def get_running_runner_source(self, launch_method: str, orchestra_runner, direct_runner):
-        return self._commands().get_running_runner_source(launch_method, orchestra_runner, direct_runner)
-
     def get_orchestra_log_path(self, orchestra_runner):
         return self._commands().get_orchestra_log_path(orchestra_runner)
 
@@ -52,9 +46,6 @@ class LogsFeature:
 
     def create_log_tail_worker(self, file_path: str, *, initial_max_bytes: int | None = 1024 * 1024):
         return self._commands().create_log_tail_worker(file_path, initial_max_bytes=initial_max_bytes)
-
-    def create_winws_output_worker(self, process):
-        return self._commands().create_winws_output_worker(process)
 
     def create_logs_overview_worker(self, *, run_cleanup: bool):
         return self._commands().create_logs_overview_worker(run_cleanup=run_cleanup)
@@ -81,15 +72,6 @@ class LogsFeature:
     def build_stats_text_plan(self, stats, *, language: str):
         return self._commands().build_stats_text_plan(stats, language=language)
 
-    def build_winws_output_plan(self, *, launch_method: str, orchestra_runner, direct_runner, process_pid, language: str):
-        return self._commands().build_winws_output_plan(
-            launch_method=launch_method,
-            orchestra_runner=orchestra_runner,
-            direct_runner=direct_runner,
-            process_pid=process_pid,
-            language=language,
-        )
-
     def run_runtime_init(self, **kwargs):
         return self._runtime().run_logs_runtime_init(**kwargs)
 
@@ -98,6 +80,3 @@ class LogsFeature:
 
     def handle_thread_stop(self, **kwargs):
         return self._runtime().handle_thread_stop(**kwargs)
-
-    def start_winws_output_worker(self, **kwargs):
-        return self._runtime().start_winws_output_worker(**kwargs)

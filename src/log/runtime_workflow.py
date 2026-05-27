@@ -11,8 +11,6 @@ def run_logs_runtime_init(
     refresh_logs_fn,
     update_stats_fn,
     start_tail_worker_fn,
-    start_winws_worker_fn,
-    start_status_timer_fn,
 ) -> tuple[bool, bool]:
     next_runtime_initialized = bool(runtime_initialized)
     next_runtime_started = bool(runtime_started)
@@ -25,8 +23,6 @@ def run_logs_runtime_init(
     if not next_runtime_started:
         next_runtime_started = True
         start_tail_worker_fn()
-        start_winws_worker_fn()
-        start_status_timer_fn(3000)
 
     return next_runtime_initialized, next_runtime_started
 
@@ -115,56 +111,3 @@ def handle_thread_stop(*, worker, thread, build_stop_plan_fn, blocking: bool, lo
             except Exception:
                 pass
     return worker, thread
-
-
-def start_winws_output_worker(
-    *,
-    stop_worker_fn,
-    refresh_title_fn,
-    build_output_plan_fn,
-    launch_method: str,
-    orchestra_runner,
-    direct_runner,
-    process_pid,
-    language: str,
-    set_status_fn,
-    thread_cls,
-    parent,
-    create_worker_fn,
-    on_new_output,
-    on_process_ended,
-    on_thread_finished,
-    log_fn,
-):
-    stop_worker_fn()
-    refresh_title_fn()
-
-    plan = build_output_plan_fn(
-        launch_method=launch_method,
-        orchestra_runner=orchestra_runner,
-        direct_runner=direct_runner,
-        process_pid=process_pid,
-        language=language,
-    )
-    set_status_fn(plan.status_kind, plan.status_text)
-
-    if plan.action != "start_worker" or not plan.process:
-        return None, None
-
-    try:
-        thread = thread_cls(parent)
-        worker = create_worker_fn(plan.process)
-        worker.moveToThread(thread)
-
-        thread.started.connect(worker.run)
-        worker.new_output.connect(on_new_output)
-        worker.process_ended.connect(on_process_ended)
-        worker.finished.connect(thread.quit)
-        worker.finished.connect(worker.deleteLater)
-        thread.finished.connect(on_thread_finished)
-        thread.finished.connect(thread.deleteLater)
-        thread.start()
-        return thread, worker
-    except Exception as e:
-        log_fn(f"Ошибка запуска winws output worker: {e}", "ERROR")
-        return None, None

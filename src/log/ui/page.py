@@ -32,17 +32,13 @@ from log.ui.runtime_helpers import (
     append_error,
     clear_errors,
     compute_errors_text_height,
-    format_winws_output_line,
     render_send_status_label,
-    resolve_winws_status_style,
-    set_winws_status,
 )
 from log.ui.send_build import build_logs_send_tab
 from log.ui.support_workflow import (
     apply_support_feedback,
     update_orchestra_indicator,
 )
-from settings.mode import ORCHESTRA_MODE
 from app.ui_texts import tr as tr_catalog
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens
 from log.log import log
@@ -108,16 +104,8 @@ class LogsPage(BasePage):
 
         self._tokens = get_theme_tokens()
 
-        # Theme-dependent colors used in runtime status/output updates.
-        self._winws_stdout_color = "#00ff88"
-        self._winws_stderr_color = "#ff6b6b"
-        self._winws_status_neutral = self._tokens.fg_muted
-        self._winws_status_running = self._tokens.accent_hex
-        self._winws_status_error = self._tokens.fg
-
         # References for theme refresh (icons/labels created as locals).
         self._warning_icon_label = None
-        self._terminal_icon_label = None
         self._info_icon_label = None
         self._orchestra_icon_label = None
         self._orchestra_text_label = None
@@ -128,20 +116,12 @@ class LogsPage(BasePage):
         self._send_actions_title = None
         self._send_actions_bar = None
 
-        # Winws output worker
-        self._winws_thread = None
-        self._winws_worker = None
-        self._winws_lines_count = 0
         self._logs_overview_runtime = OneShotWorkerRuntime()
         self._logs_overview_pending_cleanup = False
 
         # Error panel height tuning (avoid large empty block when no errors).
         self._errors_text_min_height = 52
         self._errors_text_max_height = 140
-
-        # Таймер для обновления статуса winws
-        self._winws_status_timer = QTimer(self)
-        self._winws_status_timer.timeout.connect(self._update_winws_status)
 
         self._runtime_initialized = False
         self._send_tab_initialized = False
@@ -173,8 +153,6 @@ class LogsPage(BasePage):
             refresh_logs_fn=self._refresh_logs_list,
             update_stats_fn=self._update_stats,
             start_tail_worker_fn=self._start_tail_worker,
-            start_winws_worker_fn=self._schedule_winws_output_worker_start,
-            start_status_timer_fn=self._winws_status_timer.start,
         )
         self._log_ui_timing("logs_ui.runtime_init.total", started_at)
 
@@ -191,10 +169,8 @@ class LogsPage(BasePage):
         self._run_runtime_init_once()
 
     def _stop_runtime(self) -> None:
-        self._winws_status_timer.stop()
         self._stop_logs_overview_worker(blocking=False)
         self._stop_tail_worker(blocking=False)
-        self._stop_winws_output_worker(blocking=False)
         self._runtime_started = False
 
     def on_page_activated(self) -> None:
@@ -268,35 +244,6 @@ class LogsPage(BasePage):
                 " }"
             )
 
-        # winws panel
-        if self._terminal_icon_label is not None:
-            try:
-                self._terminal_icon_label.setPixmap(
-                    get_cached_qta_pixmap('fa5s.terminal', color=tokens.accent_hex, size=16)
-                )
-            except Exception:
-                pass
-
-        self._winws_stdout_color = "rgba(21, 128, 61, 0.92)" if tokens.is_light else "#00ff88"
-        self._winws_stderr_color = err_fg
-        self._winws_status_neutral = tokens.fg_muted
-        self._winws_status_running = tokens.accent_hex
-        self._winws_status_error = err_fg
-
-        if getattr(self, "winws_text", None) is not None:
-            self.winws_text.setStyleSheet(
-                "QTextEdit {"
-                f" background-color: {editor_bg};"
-                f" color: {editor_fg};"
-                f" border: 1px solid {tokens.surface_border};"
-                " border-radius: 6px;"
-                " padding: 8px;"
-                " font-family: 'Consolas', 'Courier New', monospace;"
-                " font-size: 11px;"
-                " }"
-            )
-            self._refresh_winws_status_style_only()
-
         # Send tab (exists only after lazy init)
         if self._info_icon_label is not None:
             try:
@@ -351,33 +298,6 @@ class LogsPage(BasePage):
             theme_tokens=theme_tokens,
         )
 
-    def _refresh_winws_status_style_only(self) -> None:
-        if getattr(self, "winws_status_label", None) is None:
-            return
-        try:
-            current_text = self.winws_status_label.text() or ""
-        except Exception:
-            current_text = ""
-        kind, text = resolve_winws_status_style(
-            current_text=current_text,
-            neutral_color=self._winws_status_neutral,
-            running_color=self._winws_status_running,
-            error_color=self._winws_status_error,
-        )
-        self._set_winws_status(kind, text)
-
-    def _set_winws_status(self, kind: str, text: str) -> None:
-        if getattr(self, "winws_status_label", None) is None:
-            return
-        set_winws_status(
-            self.winws_status_label,
-            kind=kind,
-            text=text,
-            neutral_color=self._winws_status_neutral,
-            running_color=self._winws_status_running,
-            error_color=self._winws_status_error,
-        )
-        
     def _build_ui(self):
         # ═══════════════════════════════════════════════════════════
         # Переключатель табов (ЛОГИ / ОТПРАВКА) — Fluent Pivot
@@ -532,13 +452,11 @@ class LogsPage(BasePage):
             try:
                 self.errors_title_label.setText(tr_catalog("page.logs.errors.title", language=self._ui_language, default="Ошибки и предупреждения"))
                 self.clear_errors_btn.setText(tr_catalog("page.logs.button.clear", language=self._ui_language, default="Очистить"))
-                self.clear_winws_btn.setText(tr_catalog("page.logs.button.clear", language=self._ui_language, default="Очистить"))
                 self.errors_count_label.setText(
                     tr_catalog("page.logs.errors.count", language=self._ui_language, default="Ошибок: {count}").format(
                         count=max(0, int(self._errors_count))
                     )
                 )
-                self._refresh_winws_title()
             except Exception:
                 pass
 
@@ -680,7 +598,6 @@ class LogsPage(BasePage):
             errors_text_max_height=self._errors_text_max_height,
             on_clear_errors=self._clear_errors,
             on_update_errors_height=self._update_errors_text_height,
-            on_clear_winws_output=self._clear_winws_output,
         )
         self.errors_card = logs_widgets.errors_card
         self._warning_icon_label = logs_widgets.warning_icon_label
@@ -688,16 +605,9 @@ class LogsPage(BasePage):
         self.errors_count_label = logs_widgets.errors_count_label
         self.clear_errors_btn = logs_widgets.clear_errors_btn
         self.errors_text = logs_widgets.errors_text
-        self.winws_card = logs_widgets.winws_card
-        self._terminal_icon_label = logs_widgets.terminal_icon_label
-        self.winws_title_label = logs_widgets.winws_title_label
-        self.winws_status_label = logs_widgets.winws_status_label
-        self.clear_winws_btn = logs_widgets.clear_winws_btn
-        self.winws_text = logs_widgets.winws_text
 
         self._logs_secondary_initialized = True
         self._update_errors_text_height()
-        self._refresh_winws_title()
         self._apply_page_theme(force=True)
         return True
 
@@ -756,42 +666,6 @@ class LogsPage(BasePage):
 
     def _get_orchestra_runner(self):
         return self._orchestra.runner
-
-    def _refresh_winws_title(self):
-        """Обновляет заголовок панели вывода по текущему методу запуска"""
-        if not hasattr(self, "winws_title_label"):
-            return
-
-        try:
-            exe_name = self._logs.resolve_winws_exe_name(self.get_launch_method())
-        except Exception:
-            from settings.mode import EXE_NAME_WINWS1
-
-            exe_name = EXE_NAME_WINWS1
-
-        self.winws_title_label.setText(
-            tr_catalog(
-                "page.logs.winws.title_template",
-                language=self._ui_language,
-                default="Вывод {exe_name}",
-            ).format(exe_name=exe_name)
-        )
-
-    def _get_running_runner_source(self):
-        """
-        Возвращает источник активного процесса.
-
-        Returns:
-            Tuple[str|None, runner|None] где source:
-            - "orchestra" для OrchestraRunner
-            - "direct" для StrategyRunner
-            - None если процесс не запущен
-        """
-        return self._logs.get_running_runner_source(
-            self.get_launch_method(),
-            self._get_orchestra_runner(),
-            self._runtime.current_strategy_runner(),
-        )
 
     def _get_orchestra_log_path(self) -> str:
         """
@@ -1006,163 +880,6 @@ class LogsPage(BasePage):
             warning_prefix="Log tail worker",
         )
 
-    def _schedule_winws_output_worker_start(self) -> None:
-        QTimer.singleShot(0, self._start_winws_output_worker_after_secondary_ready)
-
-    def _start_winws_output_worker_after_secondary_ready(self) -> None:
-        if self._cleanup_in_progress or not self.isVisible():
-            return
-        if not self._ensure_logs_secondary_panels():
-            self._schedule_logs_secondary_panels()
-            return
-        self._start_winws_output_worker()
-
-    def _start_winws_output_worker(self):
-        """Запускает worker для чтения вывода winws"""
-        if not self._ensure_logs_secondary_panels():
-            return
-        launch_method = self.get_launch_method()
-        self._winws_thread, self._winws_worker = self._logs.start_winws_output_worker(
-            stop_worker_fn=self._stop_winws_output_worker,
-            refresh_title_fn=self._refresh_winws_title,
-            build_output_plan_fn=self._logs.build_winws_output_plan,
-            launch_method=launch_method,
-            orchestra_runner=self._get_orchestra_runner(),
-            direct_runner=self._runtime.current_strategy_runner(),
-            process_pid=self._runtime.current_process_pid(launch_method, refresh=True),
-            language=self._ui_language,
-            set_status_fn=self._set_winws_status,
-            thread_cls=QThread,
-            parent=self,
-            create_worker_fn=self._logs.create_winws_output_worker,
-            on_new_output=self._append_winws_output,
-            on_process_ended=self._on_winws_process_ended,
-            on_thread_finished=self._on_winws_thread_finished,
-            log_fn=log,
-        )
-
-    def _on_winws_thread_finished(self):
-        self._winws_thread = None
-        self._winws_worker = None
-
-    def _stop_winws_output_worker(self, blocking: bool = False):
-        """Останавливает worker чтения вывода winws (неблокирующий по умолчанию)"""
-        try:
-            self._winws_worker, self._winws_thread = self._logs.handle_thread_stop(
-                worker=self._winws_worker,
-                thread=self._winws_thread,
-                build_stop_plan_fn=self._logs.build_thread_stop_plan,
-                blocking=blocking,
-                log_fn=log,
-                warning_prefix="Winws output worker",
-            )
-        except Exception as e:
-            log(f"Ошибка остановки winws output worker: {e}", "DEBUG")
-
-    def _append_winws_output(self, text: str, stream_type: str):
-        """Добавляет вывод winws в текстовое поле"""
-        if self._cleanup_in_progress:
-            return
-        if not self._ensure_logs_secondary_panels():
-            return
-        self._winws_lines_count += 1
-
-        formatted = format_winws_output_line(
-            text=text,
-            stream_type=stream_type,
-            stdout_color=self._winws_stdout_color,
-            stderr_color=self._winws_stderr_color,
-        )
-
-        self.winws_text.append(formatted)
-
-        # Автопрокрутка
-        scrollbar = self.winws_text.verticalScrollBar()
-        scrollbar.setValue(scrollbar.maximum())
-
-    def _on_winws_process_ended(self, exit_code: int):
-        """Обработчик завершения процесса winws"""
-        if self._cleanup_in_progress:
-            return
-        if not self._ensure_logs_secondary_panels():
-            return
-        if exit_code == 0:
-            self._set_winws_status(
-                "neutral",
-                tr_catalog(
-                    "page.logs.winws.status.ended_template",
-                    language=self._ui_language,
-                    default="Процесс завершён (код: {code})",
-                ).format(code=exit_code),
-            )
-        else:
-            self._set_winws_status(
-                "error",
-                tr_catalog(
-                    "page.logs.winws.status.ended_error_template",
-                    language=self._ui_language,
-                    default="Процесс завершён с ошибкой (код: {code})",
-                ).format(code=exit_code),
-            )
-
-    def _update_winws_status(self):
-        """Периодически проверяет статус процесса winws"""
-        if self._cleanup_in_progress:
-            return
-        if not self._ensure_logs_secondary_panels():
-            self._schedule_logs_secondary_panels()
-            return
-        self._refresh_winws_title()
-        source, runner = self._get_running_runner_source()
-
-        if source == ORCHESTRA_MODE and runner:
-            # Для оркестратора всегда останавливаем worker чтения stdout,
-            # чтобы не конкурировать с внутренним reader'ом orchestra_runner.
-            if self._winws_thread and self._winws_thread.isRunning():
-                self._stop_winws_output_worker()
-
-            pid = self._runtime.current_process_pid(self.get_launch_method(), refresh=True)
-            pid_text = str(pid) if isinstance(pid, int) else "?"
-            self._set_winws_status("running", f"PID: {pid_text} | Оркестратор")
-            return
-
-        if source == "direct" and runner:
-            # Если worker не работает, запускаем его
-            if not self._winws_thread or not self._winws_thread.isRunning():
-                self._start_winws_output_worker()
-            else:
-                launch_method = self.get_launch_method()
-                plan = self._logs.build_winws_output_plan(
-                    launch_method=launch_method,
-                    orchestra_runner=self._get_orchestra_runner(),
-                    direct_runner=runner,
-                    process_pid=self._runtime.current_process_pid(launch_method, refresh=True),
-                    language=self._ui_language,
-                )
-                self._set_winws_status(plan.status_kind, plan.status_text)
-            return
-
-        # Процесс не запущен - обновляем статус если worker не работает
-        if not self._winws_thread or not self._winws_thread.isRunning():
-            self._set_winws_status(
-                "neutral",
-                tr_catalog("page.logs.winws.status.not_running", language=self._ui_language, default="Процесс не запущен"),
-            )
-
-    def _clear_winws_output(self):
-        """Очищает поле вывода winws"""
-        if not self._ensure_logs_secondary_panels():
-            return
-        self.winws_text.clear()
-        self._winws_lines_count = 0
-        self.info_label.setText(
-            tr_catalog(
-                "page.logs.info.winws_cleared",
-                language=self._ui_language,
-                default="🧹 Вывод winws очищен",
-            )
-        )
-
     def _append_text(self, text: str):
         """Добавляет текст в лог"""
         if self._cleanup_in_progress:
@@ -1315,7 +1032,5 @@ class LogsPage(BasePage):
         """Очистка при закрытии - блокирующий режим"""
         self._cleanup_in_progress = True
         self._spin_timer.stop()
-        self._winws_status_timer.stop()
         self._stop_logs_overview_worker(blocking=True)
         self._stop_tail_worker(blocking=True)
-        self._stop_winws_output_worker(blocking=True)

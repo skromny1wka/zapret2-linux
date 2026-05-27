@@ -1701,22 +1701,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "📊 Логи: {logs} (макс {max_logs}) | 🔧 Debug: {debug} (макс {max_debug}) | 💾 Размер: {size:.2f} MB",
         "en": "📊 Logs: {logs} (max {max_logs}) | 🔧 Debug: {debug} (max {max_debug}) | 💾 Size: {size:.2f} MB",
     },
-    "page.logs.winws.title_template": {
-        "ru": "Вывод {exe_name}",
-        "en": "{exe_name} Output",
-    },
-    "page.logs.winws.status.not_running": {
-        "ru": "Процесс не запущен",
-        "en": "Process is not running",
-    },
-    "page.logs.winws.status.ended_template": {
-        "ru": "Процесс завершён (код: {code})",
-        "en": "Process ended (code: {code})",
-    },
-    "page.logs.winws.status.ended_error_template": {
-        "ru": "Процесс завершён с ошибкой (код: {code})",
-        "en": "Process ended with error (code: {code})",
-    },
     "page.logs.send.card.title": {
         "ru": "Поддержка через GitHub Discussions",
         "en": "Support via GitHub Discussions",
@@ -4494,10 +4478,6 @@ TEXTS_PAGES_FINAL: dict[str, dict[str, str]] = {
     "page.control.dialog.max_block_disable.title": {
         "ru": "Отключение блокировки MAX",
         "en": "Disable MAX Blocking",
-    },
-    "page.logs.info.winws_cleared": {
-        "ru": "🧹 Вывод winws очищен",
-        "en": "🧹 winws output cleared",
     },
     "page.logs.info.copied": {
         "ru": "✅ Скопировано в буфер обмена",

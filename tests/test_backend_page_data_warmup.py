@@ -126,8 +126,6 @@ class BackendPageDataWarmupTests(unittest.TestCase):
             _refresh_logs_list=Mock(),
             _update_stats=Mock(),
             _start_tail_worker=Mock(),
-            _schedule_winws_output_worker_start=Mock(),
-            _winws_status_timer=SimpleNamespace(start=Mock()),
             _log_ui_timing=Mock(),
         )
 

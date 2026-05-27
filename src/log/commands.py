@@ -8,8 +8,6 @@ import time
 from dataclasses import dataclass
 
 from config.config import LOGS_FOLDER, MAX_DEBUG_LOG_FILES, MAX_LOG_FILES
-from settings.mode import EXE_NAME_WINWS1, ORCHESTRA_MODE, exe_name_for_launch_method, is_orchestra_launch_method
-
 from log.log import LOG_FILE, cleanup_old_logs, global_logger, log
 
 from support_request_bundle import prepare_support_request
@@ -47,14 +45,6 @@ class LogsThreadStopPlan:
     wait_timeout_ms: int
     should_terminate: bool
     terminate_wait_ms: int
-
-
-@dataclass(slots=True)
-class LogsWinwsOutputPlan:
-    action: str
-    status_kind: str
-    status_text: str
-    process: object | None
 
 
 @dataclass(slots=True)
@@ -198,29 +188,6 @@ def _log_timing(label: str, started_at: float) -> None:
     except Exception:
         pass
 
-def resolve_winws_exe_name(launch_method: str) -> str:
-    try:
-        return exe_name_for_launch_method(launch_method)
-    except Exception:
-        return EXE_NAME_WINWS1
-
-def get_running_runner_source(launch_method: str, orchestra_runner, direct_runner):
-    orchestra_running = bool(orchestra_runner and orchestra_runner.is_running())
-    direct_running = bool(direct_runner and direct_runner.is_running())
-
-    if is_orchestra_launch_method(launch_method):
-        if orchestra_running:
-            return ORCHESTRA_MODE, orchestra_runner
-        if direct_running:
-            return "direct", direct_runner
-        return None, None
-
-    if direct_running:
-        return "direct", direct_runner
-    if orchestra_running:
-        return ORCHESTRA_MODE, orchestra_runner
-    return None, None
-
 def get_orchestra_log_path(orchestra_runner):
     try:
         if orchestra_runner:
@@ -274,13 +241,6 @@ def create_log_tail_worker(file_path: str, *, initial_max_bytes: int | None = 10
         initial_chunk_chars=65536,
         initial_max_bytes=initial_max_bytes,
     )
-
-def create_winws_output_worker(process):
-    from log.winws_output_worker import WinwsOutputWorker
-
-    worker = WinwsOutputWorker()
-    worker.set_process(process)
-    return worker
 
 def create_logs_overview_worker(*, run_cleanup: bool):
     from log.overview_worker import LogsOverviewWorker
@@ -386,61 +346,4 @@ def build_stats_text_plan(stats: LogsStatsState, *, language: str) -> LogsStatsT
             max_debug=stats.max_debug_logs,
             size=stats.total_size_mb,
         )
-    )
-
-def _format_process_pid(pid: int | None) -> str:
-    return str(pid) if isinstance(pid, int) else "?"
-
-
-def build_winws_output_plan(
-    *,
-    launch_method: str,
-    orchestra_runner,
-    direct_runner,
-    process_pid: int | None,
-    language: str,
-) -> LogsWinwsOutputPlan:
-    source, runner = get_running_runner_source(launch_method, orchestra_runner, direct_runner)
-
-    if source == ORCHESTRA_MODE and runner:
-        return LogsWinwsOutputPlan(
-            action=ORCHESTRA_MODE,
-            status_kind="running",
-            status_text=f"PID: {_format_process_pid(process_pid)} | Оркестратор",
-            process=None,
-        )
-
-    if source != "direct" or not runner:
-        from app.ui_texts import tr as tr_catalog
-
-        return LogsWinwsOutputPlan(
-            action="idle",
-            status_kind="neutral",
-            status_text=tr_catalog(
-                "page.logs.winws.status.not_running",
-                language=language,
-                default="Процесс не запущен",
-            ),
-            process=None,
-        )
-
-    strategy_info = {}
-    try:
-        get_info = getattr(runner, "get_current_strategy_info", None)
-        if callable(get_info):
-            info_value = get_info()
-            if isinstance(info_value, dict):
-                strategy_info = info_value
-    except Exception:
-        pass
-
-    strategy_name = strategy_info.get("name", "winws")
-    if len(strategy_name) > 35:
-        strategy_name = strategy_name[:32] + "..."
-
-    return LogsWinwsOutputPlan(
-        action="status_only",
-        status_kind="running",
-        status_text=f"PID: {_format_process_pid(process_pid)} | {strategy_name}",
-        process=None,
     )
