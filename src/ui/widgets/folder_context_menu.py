@@ -11,7 +11,6 @@ from ui.presets_menu.common import fluent_icon, make_menu_action
 
 @dataclass(frozen=True)
 class FolderMenuActions:
-    load_state: Callable[[], dict]
     run_action: Callable[[str, dict], object]
 
 
@@ -68,6 +67,7 @@ def show_folder_context_menu(
     parent,
     folder_key: str,
     global_pos,
+    folder_state: dict,
     actions: FolderMenuActions,
     labels: FolderMenuLabels,
     refresh_fn: Callable[[], object],
@@ -76,7 +76,7 @@ def show_folder_context_menu(
 ) -> None:
     key = str(folder_key or "").strip()
     service_keys = {str(value or "").strip() for value in (service_folder_keys or set()) if str(value or "").strip()}
-    state = actions.load_state()
+    state = folder_state if isinstance(folder_state, dict) else {}
     folders = state.get("folders", {}) if isinstance(state, dict) else {}
     folder = folders.get(key) if isinstance(folders, dict) else None
     is_service = key in service_keys

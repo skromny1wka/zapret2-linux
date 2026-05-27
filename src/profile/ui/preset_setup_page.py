@@ -853,10 +853,22 @@ class PresetSetupPageBase(BasePage):
         )
 
     def _on_folder_context_requested(self, folder_key: str, global_pos) -> None:
+        self._request_profile_folder_action(
+            "load_state",
+            folder_key=folder_key,
+            context_extra={
+                "show_menu": True,
+                "folder_key": str(folder_key or ""),
+                "global_pos": global_pos,
+            },
+        )
+
+    def _show_folder_menu_with_state(self, folder_key: str, global_pos, folder_state: dict) -> None:
         show_profile_folder_menu(
             parent=self,
             folder_key=folder_key,
             global_pos=global_pos,
+            folder_state=folder_state,
             refresh_fn=self.refresh_from_preset_switch,
             request_folder_action_fn=self._request_profile_folder_action,
             log_fn=log,
@@ -879,6 +891,7 @@ class PresetSetupPageBase(BasePage):
         name: str = "",
         direction: int = 0,
         collapsed: bool = False,
+        context_extra: dict | None = None,
     ):
         return ProfileFolderActionWorker(
             request_id,
@@ -887,6 +900,7 @@ class PresetSetupPageBase(BasePage):
             name=name,
             direction=direction,
             collapsed=collapsed,
+            context_extra=context_extra,
             parent=self,
         )
 
@@ -899,6 +913,7 @@ class PresetSetupPageBase(BasePage):
         direction: int = 0,
         collapsed: bool = False,
         refresh: bool = True,
+        context_extra: dict | None = None,
     ) -> None:
         worker = self.__dict__.get("_profile_folder_action_worker")
         if worker is not None:
@@ -912,6 +927,7 @@ class PresetSetupPageBase(BasePage):
                             "direction": int(direction or 0),
                             "collapsed": bool(collapsed),
                             "refresh": bool(refresh),
+                            "context_extra": dict(context_extra or {}),
                         }
                     )
                     return
@@ -926,6 +942,7 @@ class PresetSetupPageBase(BasePage):
             name=str(name or ""),
             direction=int(direction or 0),
             collapsed=bool(collapsed),
+            context_extra=dict(context_extra or {}),
         )
         worker._refresh_profile_page_after_action = bool(refresh)
         self._profile_folder_action_worker = worker
@@ -934,8 +951,16 @@ class PresetSetupPageBase(BasePage):
         worker.finished.connect(lambda w=worker: self._on_profile_folder_action_worker_finished(w))
         worker.start()
 
-    def _on_profile_folder_action_finished(self, request_id: int, _action: str, result, _context) -> None:
+    def _on_profile_folder_action_finished(self, request_id: int, action: str, result, context) -> None:
         if request_id != int(getattr(self, "_profile_folder_action_request_id", 0) or 0):
+            return
+        context = dict(context or {})
+        if str(action or "") == "load_state" and bool(context.get("show_menu")):
+            self._show_folder_menu_with_state(
+                str(context.get("folder_key") or ""),
+                context.get("global_pos"),
+                result if isinstance(result, dict) else {},
+            )
             return
         worker = self.__dict__.get("_profile_folder_action_worker")
         should_refresh = bool(getattr(worker, "_refresh_profile_page_after_action", True))
@@ -960,6 +985,7 @@ class PresetSetupPageBase(BasePage):
                 direction=int(pending.get("direction") or 0),
                 collapsed=bool(pending.get("collapsed")),
                 refresh=bool(pending.get("refresh", True)),
+                context_extra=dict(pending.get("context_extra") or {}),
             )
 
     def apply_profile_setup_change(self, profile_key: str, change_kind: str) -> None:

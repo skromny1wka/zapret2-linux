@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from folders.defaults import PINNED_FOLDER_KEY
-from presets.folders import load_preset_folder_state
 from ui.widgets.folder_context_menu import FolderMenuActions, FolderMenuLabels, FolderNameDialog, show_folder_context_menu
 
 
@@ -13,6 +12,7 @@ def show_preset_folder_menu(
     scope_key: str,
     folder_key: str,
     global_pos,
+    folder_state: dict,
     refresh_fn: Callable[[], object],
     request_folder_action_fn: Callable[..., object],
     log_fn: Callable[[str, str], object] | None = None,
@@ -27,8 +27,8 @@ def show_preset_folder_menu(
         parent=parent,
         folder_key=folder_key,
         global_pos=global_pos,
+        folder_state=folder_state,
         actions=FolderMenuActions(
-            load_state=lambda: load_preset_folder_state(scope),
             run_action=request_action,
         ),
         labels=FolderMenuLabels(

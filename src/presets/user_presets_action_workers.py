@@ -275,6 +275,7 @@ class UserPresetFolderActionWorker(QThread):
         name: str = "",
         direction: int = 0,
         collapsed: bool = False,
+        context_extra: dict | None = None,
         parent=None,
     ):
         super().__init__(parent)
@@ -285,6 +286,7 @@ class UserPresetFolderActionWorker(QThread):
         self._name = str(name or "").strip()
         self._direction = int(direction or 0)
         self._collapsed = bool(collapsed)
+        self._context_extra = dict(context_extra or {})
 
     def run(self) -> None:
         from presets.folders import (
@@ -304,8 +306,11 @@ class UserPresetFolderActionWorker(QThread):
             "direction": self._direction,
             "collapsed": self._collapsed,
         }
+        context.update(self._context_extra)
         try:
-            if self._action == "create":
+            if self._action == "load_state":
+                result = load_preset_folder_state(self._scope_key)
+            elif self._action == "create":
                 result = create_preset_folder(self._scope_key, self._name)
             elif self._action == "rename":
                 result = rename_preset_folder(self._scope_key, self._folder_key, self._name)

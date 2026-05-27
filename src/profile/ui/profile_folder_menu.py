@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from profile.folders import load_profile_folder_state
 from ui.widgets.folder_context_menu import FolderMenuActions, FolderMenuLabels, show_folder_context_menu
 
 
@@ -11,6 +10,7 @@ def show_profile_folder_menu(
     parent,
     folder_key: str,
     global_pos,
+    folder_state: dict,
     refresh_fn: Callable[[], object],
     request_folder_action_fn: Callable[..., object],
     log_fn: Callable[[str, str], object] | None = None,
@@ -23,8 +23,8 @@ def show_profile_folder_menu(
         parent=parent,
         folder_key=folder_key,
         global_pos=global_pos,
+        folder_state=folder_state,
         actions=FolderMenuActions(
-            load_state=load_profile_folder_state,
             run_action=request_action,
         ),
         labels=FolderMenuLabels(

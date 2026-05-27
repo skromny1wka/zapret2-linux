@@ -426,6 +426,7 @@ class ProfileFolderActionWorker(QThread):
         name: str = "",
         direction: int = 0,
         collapsed: bool = False,
+        context_extra: dict | None = None,
         parent=None,
     ):
         super().__init__(parent)
@@ -435,11 +436,13 @@ class ProfileFolderActionWorker(QThread):
         self._name = str(name or "").strip()
         self._direction = int(direction or 0)
         self._collapsed = bool(collapsed)
+        self._context_extra = dict(context_extra or {})
 
     def run(self) -> None:
         from profile.folders import (
             create_profile_folder,
             delete_profile_folder,
+            load_profile_folder_state,
             move_profile_folder_by_step,
             rename_profile_folder,
             reset_profile_folders,
@@ -452,8 +455,11 @@ class ProfileFolderActionWorker(QThread):
             "direction": self._direction,
             "collapsed": self._collapsed,
         }
+        context.update(self._context_extra)
         try:
-            if self._action == "create":
+            if self._action == "load_state":
+                result = load_profile_folder_state()
+            elif self._action == "create":
                 result = create_profile_folder(self._name)
             elif self._action == "rename":
                 result = rename_profile_folder(self._folder_key, self._name)

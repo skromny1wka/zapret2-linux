@@ -863,11 +863,23 @@ class UserPresetsPageBase(BasePage):
         self._show_folder_menu("", global_pos)
 
     def _show_folder_menu(self, folder_key: str, global_pos: QPoint):
+        self._request_preset_folder_action(
+            "load_state",
+            folder_key=folder_key,
+            context_extra={
+                "show_menu": True,
+                "folder_key": str(folder_key or ""),
+                "global_pos": global_pos,
+            },
+        )
+
+    def _show_folder_menu_with_state(self, folder_key: str, global_pos: QPoint, folder_state: dict):
         show_preset_folder_menu(
             parent=self,
             scope_key=self._folder_scope_key(),
             folder_key=folder_key,
             global_pos=global_pos,
+            folder_state=folder_state,
             refresh_fn=self._refresh_presets_view_from_cache,
             request_folder_action_fn=self._request_preset_folder_action,
             log_fn=log,
@@ -882,6 +894,7 @@ class UserPresetsPageBase(BasePage):
         name: str = "",
         direction: int = 0,
         collapsed: bool = False,
+        context_extra: dict | None = None,
     ):
         return UserPresetFolderActionWorker(
             request_id,
@@ -891,6 +904,7 @@ class UserPresetsPageBase(BasePage):
             name=name,
             direction=direction,
             collapsed=collapsed,
+            context_extra=context_extra,
             parent=self,
         )
 
@@ -902,6 +916,7 @@ class UserPresetsPageBase(BasePage):
         name: str = "",
         direction: int = 0,
         collapsed: bool = False,
+        context_extra: dict | None = None,
     ) -> None:
         worker = self.__dict__.get("_preset_folder_action_worker")
         if worker is not None:
@@ -914,6 +929,7 @@ class UserPresetsPageBase(BasePage):
                             "name": str(name or ""),
                             "direction": int(direction or 0),
                             "collapsed": bool(collapsed),
+                            "context_extra": dict(context_extra or {}),
                         }
                     )
                     return
@@ -928,6 +944,7 @@ class UserPresetsPageBase(BasePage):
             name=str(name or ""),
             direction=int(direction or 0),
             collapsed=bool(collapsed),
+            context_extra=dict(context_extra or {}),
         )
         self._preset_folder_action_worker = worker
         worker.completed.connect(self._on_preset_folder_action_finished)
@@ -935,8 +952,16 @@ class UserPresetsPageBase(BasePage):
         worker.finished.connect(lambda w=worker: self._on_preset_folder_action_worker_finished(w))
         worker.start()
 
-    def _on_preset_folder_action_finished(self, request_id: int, _action: str, result, _context) -> None:
+    def _on_preset_folder_action_finished(self, request_id: int, action: str, result, context) -> None:
         if request_id != int(getattr(self, "_preset_folder_action_request_id", 0) or 0):
+            return
+        context = dict(context or {})
+        if str(action or "") == "load_state" and bool(context.get("show_menu")):
+            self._show_folder_menu_with_state(
+                str(context.get("folder_key") or ""),
+                context.get("global_pos"),
+                result if isinstance(result, dict) else {},
+            )
             return
         if bool(result):
             self._refresh_presets_view_from_cache()
@@ -958,6 +983,7 @@ class UserPresetsPageBase(BasePage):
                 name=str(pending.get("name") or ""),
                 direction=int(pending.get("direction") or 0),
                 collapsed=bool(pending.get("collapsed")),
+                context_extra=dict(pending.get("context_extra") or {}),
             )
 
     def _on_toggle_pin_preset(self, name: str):
