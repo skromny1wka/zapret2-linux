@@ -158,6 +158,8 @@ class PresetRawEditorPage(BasePage):
         self._is_loading = False
         self._raw_load_request_id = 0
         self._raw_load_worker = None
+        self._raw_activate_request_id = 0
+        self._raw_activate_worker = None
         self._cleanup_in_progress = False
         self._ui_state_store = None
         self._ui_state_unsubscribe = None
@@ -686,15 +688,52 @@ class PresetRawEditorPage(BasePage):
 
     def _activate_preset(self) -> None:
         self._flush_pending_save()
-        try:
-            if self._activate_selected_preset():
-                self._refresh_header()
-                self._set_footer(self._activation_footer_text())
-                self._show_success(f"Пресет «{self._preset_name}» активирован")
-            else:
-                self._show_error(f"Не удалось активировать пресет «{self._preset_name}»")
-        except Exception as e:
-            self._show_error(str(e))
+        if not self._preset_file_name:
+            self._show_error(f"Не удалось активировать пресет «{self._preset_name}»")
+            return
+        self._set_footer(self._activation_footer_text())
+        self._request_preset_activation()
+
+    def _request_preset_activation(self) -> None:
+        worker = self._raw_activate_worker
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    return
+            except Exception:
+                return
+        self._raw_activate_request_id += 1
+        request_id = self._raw_activate_request_id
+        if self.activateButton is not None:
+            self.activateButton.setEnabled(False)
+        worker = self._controller.create_activate_worker(request_id, self._preset_file_name, self)
+        self._raw_activate_worker = worker
+        worker.activated.connect(self._on_preset_activation_finished)
+        worker.failed.connect(self._on_preset_activation_failed)
+        worker.finished.connect(lambda w=worker: self._on_preset_activation_worker_finished(w))
+        worker.start()
+
+    def _on_preset_activation_finished(self, request_id: int, activated: bool) -> None:
+        if request_id != self._raw_activate_request_id:
+            return
+        if activated:
+            self._refresh_header()
+            self._set_footer(self._activation_footer_text())
+            self._show_success(f"Пресет «{self._preset_name}» активирован")
+            return
+        self._show_error(f"Не удалось активировать пресет «{self._preset_name}»")
+
+    def _on_preset_activation_failed(self, request_id: int, error: str) -> None:
+        if request_id != self._raw_activate_request_id:
+            return
+        self._show_error(str(error))
+
+    def _on_preset_activation_worker_finished(self, worker) -> None:
+        if self._raw_activate_worker is worker:
+            self._raw_activate_worker = None
+        worker.deleteLater()
+        if self.activateButton is not None:
+            self.activateButton.setEnabled(True)
 
     def _activation_footer_text(self) -> str:
         try:
@@ -867,14 +906,6 @@ class PresetRawEditorPage(BasePage):
             return self._controller.selected_file_name()
         except Exception:
             return ""
-
-    def _activate_selected_preset(self) -> bool:
-        try:
-            return self._controller.activate(
-                file_name=self._preset_file_name,
-            )
-        except Exception:
-            return False
 
     def _notify_preset_structure_changed(self) -> None:
         store = self._ui_state_store

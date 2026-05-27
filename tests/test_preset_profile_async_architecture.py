@@ -16,6 +16,8 @@ from presets import display_state
 from presets import commands as preset_commands
 from presets.ui.common.preset_subpage_base import PresetRawEditorPage
 from presets.ui.common.user_presets_page import UserPresetsPageBase
+from presets.raw_preset_loader import RawPresetActivateWorker
+from presets.user_presets_action_workers import UserPresetActivateWorker
 import presets.ui.control.additional_settings_runtime as control_additional_settings_runtime
 import presets.ui.control.control_page_shared as control_page_shared
 import presets.ui.control.zapret1.runtime_helpers as zapret1_runtime_helpers
@@ -149,6 +151,18 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
         self.assertIn("viewport().update()", source)
         self.assertNotIn("viewport().repaint()", source)
+
+    def test_user_presets_activation_runs_through_worker(self) -> None:
+        handler_source = inspect.getsource(UserPresetsPageBase._on_activate_preset)
+        request_source = inspect.getsource(UserPresetsPageBase._request_preset_activation)
+        worker_source = inspect.getsource(UserPresetActivateWorker.run)
+
+        self.assertNotIn("activate_preset_action", handler_source)
+        self.assertNotIn(".activate_preset(", handler_source)
+        self.assertIn("apply_active_preset_marker_for_file", handler_source)
+        self.assertIn("_request_preset_activation", handler_source)
+        self.assertIn("create_preset_activate_worker", request_source)
+        self.assertIn("actions_api.activate_preset", worker_source)
 
     def test_profile_commands_reuse_service_cache(self) -> None:
         source = inspect.getsource(profile_commands._profile_preset_service)
@@ -692,6 +706,17 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
         self.assertNotIn("self._controller.load_text(", source)
         self.assertIn("_request_raw_preset_text", source)
+
+    def test_raw_preset_editor_activation_runs_through_worker(self) -> None:
+        source = inspect.getsource(PresetRawEditorPage._activate_preset)
+        request_source = inspect.getsource(PresetRawEditorPage._request_preset_activation)
+        worker_source = inspect.getsource(RawPresetActivateWorker.run)
+
+        self.assertNotIn("_activate_selected_preset()", source)
+        self.assertNotIn("self._controller.activate(", source)
+        self.assertIn("_request_preset_activation", source)
+        self.assertIn("create_activate_worker", request_source)
+        self.assertIn("controller.activate", worker_source)
 
     def test_profile_setup_builds_hidden_tabs_lazily(self) -> None:
         build_source = inspect.getsource(ProfileSetupPageBase._build_content)

@@ -68,22 +68,6 @@ def handle_item_dropped_action(
         log_fn(f"Ошибка перетаскивания элемента: {exc}", "ERROR")
 
 
-def activate_preset_action(*, name: str, resolve_display_name_fn, actions_api, runtime_service, info_bar_cls, tr_fn, parent_window, log_fn) -> bool:
-    display_name = resolve_display_name_fn(name)
-    result = actions_api.activate_preset(file_name=name, display_name=display_name)
-    log_fn(result.log_message, result.log_level)
-    if result.ok and result.activated_file_name:
-        runtime_service.apply_active_preset_marker_for_file(result.activated_file_name)
-        return True
-    if result.infobar_level == "error":
-        info_bar_cls.error(
-            title=result.infobar_title or tr_fn("common.error.title", "Ошибка"),
-            content=result.infobar_content,
-            parent=parent_window,
-        )
-    return False
-
-
 def open_edit_preset_menu_action(*, page, name: str, global_pos, is_builtin_preset_file_fn, is_selected_preset_file_fn, tr_fn, make_menu_action, fluent_icon, round_menu_cls, on_preset_list_action_fn, show_preset_actions_menu_fn, tr_prefix: str) -> None:
     is_builtin = is_builtin_preset_file_fn(name)
     disabled_actions = {"delete"} if (not is_builtin and is_selected_preset_file_fn(name)) else set()

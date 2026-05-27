@@ -25,3 +25,23 @@ class RawPresetLoadWorker(QThread):
             self.failed.emit(self._request_id, str(exc))
             return
         self.loaded.emit(self._request_id, result)
+
+
+class RawPresetActivateWorker(QThread):
+    activated = pyqtSignal(int, bool)
+    failed = pyqtSignal(int, str)
+
+    def __init__(self, request_id: int, controller, file_name: str, parent=None):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self.controller = controller
+        self._file_name = str(file_name or "").strip()
+
+    def run(self) -> None:
+        try:
+            activated = bool(self.controller.activate(file_name=self._file_name))
+        except Exception as exc:
+            log(f"RawPresetActivateWorker: не удалось активировать preset: {exc}", "ERROR")
+            self.failed.emit(self._request_id, str(exc))
+            return
+        self.activated.emit(self._request_id, activated)

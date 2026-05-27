@@ -23,6 +23,7 @@ from presets.user_presets_runtime_service import (
     UserPresetsRuntimeAdapter,
     UserPresetsRuntimeService,
 )
+from presets.user_presets_action_workers import UserPresetActivateWorker
 from presets.ui.common.user_presets_page_runtime import (
     UserPresetsPageRuntime,
     UserPresetsPageRuntimeConfig,
@@ -51,7 +52,6 @@ from presets.ui.common.user_presets_actions_workflow import (
     show_reset_all_result,
 )
 from presets.ui.common.user_presets_item_actions_workflow import (
-    activate_preset_action,
     delete_preset_action,
     duplicate_preset_action,
     export_preset_action,
@@ -165,6 +165,9 @@ class UserPresetsPageBase(BasePage):
         self._ui_state_store: Optional[MainWindowStateStore] = None
         self._ui_state_unsubscribe = None
         self._cleanup_in_progress = False
+        self._preset_activate_worker = None
+        self._preset_activate_request_id = 0
+        self._pending_preset_activation: tuple[str, str] | None = None
         self._build_ui()
         self._after_ui_built()
         self.bind_ui_state_store(ui_state_store)
@@ -774,16 +777,83 @@ class UserPresetsPageBase(BasePage):
         )
 
     def _on_activate_preset(self, name: str) -> bool:
-        return activate_preset_action(
-            name=name,
-            resolve_display_name_fn=self._resolve_display_name,
-            actions_api=self._actions_api(),
-            runtime_service=self._runtime_service,
-            info_bar_cls=InfoBar,
-            tr_fn=self._tr,
-            parent_window=self.window(),
-            log_fn=log,
+        preset_file_name = str(name or "").strip()
+        if not preset_file_name:
+            return False
+        display_name = self._resolve_display_name(preset_file_name) or preset_file_name
+        self._runtime_service.apply_active_preset_marker_for_file(preset_file_name)
+        self._request_preset_activation(preset_file_name, display_name)
+        return True
+
+    def create_preset_activate_worker(self, request_id: int, *, file_name: str, display_name: str):
+        return UserPresetActivateWorker(
+            request_id,
+            self._actions_api(),
+            file_name=file_name,
+            display_name=display_name,
+            parent=self,
         )
+
+    def _request_preset_activation(self, file_name: str, display_name: str) -> None:
+        worker = self.__dict__.get("_preset_activate_worker")
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    self._pending_preset_activation = (str(file_name or "").strip(), str(display_name or "").strip())
+                    return
+            except Exception:
+                return
+        self._preset_activate_request_id = int(getattr(self, "_preset_activate_request_id", 0) or 0) + 1
+        request_id = self._preset_activate_request_id
+        worker = self.create_preset_activate_worker(
+            request_id,
+            file_name=file_name,
+            display_name=display_name,
+        )
+        self._preset_activate_worker = worker
+        worker.activated.connect(self._on_preset_activation_finished)
+        worker.failed.connect(self._on_preset_activation_failed)
+        worker.finished.connect(lambda w=worker: self._on_preset_activate_worker_finished(w))
+        worker.start()
+
+    def _on_preset_activation_finished(self, request_id: int, result) -> None:
+        if request_id != int(getattr(self, "_preset_activate_request_id", 0) or 0):
+            return
+        if self.__dict__.get("_pending_preset_activation"):
+            return
+        log(str(getattr(result, "log_message", "") or ""), str(getattr(result, "log_level", "") or "INFO"))
+        if bool(getattr(result, "ok", False)) and getattr(result, "activated_file_name", None):
+            self._runtime_service.apply_active_preset_marker_for_file(str(result.activated_file_name))
+            return
+        if str(getattr(result, "infobar_level", "") or "") == "error":
+            InfoBar.error(
+                title=str(getattr(result, "infobar_title", "") or self._tr("common.error.title", "Ошибка")),
+                content=str(getattr(result, "infobar_content", "") or ""),
+                parent=self.window(),
+            )
+        self._refresh_presets_view_from_cache()
+
+    def _on_preset_activation_failed(self, request_id: int, error: str) -> None:
+        if request_id != int(getattr(self, "_preset_activate_request_id", 0) or 0):
+            return
+        if self.__dict__.get("_pending_preset_activation"):
+            return
+        log(f"Ошибка активации preset-а: {error}", "ERROR")
+        InfoBar.error(
+            title=self._tr("common.error.title", "Ошибка"),
+            content=str(error),
+            parent=self.window(),
+        )
+        self._refresh_presets_view_from_cache()
+
+    def _on_preset_activate_worker_finished(self, worker) -> None:
+        if self.__dict__.get("_preset_activate_worker") is worker:
+            self._preset_activate_worker = None
+        worker.deleteLater()
+        pending = self.__dict__.get("_pending_preset_activation")
+        self._pending_preset_activation = None
+        if pending:
+            self._request_preset_activation(pending[0], pending[1])
 
     def _on_edit_preset(self, name: str, global_pos: QPoint | None = None):
         open_edit_preset_menu_action(
