@@ -6,7 +6,6 @@ from presets.ui.control.control_runtime import ControlStatusPlan, ControlStopBut
 from presets.ui.control.additional_settings_runtime import (
     build_additional_settings_state,
     create_refresh_runtime,
-    save_discord_restart_setting,
 )
 from profile.ui_mode import (
     PROFILE_UI_MODE_DEFAULT,

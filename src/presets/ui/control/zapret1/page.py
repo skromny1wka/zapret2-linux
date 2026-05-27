@@ -517,8 +517,7 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         )
 
     def _on_discord_restart_changed(self, enabled: bool) -> None:
-        self._refresh_runtime.mark_additional_settings_written()
-        winws1_page_runtime.save_discord_restart_setting(enabled)
+        self._request_additional_settings_save("discord_restart", bool(enabled), launch_method=ZAPRET1_MODE)
 
     def _on_wssize_toggled(self, enabled: bool) -> None:
         self._request_additional_settings_save("wssize", bool(enabled), launch_method=ZAPRET1_MODE)

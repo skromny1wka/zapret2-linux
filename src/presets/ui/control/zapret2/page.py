@@ -768,8 +768,7 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         self._apply_additional_settings_state(plan)
 
     def _on_discord_restart_changed(self, enabled: bool) -> None:
-        self._refresh_runtime.mark_additional_settings_written()
-        zapret2_page_runtime.save_discord_restart_setting(enabled)
+        self._request_additional_settings_save("discord_restart", bool(enabled), launch_method=ZAPRET2_MODE)
 
     def _on_wssize_toggled(self, enabled: bool) -> None:
         self._request_additional_settings_save("wssize", bool(enabled), launch_method=ZAPRET2_MODE)

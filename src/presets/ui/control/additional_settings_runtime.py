@@ -86,7 +86,11 @@ class AdditionalSettingsSaveWorker(QThread):
 
     def run(self) -> None:
         try:
-            if self._setting == "wssize":
+            if self._setting == "discord_restart":
+                from discord.discord_restart import set_discord_restart_setting
+
+                set_discord_restart_setting(self._enabled)
+            elif self._setting == "wssize":
                 self._profile_feature.set_wssize_enabled(
                     self._enabled,
                     launch_method=self._launch_method,
@@ -131,12 +135,3 @@ def build_additional_settings_state(state: dict | None) -> ControlAdditionalSett
         wssize_enabled=bool(state.get("wssize_enabled", False)),
         debug_log_enabled=bool(state.get("debug_log_enabled", False)),
     )
-
-
-def save_discord_restart_setting(enabled: bool) -> None:
-    try:
-        from discord.discord_restart import set_discord_restart_setting
-
-        set_discord_restart_setting(bool(enabled))
-    except Exception:
-        pass
