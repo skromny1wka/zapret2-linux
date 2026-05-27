@@ -24,6 +24,7 @@ from ui.window_ui_session import get_window_ui_session
 SIDEBAR_SEARCH_AFTER_INTERACTIVE_MS = 2_500
 SIDEBAR_HIDDEN_MODE_ITEMS_AFTER_INTERACTIVE_MS = 6_000
 SIDEBAR_SECONDARY_GROUPS_AFTER_INTERACTIVE_MS = 4_500
+SIDEBAR_SECONDARY_GROUP_STEP_MS = 75
 SIDEBAR_EXPANDED_UI_STATE_KEY = "sidebar_expanded"
 
 
@@ -403,20 +404,37 @@ def _install_secondary_sidebar_groups(window) -> None:
     except Exception:
         method = ""
     initial_visibility = get_nav_visibility(method)
-    for group_plan in build_sidebar_group_plans(method):
-        if group_plan.group_name == "root":
-            continue
-        _add_sidebar_group(window, group_plan, initial_visibility)
+    group_plans = tuple(
+        group_plan
+        for group_plan in build_sidebar_group_plans(method)
+        if group_plan.group_name != "root"
+    )
 
-    _refresh_existing_nav_mode_visibility(window, method)
-    apply_nav_visibility_filter(window)
-    try:
-        window.log_startup_metric(
-            "StartupSecondarySidebarReady",
-            f"{(_time.perf_counter() - started_at) * 1000:.0f}ms",
+    def _finish() -> None:
+        _refresh_existing_nav_mode_visibility(window, method)
+        apply_nav_visibility_filter(window)
+        try:
+            window.log_startup_metric(
+                "StartupSecondarySidebarReady",
+                f"{(_time.perf_counter() - started_at) * 1000:.0f}ms",
+            )
+        except Exception:
+            pass
+
+    def _install_next_group(index: int = 0) -> None:
+        if get_window_ui_session(window) is None:
+            return
+        if index >= len(group_plans):
+            _finish()
+            return
+
+        _add_sidebar_group(window, group_plans[index], initial_visibility)
+        QTimer.singleShot(
+            SIDEBAR_SECONDARY_GROUP_STEP_MS,
+            lambda next_index=index + 1: _install_next_group(next_index),
         )
-    except Exception:
-        pass
+
+    _install_next_group()
 
 
 def _schedule_secondary_sidebar_groups_after_interactive(window) -> None:

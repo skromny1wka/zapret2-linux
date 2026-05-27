@@ -389,7 +389,11 @@ class PresetSidebarNavigationTests(unittest.TestCase):
 
             self.assertEqual(len(scheduled), 1)
             self.assertGreaterEqual(scheduled[0][0], 4_000)
-            scheduled[0][1]()
+
+            next_callback_index = 0
+            while next_callback_index < len(scheduled):
+                scheduled[next_callback_index][1]()
+                next_callback_index += 1
 
         self.assertIn(PageName.NETWORK, added_pages)
         self.assertIn(PageName.LOGS, added_pages)
