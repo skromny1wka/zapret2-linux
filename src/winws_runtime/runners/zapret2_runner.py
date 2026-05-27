@@ -530,6 +530,44 @@ class Winws2StrategyRunner(StrategyRunnerBase):
             return False
         return is_process_alive_with_expected_name(pid, self.winws_exe)
 
+    @staticmethod
+    def _safe_file_sha1(path: str) -> str:
+        try:
+            h = hashlib.sha1()
+            with open(path, "rb") as f:
+                for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                    h.update(chunk)
+            return h.hexdigest()
+        except Exception:
+            return ""
+
+    def _log_winws2_launch_command(self, *, cmd: list[str], artifact: PreparedPresetArtifact) -> None:
+        try:
+            command_line = subprocess.list2cmdline([str(part) for part in cmd])
+        except Exception:
+            command_line = " ".join(str(part) for part in cmd)
+
+        log(f"Winws2 launch command: {command_line}", "INFO")
+        log(f"Winws2 launch cwd: {self.work_dir}", "INFO")
+
+        for arg in artifact.launch_args:
+            value = str(arg or "")
+            if not value.startswith("@") or len(value) <= 1:
+                continue
+
+            config_path = value[1:]
+            try:
+                size = os.path.getsize(config_path)
+            except Exception:
+                size = -1
+            digest = self._safe_file_sha1(config_path)
+            digest_part = f", sha1={digest}" if digest else ""
+            log(
+                "Winws2 launch @config: "
+                f"path={config_path}, bytes={size}{digest_part}, source={artifact.preset_path}",
+                "INFO",
+            )
+
     def _spawn_process_locked(
         self,
         artifact: PreparedPresetArtifact,
@@ -551,6 +589,7 @@ class Winws2StrategyRunner(StrategyRunnerBase):
         start_label = "Preset switch" if preset_switch else "Starting"
 
         log(f"{start_label}: starting from preset {artifact.preset_path}", "INFO")
+        self._log_winws2_launch_command(cmd=cmd, artifact=artifact)
         if not preset_switch:
             log(f"Strategy: {strategy_name}", "INFO")
 

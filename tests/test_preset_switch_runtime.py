@@ -22,6 +22,38 @@ class Winws2PresetSwitchTests(unittest.TestCase):
             )
         )
 
+    def test_winws2_launch_logs_exact_command_and_at_config(self) -> None:
+        from winws_runtime.runners.zapret2_runner import Winws2StrategyRunner
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            config_path = Path(tmp_dir) / "winws2_at_test.txt"
+            config_path.write_text("--wf-tcp-out=443\n", encoding="utf-8")
+            preset_path = Path(tmp_dir) / "Default v1 (game filter).txt"
+            preset_path.write_text("--wf-tcp-out=443\n", encoding="utf-8")
+
+            runner = object.__new__(Winws2StrategyRunner)
+            runner.winws_exe = str(Path(tmp_dir) / "winws2.exe")
+            runner.work_dir = tmp_dir
+
+            artifact = SimpleNamespace(
+                launch_args=(f"@{config_path}",),
+                preset_path=str(preset_path),
+            )
+
+            with patch("winws_runtime.runners.zapret2_runner.log") as log_mock:
+                runner._log_winws2_launch_command(
+                    cmd=[runner.winws_exe, *artifact.launch_args],
+                    artifact=artifact,
+                )
+
+            messages = [str(call.args[0]) for call in log_mock.call_args_list]
+            self.assertTrue(any("Winws2 launch command:" in message for message in messages))
+            self.assertTrue(any(str(config_path) in message for message in messages))
+            self.assertTrue(any("Winws2 launch cwd:" in message for message in messages))
+            self.assertTrue(any("Winws2 launch @config:" in message for message in messages))
+            self.assertTrue(any("sha1=" in message for message in messages))
+            self.assertTrue(any(str(preset_path) in message for message in messages))
+
     def test_runner_file_watcher_restart_path_is_removed(self) -> None:
         from winws_runtime.runners import preset_runner_support, zapret1_runner, zapret2_runner
 
