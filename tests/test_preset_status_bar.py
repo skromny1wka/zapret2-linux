@@ -71,6 +71,64 @@ class PresetStatusBarPlanTests(unittest.TestCase):
             [(True, "Применяем пресет..."), (False, "")],
         )
 
+    def test_debounced_preset_switch_coalesces_multiple_apply_requests(self) -> None:
+        from unittest.mock import patch
+        from winws_runtime.runtime.restart_flow import switch_presets_async
+
+        class _Signal:
+            def __init__(self) -> None:
+                self.callback = None
+
+            def connect(self, callback) -> None:
+                self.callback = callback
+
+        class _FakeTimer:
+            instances = []
+
+            def __init__(self) -> None:
+                self.timeout = _Signal()
+                self.start_count = 0
+                self.delay_ms = None
+                self.active = False
+                _FakeTimer.instances.append(self)
+
+            def setSingleShot(self, _single_shot: bool) -> None:
+                pass
+
+            def start(self, delay_ms: int) -> None:
+                self.start_count += 1
+                self.delay_ms = delay_ms
+                self.active = True
+
+            def stop(self) -> None:
+                self.active = False
+
+            def isActive(self) -> bool:
+                return self.active
+
+            def fire(self) -> None:
+                self.active = False
+                self.timeout.callback()
+
+        owner = _StoppedRuntimeOwner()
+
+        with patch("winws_runtime.runtime.restart_flow.QTimer", _FakeTimer):
+            switch_presets_async(owner, ZAPRET2_MODE, delay_ms=900)
+            switch_presets_async(owner, ZAPRET2_MODE, delay_ms=900)
+
+            self.assertEqual(owner._presets_switch_requested_generation, 0)
+            self.assertEqual(len(_FakeTimer.instances), 1)
+            self.assertEqual(_FakeTimer.instances[0].start_count, 2)
+            self.assertEqual(_FakeTimer.instances[0].delay_ms, 900)
+
+            _FakeTimer.instances[0].fire()
+
+        self.assertEqual(owner._presets_switch_requested_generation, 1)
+        self.assertEqual(
+            owner._runtime_service_obj.busy_calls,
+            [(True, "Применяем пресет..."), (False, "")],
+        )
+
     def test_selected_status_names_winws_when_process_is_not_running(self) -> None:
         from presets.ui.common.preset_status_bar import build_preset_status_plan
 

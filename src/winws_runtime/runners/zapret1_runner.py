@@ -357,21 +357,6 @@ class Winws1StrategyRunner(StrategyRunnerBase):
 
             if self.running_process and self.is_running():
                 self._stop_process_only_locked()
-                cleanup_required = True
-            else:
-                try:
-                    cleanup_required = bool(get_process_pids_by_name(os.path.basename(self.winws_exe)))
-                except Exception:
-                    cleanup_required = False
-
-            if cleanup_required:
-                self._prepare_cleanup_before_spawn_locked(retry_count=0)
-
-            if not self._ensure_windivert_ready_before_spawn():
-                self._last_spawn_exit_code = 34
-                self._last_spawn_stderr = "windivert: readiness probe failed before fast switch spawn"
-                self._set_last_error("WinDivert ещё не готов к открытию фильтра", notify=False)
-                return False
 
             artifact = self._refresh_artifact_if_source_changed_locked(artifact)
             if not artifact.validation_ok:

@@ -166,7 +166,7 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
                 )
             )
 
-            launch_runtime.switch_presets_async.assert_called_once_with(ZAPRET2_MODE)
+            launch_runtime.switch_presets_async.assert_called_once_with(ZAPRET2_MODE, delay_ms=900)
             launch_runtime.stop_dpi_async.assert_not_called()
 
     def test_zapret2_additional_settings_only_save_preset_source(self) -> None:

@@ -84,12 +84,52 @@ def process_pending_presets_switch(runtime_owner) -> None:
     )
 
 
-def switch_presets_async(runtime_owner, launch_method: str | None = None) -> None:
+def _cancel_debounced_presets_switch(runtime_owner) -> None:
+    try:
+        timer = getattr(runtime_owner, "_presets_switch_debounce_timer", None)
+        if timer is not None and timer.isActive():
+            timer.stop()
+    except Exception:
+        pass
+    try:
+        runtime_owner._presets_switch_debounce_method = ""
+    except Exception:
+        pass
+
+
+def _fire_debounced_presets_switch(runtime_owner) -> None:
+    method = str(getattr(runtime_owner, "_presets_switch_debounce_method", "") or "").strip().lower()
+    _cancel_debounced_presets_switch(runtime_owner)
+    if method:
+        switch_presets_async(runtime_owner, method)
+
+
+def _schedule_debounced_presets_switch(runtime_owner, method: str, delay_ms: int) -> None:
+    runtime_owner._presets_switch_debounce_method = method
+    timer = getattr(runtime_owner, "_presets_switch_debounce_timer", None)
+    if timer is None:
+        timer = QTimer()
+        timer.setSingleShot(True)
+        timer.timeout.connect(lambda: _fire_debounced_presets_switch(runtime_owner))
+        runtime_owner._presets_switch_debounce_timer = timer
+    timer.start(max(0, int(delay_ms)))
+    log(
+        f"Preset mode switch отложен на {max(0, int(delay_ms))}мс, ждём последние изменения ({method})",
+        "DEBUG",
+    )
+
+
+def switch_presets_async(runtime_owner, launch_method: str | None = None, *, delay_ms: int = 0) -> None:
     method = str(launch_method or get_strategy_launch_method() or "").strip().lower()
     if not is_preset_launch_method(method):
         runtime_owner.restart_dpi_async()
         return
 
+    if int(delay_ms or 0) > 0:
+        _schedule_debounced_presets_switch(runtime_owner, method, int(delay_ms))
+        return
+
+    _cancel_debounced_presets_switch(runtime_owner)
     runtime_owner._presets_switch_method = method
     runtime_owner._presets_switch_requested_generation += 1
     runtime_owner._runtime_service().set_busy(True, "Применяем пресет...")

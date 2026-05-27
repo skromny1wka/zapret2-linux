@@ -6,6 +6,9 @@ from settings.mode import is_preset_launch_method, normalize_launch_method
 from profile.launch_validation import preset_has_enabled_profiles_for_launch
 
 
+PRESET_CONTENT_APPLY_DEBOUNCE_MS = 900
+
+
 def _is_launch_running(runtime_feature) -> bool:
     try:
         launch_runtime = runtime_feature.objects.launch_runtime
@@ -71,5 +74,5 @@ def request_preset_runtime_content_apply(
         f"Preset runtime apply{profile_info} ({method}, reason={reason}) -> preset mode switch pipeline",
         "INFO",
     )
-    launch_runtime.switch_presets_async(method)
+    launch_runtime.switch_presets_async(method, delay_ms=PRESET_CONTENT_APPLY_DEBOUNCE_MS)
     return True

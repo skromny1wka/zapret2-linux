@@ -40,6 +40,8 @@ class PresetLaunchRuntime:
         self._presets_switch_requested_generation = 0
         self._presets_switch_completed_generation = 0
         self._presets_switch_method = ""
+        self._presets_switch_debounce_timer = None
+        self._presets_switch_debounce_method = ""
         self._pending_launch_warnings: list[str] = []
         self._restart_request_generation = 0
         self._restart_completed_generation = 0
@@ -134,8 +136,8 @@ class PresetLaunchRuntime:
     def _process_pending_presets_switch(self) -> None:
         process_pending_presets_switch(self)
 
-    def switch_presets_async(self, launch_method: str | None = None) -> None:
-        switch_presets_async_impl(self, launch_method)
+    def switch_presets_async(self, launch_method: str | None = None, *, delay_ms: int = 0) -> None:
+        switch_presets_async_impl(self, launch_method, delay_ms=delay_ms)
 
     def _process_pending_restart_request(self) -> None:
         process_pending_restart_request(self)
