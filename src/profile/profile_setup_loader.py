@@ -188,7 +188,7 @@ class ProfileEnabledSaveWorker(QThread):
 
 
 class ProfileStrategyApplyWorker(QThread):
-    applied = pyqtSignal(int, str, str)
+    applied = pyqtSignal(int, str, str, str)
     failed = pyqtSignal(int, str)
 
     def __init__(self, request_id: int, controller, profile_key: str, strategy_id: str, parent=None):
@@ -211,11 +211,11 @@ class ProfileStrategyApplyWorker(QThread):
         if not profile_key:
             self.failed.emit(self._request_id, "Стратегия не применена")
             return
-        self.applied.emit(self._request_id, str(profile_key), self._strategy_id)
+        self.applied.emit(self._request_id, self._profile_key, str(profile_key), self._strategy_id)
 
 
 class ProfileStrategyFeedbackSaveWorker(QThread):
-    saved = pyqtSignal(int, object)
+    saved = pyqtSignal(int, str, str, object)
     failed = pyqtSignal(int, str)
 
     def __init__(
@@ -224,6 +224,7 @@ class ProfileStrategyFeedbackSaveWorker(QThread):
         controller,
         *,
         profile_key: str,
+        strategy_id: str,
         rating: str | None = None,
         favorite: bool | None = None,
         parent=None,
@@ -232,6 +233,7 @@ class ProfileStrategyFeedbackSaveWorker(QThread):
         self._request_id = int(request_id)
         self._controller = controller
         self._profile_key = str(profile_key or "").strip()
+        self._strategy_id = str(strategy_id or "").strip()
         self._rating = rating
         self._favorite = favorite
 
@@ -246,4 +248,4 @@ class ProfileStrategyFeedbackSaveWorker(QThread):
             log(f"ProfileStrategyFeedbackSaveWorker: не удалось сохранить оценку стратегии: {exc}", "ERROR")
             self.failed.emit(self._request_id, str(exc))
             return
-        self.saved.emit(self._request_id, state)
+        self.saved.emit(self._request_id, self._profile_key, self._strategy_id, state)

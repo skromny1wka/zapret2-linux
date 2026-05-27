@@ -1686,8 +1686,16 @@ class ProfileSetupPageBase(BasePage):
         worker.finished.connect(lambda w=worker: self._on_strategy_apply_worker_finished(w))
         worker.start()
 
-    def _on_strategy_apply_finished(self, request_id: int, profile_key: str, strategy_id: str) -> None:
+    def _on_strategy_apply_finished(
+        self,
+        request_id: int,
+        requested_profile_key: str,
+        profile_key: str,
+        strategy_id: str,
+    ) -> None:
         if request_id != int(getattr(self, "_strategy_apply_request_id", 0) or 0):
+            return
+        if str(requested_profile_key or "").strip() != str(self._profile_key or "").strip():
             return
         pending = str(getattr(self, "_pending_strategy_apply", "") or "").strip()
         if pending and pending != str(strategy_id or "").strip():
@@ -1774,11 +1782,16 @@ class ProfileSetupPageBase(BasePage):
     def _start_strategy_feedback_save_worker(self, request: dict) -> None:
         if not self._profile_key:
             return
+        item = getattr(getattr(self, "_payload", None), "item", None)
+        strategy_id = str(getattr(item, "strategy_id", "") or "").strip()
+        if not strategy_id or strategy_id in {"none", "custom"}:
+            return
         self._strategy_feedback_save_request_id = int(getattr(self, "_strategy_feedback_save_request_id", 0) or 0) + 1
         request_id = self._strategy_feedback_save_request_id
         worker = self._controller.create_strategy_feedback_save_worker(
             request_id,
             profile_key=self._profile_key,
+            strategy_id=strategy_id,
             rating=request.get("rating"),
             favorite=request.get("favorite"),
             parent=self,
@@ -1789,10 +1802,22 @@ class ProfileSetupPageBase(BasePage):
         worker.finished.connect(lambda w=worker: self._on_strategy_feedback_save_worker_finished(w))
         worker.start()
 
-    def _on_strategy_feedback_save_finished(self, request_id: int, state) -> None:
+    def _on_strategy_feedback_save_finished(
+        self,
+        request_id: int,
+        profile_key: str,
+        strategy_id: str,
+        state,
+    ) -> None:
         if request_id != int(getattr(self, "_strategy_feedback_save_request_id", 0) or 0):
             return
         if self.__dict__.get("_pending_strategy_feedback_save"):
+            return
+        if str(profile_key or "").strip() != str(self._profile_key or "").strip():
+            return
+        item = getattr(getattr(self, "_payload", None), "item", None)
+        current_strategy_id = str(getattr(item, "strategy_id", "") or "").strip()
+        if str(strategy_id or "").strip() != current_strategy_id:
             return
         if not self._apply_strategy_feedback_locally(state):
             self.reload_current_profile()

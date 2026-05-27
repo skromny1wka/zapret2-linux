@@ -1263,7 +1263,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         ProfileSetupPageBase._on_strategy_list_activated(page, "tls_fake")
 
-        ProfileSetupPageBase._on_strategy_apply_finished(page, 1, "profile-1", "tls_fake")
+        ProfileSetupPageBase._on_strategy_apply_finished(page, 1, "template:profile-1", "profile-1", "tls_fake")
 
         page.reload_current_profile.assert_called_once()
         page._on_profile_changed_callback.assert_called_once_with("profile-1", "strategy")
@@ -1302,7 +1302,22 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page.reload_current_profile = Mock()
         page._on_profile_changed_callback = Mock()
 
-        ProfileSetupPageBase._on_strategy_apply_finished(page, 1, "profile-1", "first")
+        ProfileSetupPageBase._on_strategy_apply_finished(page, 1, "profile-1", "profile-1", "first")
+
+        page._apply_strategy_locally.assert_not_called()
+        page.reload_current_profile.assert_not_called()
+        page._on_profile_changed_callback.assert_not_called()
+
+    def test_strategy_apply_finish_from_previous_profile_is_ignored(self) -> None:
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._profile_key = "profile-2"
+        page._strategy_apply_request_id = 1
+        page._pending_strategy_apply = None
+        page._apply_strategy_locally = Mock(return_value=True)
+        page.reload_current_profile = Mock()
+        page._on_profile_changed_callback = Mock()
+
+        ProfileSetupPageBase._on_strategy_apply_finished(page, 1, "profile-1", "profile-1", "tls_fake")
 
         page._apply_strategy_locally.assert_not_called()
         page.reload_current_profile.assert_not_called()
@@ -1314,7 +1329,14 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         worker = ProfileStrategyApplyWorker(9, controller, "template:profile-1", "tls_fake")
         applied = []
 
-        worker.applied.connect(lambda request_id, profile_key, strategy_id: applied.append((request_id, profile_key, strategy_id)))
+        worker.applied.connect(
+            lambda request_id, requested_profile_key, profile_key, strategy_id: applied.append((
+                request_id,
+                requested_profile_key,
+                profile_key,
+                strategy_id,
+            ))
+        )
 
         worker.run()
 
@@ -1322,7 +1344,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             profile_key="template:profile-1",
             strategy_id="tls_fake",
         )
-        self.assertEqual(applied, [(9, "profile-1", "tls_fake")])
+        self.assertEqual(applied, [(9, "template:profile-1", "profile-1", "tls_fake")])
 
     def test_strategy_feedback_updates_payload_without_reloading_profile(self) -> None:
         class _Signal:
@@ -1387,6 +1409,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._controller.create_strategy_feedback_save_worker.assert_called_once_with(
             1,
             profile_key="profile-1",
+            strategy_id="tls_fake",
             rating="work",
             favorite=None,
             parent=page,
@@ -1397,6 +1420,8 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         ProfileSetupPageBase._on_strategy_feedback_save_finished(
             page,
             1,
+            "profile-1",
+            "tls_fake",
             ProfileStrategyState(rating="work", favorite=False),
         )
 
@@ -1406,6 +1431,28 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._apply_feedback_buttons.assert_called_once_with(page._payload)
         page._on_profile_changed_callback.assert_called_once_with("profile-1", "feedback")
 
+    def test_strategy_feedback_finish_for_previous_strategy_is_ignored(self) -> None:
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._profile_key = "profile-1"
+        page._strategy_feedback_save_request_id = 1
+        page._pending_strategy_feedback_save = None
+        page._payload = SimpleNamespace(item=SimpleNamespace(strategy_id="new_strategy"))
+        page._apply_strategy_feedback_locally = Mock(return_value=True)
+        page.reload_current_profile = Mock()
+        page._on_profile_changed_callback = Mock()
+
+        ProfileSetupPageBase._on_strategy_feedback_save_finished(
+            page,
+            1,
+            "profile-1",
+            "old_strategy",
+            ProfileStrategyState(rating="work", favorite=False),
+        )
+
+        page._apply_strategy_feedback_locally.assert_not_called()
+        page.reload_current_profile.assert_not_called()
+        page._on_profile_changed_callback.assert_not_called()
+
     def test_strategy_feedback_worker_emits_state(self) -> None:
         controller = Mock()
         state = ProfileStrategyState(rating="work", favorite=True)
@@ -1414,12 +1461,20 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             10,
             controller,
             profile_key="profile-1",
+            strategy_id="tls_fake",
             rating="work",
             favorite=True,
         )
         saved = []
 
-        worker.saved.connect(lambda request_id, emitted_state: saved.append((request_id, emitted_state)))
+        worker.saved.connect(
+            lambda request_id, profile_key, strategy_id, emitted_state: saved.append((
+                request_id,
+                profile_key,
+                strategy_id,
+                emitted_state,
+            ))
+        )
 
         worker.run()
 
@@ -1428,7 +1483,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             rating="work",
             favorite=True,
         )
-        self.assertEqual(saved, [(10, state)])
+        self.assertEqual(saved, [(10, "profile-1", "tls_fake", state)])
 
     def test_clicking_strategy_for_skipped_profile_does_not_apply_strategy(self) -> None:
         page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
