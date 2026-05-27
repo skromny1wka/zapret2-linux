@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from PyQt6.QtCore import QThread, pyqtSignal
+
+from log.log import log
+
 
 class ControlAdditionalSettingsState:
     def __init__(self, *, discord_restart: bool, wssize_enabled: bool, debug_log_enabled: bool):
@@ -11,7 +15,10 @@ class ControlAdditionalSettingsState:
 class ModeControlRefreshRuntime:
     def __init__(self) -> None:
         self.additional_settings_worker = None
+        self.additional_settings_save_worker = None
+        self.additional_settings_save_pending = None
         self.additional_settings_request_id = 0
+        self.additional_settings_save_request_id = 0
         self.additional_settings_dirty = True
 
     def has_pending_refresh(self) -> bool:
@@ -33,6 +40,10 @@ class ModeControlRefreshRuntime:
         self.additional_settings_request_id += 1
         return self.additional_settings_request_id
 
+    def next_additional_settings_save_request_id(self) -> int:
+        self.additional_settings_save_request_id += 1
+        return self.additional_settings_save_request_id
+
     def accept_additional_settings_result(self, request_id: int) -> bool:
         if int(request_id) != int(self.additional_settings_request_id):
             return False
@@ -49,6 +60,67 @@ def create_additional_settings_worker(request_id: int, profile_feature, *, launc
         request_id,
         parent,
         launch_method=launch_method,
+    )
+
+
+class AdditionalSettingsSaveWorker(QThread):
+    saved = pyqtSignal(int, str, bool)
+    failed = pyqtSignal(int, str, str)
+
+    def __init__(
+        self,
+        request_id: int,
+        profile_feature,
+        *,
+        launch_method: str,
+        setting: str,
+        enabled: bool,
+        parent=None,
+    ):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self._profile_feature = profile_feature
+        self._launch_method = str(launch_method or "").strip()
+        self._setting = str(setting or "").strip()
+        self._enabled = bool(enabled)
+
+    def run(self) -> None:
+        try:
+            if self._setting == "wssize":
+                self._profile_feature.set_wssize_enabled(
+                    self._enabled,
+                    launch_method=self._launch_method,
+                )
+            elif self._setting == "debug_log":
+                self._profile_feature.set_debug_log_enabled(
+                    self._enabled,
+                    launch_method=self._launch_method,
+                )
+            else:
+                raise ValueError(f"Неизвестная дополнительная настройка: {self._setting}")
+        except Exception as exc:
+            log(f"AdditionalSettingsSaveWorker: не удалось сохранить настройку {self._setting}: {exc}", "ERROR")
+            self.failed.emit(self._request_id, self._setting, str(exc))
+            return
+        self.saved.emit(self._request_id, self._setting, self._enabled)
+
+
+def create_additional_settings_save_worker(
+    request_id: int,
+    profile_feature,
+    *,
+    launch_method: str,
+    setting: str,
+    enabled: bool,
+    parent=None,
+):
+    return AdditionalSettingsSaveWorker(
+        request_id,
+        profile_feature,
+        launch_method=launch_method,
+        setting=setting,
+        enabled=enabled,
+        parent=parent,
     )
 
 

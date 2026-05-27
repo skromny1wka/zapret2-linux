@@ -12,6 +12,7 @@ from presets.ui.control.control_page_runtime_shared import (
 )
 from presets.ui.control.additional_settings_runtime import (
     build_additional_settings_state,
+    create_additional_settings_save_worker,
     create_additional_settings_worker,
     create_refresh_runtime,
     save_discord_restart_setting,

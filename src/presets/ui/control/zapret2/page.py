@@ -37,6 +37,7 @@ from app.ui_texts import tr as tr_catalog
 from presets.ui.control.windows_features.runtime import ControlPageWindowsFeatureMixin
 from presets.ui.control.top_summary_widget import ControlTopSummaryWidget
 from presets.ui.control.additional_settings_runtime import (
+    create_additional_settings_save_worker as create_control_additional_settings_save_worker,
     create_additional_settings_worker as create_control_additional_settings_worker,
 )
 import presets.ui.control.zapret2.page_runtime as zapret2_page_runtime
@@ -771,20 +772,59 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         zapret2_page_runtime.save_discord_restart_setting(enabled)
 
     def _on_wssize_toggled(self, enabled: bool) -> None:
-        self._refresh_runtime.mark_additional_settings_written()
-        zapret2_page_runtime.save_wssize_enabled(
-            enabled,
-            profile_feature=self._profile,
-            runtime_feature=self._runtime_feature,
-        )
+        self._request_additional_settings_save("wssize", bool(enabled), launch_method=ZAPRET2_MODE)
 
     def _on_debug_log_toggled(self, enabled: bool) -> None:
-        self._refresh_runtime.mark_additional_settings_written()
-        zapret2_page_runtime.save_debug_log_enabled(
-            enabled,
-            profile_feature=self._profile,
-            runtime_feature=self._runtime_feature,
+        self._request_additional_settings_save("debug_log", bool(enabled), launch_method=ZAPRET2_MODE)
+
+    def _request_additional_settings_save(self, setting: str, enabled: bool, *, launch_method: str) -> None:
+        runtime = self._refresh_runtime
+        runtime.mark_additional_settings_written()
+        worker = runtime.additional_settings_save_worker
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    runtime.additional_settings_save_pending = (setting, bool(enabled), launch_method)
+                    return
+            except Exception:
+                return
+        request_id = runtime.next_additional_settings_save_request_id()
+        worker = create_control_additional_settings_save_worker(
+            request_id,
+            self._profile,
+            launch_method=launch_method,
+            setting=setting,
+            enabled=bool(enabled),
+            parent=self,
         )
+        runtime.additional_settings_save_worker = worker
+        worker.saved.connect(self._on_additional_settings_save_finished)
+        worker.failed.connect(self._on_additional_settings_save_failed)
+        worker.finished.connect(lambda w=worker: self._on_additional_settings_save_worker_finished(w))
+        worker.start()
+
+    def _on_additional_settings_save_finished(self, request_id: int, _setting: str, _enabled: bool) -> None:
+        if request_id != self._refresh_runtime.additional_settings_save_request_id:
+            return
+
+    def _on_additional_settings_save_failed(self, request_id: int, _setting: str, error: str) -> None:
+        if request_id != self._refresh_runtime.additional_settings_save_request_id:
+            return
+        InfoBar.warning(title="Ошибка", content=f"Не удалось сохранить настройку: {error}", parent=self.window())
+
+    def _on_additional_settings_save_worker_finished(self, worker) -> None:
+        runtime = self._refresh_runtime
+        if runtime.additional_settings_save_worker is worker:
+            runtime.additional_settings_save_worker = None
+        worker.deleteLater()
+        pending = runtime.additional_settings_save_pending
+        runtime.additional_settings_save_pending = None
+        if pending is not None and not self._cleanup_in_progress:
+            self._request_additional_settings_save(
+                str(pending[0]),
+                bool(pending[1]),
+                launch_method=str(pending[2]),
+            )
 
     # ==================== Profile UI mode: Basic/Advanced ====================
 
