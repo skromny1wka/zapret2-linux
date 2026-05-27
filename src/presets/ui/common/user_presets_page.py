@@ -23,7 +23,11 @@ from presets.user_presets_runtime_service import (
     UserPresetsRuntimeAdapter,
     UserPresetsRuntimeService,
 )
-from presets.user_presets_action_workers import UserPresetActivateWorker, UserPresetItemActionWorker
+from presets.user_presets_action_workers import (
+    UserPresetActivateWorker,
+    UserPresetBulkActionWorker,
+    UserPresetItemActionWorker,
+)
 from presets.ui.common.user_presets_page_runtime import (
     UserPresetsPageRuntime,
     UserPresetsPageRuntimeConfig,
@@ -44,9 +48,7 @@ from presets.ui.common.preset_status_bar import (
     build_runtime_preset_status_plan,
 )
 from presets.ui.common.user_presets_actions_workflow import (
-    import_preset_action,
     restore_reset_all_button_label,
-    run_reset_all_presets_action,
     show_inline_action_create,
     show_inline_action_rename,
     show_reset_all_result,
@@ -166,6 +168,9 @@ class UserPresetsPageBase(BasePage):
         self._pending_preset_activation: tuple[str, str] | None = None
         self._preset_item_action_worker = None
         self._preset_item_action_request_id = 0
+        self._preset_bulk_action_worker = None
+        self._preset_bulk_action_request_id = 0
+        self._preset_bulk_action_kind = ""
         self._build_ui()
         self._after_ui_built()
         self.bind_ui_state_store(ui_state_store)
@@ -577,34 +582,99 @@ class UserPresetsPageBase(BasePage):
         self._show_inline_action_create()
 
     def _on_import_clicked(self):
-        import_preset_action(
-            file_dialog_cls=QFileDialog,
-            parent=self,
-            parent_window=self.window(),
-            tr_fn=self._tr,
-            actions_api=self._actions_api(),
-            runtime_service=self._runtime_service,
-            log_fn=log,
-            info_bar_cls=InfoBar,
-            tr_prefix=self._config.tr_prefix,
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            self._tr(f"{self._config.tr_prefix}.file_dialog.import_title", "Импортировать пресет"),
+            "",
+            "Файлы пресетов (*.txt);;Все файлы (*.*)",
         )
+        if not file_path:
+            return
+        self._request_preset_bulk_action("import", file_path=file_path)
 
     def _on_reset_all_presets_clicked(self):
-        run_reset_all_presets_action(
-            dialog_cls=self._config.reset_all_dialog_cls,
-            parent_window=self.window(),
-            language=self._ui_language,
-            actions_api=self._actions_api(),
-            runtime_service=self._runtime_service,
-            log_fn=log,
-            info_bar_cls=InfoBar,
-            tr_fn=self._tr,
-            show_result_fn=self._show_reset_all_result,
-            is_visible=self.isVisible(),
-            refresh_view_fn=self.refresh_presets_view_if_possible,
-            set_bulk_reset_running_fn=lambda value: setattr(self, "_bulk_reset_running", value),
-            tr_prefix=self._config.tr_prefix,
+        dlg = self._config.reset_all_dialog_cls(self.window(), language=self._ui_language)
+        if not dlg.exec():
+            return
+        self._bulk_reset_running = True
+        if not self._request_preset_bulk_action("reset_all"):
+            self._bulk_reset_running = False
+
+    def create_preset_bulk_action_worker(self, request_id: int, *, action: str, file_path: str = ""):
+        return UserPresetBulkActionWorker(
+            request_id,
+            self._actions_api(),
+            action=action,
+            file_path=file_path,
+            parent=self,
         )
+
+    def _request_preset_bulk_action(self, action: str, *, file_path: str = "") -> bool:
+        worker = self.__dict__.get("_preset_bulk_action_worker")
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    return False
+            except Exception:
+                return False
+        self._preset_bulk_action_request_id = int(getattr(self, "_preset_bulk_action_request_id", 0) or 0) + 1
+        request_id = self._preset_bulk_action_request_id
+        self._preset_bulk_action_kind = str(action or "")
+        worker = self.create_preset_bulk_action_worker(
+            request_id,
+            action=str(action or ""),
+            file_path=str(file_path or ""),
+        )
+        self._preset_bulk_action_worker = worker
+        worker.completed.connect(self._on_preset_bulk_action_finished)
+        worker.failed.connect(self._on_preset_bulk_action_failed)
+        worker.finished.connect(lambda w=worker: self._on_preset_bulk_action_worker_finished(w))
+        worker.start()
+        return True
+
+    def _on_preset_bulk_action_finished(self, request_id: int, action: str, result, _context) -> None:
+        if request_id != int(getattr(self, "_preset_bulk_action_request_id", 0) or 0):
+            return
+        log(str(getattr(result, "log_message", "") or ""), str(getattr(result, "log_level", "") or "INFO"))
+        if bool(getattr(result, "structure_changed", False)):
+            self._runtime_service.mark_presets_structure_changed()
+        if action == "import":
+            level = str(getattr(result, "infobar_level", "") or "")
+            title = str(getattr(result, "infobar_title", "") or "")
+            content = str(getattr(result, "infobar_content", "") or "")
+            if level == "warning":
+                InfoBar.warning(title=title, content=content, parent=self.window())
+            else:
+                InfoBar.success(title=title, content=content, parent=self.window())
+        elif action == "reset_all":
+            self._show_reset_all_result(
+                int(getattr(result, "success_count", 0) or 0),
+                int(getattr(result, "total_count", 0) or 0),
+                int(getattr(result, "failed_count", 0) or 0),
+            )
+
+    def _on_preset_bulk_action_failed(self, request_id: int, action: str, error: str, _context) -> None:
+        if request_id != int(getattr(self, "_preset_bulk_action_request_id", 0) or 0):
+            return
+        log(f"Ошибка массового действия preset ({action}): {error}", "ERROR")
+        error_key = "error.import_exception" if action == "import" else "error.reset_all_exception"
+        default = "Не удалось импортировать пресет: {error}" if action == "import" else "Ошибка восстановления пресетов: {error}"
+        InfoBar.error(
+            title=self._tr("common.error.title", "Ошибка"),
+            content=self._tr(f"{self._config.tr_prefix}.{error_key}", default, error=error),
+            parent=self.window(),
+        )
+
+    def _on_preset_bulk_action_worker_finished(self, worker) -> None:
+        action = str(getattr(self, "_preset_bulk_action_kind", "") or "")
+        if self.__dict__.get("_preset_bulk_action_worker") is worker:
+            self._preset_bulk_action_worker = None
+            self._preset_bulk_action_kind = ""
+        worker.deleteLater()
+        if action == "reset_all":
+            self._bulk_reset_running = False
+            if self._runtime_service.is_ui_dirty() and self.isVisible():
+                self.refresh_presets_view_if_possible()
 
     def _show_reset_all_result(self, success_count: int, total_count: int, failed_count: int = 0) -> None:
         show_reset_all_result(

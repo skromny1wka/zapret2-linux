@@ -89,4 +89,43 @@ class UserPresetItemActionWorker(QThread):
         self.completed.emit(self._request_id, self._action, result, context)
 
 
-__all__ = ["UserPresetActivateWorker", "UserPresetItemActionWorker"]
+class UserPresetBulkActionWorker(QThread):
+    completed = pyqtSignal(int, str, object, object)
+    failed = pyqtSignal(int, str, str, object)
+
+    def __init__(
+        self,
+        request_id: int,
+        actions_api,
+        *,
+        action: str,
+        file_path: str = "",
+        parent=None,
+    ):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self.actions_api = actions_api
+        self._action = str(action or "").strip()
+        self._file_path = str(file_path or "").strip()
+
+    def run(self) -> None:
+        context = {"file_path": self._file_path}
+        try:
+            if self._action == "import":
+                result = self.actions_api.import_preset_from_file(file_path=self._file_path)
+            elif self._action == "reset_all":
+                result = self.actions_api.reset_all_presets()
+            else:
+                raise ValueError(f"Неизвестное массовое действие preset: {self._action}")
+        except Exception as exc:
+            log(f"UserPresetBulkActionWorker: действие {self._action} не выполнено: {exc}", "ERROR")
+            self.failed.emit(self._request_id, self._action, str(exc), context)
+            return
+        self.completed.emit(self._request_id, self._action, result, context)
+
+
+__all__ = [
+    "UserPresetActivateWorker",
+    "UserPresetBulkActionWorker",
+    "UserPresetItemActionWorker",
+]

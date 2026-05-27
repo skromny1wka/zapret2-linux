@@ -18,6 +18,7 @@ from presets.ui.common.preset_subpage_base import PresetRawEditorPage
 from presets.ui.common.user_presets_page import UserPresetsPageBase
 from presets.raw_preset_loader import RawPresetActionWorker, RawPresetActivateWorker, RawPresetSaveWorker
 from presets.user_presets_action_workers import UserPresetActivateWorker, UserPresetItemActionWorker
+import presets.user_presets_action_workers as user_presets_action_workers
 import presets.ui.control.additional_settings_runtime as control_additional_settings_runtime
 import presets.ui.control.control_page_shared as control_page_shared
 import presets.ui.control.zapret1.runtime_helpers as zapret1_runtime_helpers
@@ -190,6 +191,25 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("actions_api.reset_preset_to_builtin", worker_source)
         self.assertIn("actions_api.delete_preset", worker_source)
         self.assertIn("actions_api.export_preset", worker_source)
+
+    def test_user_presets_import_and_reset_all_run_through_worker(self) -> None:
+        import_source = inspect.getsource(UserPresetsPageBase._on_import_clicked)
+        reset_source = inspect.getsource(UserPresetsPageBase._on_reset_all_presets_clicked)
+
+        self.assertTrue(hasattr(user_presets_action_workers, "UserPresetBulkActionWorker"))
+        worker_source = inspect.getsource(user_presets_action_workers.UserPresetBulkActionWorker.run)
+        request_source = inspect.getsource(UserPresetsPageBase._request_preset_bulk_action)
+
+        for source in (import_source, reset_source):
+            self.assertIn("_request_preset_bulk_action", source)
+            self.assertNotIn("import_preset_action", source)
+            self.assertNotIn("run_reset_all_presets_action", source)
+            self.assertNotIn(".import_preset_from_file(", source)
+            self.assertNotIn(".reset_all_presets(", source)
+
+        self.assertIn("create_preset_bulk_action_worker", request_source)
+        self.assertIn("actions_api.import_preset_from_file", worker_source)
+        self.assertIn("actions_api.reset_all_presets", worker_source)
 
     def test_profile_commands_reuse_service_cache(self) -> None:
         source = inspect.getsource(profile_commands._profile_preset_service)
