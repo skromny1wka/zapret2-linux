@@ -16,7 +16,7 @@ from presets import display_state
 from presets import commands as preset_commands
 from presets.ui.common.preset_subpage_base import PresetRawEditorPage
 from presets.ui.common.user_presets_page import UserPresetsPageBase
-from presets.raw_preset_loader import RawPresetActivateWorker
+from presets.raw_preset_loader import RawPresetActivateWorker, RawPresetSaveWorker
 from presets.user_presets_action_workers import UserPresetActivateWorker
 import presets.ui.control.additional_settings_runtime as control_additional_settings_runtime
 import presets.ui.control.control_page_shared as control_page_shared
@@ -706,6 +706,42 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
         self.assertNotIn("self._controller.load_text(", source)
         self.assertIn("_request_raw_preset_text", source)
+
+    def test_raw_preset_editor_saves_file_through_worker(self) -> None:
+        save_source = inspect.getsource(PresetRawEditorPage._save_file)
+        workflow_source = inspect.getsource(__import__("presets.raw_preset_editor_workflow", fromlist=["RawPresetEditorController"]).RawPresetEditorController)
+        worker_source = inspect.getsource(RawPresetSaveWorker.run)
+
+        self.assertNotIn("self._controller.save_text(", save_source)
+        self.assertIn("_request_raw_preset_save", save_source)
+        self.assertIn("create_save_worker", workflow_source)
+        self.assertIn("RawPresetSaveWorker", workflow_source)
+        self.assertIn("controller.save_text", worker_source)
+
+    def test_raw_preset_editor_waits_for_pending_save_before_file_actions(self) -> None:
+        set_file_source = inspect.getsource(PresetRawEditorPage.set_preset_file_name)
+        activate_source = inspect.getsource(PresetRawEditorPage._activate_preset)
+        open_source = inspect.getsource(PresetRawEditorPage._open_external)
+        rename_source = inspect.getsource(PresetRawEditorPage._rename_preset)
+        duplicate_source = inspect.getsource(PresetRawEditorPage._duplicate_preset)
+        export_source = inspect.getsource(PresetRawEditorPage._export_preset)
+        reset_source = inspect.getsource(PresetRawEditorPage._reset_preset)
+        delete_source = inspect.getsource(PresetRawEditorPage._delete_preset)
+        save_finished_source = inspect.getsource(PresetRawEditorPage._on_raw_preset_save_worker_finished)
+
+        for source in (
+            set_file_source,
+            activate_source,
+            open_source,
+            rename_source,
+            duplicate_source,
+            export_source,
+            reset_source,
+            delete_source,
+        ):
+            self.assertIn("_run_after_raw_preset_save", source)
+        self.assertIn("_after_raw_preset_save", save_finished_source)
+        self.assertIn("_raw_save_succeeded", save_finished_source)
 
     def test_raw_preset_editor_activation_runs_through_worker(self) -> None:
         source = inspect.getsource(PresetRawEditorPage._activate_preset)

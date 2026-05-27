@@ -204,6 +204,26 @@ class RawPresetEditorController:
 
         return RawPresetLoadWorker(request_id, self, path, parent)
 
+    def create_save_worker(
+        self,
+        request_id: int,
+        *,
+        file_name: str,
+        source_text: str,
+        publish_content_changed: bool,
+        parent=None,
+    ):
+        from presets.raw_preset_loader import RawPresetSaveWorker
+
+        return RawPresetSaveWorker(
+            request_id,
+            self,
+            file_name=file_name,
+            source_text=source_text,
+            publish_content_changed=publish_content_changed,
+            parent=parent,
+        )
+
     def create_activate_worker(self, request_id: int, file_name: str, parent=None):
         from presets.raw_preset_loader import RawPresetActivateWorker
 

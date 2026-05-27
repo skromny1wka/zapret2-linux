@@ -158,6 +158,11 @@ class PresetRawEditorPage(BasePage):
         self._is_loading = False
         self._raw_load_request_id = 0
         self._raw_load_worker = None
+        self._raw_save_request_id = 0
+        self._raw_save_worker = None
+        self._pending_raw_preset_save: tuple[str, str, bool] | None = None
+        self._after_raw_preset_save = None
+        self._raw_save_succeeded = True
         self._raw_activate_request_id = 0
         self._raw_activate_worker = None
         self._cleanup_in_progress = False
@@ -363,7 +368,8 @@ class PresetRawEditorPage(BasePage):
         self.add_widget(self.footerStatusBar)
 
     def set_preset_file_name(self, file_name: str) -> None:
-        self._flush_pending_save()
+        if not self._run_after_raw_preset_save(lambda: self.set_preset_file_name(file_name)):
+            return
         self._preset_file_name = str(file_name or "").strip()
         self._preset_name = Path(self._preset_file_name).stem if self._preset_file_name else ""
         if self._preset_file_name:
@@ -391,7 +397,29 @@ class PresetRawEditorPage(BasePage):
             return
         if self._save_timer.isActive():
             self._save_timer.stop()
+        if self._content_publish_pending:
             self._save_file()
+
+    def _run_after_raw_preset_save(self, callback) -> bool:
+        if self._cleanup_in_progress:
+            return False
+        worker = self._raw_save_worker
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    self._after_raw_preset_save = callback
+                    return False
+            except Exception:
+                return False
+        if self._pending_raw_preset_save is not None:
+            self._after_raw_preset_save = callback
+            return False
+        if self._save_timer.isActive() or self._content_publish_pending:
+            self._after_raw_preset_save = callback
+            self._save_timer.stop()
+            self._save_file()
+            return False
+        return True
 
     def _refresh_header(self) -> None:
         self._rebuild_breadcrumb()
@@ -489,27 +517,114 @@ class PresetRawEditorPage(BasePage):
         self._save_timer.start(900)
         self._set_footer("Изменения...")
 
-    def _save_file(self, *, publish_content_changed: bool = False) -> None:
+    def _save_file(self, *, publish_content_changed: bool = False) -> bool:
         if self._cleanup_in_progress:
-            return
+            return False
         if self._preset_path is None:
+            return False
+        return self._request_raw_preset_save(
+            file_name=self._preset_file_name,
+            source_text=self.editor.toPlainText(),
+            publish_content_changed=publish_content_changed,
+        )
+
+    def _request_raw_preset_save(
+        self,
+        *,
+        file_name: str,
+        source_text: str,
+        publish_content_changed: bool = False,
+    ) -> bool:
+        worker = self._raw_save_worker
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    pending = self._pending_raw_preset_save
+                    self._pending_raw_preset_save = (
+                        str(file_name or "").strip(),
+                        str(source_text or ""),
+                        bool(publish_content_changed or (pending[2] if pending else False)),
+                    )
+                    return True
+            except Exception:
+                return False
+        self._start_raw_preset_save_worker(
+            file_name=file_name,
+            source_text=source_text,
+            publish_content_changed=publish_content_changed,
+        )
+        return True
+
+    def _start_raw_preset_save_worker(
+        self,
+        *,
+        file_name: str,
+        source_text: str,
+        publish_content_changed: bool,
+    ) -> None:
+        self._raw_save_request_id += 1
+        request_id = self._raw_save_request_id
+        self._raw_save_succeeded = False
+        self._set_footer("Сохранение...")
+        worker = self._controller.create_save_worker(
+            request_id,
+            file_name=str(file_name or "").strip(),
+            source_text=str(source_text or ""),
+            publish_content_changed=bool(publish_content_changed),
+            parent=self,
+        )
+        self._raw_save_worker = worker
+        worker.saved.connect(self._on_raw_preset_save_finished)
+        worker.failed.connect(self._on_raw_preset_save_failed)
+        worker.finished.connect(lambda w=worker: self._on_raw_preset_save_worker_finished(w))
+        worker.start()
+
+    def _on_raw_preset_save_finished(
+        self,
+        request_id: int,
+        requested_file_name: str,
+        result,
+        publish_content_changed: bool,
+    ) -> None:
+        if request_id != self._raw_save_request_id:
             return
-        try:
-            result = self._controller.save_text(
-                file_name=self._preset_file_name,
-                source_text=self.editor.toPlainText(),
-                publish_content_changed=publish_content_changed,
+        current_file_name = str(self._preset_file_name or "").strip().lower()
+        saved_file_name = str(requested_file_name or "").strip().lower()
+        if current_file_name and saved_file_name and current_file_name != saved_file_name:
+            return
+        updated = result.updated
+        self._raw_save_succeeded = True
+        self._preset_name = updated.name
+        self._preset_file_name = updated.file_name
+        self._preset_path = result.path
+        if publish_content_changed:
+            self._content_publish_pending = False
+        self._set_footer(result.footer_text)
+
+    def _on_raw_preset_save_failed(self, request_id: int, error: str) -> None:
+        if request_id != self._raw_save_request_id:
+            return
+        self._raw_save_succeeded = False
+        self._set_footer(f"Ошибка сохранения: {error}")
+        self._show_error(str(error))
+
+    def _on_raw_preset_save_worker_finished(self, worker) -> None:
+        if self._raw_save_worker is worker:
+            self._raw_save_worker = None
+        worker.deleteLater()
+        pending = self._pending_raw_preset_save
+        self._pending_raw_preset_save = None
+        if pending and not self._cleanup_in_progress:
+            self._start_raw_preset_save_worker(
+                file_name=pending[0],
+                source_text=pending[1],
+                publish_content_changed=pending[2],
             )
-            updated = result.updated
-            self._preset_name = updated.name
-            self._preset_file_name = updated.file_name
-            self._preset_path = result.path
-            if publish_content_changed:
-                self._content_publish_pending = False
-            self._set_footer(result.footer_text)
-        except Exception as e:
-            self._set_footer(f"Ошибка сохранения: {e}")
-            self._show_error(str(e))
+            return
+        callback = self._after_raw_preset_save
+        self._after_raw_preset_save = None
+        if callback is not None and self._raw_save_succeeded and not self._cleanup_in_progress:
+            callback()
 
     def _commit_pending_content_change(self) -> None:
         if self._cleanup_in_progress or not self._content_publish_pending:
@@ -687,7 +802,8 @@ class PresetRawEditorPage(BasePage):
             return False
 
     def _activate_preset(self) -> None:
-        self._flush_pending_save()
+        if not self._run_after_raw_preset_save(self._activate_preset):
+            return
         if not self._preset_file_name:
             self._show_error(f"Не удалось активировать пресет «{self._preset_name}»")
             return
@@ -748,7 +864,8 @@ class PresetRawEditorPage(BasePage):
 
     def _open_external(self) -> None:
         try:
-            self._flush_pending_save()
+            if not self._run_after_raw_preset_save(self._open_external):
+                return
             if self._preset_path is None:
                 return
             self._controller.open_source_file(self._preset_path)
@@ -790,7 +907,8 @@ class PresetRawEditorPage(BasePage):
         if self._is_current_builtin():
             self._show_error("Встроенный пресет нельзя переименовать. Создайте копию и работайте уже с ней.")
             return
-        self._flush_pending_save()
+        if not self._run_after_raw_preset_save(self._rename_preset):
+            return
         dialog = _RenameDialog(self._preset_name, [], self.window())
         if not dialog.exec():
             return
@@ -809,7 +927,8 @@ class PresetRawEditorPage(BasePage):
             self._show_error(str(e))
 
     def _duplicate_preset(self) -> None:
-        self._flush_pending_save()
+        if not self._run_after_raw_preset_save(self._duplicate_preset):
+            return
         try:
             new_name = f"{self._preset_name} (копия)"
             duplicated = self._controller.duplicate(
@@ -823,7 +942,8 @@ class PresetRawEditorPage(BasePage):
             self._show_error(str(e))
 
     def _export_preset(self) -> None:
-        self._flush_pending_save()
+        if not self._run_after_raw_preset_save(self._export_preset):
+            return
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Экспортировать пресет",
@@ -842,7 +962,8 @@ class PresetRawEditorPage(BasePage):
             self._show_error(str(e))
 
     def _reset_preset(self) -> None:
-        self._flush_pending_save()
+        if not self._run_after_raw_preset_save(self._reset_preset):
+            return
         if MessageBox is not None:
             box = MessageBox(
                 "Вернуть встроенный пресет?",
@@ -872,7 +993,8 @@ class PresetRawEditorPage(BasePage):
         if self._is_current_builtin():
             self._show_error("Встроенный пресет нельзя удалить.")
             return
-        self._flush_pending_save()
+        if not self._run_after_raw_preset_save(self._delete_preset):
+            return
         if MessageBox is not None:
             box = MessageBox(
                 "Удалить пресет?",
