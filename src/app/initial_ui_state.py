@@ -14,9 +14,10 @@ def build_initial_ui_state() -> AppUiState:
         appearance = settings.get("appearance") if isinstance(settings, dict) else {}
         if not isinstance(appearance, dict):
             appearance = {}
-        from settings.appearance import store_warmed_ui_language
+        from settings.appearance import store_warmed_rkn_background, store_warmed_ui_language
 
         store_warmed_ui_language(appearance.get("ui_language"))
+        store_warmed_rkn_background(appearance.get("rkn_background"))
         program = settings.get("program") if isinstance(settings, dict) else {}
         if not isinstance(program, dict):
             program = {}

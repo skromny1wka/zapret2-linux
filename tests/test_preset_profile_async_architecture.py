@@ -89,6 +89,7 @@ from diagnostics.ui.page import ConnectionTestPage
 import diagnostics.ui.runtime_helpers as diagnostics_runtime_helpers
 from app.feature_facades.diagnostics import DiagnosticsFeature
 import ui.navigation.text_sync as navigation_text_sync
+import ui.theme as ui_theme
 from app.page_names import PageName
 from ui.widgets.win11_controls import Win11RadioOption
 from ui.page_host import WindowPageHost
@@ -655,6 +656,15 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("get_rkn_background_options()", reload_source)
         self.assertIn("load_rkn_background", worker_source)
         self.assertIn("get_rkn_background_options", worker_source)
+
+    def test_window_background_uses_warmed_rkn_background_without_folder_scan(self) -> None:
+        apply_source = inspect.getsource(ui_theme.apply_window_background)
+        resolve_source = inspect.getsource(ui_theme.resolve_rkn_background_path)
+
+        self.assertIn("peek_warmed_rkn_background", apply_source)
+        self.assertNotIn("load_rkn_background", apply_source)
+        self.assertNotIn("get_rkn_background_options", resolve_source)
+        self.assertIn("_RKN_BG_PREFERRED", resolve_source)
 
     def test_appearance_windows_accent_loads_through_worker(self) -> None:
         self.assertTrue(hasattr(appearance_workers, "AppearanceWindowsAccentLoadWorker"))

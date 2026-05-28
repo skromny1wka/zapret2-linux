@@ -375,7 +375,7 @@ def resolve_rkn_background_path(selected_rel_path: str | None = None) -> str | N
         if selected_abs is not None and os.path.isfile(selected_abs):
             return selected_abs
 
-    for rel, _label in get_rkn_background_options():
+    for rel, _label in _RKN_BG_PREFERRED:
         abs_path = _theme_rel_to_abs(rel)
         if abs_path is not None and os.path.isfile(abs_path):
             return abs_path
@@ -421,8 +421,8 @@ def apply_window_background(window, theme_name: str | None = None, preset: str |
     if hasattr(window, 'set_background_image'):
         if preset == "rkn_chan":
             try:
-                from settings.appearance import load_rkn_background
-                selected_rkn_bg = load_rkn_background().value
+                from settings.appearance import peek_warmed_rkn_background
+                selected_rkn_bg = peek_warmed_rkn_background()
             except Exception:
                 selected_rkn_bg = None
 

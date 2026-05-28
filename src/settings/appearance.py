@@ -99,6 +99,8 @@ _warmed_page_initial_state_lock = threading.Lock()
 _warmed_page_initial_state_cache: AppearancePageInitialStatePlan | None = None
 _warmed_ui_language_lock = threading.Lock()
 _warmed_ui_language_cache: str | None = None
+_warmed_rkn_background_lock = threading.Lock()
+_warmed_rkn_background_cache: str | None = None
 
 
 def store_warmed_ui_language(language: str | None) -> None:
@@ -118,11 +120,30 @@ def clear_warmed_ui_language_cache() -> None:
         _warmed_ui_language_cache = None
 
 
+def store_warmed_rkn_background(value: str | None) -> None:
+    global _warmed_rkn_background_cache
+    normalized = str(value or "").strip().replace("\\", "/") or None
+    with _warmed_rkn_background_lock:
+        _warmed_rkn_background_cache = normalized
+
+
+def peek_warmed_rkn_background() -> str | None:
+    with _warmed_rkn_background_lock:
+        return _warmed_rkn_background_cache
+
+
+def clear_warmed_rkn_background_cache() -> None:
+    global _warmed_rkn_background_cache
+    with _warmed_rkn_background_lock:
+        _warmed_rkn_background_cache = None
+
+
 def store_warmed_page_initial_state(state: AppearancePageInitialStatePlan) -> None:
     global _warmed_page_initial_state_cache
     with _warmed_page_initial_state_lock:
         _warmed_page_initial_state_cache = state
     store_warmed_ui_language(state.ui_language)
+    store_warmed_rkn_background(state.rkn_background)
 
 
 def clear_warmed_page_initial_state_cache() -> None:
@@ -469,6 +490,7 @@ def save_rkn_background(value: str | None) -> AppearanceRknBackgroundPlan:
         set_rkn_background(normalized)
     except Exception:
         pass
+    store_warmed_rkn_background(normalized)
     return AppearanceRknBackgroundPlan(value=normalized or None)
 
 def load_premium_effects() -> AppearancePremiumEffectsPlan:
