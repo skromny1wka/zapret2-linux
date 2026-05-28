@@ -409,6 +409,53 @@ class ProfileListModel(QAbstractListModel):
         self.endResetModel()
         return True
 
+    def apply_folder_state(self, folder_state: dict[str, Any]) -> bool:
+        if not isinstance(folder_state, dict):
+            return False
+        if not self._all_items:
+            return False
+
+        from profile.folders import profile_folder_collapsed, profile_folder_for_profile
+
+        next_items: list[ProfileDisplayItem] = []
+        for item in self._all_items:
+            folder_key, folder_name, order = profile_folder_for_profile(item, folder_state)
+            next_items.append(
+                replace(
+                    item,
+                    group=folder_key,
+                    group_name=folder_name,
+                    order=int(order) if order is not None else int(item.order or 0),
+                    order_is_manual=order is not None,
+                    group_collapsed=profile_folder_collapsed(folder_key, folder_state),
+                )
+            )
+
+        next_items_tuple = tuple(sorted(next_items, key=profile_display_sort_key))
+        next_group_expanded = _initial_group_expanded(next_items_tuple)
+        next_rows = self._build_rows_from(next_items_tuple, next_group_expanded)
+        next_profile_items = {item.key: item for item in next_items_tuple}
+
+        can_keep_visible_rows = [_stable_row_identity(row) for row in self._rows] == [
+            _stable_row_identity(row) for row in next_rows
+        ]
+        if can_keep_visible_rows:
+            changed_rows = tuple(index for index, row in enumerate(next_rows) if self._rows[index] != row)
+            self._all_items = next_items_tuple
+            self._profile_items = next_profile_items
+            self._group_expanded = next_group_expanded
+            self._rows = next_rows
+            self._emit_data_changed_for_rows(changed_rows)
+            return True
+
+        self.beginResetModel()
+        self._all_items = next_items_tuple
+        self._profile_items = next_profile_items
+        self._group_expanded = next_group_expanded
+        self._rows = next_rows
+        self.endResetModel()
+        return True
+
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         if parent.isValid():
             return 0

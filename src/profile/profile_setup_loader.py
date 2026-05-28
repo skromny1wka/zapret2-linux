@@ -529,6 +529,11 @@ class ProfileFolderActionWorker(QThread):
             log(f"ProfileFolderActionWorker: не удалось выполнить действие папки profile: {exc}", "ERROR")
             self.failed.emit(self._request_id, self._action, str(exc), context)
             return
+        if self._action != "load_state" and bool(result):
+            try:
+                context["folder_state"] = load_profile_folder_state()
+            except Exception as exc:
+                log(f"ProfileFolderActionWorker: не удалось обновить состояние папок profile: {exc}", "DEBUG")
         self.completed.emit(self._request_id, self._action, result, context)
 
 

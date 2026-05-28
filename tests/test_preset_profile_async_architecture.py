@@ -12,6 +12,7 @@ import profile.additional_settings_loader as profile_additional_settings_loader
 import profile.profile_setup_loader as profile_setup_loader
 from profile.profile_list_loader import ProfileListLoadWorker
 from profile.service import ProfilePresetService
+from profile.ui.profile_list_model import ProfileListModel as ProfileSetupListModel
 from profile.ui.profiles_list import ProfilesList
 from profile.ui.profile_setup_page import ProfileSetupPageBase
 from profile.ui.preset_setup_page import PresetSetupPageBase
@@ -145,6 +146,72 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_profile_load_request_id += 1", running_branch)
         self.assertIn("_profile_payload_dirty = True", running_branch)
         self.assertIn("_schedule_profiles_payload_request(force=True)", finished_source)
+
+    def test_profile_folder_worker_returns_folder_state_after_write_action(self) -> None:
+        worker_source = inspect.getsource(profile_setup_loader.ProfileFolderActionWorker.run)
+
+        self.assertIn('context["folder_state"]', worker_source)
+        self.assertIn('self._action != "load_state"', worker_source)
+
+    def test_profile_folder_action_updates_visible_list_without_reload(self) -> None:
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._profile_folder_action_request_id = 7
+        page._profile_folder_action_worker = SimpleNamespace(_refresh_profile_page_after_action=True)
+        page._profiles_list = Mock()
+        page._profiles_list.apply_profile_folder_state.return_value = True
+        page._profile_payload_dirty = False
+        page.refresh_from_preset_switch = Mock(
+            side_effect=AssertionError("folder action must not reload the whole profile list")
+        )
+
+        PresetSetupPageBase._on_profile_folder_action_finished(
+            page,
+            7,
+            "rename",
+            True,
+            {"folder_state": {"folders": {}, "items": {}}},
+        )
+
+        page._profiles_list.apply_profile_folder_state.assert_called_once_with({"folders": {}, "items": {}})
+        page.refresh_from_preset_switch.assert_not_called()
+        self.assertTrue(page._profile_payload_dirty)
+
+    def test_profile_model_applies_folder_state_without_loading_profiles_again(self) -> None:
+        model = ProfileSetupListModel()
+        model.set_profiles((
+            SimpleNamespace(
+                key="profile-1",
+                persistent_key="persistent-1",
+                profile_index=0,
+                profile_name="Discord",
+                enabled=True,
+                in_preset=True,
+                strategy_id="none",
+                strategy_name="Стратегия не выбрана",
+                match_lines=("--filter-tcp=443",),
+                list_type="hostlist",
+                rating="",
+                favorite=False,
+                group="common",
+                group_name="Общие",
+                order=0,
+                order_is_manual=False,
+                group_collapsed=False,
+                user_profile_id="",
+            ),
+        ))
+        model.beginResetModel = Mock(side_effect=AssertionError("folder rename must not reload profiles"))
+
+        self.assertTrue(model.apply_folder_state({
+            "folders": {
+                "common": {"name": "Новая папка", "order": 0, "collapsed": False},
+            },
+            "items": {
+                "persistent-1": {"folder_key": "common", "order": 0},
+            },
+        }))
+
+        self.assertEqual(model.index(0, 0).data(ProfileSetupListModel.GroupNameRole), "Новая папка")
 
     def test_raw_preset_editor_saves_without_runtime_publish_until_editor_is_left(self) -> None:
         save_source = inspect.getsource(PresetRawEditorPage._save_file)

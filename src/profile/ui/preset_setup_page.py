@@ -1046,6 +1046,7 @@ class PresetSetupPageBase(BasePage):
         if request_id != int(getattr(self, "_profile_folder_action_request_id", 0) or 0):
             return
         context = dict(context or {})
+        folder_state = result if isinstance(result, dict) else context.get("folder_state")
         if str(action or "") == "load_state" and bool(context.get("show_menu")):
             self._show_folder_menu_with_state(
                 str(context.get("folder_key") or ""),
@@ -1056,7 +1057,21 @@ class PresetSetupPageBase(BasePage):
         worker = self.__dict__.get("_profile_folder_action_worker")
         should_refresh = bool(getattr(worker, "_refresh_profile_page_after_action", True))
         if bool(result) and should_refresh:
+            if isinstance(folder_state, dict) and self._apply_profile_folder_state_locally(folder_state):
+                return
             self.refresh_from_preset_switch()
+
+    def _apply_profile_folder_state_locally(self, folder_state: dict) -> bool:
+        profiles_list = self.__dict__.get("_profiles_list")
+        if profiles_list is None:
+            return False
+        apply_state = getattr(profiles_list, "apply_profile_folder_state", None)
+        if apply_state is None:
+            return False
+        if not apply_state(folder_state):
+            return False
+        self._profile_payload_dirty = True
+        return True
 
     def _on_profile_folder_action_failed(self, request_id: int, action: str, error: str, _context) -> None:
         if request_id != int(getattr(self, "_profile_folder_action_request_id", 0) or 0):

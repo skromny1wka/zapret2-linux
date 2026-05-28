@@ -159,6 +159,9 @@ class ProfilesList(QWidget):
             destination_group_key,
         )
 
+    def apply_profile_folder_state(self, folder_state: dict[str, Any]) -> bool:
+        return self._model.apply_folder_state(folder_state)
+
     def set_search_query(self, query: str) -> None:
         self._search_query = str(query or "")
         self._model.set_search_query(self._search_query)
