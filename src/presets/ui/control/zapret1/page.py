@@ -372,17 +372,10 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             self._apply_program_settings_snapshot(snapshot)
 
     def _on_auto_dpi_toggled(self, enabled: bool) -> None:
-        try:
-            plan = self._program_settings.set_auto_dpi_enabled(enabled)
-            InfoBar.success(title=plan.title, content=plan.message, parent=self.window())
-        finally:
-            self._sync_program_settings()
+        self._request_program_settings_save("auto_dpi", bool(enabled))
 
     def _on_hide_to_tray_toggled(self, enabled: bool) -> None:
-        try:
-            self._program_settings.set_hide_to_tray_on_minimize_close(bool(enabled))
-        finally:
-            self._sync_program_settings()
+        self._request_program_settings_save("hide_to_tray", bool(enabled))
 
     def _load_preset_name(self) -> tuple[str, str]:
         try:

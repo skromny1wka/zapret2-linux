@@ -865,18 +865,10 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         )
 
     def _on_auto_dpi_toggled(self, enabled: bool) -> None:
-        try:
-            plan = self._program_settings.set_auto_dpi_enabled(enabled)
-            self._set_status(plan.message)
-            InfoBar.success(title=plan.title, content=plan.message, parent=self.window())
-        finally:
-            self._sync_program_settings()
+        self._request_program_settings_save("auto_dpi", bool(enabled))
 
     def _on_hide_to_tray_toggled(self, enabled: bool) -> None:
-        try:
-            self._program_settings.set_hide_to_tray_on_minimize_close(bool(enabled))
-        finally:
-            self._sync_program_settings()
+        self._request_program_settings_save("hide_to_tray", bool(enabled))
 
     def _update_stop_winws_button_text(self):
         plan = zapret2_page_runtime.build_stop_button_plan(language=self._ui_language)

@@ -115,6 +115,73 @@ class ControlPageActionMixin:
         except Exception:
             pass
 
+    def create_program_settings_save_worker(self, request_id: int, *, action: str, enabled: bool):
+        return self._program_settings.create_program_settings_save_worker(
+            request_id,
+            action=action,
+            enabled=bool(enabled),
+            parent=self,
+        )
+
+    def _request_program_settings_save(self, action: str, enabled: bool) -> None:
+        runtime = self._refresh_runtime
+        worker = runtime.program_settings_save_worker
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    runtime.program_settings_save_pending = (action, bool(enabled))
+                    return
+            except Exception:
+                return
+        request_id = runtime.next_program_settings_save_request_id()
+        worker = self.create_program_settings_save_worker(
+            request_id,
+            action=action,
+            enabled=bool(enabled),
+        )
+        runtime.program_settings_save_worker = worker
+        worker.saved.connect(self._on_program_settings_save_finished)
+        worker.failed.connect(self._on_program_settings_save_failed)
+        worker.finished.connect(lambda w=worker: self._on_program_settings_save_worker_finished(w))
+        worker.start()
+
+    def _on_program_settings_save_finished(self, request_id: int, action: str, result) -> None:
+        runtime = self._refresh_runtime
+        if request_id != runtime.program_settings_save_request_id:
+            return
+        try:
+            if action == "auto_dpi":
+                self._set_status(str(getattr(result, "message", "") or ""))
+                from qfluentwidgets import InfoBar
+
+                InfoBar.success(
+                    title=str(getattr(result, "title", "Автозапуск DPI") or "Автозапуск DPI"),
+                    content=str(getattr(result, "message", "") or ""),
+                    parent=self.window(),
+                )
+        finally:
+            sync_program_settings = getattr(self, "_sync_program_settings", None)
+            if callable(sync_program_settings):
+                sync_program_settings()
+
+    def _on_program_settings_save_failed(self, request_id: int, action: str, error: str) -> None:
+        runtime = self._refresh_runtime
+        if request_id != runtime.program_settings_save_request_id:
+            return
+        from qfluentwidgets import InfoBar
+
+        InfoBar.warning(title="Ошибка", content=f"Не удалось сохранить настройку: {error}", parent=self.window())
+
+    def _on_program_settings_save_worker_finished(self, worker) -> None:
+        runtime = self._refresh_runtime
+        if runtime.program_settings_save_worker is worker:
+            runtime.program_settings_save_worker = None
+        worker.deleteLater()
+        pending = runtime.program_settings_save_pending
+        runtime.program_settings_save_pending = None
+        if pending is not None and not bool(getattr(self, "_cleanup_in_progress", False)):
+            self._request_program_settings_save(str(pending[0]), bool(pending[1]))
+
 
 def bind_control_ui_state_store(
     owner,
@@ -159,3 +226,14 @@ def cleanup_control_page_subscriptions(owner) -> None:
         except Exception:
             pass
     owner._program_settings_runtime_unsubscribe = None
+
+    runtime = getattr(owner, "_refresh_runtime", None)
+    if runtime is not None:
+        runtime.program_settings_save_pending = None
+        worker = getattr(runtime, "program_settings_save_worker", None)
+        if worker is not None:
+            try:
+                worker.quit()
+            except Exception:
+                pass
+            runtime.program_settings_save_worker = None

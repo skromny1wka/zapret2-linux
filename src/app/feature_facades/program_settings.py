@@ -50,6 +50,16 @@ class ProgramSettingsFeature:
     def set_hide_to_tray_on_minimize_close(self, enabled: bool) -> bool:
         return bool(self._commands().set_hide_to_tray_on_minimize_close(enabled))
 
+    def create_program_settings_save_worker(self, request_id: int, *, action: str, enabled: bool, parent=None):
+        from program_settings.workers import ProgramSettingsSaveWorker
+
+        return ProgramSettingsSaveWorker(
+            request_id,
+            action=action,
+            enabled=bool(enabled),
+            parent=parent,
+        )
+
     def set_defender_disabled(self, disable: bool, *, status_callback=None):
         return self._commands().set_defender_disabled(disable, status_callback=status_callback)
 

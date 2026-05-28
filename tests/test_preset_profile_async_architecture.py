@@ -22,6 +22,7 @@ from presets.user_presets_action_workers import UserPresetActivateWorker, UserPr
 import presets.user_presets_action_workers as user_presets_action_workers
 import presets.ui.control.additional_settings_runtime as control_additional_settings_runtime
 import presets.ui.control.control_page_shared as control_page_shared
+import program_settings.workers as program_settings_workers
 import presets.ui.common.preset_folder_menu as preset_folder_menu
 import presets.ui.common.preset_rating_menu as preset_rating_menu
 import profile.ui.profile_folder_menu as profile_folder_menu
@@ -1018,6 +1019,31 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("set_wssize_enabled", worker_source)
         self.assertIn("set_debug_log_enabled", worker_source)
         self.assertIn("launch_method=self._launch_method", worker_source)
+
+    def test_control_program_settings_save_runs_through_worker(self) -> None:
+        zapret1_auto_source = inspect.getsource(Zapret1ModeControlPage._on_auto_dpi_toggled)
+        zapret1_tray_source = inspect.getsource(Zapret1ModeControlPage._on_hide_to_tray_toggled)
+        zapret2_auto_source = inspect.getsource(Zapret2ModeControlPage._on_auto_dpi_toggled)
+        zapret2_tray_source = inspect.getsource(Zapret2ModeControlPage._on_hide_to_tray_toggled)
+
+        self.assertTrue(hasattr(program_settings_workers, "ProgramSettingsSaveWorker"))
+        worker_source = inspect.getsource(program_settings_workers.ProgramSettingsSaveWorker.run)
+        shared_source = inspect.getsource(control_page_shared.ControlPageActionMixin)
+
+        for source in (
+            zapret1_auto_source,
+            zapret1_tray_source,
+            zapret2_auto_source,
+            zapret2_tray_source,
+        ):
+            self.assertIn("_request_program_settings_save", source)
+            self.assertNotIn("self._program_settings.set_auto_dpi_enabled", source)
+            self.assertNotIn("self._program_settings.set_hide_to_tray_on_minimize_close", source)
+
+        self.assertIn("create_program_settings_save_worker", shared_source)
+        self.assertIn("program_settings_save_pending", shared_source)
+        self.assertIn("set_auto_dpi_enabled", worker_source)
+        self.assertIn("set_hide_to_tray_on_minimize_close", worker_source)
 
     def test_zapret2_control_defers_initial_store_snapshot_during_startup(self) -> None:
         helper_source = inspect.getsource(control_page_shared.bind_control_ui_state_store)

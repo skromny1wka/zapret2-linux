@@ -20,6 +20,9 @@ class ModeControlRefreshRuntime:
         self.additional_settings_request_id = 0
         self.additional_settings_save_request_id = 0
         self.additional_settings_dirty = True
+        self.program_settings_save_worker = None
+        self.program_settings_save_pending = None
+        self.program_settings_save_request_id = 0
 
     def has_pending_refresh(self) -> bool:
         return bool(self.additional_settings_dirty)
@@ -43,6 +46,10 @@ class ModeControlRefreshRuntime:
     def next_additional_settings_save_request_id(self) -> int:
         self.additional_settings_save_request_id += 1
         return self.additional_settings_save_request_id
+
+    def next_program_settings_save_request_id(self) -> int:
+        self.program_settings_save_request_id += 1
+        return self.program_settings_save_request_id
 
     def accept_additional_settings_result(self, request_id: int) -> bool:
         if int(request_id) != int(self.additional_settings_request_id):
