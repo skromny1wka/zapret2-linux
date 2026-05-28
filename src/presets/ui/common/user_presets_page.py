@@ -244,7 +244,35 @@ class UserPresetsPageBase(BasePage):
         return self._listing_api().get_selected_source_preset_file_name_light()
 
     def _resolve_display_name(self, reference: str) -> str:
-        return self._listing_api().resolve_display_name(reference)
+        candidate = str(reference or "").strip()
+        if not candidate:
+            return ""
+
+        model = getattr(self, "_presets_model", None)
+        try:
+            row = model.find_preset_row(candidate) if model is not None else -1
+            if row >= 0:
+                index = model.index(row, 0)
+                name_role = getattr(type(model), "NameRole", None)
+                if index.isValid() and name_role is not None:
+                    display_name = str(index.data(name_role) or "").strip()
+                    if display_name:
+                        return display_name
+        except Exception:
+            pass
+
+        cached_metadata = self._runtime_service.cached_presets_metadata()
+        metadata_key = candidate
+        metadata = cached_metadata.get(metadata_key)
+        if metadata is None and candidate and not candidate.lower().endswith(".txt"):
+            metadata_key = f"{candidate}.txt"
+            metadata = cached_metadata.get(metadata_key)
+        if isinstance(metadata, dict):
+            display_name = str(metadata.get("display_name") or "").strip()
+            if display_name:
+                return display_name
+
+        return candidate[:-4].strip() if candidate.lower().endswith(".txt") else candidate
 
     def _on_store_changed(self):
         self._runtime_service.on_store_changed()

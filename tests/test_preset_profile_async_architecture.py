@@ -284,6 +284,32 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("create_preset_activate_worker", request_source)
         self.assertIn("actions_api.activate_preset", worker_source)
 
+    def test_user_presets_display_name_uses_visible_cache_not_backend_manifest(self) -> None:
+        class _ListingApi:
+            def resolve_display_name(self, _reference: str) -> str:
+                raise AssertionError("display name must not be resolved from backend in GUI path")
+
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._page_api = type("_PageApi", (), {"listing": _ListingApi()})()
+        page._runtime_service = UserPresetsRuntimeService()
+        page._runtime_service._cached_presets_metadata = {
+            "cached.txt": {"display_name": "Cached Preset"},
+        }
+        page._presets_model = PresetListModel()
+        page._presets_model.set_rows(
+            [
+                {
+                    "kind": "preset",
+                    "file_name": "visible.txt",
+                    "name": "Visible Preset",
+                }
+            ]
+        )
+
+        self.assertEqual(page._resolve_display_name("visible.txt"), "Visible Preset")
+        self.assertEqual(page._resolve_display_name("cached.txt"), "Cached Preset")
+        self.assertEqual(page._resolve_display_name("fallback.txt"), "fallback")
+
     def test_user_presets_menu_selected_check_uses_runtime_marker(self) -> None:
         source = inspect.getsource(UserPresetsPageBase._is_selected_source_preset_file)
 
