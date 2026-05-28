@@ -233,6 +233,16 @@ class WhitelistController:
             refresh=refresh,
         )
 
+    def create_snapshot_load_worker(self, request_id: int, *, refresh: bool, parent=None):
+        from orchestra.managed_lists_workers import OrchestraWhitelistSnapshotLoadWorker
+
+        return OrchestraWhitelistSnapshotLoadWorker(
+            request_id,
+            self,
+            refresh=refresh,
+            parent=parent,
+        )
+
     def create_action_worker(
         self,
         request_id: int,

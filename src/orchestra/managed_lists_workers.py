@@ -24,6 +24,26 @@ class OrchestraManagedSnapshotLoadWorker(QThread):
         self.loaded.emit(self._request_id, snapshot)
 
 
+class OrchestraWhitelistSnapshotLoadWorker(QThread):
+    loaded = pyqtSignal(int, bool, object)
+    failed = pyqtSignal(int, bool, str)
+
+    def __init__(self, request_id: int, controller, *, refresh: bool, parent=None):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self._controller = controller
+        self._refresh = bool(refresh)
+
+    def run(self) -> None:
+        try:
+            snapshot = self._controller.snapshot(refresh=self._refresh)
+        except Exception as exc:
+            log(f"Orchestra whitelist snapshot worker: ошибка загрузки: {exc}", "ERROR")
+            self.failed.emit(self._request_id, self._refresh, str(exc))
+            return
+        self.loaded.emit(self._request_id, self._refresh, snapshot)
+
+
 class OrchestraWhitelistActionWorker(QThread):
     loaded = pyqtSignal(int, str, object, object)
     failed = pyqtSignal(int, str, str, object)
@@ -67,4 +87,8 @@ class OrchestraWhitelistActionWorker(QThread):
         self.loaded.emit(self._request_id, self._action, {"result": result, "snapshot": snapshot}, context)
 
 
-__all__ = ["OrchestraManagedSnapshotLoadWorker", "OrchestraWhitelistActionWorker"]
+__all__ = [
+    "OrchestraManagedSnapshotLoadWorker",
+    "OrchestraWhitelistActionWorker",
+    "OrchestraWhitelistSnapshotLoadWorker",
+]

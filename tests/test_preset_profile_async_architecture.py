@@ -1295,6 +1295,18 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("remove_domain", worker_source)
         self.assertIn("clear_user_domains", worker_source)
 
+    def test_orchestra_whitelist_snapshot_loads_through_worker(self) -> None:
+        whitelist_workers = importlib.import_module("orchestra.managed_lists_workers")
+        sync_source = inspect.getsource(OrchestraWhitelistPage._sync_whitelist_view)
+        controller_source = inspect.getsource(orchestra_managed_lists_controller.WhitelistController)
+
+        self.assertTrue(hasattr(whitelist_workers, "OrchestraWhitelistSnapshotLoadWorker"))
+        worker_source = inspect.getsource(whitelist_workers.OrchestraWhitelistSnapshotLoadWorker.run)
+        self.assertIn("_start_snapshot_worker", sync_source)
+        self.assertNotIn(".snapshot(", sync_source)
+        self.assertIn("create_snapshot_load_worker", controller_source)
+        self.assertIn("snapshot(refresh=self._refresh)", worker_source)
+
     def test_page_host_logs_first_and_repeat_show_for_all_pages(self) -> None:
         init_source = inspect.getsource(WindowPageHost.__init__)
         show_source = inspect.getsource(WindowPageHost.show_page)

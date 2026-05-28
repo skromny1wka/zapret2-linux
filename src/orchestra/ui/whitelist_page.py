@@ -158,6 +158,8 @@ class OrchestraWhitelistPage(BasePage):
         self._domains_card = None
         self._runtime_initialized = False
         self._last_snapshot_revision = None
+        self._snapshot_runtime = OneShotWorkerRuntime()
+        self._snapshot_refresh_pending = False
         self._action_runtime = OneShotWorkerRuntime()
 
         self._setup_ui()
@@ -392,11 +394,54 @@ class OrchestraWhitelistPage(BasePage):
         return self._controller.is_running()
 
     def _sync_whitelist_view(self, *, refresh: bool) -> None:
-        snapshot = self._controller.snapshot(refresh=refresh)
+        self._start_snapshot_worker(refresh=refresh)
+
+    def create_snapshot_worker(self, request_id: int, *, refresh: bool):
+        return self._controller.create_snapshot_load_worker(
+            request_id,
+            refresh=refresh,
+            parent=self,
+        )
+
+    def _start_snapshot_worker(self, *, refresh: bool) -> None:
+        if self._snapshot_runtime.is_running():
+            if refresh:
+                self._snapshot_refresh_pending = True
+            return
+        self._snapshot_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: self.create_snapshot_worker(
+                request_id,
+                refresh=refresh,
+            ),
+            on_loaded=self._on_snapshot_loaded,
+            on_failed=self._on_snapshot_failed,
+            on_finished=self._on_snapshot_finished,
+        )
+
+    def _on_snapshot_loaded(self, request_id: int, refresh: bool, snapshot) -> None:
+        if not self._snapshot_runtime.is_current(
+            request_id,
+            cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
+        ):
+            return
         if not refresh and snapshot.revision == self._last_snapshot_revision:
             return
-        self._last_snapshot_revision = snapshot.revision
         self._apply_whitelist_snapshot(snapshot)
+
+    def _on_snapshot_failed(self, request_id: int, _refresh: bool, error: str) -> None:
+        if not self._snapshot_runtime.is_current(
+            request_id,
+            cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
+        ):
+            return
+        log(f"Не удалось загрузить whitelist: {error}", "WARNING")
+
+    def _on_snapshot_finished(self, _worker) -> None:
+        if self._snapshot_refresh_pending and not bool(getattr(self, "_cleanup_in_progress", False)):
+            self._snapshot_refresh_pending = False
+            self._start_snapshot_worker(refresh=True)
+            return
+        self._snapshot_refresh_pending = False
 
     def _refresh_data(self):
         """Явно перечитывает whitelist из канонического runtime service."""
@@ -623,6 +668,7 @@ class OrchestraWhitelistPage(BasePage):
         snapshot = payload.get("snapshot")
         changed = bool(getattr(result, "changed", False))
         if snapshot is not None:
+            self._snapshot_runtime.cancel()
             self._apply_whitelist_snapshot(snapshot)
         if changed:
             if action == "add":
@@ -651,6 +697,11 @@ class OrchestraWhitelistPage(BasePage):
 
     def cleanup(self) -> None:
         super().cleanup()
+        self._snapshot_runtime.stop(
+            blocking=False,
+            log_fn=log,
+            warning_prefix="Orchestra whitelist snapshot worker",
+        )
         self._action_runtime.stop(
             blocking=False,
             log_fn=log,
