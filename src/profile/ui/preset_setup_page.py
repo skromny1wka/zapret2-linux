@@ -445,7 +445,7 @@ class PresetSetupPageBase(BasePage):
             self._sync_profile_list_locally()
             return
         if action == "delete" and bool(result):
-            self._sync_profile_list_locally()
+            self._remove_profile_item_locally(profile_key)
 
     def _on_profile_context_action_failed(self, request_id: int, error: str) -> None:
         if request_id != int(getattr(self, "_profile_context_action_request_id", 0) or 0):
@@ -498,6 +498,7 @@ class PresetSetupPageBase(BasePage):
 
     def _remove_profile_item_locally(self, profile_key: str) -> None:
         if self._profiles_list is not None and self._profiles_list.remove_profile_item(profile_key):
+            self._profile_payload_dirty = True
             return
         self.refresh_from_preset_switch()
 
