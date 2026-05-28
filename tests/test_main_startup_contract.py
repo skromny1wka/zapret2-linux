@@ -1579,6 +1579,44 @@ class StartupRuntimeSetupTests(unittest.TestCase):
 
                 control_page._refresh_top_summary.assert_called_once()
 
+    def test_control_pages_do_not_reload_top_summary_for_active_preset_marker_only(self) -> None:
+        from app.state_store import AppUiState
+        from presets.ui.control.zapret1.page import Zapret1ModeControlPage
+        from presets.ui.control.zapret2.page import Zapret2ModeControlPage
+
+        for page_cls in (Zapret2ModeControlPage, Zapret1ModeControlPage):
+            with self.subTest(page_cls=page_cls.__name__):
+                control_page = page_cls.__new__(page_cls)
+                control_page._cleanup_in_progress = False
+                control_page._refresh_runtime = SimpleNamespace(additional_settings_dirty=False)
+                control_page._startup_can_refresh_top_summary = Mock(return_value=True)
+                control_page._refresh_top_summary = Mock()
+                control_page._wait_for_startup_interactive_before_top_summary = Mock()
+                control_page._sync_profile_ui_mode_from_settings = Mock()
+                control_page._apply_selected_preset_name_fast = Mock()
+                control_page._refresh_preset_name = Mock()
+                control_page._schedule_additional_settings_reload = Mock()
+                control_page._apply_pending_mode_refresh_if_ready = Mock()
+                control_page._apply_pending_preset_name_refresh = Mock()
+                control_page._apply_pending_additional_settings_refresh = Mock()
+                control_page.run_when_page_ready = Mock()
+                control_page.isVisible = Mock(return_value=True)
+                control_page._deferred_sections_hydrated = True
+                control_page.set_loading = Mock()
+                control_page.update_status = Mock()
+                control_page.update_strategy = Mock()
+                control_page._refresh_last_status_message = Mock()
+
+                page_cls._on_ui_state_changed(
+                    control_page,
+                    AppUiState(current_strategy_summary="Профили"),
+                    frozenset({"active_preset_revision"}),
+                )
+
+                control_page._refresh_top_summary.assert_not_called()
+                self.assertTrue(control_page._refresh_runtime.additional_settings_dirty)
+                control_page._schedule_additional_settings_reload.assert_called_once_with(force=True)
+
     def test_window_page_actions_route_pages_through_adapter(self) -> None:
         from app.page_names import PageName
         from main import window_page_actions

@@ -937,7 +937,6 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         presets_changed = "active_preset_revision" in changed
         summary_changed = (
             not changed
-            or presets_changed
             or "current_strategy_summary" in changed
             or "preset_content_revision" in changed
             or "subscription_is_premium" in changed

@@ -648,7 +648,6 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
                 self.run_when_page_ready(self._apply_pending_additional_settings_refresh)
         if (
             not changed
-            or "active_preset_revision" in changed
             or "current_strategy_summary" in changed
             or "preset_content_revision" in changed
             or "subscription_is_premium" in changed
