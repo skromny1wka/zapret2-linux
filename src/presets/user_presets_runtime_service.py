@@ -221,17 +221,12 @@ class UserPresetsRuntimeService:
         if not preset_file_name:
             return
 
-        model_type = type(page._presets_model)
-        kind_role = getattr(model_type, "KindRole", None)
-        file_role = getattr(model_type, "FileNameRole", None)
-
-        for row in range(page._presets_model.rowCount()):
-            index = page._presets_model.index(row, 0)
-            if str(index.data(kind_role) or "") != "preset":
-                continue
-            if preset_file_name and str(index.data(file_role) or "") == preset_file_name:
-                page.presets_list.setCurrentIndex(index)
-                return
+        row = page._presets_model.find_preset_row(preset_file_name)
+        if row < 0:
+            return
+        index = page._presets_model.index(row, 0)
+        if index.isValid():
+            page.presets_list.setCurrentIndex(index)
 
     def apply_active_preset_marker_for_file(
         self,

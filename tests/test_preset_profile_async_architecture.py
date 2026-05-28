@@ -19,6 +19,7 @@ from presets.ui.common.preset_subpage_base import PresetRawEditorPage
 from presets.ui.common.user_presets_page import UserPresetsPageBase
 from presets.raw_preset_loader import RawPresetActionWorker, RawPresetActivateWorker, RawPresetSaveWorker
 from presets.user_presets_action_workers import UserPresetActivateWorker, UserPresetItemActionWorker
+from ui.presets_menu.model import PresetListModel
 import presets.user_presets_action_workers as user_presets_action_workers
 import presets.ui.control.additional_settings_runtime as control_additional_settings_runtime
 import presets.ui.control.control_page_shared as control_page_shared
@@ -169,6 +170,44 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
         self.assertIn("viewport().update()", source)
         self.assertNotIn("viewport().repaint()", source)
+
+    def test_preset_list_active_marker_updates_indexed_rows_only(self) -> None:
+        class CountingRow(dict):
+            def __init__(self, *args, **kwargs) -> None:
+                super().__init__(*args, **kwargs)
+                self.get_count = 0
+
+            def get(self, key, default=None):
+                self.get_count += 1
+                return super().get(key, default)
+
+        rows = [
+            CountingRow(
+                {
+                    "kind": "preset",
+                    "file_name": f"preset-{index}.txt",
+                    "is_active": index == 3,
+                }
+            )
+            for index in range(100)
+        ]
+        model = PresetListModel()
+        model.set_rows(rows)
+        for row in rows:
+            row.get_count = 0
+
+        self.assertTrue(model.set_active_preset("preset-70.txt"))
+
+        touched_rows = [row for row in rows if row.get_count]
+        self.assertLessEqual(len(touched_rows), 2)
+        self.assertFalse(rows[3]["is_active"])
+        self.assertTrue(rows[70]["is_active"])
+
+    def test_user_presets_current_index_uses_model_row_index(self) -> None:
+        source = inspect.getsource(UserPresetsRuntimeService.set_current_preset_index)
+
+        self.assertIn("find_preset_row", source)
+        self.assertNotIn("for row in range", source)
 
     def test_user_presets_activation_runs_through_worker(self) -> None:
         handler_source = inspect.getsource(UserPresetsPageBase._on_activate_preset)

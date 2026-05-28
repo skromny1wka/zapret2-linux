@@ -27,22 +27,33 @@ class PresetListModel(QAbstractListModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._rows: list[dict[str, object]] = []
+        self._preset_row_by_file_name: dict[str, int] = {}
+        self._active_preset_file_names: set[str] = set()
 
     def set_rows(self, rows: list[dict[str, object]]) -> None:
         self.beginResetModel()
         self._rows = rows
+        self._rebuild_row_index()
         self.endResetModel()
+
+    def _rebuild_row_index(self) -> None:
+        self._preset_row_by_file_name = {}
+        self._active_preset_file_names = set()
+        for row_index, row in enumerate(self._rows):
+            if str(row.get("kind") or "") != "preset":
+                continue
+            file_name = str(row.get("file_name") or "").strip()
+            if not file_name:
+                continue
+            self._preset_row_by_file_name[file_name] = row_index
+            if bool(row.get("is_active", False)):
+                self._active_preset_file_names.add(file_name)
 
     def find_preset_row(self, file_name: str) -> int:
         candidate = str(file_name or "").strip()
         if not candidate:
             return -1
-        for row_index, row in enumerate(self._rows):
-            if str(row.get("kind") or "") != "preset":
-                continue
-            if str(row.get("file_name") or "") == candidate:
-                return row_index
-        return -1
+        return int(self._preset_row_by_file_name.get(candidate, -1))
 
     def move_preset(
         self,
@@ -93,6 +104,7 @@ class PresetListModel(QAbstractListModel):
 
         self.beginResetModel()
         self._rows = rows
+        self._rebuild_row_index()
         self.endResetModel()
         return True
 
@@ -120,6 +132,13 @@ class PresetListModel(QAbstractListModel):
             if row.get(key) == value:
                 continue
             row[key] = value
+            if key == "is_active":
+                file_name = str(row.get("file_name") or "").strip()
+                if file_name:
+                    if bool(value):
+                        self._active_preset_file_names.add(file_name)
+                    else:
+                        self._active_preset_file_names.discard(file_name)
             changed_roles.update(role_map[key])
 
         if not changed_roles:
@@ -134,17 +153,23 @@ class PresetListModel(QAbstractListModel):
         file_name: str,
     ) -> bool:
         preset_file_name = str(file_name or "").strip()
+        next_active_files = {preset_file_name} if preset_file_name in self._preset_row_by_file_name else set()
+        candidate_files = set(self._active_preset_file_names)
+        candidate_files.update(next_active_files)
         changed_rows: list[int] = []
-        for row_index, row in enumerate(self._rows):
-            if str(row.get("kind") or "") != "preset":
+
+        for row_file_name in candidate_files:
+            row_index = self._preset_row_by_file_name.get(row_file_name, -1)
+            if row_index < 0 or row_index >= len(self._rows):
                 continue
-            row_file_name = str(row.get("file_name") or "")
-            next_active = bool(preset_file_name and row_file_name == preset_file_name)
-            if bool(row.get("is_active", False)) == next_active:
+            row = self._rows[row_index]
+            next_active = row_file_name in next_active_files
+            if bool(row.get("is_active", False)) == bool(next_active):
                 continue
             row["is_active"] = next_active
             changed_rows.append(row_index)
 
+        self._active_preset_file_names = set(next_active_files)
         for row_index in changed_rows:
             model_index = self.index(row_index, 0)
             self.dataChanged.emit(model_index, model_index, [self.ActiveRole])
