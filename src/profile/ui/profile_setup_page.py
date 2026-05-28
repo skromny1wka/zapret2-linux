@@ -2006,6 +2006,62 @@ class ProfileSetupPageBase(BasePage):
         if pending:
             self._start_strategy_feedback_save_worker(pending)
 
+    def cleanup(self) -> None:
+        self._cleanup_in_progress = True
+        timer = self.__dict__.get("_settings_save_timer")
+        if timer is not None:
+            try:
+                timer.stop()
+            except Exception:
+                pass
+        for attr in (
+            "_pending_list_file_validation",
+            "_pending_settings_save",
+            "_pending_strategy_apply",
+            "_pending_strategy_feedback_save",
+        ):
+            setattr(self, attr, None)
+        for attr in (
+            "_setup_load_request_id",
+            "_list_file_load_request_id",
+            "_list_file_save_request_id",
+            "_list_file_validation_request_id",
+            "_settings_save_request_id",
+            "_raw_profile_save_request_id",
+            "_enabled_save_request_id",
+            "_user_profile_update_request_id",
+            "_user_profile_delete_request_id",
+            "_strategy_apply_request_id",
+            "_strategy_feedback_save_request_id",
+        ):
+            setattr(self, attr, int(getattr(self, attr, 0) or 0) + 1)
+        for attr in (
+            "_setup_load_worker",
+            "_list_file_load_worker",
+            "_list_file_save_worker",
+            "_list_file_validation_worker",
+            "_settings_save_worker",
+            "_raw_profile_save_worker",
+            "_enabled_save_worker",
+            "_user_profile_update_worker",
+            "_user_profile_delete_worker",
+            "_strategy_apply_worker",
+            "_strategy_feedback_save_worker",
+        ):
+            worker = self.__dict__.get(attr)
+            if worker is None:
+                continue
+            try:
+                worker.quit()
+            except Exception:
+                pass
+            setattr(self, attr, None)
+        self._strategy_apply_worker_strategy_id = ""
+        try:
+            super().cleanup()
+        except Exception:
+            pass
+
     def _apply_strategy_feedback_locally(self, state) -> bool:
         if self._payload is None or state is None:
             return False

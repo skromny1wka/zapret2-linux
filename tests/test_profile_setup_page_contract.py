@@ -782,6 +782,63 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertIn("_profile_folder_action_pending.clear()", source)
         self.assertGreaterEqual(source.count(".quit()"), 1)
 
+    def test_profile_setup_cleanup_stops_all_detail_workers_and_pending_requests(self) -> None:
+        class _Worker:
+            def __init__(self) -> None:
+                self.quit = Mock()
+
+        worker_attrs = (
+            "_setup_load_worker",
+            "_list_file_load_worker",
+            "_list_file_save_worker",
+            "_list_file_validation_worker",
+            "_settings_save_worker",
+            "_raw_profile_save_worker",
+            "_enabled_save_worker",
+            "_user_profile_update_worker",
+            "_user_profile_delete_worker",
+            "_strategy_apply_worker",
+            "_strategy_feedback_save_worker",
+        )
+        request_attrs = (
+            "_setup_load_request_id",
+            "_list_file_load_request_id",
+            "_list_file_save_request_id",
+            "_list_file_validation_request_id",
+            "_settings_save_request_id",
+            "_raw_profile_save_request_id",
+            "_enabled_save_request_id",
+            "_user_profile_update_request_id",
+            "_user_profile_delete_request_id",
+            "_strategy_apply_request_id",
+            "_strategy_feedback_save_request_id",
+        )
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        workers = {attr: _Worker() for attr in worker_attrs}
+        for attr, worker in workers.items():
+            setattr(page, attr, worker)
+        for attr in request_attrs:
+            setattr(page, attr, 7)
+        page._pending_list_file_validation = {"kind": "hostlist"}
+        page._pending_settings_save = {"setting": "filter"}
+        page._pending_strategy_apply = "strategy-id"
+        page._pending_strategy_feedback_save = {"rating": "work"}
+        page._settings_save_timer = SimpleNamespace(stop=Mock())
+
+        ProfileSetupPageBase.cleanup(page)
+
+        for worker in workers.values():
+            worker.quit.assert_called_once()
+        for attr in worker_attrs:
+            self.assertIsNone(getattr(page, attr))
+        for attr in request_attrs:
+            self.assertEqual(getattr(page, attr), 8)
+        self.assertIsNone(page._pending_list_file_validation)
+        self.assertIsNone(page._pending_settings_save)
+        self.assertIsNone(page._pending_strategy_apply)
+        self.assertIsNone(page._pending_strategy_feedback_save)
+        page._settings_save_timer.stop.assert_called_once()
+
     def test_profile_move_starts_worker_without_direct_profile_call(self) -> None:
         class _Signal:
             def __init__(self) -> None:
