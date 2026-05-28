@@ -862,15 +862,14 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             self._sync_profile_ui_mode_from_settings()
 
     def _sync_program_settings(self) -> None:
-        snapshot = self._program_settings.refresh_program_settings_snapshot()
-        if snapshot is not None:
-            self._apply_program_settings_snapshot(snapshot)
+        self._request_program_settings_load()
 
     def _attach_program_settings_runtime(self) -> None:
         self._program_settings.attach_program_settings_runtime(
             self,
             apply_snapshot_fn=self._apply_program_settings_snapshot,
         )
+        self._sync_program_settings()
 
     def _apply_program_settings_snapshot(self, snapshot) -> None:
         if self._cleanup_in_progress:

@@ -5,6 +5,31 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from log.log import log
 
 
+class ProgramSettingsLoadWorker(QThread):
+    loaded = pyqtSignal(int, object)
+    failed = pyqtSignal(int, str)
+
+    def __init__(
+        self,
+        request_id: int,
+        *,
+        program_settings_feature,
+        parent=None,
+    ):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self._program_settings = program_settings_feature
+
+    def run(self) -> None:
+        try:
+            snapshot = self._program_settings.load_program_settings_snapshot()
+        except Exception as exc:
+            log(f"ProgramSettingsLoadWorker: не удалось загрузить настройки программы: {exc}", "WARNING")
+            self.failed.emit(self._request_id, str(exc))
+            return
+        self.loaded.emit(self._request_id, snapshot)
+
+
 class ProgramSettingsSaveWorker(QThread):
     saved = pyqtSignal(int, str, object)
     failed = pyqtSignal(int, str, str)

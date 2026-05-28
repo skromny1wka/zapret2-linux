@@ -123,6 +123,65 @@ class ControlPageActionMixin:
             parent=self,
         )
 
+    def create_program_settings_load_worker(self, request_id: int):
+        return self._program_settings.create_program_settings_load_worker(
+            request_id,
+            parent=self,
+        )
+
+    def _request_program_settings_load(self) -> None:
+        runtime = self._refresh_runtime
+        worker = runtime.program_settings_load_worker
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    runtime.program_settings_load_pending = True
+                    return
+            except Exception:
+                runtime.program_settings_load_worker = None
+
+        request_id = runtime.next_program_settings_load_request_id()
+        worker = self.create_program_settings_load_worker(request_id)
+        runtime.program_settings_load_worker = worker
+        worker.loaded.connect(self._on_program_settings_load_finished)
+        worker.failed.connect(self._on_program_settings_load_failed)
+        worker.finished.connect(lambda w=worker: self._on_program_settings_load_worker_finished(w))
+        worker.start()
+
+    def _on_program_settings_load_finished(self, request_id: int, snapshot) -> None:
+        runtime = self._refresh_runtime
+        if request_id != runtime.program_settings_load_request_id or bool(getattr(self, "_cleanup_in_progress", False)):
+            return
+        try:
+            self._program_settings.publish_program_settings_snapshot(snapshot)
+        except Exception:
+            pass
+        apply_snapshot = getattr(self, "_apply_program_settings_snapshot", None)
+        if callable(apply_snapshot):
+            apply_snapshot(snapshot)
+
+    def _on_program_settings_load_failed(self, request_id: int, error: str) -> None:
+        runtime = self._refresh_runtime
+        if request_id != runtime.program_settings_load_request_id or bool(getattr(self, "_cleanup_in_progress", False)):
+            return
+        try:
+            from log.log import log
+
+            log(f"Не удалось загрузить настройки программы: {error}", "WARNING")
+        except Exception:
+            pass
+
+    def _on_program_settings_load_worker_finished(self, worker) -> None:
+        runtime = self._refresh_runtime
+        if runtime.program_settings_load_worker is worker:
+            runtime.program_settings_load_worker = None
+        worker.deleteLater()
+        if runtime.program_settings_load_pending and not bool(getattr(self, "_cleanup_in_progress", False)):
+            runtime.program_settings_load_pending = False
+            self._request_program_settings_load()
+            return
+        runtime.program_settings_load_pending = False
+
     def _request_program_settings_save(self, action: str, enabled: bool) -> None:
         runtime = self._refresh_runtime
         worker = runtime.program_settings_save_worker
@@ -253,6 +312,15 @@ def cleanup_control_page_subscriptions(owner) -> None:
             except Exception:
                 pass
             runtime.top_summary_worker = None
+
+        runtime.program_settings_load_pending = False
+        worker = getattr(runtime, "program_settings_load_worker", None)
+        if worker is not None:
+            try:
+                worker.quit()
+            except Exception:
+                pass
+            runtime.program_settings_load_worker = None
 
         runtime.program_settings_save_pending = None
         worker = getattr(runtime, "program_settings_save_worker", None)

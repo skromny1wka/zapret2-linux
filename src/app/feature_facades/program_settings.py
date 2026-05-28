@@ -37,6 +37,12 @@ class ProgramSettingsFeature:
     def refresh_program_settings_snapshot(self):
         return self._commands().refresh_program_settings_snapshot(self.runtime_service)
 
+    def load_program_settings_snapshot(self):
+        return self._commands().load_program_settings_snapshot(self.runtime_service)
+
+    def publish_program_settings_snapshot(self, snapshot) -> bool:
+        return bool(self._commands().publish_program_settings_snapshot(self.runtime_service, snapshot))
+
     def attach_program_settings_runtime(self, owner, *, apply_snapshot_fn) -> None:
         return self._commands().attach_program_settings_runtime(
             owner,
@@ -57,6 +63,15 @@ class ProgramSettingsFeature:
             request_id,
             action=action,
             enabled=bool(enabled),
+            parent=parent,
+        )
+
+    def create_program_settings_load_worker(self, request_id: int, *, parent=None):
+        from program_settings.workers import ProgramSettingsLoadWorker
+
+        return ProgramSettingsLoadWorker(
+            request_id,
+            program_settings_feature=self,
             parent=parent,
         )
 

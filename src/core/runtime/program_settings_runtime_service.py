@@ -83,6 +83,23 @@ class ProgramSettingsRuntimeService:
             max_blocked=max_blocked,
         )
 
+    def read_snapshot(self) -> ProgramSettingsSnapshot:
+        return self._read_snapshot()
+
+    def publish_snapshot(self, snapshot: ProgramSettingsSnapshot) -> bool:
+        should_notify = False
+        with self._lock:
+            previous = self._snapshot
+            if previous is None or previous.revision != snapshot.revision:
+                self._snapshot = snapshot
+                should_notify = True
+            else:
+                snapshot = previous
+
+        if should_notify:
+            self._notify(snapshot)
+        return should_notify
+
     @staticmethod
     def _make_callback_ref(callback):
         try:
@@ -126,18 +143,7 @@ class ProgramSettingsRuntimeService:
 
     def refresh(self) -> ProgramSettingsSnapshot:
         snapshot = self._read_snapshot()
-
-        should_notify = False
-        with self._lock:
-            previous = self._snapshot
-            if previous is None or previous.revision != snapshot.revision:
-                self._snapshot = snapshot
-                should_notify = True
-            else:
-                snapshot = previous
-
-        if should_notify:
-            self._notify(snapshot)
+        self.publish_snapshot(snapshot)
         return snapshot
 
     def subscribe(self, callback, *, emit_initial: bool = False):

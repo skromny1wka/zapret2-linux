@@ -355,6 +355,7 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             self,
             apply_snapshot_fn=self._apply_program_settings_snapshot,
         )
+        self._sync_program_settings()
 
     def _apply_program_settings_snapshot(self, snapshot) -> None:
         if self._cleanup_in_progress:
@@ -368,9 +369,7 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         )
 
     def _sync_program_settings(self) -> None:
-        snapshot = self._program_settings.refresh_program_settings_snapshot()
-        if snapshot is not None:
-            self._apply_program_settings_snapshot(snapshot)
+        self._request_program_settings_load()
 
     def _on_auto_dpi_toggled(self, enabled: bool) -> None:
         self._request_program_settings_save("auto_dpi", bool(enabled))

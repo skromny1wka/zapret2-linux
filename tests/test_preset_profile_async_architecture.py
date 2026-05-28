@@ -23,6 +23,7 @@ import presets.user_presets_action_workers as user_presets_action_workers
 import presets.ui.control.additional_settings_runtime as control_additional_settings_runtime
 import presets.ui.control.control_page_shared as control_page_shared
 import presets.ui.control.windows_features.runtime as windows_features_runtime
+import program_settings.runtime as program_settings_runtime
 import program_settings.workers as program_settings_workers
 import presets.ui.common.preset_folder_menu as preset_folder_menu
 import presets.ui.common.preset_rating_menu as preset_rating_menu
@@ -1102,6 +1103,24 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("self._program_settings.set_max_block_enabled", max_source)
         self.assertIn("set_defender_disabled", worker_source)
         self.assertIn("set_max_block_enabled", worker_source)
+
+    def test_control_program_settings_load_runs_through_worker(self) -> None:
+        zapret1_sync_source = inspect.getsource(Zapret1ModeControlPage._sync_program_settings)
+        zapret2_sync_source = inspect.getsource(Zapret2ModeControlPage._sync_program_settings)
+        shared_source = inspect.getsource(control_page_shared.ControlPageActionMixin)
+        runtime_source = inspect.getsource(control_additional_settings_runtime.ModeControlRefreshRuntime)
+        worker_source = inspect.getsource(program_settings_workers.ProgramSettingsLoadWorker.run)
+        attach_source = inspect.getsource(program_settings_runtime.attach_program_settings_runtime)
+
+        self.assertIn("_request_program_settings_load", zapret1_sync_source)
+        self.assertIn("_request_program_settings_load", zapret2_sync_source)
+        self.assertNotIn("refresh_program_settings_snapshot", zapret1_sync_source)
+        self.assertNotIn("refresh_program_settings_snapshot", zapret2_sync_source)
+        self.assertIn("create_program_settings_load_worker", shared_source)
+        self.assertIn("program_settings_load_worker", runtime_source)
+        self.assertIn("load_program_settings_snapshot", worker_source)
+        self.assertIn("publish_program_settings_snapshot", shared_source)
+        self.assertIn("emit_initial=False", attach_source)
 
     def test_zapret2_control_defers_initial_store_snapshot_during_startup(self) -> None:
         helper_source = inspect.getsource(control_page_shared.bind_control_ui_state_store)
