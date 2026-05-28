@@ -55,6 +55,11 @@ def set_enabled(enabled: bool) -> None:
     set_tg_proxy_enabled(bool(enabled))
 
 
+def append_log_line(message: str) -> None:
+    manager = get_proxy_manager()
+    manager.proxy_logger.log(str(message or ""))
+
+
 def run_diagnostics(*, proxy_port: int, progress_callback=None) -> str:
     from telegram_proxy.diagnostics import run_all
 

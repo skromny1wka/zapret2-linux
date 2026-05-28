@@ -123,6 +123,33 @@ class TelegramProxyExternalLinkWorker(QThread):
         self.completed.emit(result)
 
 
+class TelegramProxyLogLineWorker(QThread):
+    completed = pyqtSignal(int)
+    failed = pyqtSignal(int, str)
+
+    def __init__(
+        self,
+        request_id: int,
+        *,
+        append_log_line_fn,
+        message: str,
+        parent=None,
+    ):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self._append_log_line_fn = append_log_line_fn
+        self._message = str(message or "")
+
+    def run(self) -> None:
+        try:
+            self._append_log_line_fn(self._message)
+        except Exception as exc:
+            log(f"TelegramProxyLogLineWorker: не удалось записать строку лога: {exc}", "WARNING")
+            self.failed.emit(self._request_id, str(exc))
+            return
+        self.completed.emit(self._request_id)
+
+
 class TelegramProxyRelayCheckWorker(QThread):
     completed = pyqtSignal(int, dict)
     warning = pyqtSignal(str)

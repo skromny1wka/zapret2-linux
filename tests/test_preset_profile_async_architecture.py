@@ -1411,6 +1411,23 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertEqual(plan.settings.upstream_mode, "always")
         self.assertEqual(plan.settings.upstream_preset_index, 1)
 
+    def test_telegram_proxy_log_lines_write_through_worker(self) -> None:
+        append_source = inspect.getsource(TelegramProxyPage._append_log_line)
+        page_source = inspect.getsource(TelegramProxyPage)
+        feature_source = inspect.getsource(TelegramProxyFeature)
+
+        self.assertTrue(hasattr(telegram_proxy_commands, "append_log_line"))
+        command_source = inspect.getsource(telegram_proxy_commands.append_log_line)
+        self.assertTrue(hasattr(telegram_proxy_workers, "TelegramProxyLogLineWorker"))
+        worker_source = inspect.getsource(telegram_proxy_workers.TelegramProxyLogLineWorker.run)
+
+        self.assertIn("_request_log_line_append", append_source)
+        self.assertNotIn("proxy_logger.log", append_source)
+        self.assertIn("_log_line_worker", page_source)
+        self.assertIn("create_log_line_worker", feature_source)
+        self.assertIn("append_log_line", command_source)
+        self.assertIn("append_log_line", worker_source)
+
     def test_dns_check_save_runs_through_worker(self) -> None:
         page_source = inspect.getsource(dns_check_page.DNSCheckPage)
         save_source = inspect.getsource(dns_check_page.DNSCheckPage.save_results)

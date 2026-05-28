@@ -18,6 +18,7 @@ class TelegramProxyFeature:
     open_external_link: Callable
     ensure_telegram_hosts: Callable
     run_diagnostics: Callable
+    append_log_line: Callable
 
     def is_running(self) -> bool:
         try:
@@ -84,6 +85,16 @@ class TelegramProxyFeature:
             url=str(url or ""),
             success_log=str(success_log or ""),
             error_prefix=str(error_prefix or ""),
+            parent=parent,
+        )
+
+    def create_log_line_worker(self, request_id: int, *, message: str, parent=None):
+        from telegram_proxy.workers import TelegramProxyLogLineWorker
+
+        return TelegramProxyLogLineWorker(
+            request_id,
+            append_log_line_fn=self.append_log_line,
+            message=str(message or ""),
             parent=parent,
         )
 
@@ -170,4 +181,5 @@ def build_telegram_proxy_feature() -> TelegramProxyFeature:
         open_external_link=lambda *args, **kwargs: _public().open_external_link(*args, **kwargs),
         ensure_telegram_hosts=lambda *args, **kwargs: _public().ensure_telegram_hosts(*args, **kwargs),
         run_diagnostics=lambda *args, **kwargs: _public().run_diagnostics(*args, **kwargs),
+        append_log_line=lambda *args, **kwargs: _public().append_log_line(*args, **kwargs),
     )
