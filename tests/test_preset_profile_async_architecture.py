@@ -542,6 +542,13 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertEqual(model.index(2, 0).data(PresetListModel.FileNameRole), "first.txt")
         self.assertEqual(model.index(2, 0).data(PresetListModel.RatingRole), 5)
 
+    def test_preset_model_single_move_detection_is_not_bruteforce(self) -> None:
+        helper_source = inspect.getsource(__import__("ui.presets_menu.model", fromlist=["_single_row_move"])._single_row_move)
+
+        self.assertNotIn("for insert_index in range", helper_source)
+        self.assertNotIn("candidate =", helper_source)
+        self.assertIn("current_positions", helper_source)
+
     def test_preset_rows_rebuild_skips_layout_when_rows_do_not_change(self) -> None:
         from presets.ui.common.user_presets_page_runtime import rebuild_presets_rows
 

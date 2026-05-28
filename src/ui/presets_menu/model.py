@@ -508,15 +508,31 @@ def _single_row_move(
     next_identities = [_stable_row_identity(row) for row in next_rows]
     if current_identities == next_identities:
         return None
-    if sorted(current_identities) != sorted(next_identities):
+    if len(set(current_identities)) != len(current_identities):
+        return None
+    if set(current_identities) != set(next_identities):
         return None
 
-    for source_index, identity in enumerate(current_identities):
-        without_source = current_identities[:source_index] + current_identities[source_index + 1:]
-        for insert_index in range(len(current_identities)):
-            candidate = without_source[:insert_index] + [identity] + without_source[insert_index:]
-            if candidate == next_identities:
-                return source_index, insert_index
+    current_positions = {identity: index for index, identity in enumerate(current_identities)}
+    first_changed = next(
+        (
+            index
+            for index, identity in enumerate(next_identities)
+            if current_positions.get(identity) != index
+        ),
+        -1,
+    )
+    if first_changed < 0:
+        return None
+
+    last_changed = len(next_identities) - 1
+    while last_changed > first_changed and current_identities[last_changed] == next_identities[last_changed]:
+        last_changed -= 1
+
+    if current_identities[first_changed] == next_identities[last_changed]:
+        return first_changed, last_changed
+    if current_identities[last_changed] == next_identities[first_changed]:
+        return last_changed, first_changed
     return None
 
 
