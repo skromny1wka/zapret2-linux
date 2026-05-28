@@ -529,6 +529,17 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertLess(source.index("get_cached_profile_list"), source.index("create_profile_list_load_worker"))
         self.assertNotIn("_show_loading_skeleton", source)
 
+    def test_preset_setup_force_refresh_skips_sync_profile_cache_check(self) -> None:
+        source = inspect.getsource(PresetSetupPageBase._request_profiles_payload)
+
+        self.assertIn("if not force:", source)
+        before_worker = source.split("worker =", 1)[0]
+        forced_prefix = before_worker.split("if not force:", 1)[0]
+        cache_branch = before_worker.split("if not force:", 1)[1]
+
+        self.assertNotIn("get_cached_profile_list", forced_prefix)
+        self.assertIn("get_cached_profile_list", cache_branch)
+
     def test_profile_service_has_selected_preset_snapshot(self) -> None:
         source = inspect.getsource(ProfilePresetService.load_selected_preset)
         helper_source = inspect.getsource(ProfilePresetService._load_selected_preset_for_revision)
