@@ -50,6 +50,7 @@ class DnsForceDnsActionWorker(QThread):
         *,
         action: str,
         enabled: bool | None = None,
+        adapters=None,
         language: str = "ru",
         parent=None,
     ):
@@ -58,6 +59,7 @@ class DnsForceDnsActionWorker(QThread):
         self._dns = dns_feature
         self._action = str(action or "").strip()
         self._enabled = None if enabled is None else bool(enabled)
+        self._adapters = list(adapters or [])
         self._language = str(language or "ru")
 
     def run(self) -> None:
@@ -111,6 +113,7 @@ class DnsForceDnsActionWorker(QThread):
             "plan": plan,
             "message": str(command_result.message or ""),
             "changed": True,
+            "dns_info": self._refresh_dns_info(),
         }
 
     def _run_reset_dhcp(self) -> dict[str, object]:
@@ -127,7 +130,13 @@ class DnsForceDnsActionWorker(QThread):
         return {
             "plan": plan,
             "message": str(command_result.message or ""),
+            "dns_info": self._refresh_dns_info(),
         }
+
+    def _refresh_dns_info(self):
+        if not self._adapters:
+            return None
+        return self._dns.refresh_dns_info(self._adapters)
 
 
 class DnsFlushCacheWorker(QThread):

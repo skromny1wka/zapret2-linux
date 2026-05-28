@@ -874,11 +874,12 @@ class NetworkPage(BasePage):
         """Обработчик переключения принудительного DNS"""
         self._request_force_dns_action("toggle", enabled=bool(enabled))
 
-    def create_force_dns_action_worker(self, request_id: int, *, action: str, enabled=None):
+    def create_force_dns_action_worker(self, request_id: int, *, action: str, enabled=None, adapters=None):
         return self._dns_feature().create_force_dns_action_worker(
             request_id,
             action=action,
             enabled=enabled,
+            adapters=adapters,
             language=self._ui_language,
             parent=self,
         )
@@ -906,6 +907,7 @@ class NetworkPage(BasePage):
             request_id,
             action=str(payload.get("action") or ""),
             enabled=payload.get("enabled"),
+            adapters=[card.adapter_name for card in self.adapter_cards],
         )
         self._force_dns_action_worker = worker
         worker.completed.connect(self._on_force_dns_action_finished)
@@ -941,8 +943,9 @@ class NetworkPage(BasePage):
             details_fallback=str(plan.details_fallback or ""),
         )
         self._update_dns_selection_state()
-        if bool(data.get("changed", True)):
-            self._refresh_adapters_dns()
+        dns_info = data.get("dns_info")
+        if bool(data.get("changed", True)) and isinstance(dns_info, dict):
+            self._apply_refreshed_adapter_dns_info(dns_info)
 
     def _apply_force_dns_reset_worker_result(self, data: dict[str, object]) -> None:
         result_plan = data.get("plan")
@@ -975,7 +978,9 @@ class NetworkPage(BasePage):
             result_plan.status_details_key,
         )
         self._update_dns_selection_state()
-        self._refresh_adapters_dns()
+        dns_info = data.get("dns_info")
+        if isinstance(dns_info, dict):
+            self._apply_refreshed_adapter_dns_info(dns_info)
 
         if result_plan.infobar_level == "success":
             InfoBar.success(

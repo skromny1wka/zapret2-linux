@@ -1813,6 +1813,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         page_source = inspect.getsource(dns_page.NetworkPage)
         toggle_source = inspect.getsource(dns_page.NetworkPage._on_force_dns_toggled)
         reset_source = inspect.getsource(dns_page.NetworkPage._reset_dns_to_dhcp)
+        toggle_result_source = inspect.getsource(dns_page.NetworkPage._apply_force_dns_toggle_worker_result)
+        reset_result_source = inspect.getsource(dns_page.NetworkPage._apply_force_dns_reset_worker_result)
 
         self.assertTrue(hasattr(page_workers, "DnsForceDnsActionWorker"))
         worker_source = inspect.getsource(page_workers.DnsForceDnsActionWorker)
@@ -1830,6 +1832,9 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("get_force_dns_status", worker_source)
         self.assertIn("enable_force_dns", worker_source)
         self.assertIn("disable_force_dns", worker_source)
+        self.assertIn("refresh_dns_info", worker_source)
+        self.assertNotIn("_refresh_adapters_dns", toggle_result_source)
+        self.assertNotIn("_refresh_adapters_dns", reset_result_source)
 
     def test_dns_flush_cache_runs_through_worker(self) -> None:
         page_workers = importlib.import_module("dns.page_workers")

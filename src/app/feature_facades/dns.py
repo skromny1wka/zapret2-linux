@@ -46,6 +46,7 @@ def build_dns_feature() -> DnsFeature:
         *,
         action: str,
         enabled=None,
+        adapters=None,
         language: str = "ru",
         parent=None,
     ):
@@ -56,6 +57,7 @@ def build_dns_feature() -> DnsFeature:
             dns_feature=feature,
             action=action,
             enabled=enabled,
+            adapters=adapters,
             language=language,
             parent=parent,
         )
