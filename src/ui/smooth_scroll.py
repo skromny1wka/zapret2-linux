@@ -91,9 +91,9 @@ def is_editor_smooth_scroll_target(widget) -> bool:
 def get_page_smooth_scroll_enabled() -> bool:
     """Читает обычную настройку плавной прокрутки страниц и списков."""
     try:
-        from settings.appearance import load_smooth_scroll_enabled
+        from settings.appearance import peek_warmed_smooth_scroll_enabled
 
-        return bool(load_smooth_scroll_enabled().enabled)
+        return bool(peek_warmed_smooth_scroll_enabled())
     except Exception:
         return False
 
@@ -101,9 +101,9 @@ def get_page_smooth_scroll_enabled() -> bool:
 def get_editor_smooth_scroll_enabled() -> bool:
     """Читает пользовательскую настройку плавной прокрутки редакторов."""
     try:
-        from settings.appearance import load_editor_smooth_scroll_enabled
+        from settings.appearance import peek_warmed_editor_smooth_scroll_enabled
 
-        return bool(load_editor_smooth_scroll_enabled().enabled)
+        return bool(peek_warmed_editor_smooth_scroll_enabled())
     except Exception:
         return False
 
@@ -111,9 +111,9 @@ def get_editor_smooth_scroll_enabled() -> bool:
 def get_effective_editor_smooth_scroll_enabled(preference: bool | None = None) -> bool:
     """Возвращает итоговый флаг редакторов с учётом мастер-настройки анимаций."""
     try:
-        from settings.appearance import load_animations_enabled
+        from settings.appearance import peek_warmed_animations_enabled
 
-        animations_enabled = bool(load_animations_enabled().enabled)
+        animations_enabled = bool(peek_warmed_animations_enabled())
     except Exception:
         animations_enabled = False
 

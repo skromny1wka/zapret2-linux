@@ -18,9 +18,13 @@ def build_initial_ui_state() -> AppUiState:
         if not isinstance(window, dict):
             window = {}
         from settings.appearance import (
+            store_warmed_animations_enabled,
             store_warmed_background_preset,
+            store_warmed_editor_smooth_scroll_enabled,
             store_warmed_mica_enabled,
+            store_warmed_premium_effects,
             store_warmed_rkn_background,
+            store_warmed_smooth_scroll_enabled,
             store_warmed_ui_language,
             store_warmed_window_opacity,
         )
@@ -30,6 +34,10 @@ def build_initial_ui_state() -> AppUiState:
         store_warmed_mica_enabled(appearance.get("mica_enabled"))
         store_warmed_window_opacity(window.get("opacity"))
         store_warmed_rkn_background(appearance.get("rkn_background"))
+        store_warmed_animations_enabled(appearance.get("animations_enabled"))
+        store_warmed_smooth_scroll_enabled(appearance.get("smooth_scroll_enabled"))
+        store_warmed_editor_smooth_scroll_enabled(appearance.get("editor_smooth_scroll_enabled"))
+        store_warmed_premium_effects(appearance.get("garland_enabled"), appearance.get("snowflakes_enabled"))
         program = settings.get("program") if isinstance(settings, dict) else {}
         if not isinstance(program, dict):
             program = {}

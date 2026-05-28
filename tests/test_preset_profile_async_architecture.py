@@ -90,7 +90,10 @@ import diagnostics.ui.runtime_helpers as diagnostics_runtime_helpers
 from app.feature_facades.diagnostics import DiagnosticsFeature
 import ui.navigation.text_sync as navigation_text_sync
 import ui.theme as ui_theme
+import ui.window_appearance_bindings as window_appearance_bindings
 import ui.window_appearance_state as window_appearance_state
+import ui.smooth_scroll as smooth_scroll
+import ui.animation_policy as animation_policy
 import main.entry as main_entry
 from app.page_names import PageName
 from ui.widgets.win11_controls import Win11RadioOption
@@ -679,6 +682,34 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("peek_warmed_window_opacity", combined)
         self.assertNotIn("load_background_preset", combined)
         self.assertNotIn("load_mica_enabled", combined)
+        self.assertNotIn("load_window_opacity", combined)
+
+    def test_window_appearance_bindings_use_warmed_state_without_settings_reads(self) -> None:
+        bindings_source = inspect.getsource(window_appearance_bindings.initialize_window_appearance_bindings)
+        holiday_source = inspect.getsource(window_appearance_bindings.initialize_window_holiday_effects)
+        smooth_source = "\n".join(
+            (
+                inspect.getsource(smooth_scroll.get_page_smooth_scroll_enabled),
+                inspect.getsource(smooth_scroll.get_editor_smooth_scroll_enabled),
+                inspect.getsource(smooth_scroll.get_effective_editor_smooth_scroll_enabled),
+            )
+        )
+        animation_source = "\n".join(
+            (
+                inspect.getsource(animation_policy.are_animations_enabled),
+                inspect.getsource(animation_policy.apply_window_animation_policy),
+            )
+        )
+        combined = "\n".join((bindings_source, holiday_source, smooth_source, animation_source))
+
+        self.assertIn("peek_warmed_animations_enabled", combined)
+        self.assertIn("peek_warmed_smooth_scroll_enabled", combined)
+        self.assertIn("peek_warmed_editor_smooth_scroll_enabled", combined)
+        self.assertIn("peek_warmed_premium_effects", combined)
+        self.assertNotIn("load_animations_enabled", combined)
+        self.assertNotIn("load_smooth_scroll_enabled", combined)
+        self.assertNotIn("load_editor_smooth_scroll_enabled", combined)
+        self.assertNotIn("load_premium_effects", combined)
         self.assertNotIn("load_window_opacity", combined)
 
     def test_appearance_windows_accent_loads_through_worker(self) -> None:

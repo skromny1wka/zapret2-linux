@@ -1174,6 +1174,11 @@ class StartupRuntimeSetupTests(unittest.TestCase):
                 "background_preset": "rkn_chan",
                 "mica_enabled": False,
                 "rkn_background": "rkn_tyan/rkn_background.jpg",
+                "animations_enabled": True,
+                "smooth_scroll_enabled": True,
+                "editor_smooth_scroll_enabled": True,
+                "garland_enabled": True,
+                "snowflakes_enabled": False,
             },
             "window": {
                 "opacity": 72,
@@ -1196,6 +1201,10 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         appearance_settings.clear_warmed_background_preset_cache()
         appearance_settings.clear_warmed_mica_enabled_cache()
         appearance_settings.clear_warmed_window_opacity_cache()
+        appearance_settings.clear_warmed_animations_enabled_cache()
+        appearance_settings.clear_warmed_smooth_scroll_enabled_cache()
+        appearance_settings.clear_warmed_editor_smooth_scroll_enabled_cache()
+        appearance_settings.clear_warmed_premium_effects_cache()
         with patch("settings.store.read_settings", return_value=data) as read_settings:
             state = build_initial_ui_state()
 
@@ -1206,6 +1215,13 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         self.assertEqual(appearance_settings.peek_warmed_mica_enabled(), False)
         self.assertEqual(appearance_settings.peek_warmed_window_opacity(), 72)
         self.assertEqual(appearance_settings.peek_warmed_rkn_background(), "rkn_tyan/rkn_background.jpg")
+        self.assertEqual(appearance_settings.peek_warmed_animations_enabled(), True)
+        self.assertEqual(appearance_settings.peek_warmed_smooth_scroll_enabled(), True)
+        self.assertEqual(appearance_settings.peek_warmed_editor_smooth_scroll_enabled(), True)
+        premium_effects = appearance_settings.peek_warmed_premium_effects()
+        self.assertIsNotNone(premium_effects)
+        self.assertEqual(premium_effects.garland_enabled, True)
+        self.assertEqual(premium_effects.snowflakes_enabled, False)
 
     def test_zapret2_control_defers_heavy_sections_until_startup_interactive(self) -> None:
         from presets.ui.control.zapret2 import page as zapret2_page

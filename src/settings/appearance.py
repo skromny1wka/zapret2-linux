@@ -107,6 +107,14 @@ _warmed_mica_enabled_lock = threading.Lock()
 _warmed_mica_enabled_cache: bool | None = None
 _warmed_window_opacity_lock = threading.Lock()
 _warmed_window_opacity_cache: int | None = None
+_warmed_animations_enabled_lock = threading.Lock()
+_warmed_animations_enabled_cache: bool | None = None
+_warmed_smooth_scroll_enabled_lock = threading.Lock()
+_warmed_smooth_scroll_enabled_cache: bool | None = None
+_warmed_editor_smooth_scroll_enabled_lock = threading.Lock()
+_warmed_editor_smooth_scroll_enabled_cache: bool | None = None
+_warmed_premium_effects_lock = threading.Lock()
+_warmed_premium_effects_cache: AppearancePremiumEffectsPlan | None = None
 
 
 def store_warmed_ui_language(language: str | None) -> None:
@@ -206,6 +214,82 @@ def clear_warmed_window_opacity_cache() -> None:
         _warmed_window_opacity_cache = None
 
 
+def store_warmed_animations_enabled(enabled: bool | None) -> None:
+    global _warmed_animations_enabled_cache
+    normalized = bool(schema.default_appearance()["animations_enabled"]) if enabled is None else bool(enabled)
+    with _warmed_animations_enabled_lock:
+        _warmed_animations_enabled_cache = normalized
+
+
+def peek_warmed_animations_enabled() -> bool | None:
+    with _warmed_animations_enabled_lock:
+        return _warmed_animations_enabled_cache
+
+
+def clear_warmed_animations_enabled_cache() -> None:
+    global _warmed_animations_enabled_cache
+    with _warmed_animations_enabled_lock:
+        _warmed_animations_enabled_cache = None
+
+
+def store_warmed_smooth_scroll_enabled(enabled: bool | None) -> None:
+    global _warmed_smooth_scroll_enabled_cache
+    normalized = bool(schema.default_appearance()["smooth_scroll_enabled"]) if enabled is None else bool(enabled)
+    with _warmed_smooth_scroll_enabled_lock:
+        _warmed_smooth_scroll_enabled_cache = normalized
+
+
+def peek_warmed_smooth_scroll_enabled() -> bool | None:
+    with _warmed_smooth_scroll_enabled_lock:
+        return _warmed_smooth_scroll_enabled_cache
+
+
+def clear_warmed_smooth_scroll_enabled_cache() -> None:
+    global _warmed_smooth_scroll_enabled_cache
+    with _warmed_smooth_scroll_enabled_lock:
+        _warmed_smooth_scroll_enabled_cache = None
+
+
+def store_warmed_editor_smooth_scroll_enabled(enabled: bool | None) -> None:
+    global _warmed_editor_smooth_scroll_enabled_cache
+    normalized = bool(schema.default_appearance()["editor_smooth_scroll_enabled"]) if enabled is None else bool(enabled)
+    with _warmed_editor_smooth_scroll_enabled_lock:
+        _warmed_editor_smooth_scroll_enabled_cache = normalized
+
+
+def peek_warmed_editor_smooth_scroll_enabled() -> bool | None:
+    with _warmed_editor_smooth_scroll_enabled_lock:
+        return _warmed_editor_smooth_scroll_enabled_cache
+
+
+def clear_warmed_editor_smooth_scroll_enabled_cache() -> None:
+    global _warmed_editor_smooth_scroll_enabled_cache
+    with _warmed_editor_smooth_scroll_enabled_lock:
+        _warmed_editor_smooth_scroll_enabled_cache = None
+
+
+def store_warmed_premium_effects(garland_enabled: bool | None, snowflakes_enabled: bool | None) -> None:
+    global _warmed_premium_effects_cache
+    defaults = schema.default_appearance()
+    plan = AppearancePremiumEffectsPlan(
+        garland_enabled=bool(defaults["garland_enabled"]) if garland_enabled is None else bool(garland_enabled),
+        snowflakes_enabled=bool(defaults["snowflakes_enabled"]) if snowflakes_enabled is None else bool(snowflakes_enabled),
+    )
+    with _warmed_premium_effects_lock:
+        _warmed_premium_effects_cache = plan
+
+
+def peek_warmed_premium_effects() -> AppearancePremiumEffectsPlan | None:
+    with _warmed_premium_effects_lock:
+        return _warmed_premium_effects_cache
+
+
+def clear_warmed_premium_effects_cache() -> None:
+    global _warmed_premium_effects_cache
+    with _warmed_premium_effects_lock:
+        _warmed_premium_effects_cache = None
+
+
 def store_warmed_page_initial_state(state: AppearancePageInitialStatePlan) -> None:
     global _warmed_page_initial_state_cache
     with _warmed_page_initial_state_lock:
@@ -215,6 +299,10 @@ def store_warmed_page_initial_state(state: AppearancePageInitialStatePlan) -> No
     store_warmed_mica_enabled(state.mica_enabled)
     store_warmed_window_opacity(state.window_opacity)
     store_warmed_rkn_background(state.rkn_background)
+    store_warmed_animations_enabled(state.animations_enabled)
+    store_warmed_smooth_scroll_enabled(state.smooth_scroll_enabled)
+    store_warmed_editor_smooth_scroll_enabled(state.editor_smooth_scroll_enabled)
+    store_warmed_premium_effects(state.garland_enabled, state.snowflakes_enabled)
 
 
 def clear_warmed_page_initial_state_cache() -> None:
@@ -431,6 +519,7 @@ def save_animations_enabled(enabled: bool) -> AppearanceTogglePlan:
         set_animations_enabled(bool(enabled))
     except Exception:
         pass
+    store_warmed_animations_enabled(bool(enabled))
     return AppearanceTogglePlan(enabled=bool(enabled))
 
 def load_smooth_scroll_enabled() -> AppearanceTogglePlan:
@@ -449,6 +538,7 @@ def save_smooth_scroll_enabled(enabled: bool) -> AppearanceTogglePlan:
         set_smooth_scroll_enabled(bool(enabled))
     except Exception:
         pass
+    store_warmed_smooth_scroll_enabled(bool(enabled))
     return AppearanceTogglePlan(enabled=bool(enabled))
 
 def load_editor_smooth_scroll_enabled() -> AppearanceTogglePlan:
@@ -467,6 +557,7 @@ def save_editor_smooth_scroll_enabled(enabled: bool) -> AppearanceTogglePlan:
         set_editor_smooth_scroll_enabled(bool(enabled))
     except Exception:
         pass
+    store_warmed_editor_smooth_scroll_enabled(bool(enabled))
     return AppearanceTogglePlan(enabled=bool(enabled))
 
 def load_accent_color() -> AppearanceAccentColorPlan:
@@ -588,6 +679,8 @@ def save_garland_enabled(enabled: bool) -> AppearanceTogglePlan:
         set_garland_enabled(bool(enabled))
     except Exception:
         pass
+    current = peek_warmed_premium_effects()
+    store_warmed_premium_effects(bool(enabled), None if current is None else current.snowflakes_enabled)
     return AppearanceTogglePlan(enabled=bool(enabled))
 
 def save_snowflakes_enabled(enabled: bool) -> AppearanceTogglePlan:
@@ -597,6 +690,8 @@ def save_snowflakes_enabled(enabled: bool) -> AppearanceTogglePlan:
         set_snowflakes_enabled(bool(enabled))
     except Exception:
         pass
+    current = peek_warmed_premium_effects()
+    store_warmed_premium_effects(None if current is None else current.garland_enabled, bool(enabled))
     return AppearanceTogglePlan(enabled=bool(enabled))
 
 def build_premium_status_plan(
