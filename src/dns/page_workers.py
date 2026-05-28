@@ -128,3 +128,37 @@ class DnsForceDnsActionWorker(QThread):
             "plan": plan,
             "message": str(command_result.message or ""),
         }
+
+
+class DnsFlushCacheWorker(QThread):
+    completed = pyqtSignal(int, object)
+    failed = pyqtSignal(int, str)
+
+    def __init__(
+        self,
+        request_id: int,
+        dns_feature,
+        *,
+        language: str = "ru",
+        parent=None,
+    ):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self._dns = dns_feature
+        self._language = str(language or "ru")
+
+    def run(self) -> None:
+        from dns.ui import page_plans as dns_page_plans
+
+        try:
+            result = self._dns.flush_dns_cache()
+            plan = dns_page_plans.build_flush_dns_cache_result_plan(
+                success=bool(result.success),
+                message=str(result.message or ""),
+                language=self._language,
+            )
+        except Exception as exc:
+            log(f"DnsFlushCacheWorker: ошибка сброса DNS кэша: {exc}", "ERROR")
+            self.failed.emit(self._request_id, str(exc))
+            return
+        self.completed.emit(self._request_id, plan)

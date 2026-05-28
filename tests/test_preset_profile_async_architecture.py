@@ -1816,6 +1816,24 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("enable_force_dns", worker_source)
         self.assertIn("disable_force_dns", worker_source)
 
+    def test_dns_flush_cache_runs_through_worker(self) -> None:
+        page_workers = importlib.import_module("dns.page_workers")
+        feature_source = inspect.getsource(__import__("app.feature_facades.dns", fromlist=["DnsFeature"]).DnsFeature)
+        page_source = inspect.getsource(dns_page.NetworkPage)
+        flush_source = inspect.getsource(dns_page.NetworkPage._flush_dns_cache)
+
+        self.assertTrue(hasattr(page_workers, "DnsFlushCacheWorker"))
+        worker_source = inspect.getsource(page_workers.DnsFlushCacheWorker)
+
+        self.assertIn("_request_dns_flush_cache", flush_source)
+        self.assertNotIn("flush_dns_cache_action", flush_source)
+        self.assertNotIn(".flush_dns_cache(", flush_source)
+        self.assertIn("create_dns_flush_cache_worker", feature_source)
+        self.assertIn("create_dns_flush_cache_worker", page_source)
+        self.assertIn("_dns_flush_cache_pending", page_source)
+        self.assertIn("flush_dns_cache", worker_source)
+        self.assertIn("build_flush_dns_cache_result_plan", worker_source)
+
     def test_network_loaded_adapters_do_not_wait_for_current_dns(self) -> None:
         stored = {}
         build_calls = []

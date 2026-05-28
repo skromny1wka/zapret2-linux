@@ -45,7 +45,6 @@ from dns.ui.force_dns_ui import (
 from dns.ui.force_dns_build import build_force_dns_card_ui
 from dns.page_force_dns_workflow import (
     apply_force_dns_status_state,
-    flush_dns_cache_action,
 )
 from dns.page_apply_workflow import (
     apply_auto_dns_quick,
@@ -129,6 +128,9 @@ class NetworkPage(BasePage):
         self._force_dns_action_worker = None
         self._force_dns_action_request_id = 0
         self._force_dns_action_pending: list[dict[str, object]] = []
+        self._dns_flush_cache_worker = None
+        self._dns_flush_cache_request_id = 0
+        self._dns_flush_cache_pending = False
         
         self.dns_cards = {}
         self.adapter_cards = []
@@ -922,6 +924,67 @@ class NetworkPage(BasePage):
         if self._force_dns_action_pending and not self._cleanup_in_progress:
             pending = self._force_dns_action_pending.pop(0)
             self._start_force_dns_action_worker(dict(pending or {}))
+
+    def create_dns_flush_cache_worker(self, request_id: int):
+        return self._dns_feature().create_dns_flush_cache_worker(
+            request_id,
+            language=self._ui_language,
+            parent=self,
+        )
+
+    def _request_dns_flush_cache(self) -> None:
+        worker = self.__dict__.get("_dns_flush_cache_worker")
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    self._dns_flush_cache_pending = True
+                    return
+            except Exception:
+                self._dns_flush_cache_pending = True
+                return
+        self._start_dns_flush_cache_worker()
+
+    def _start_dns_flush_cache_worker(self) -> None:
+        self._dns_flush_cache_request_id += 1
+        request_id = self._dns_flush_cache_request_id
+        worker = self.create_dns_flush_cache_worker(request_id)
+        self._dns_flush_cache_worker = worker
+        worker.completed.connect(self._on_dns_flush_cache_finished)
+        worker.failed.connect(self._on_dns_flush_cache_failed)
+        worker.finished.connect(lambda w=worker: self._on_dns_flush_cache_worker_finished(w))
+        worker.start()
+
+    def _on_dns_flush_cache_finished(self, request_id: int, plan) -> None:
+        if request_id != self._dns_flush_cache_request_id or self._cleanup_in_progress:
+            return
+        if getattr(plan, "infobar_level", None) == "warning":
+            InfoBar.warning(
+                title=plan.title,
+                content=plan.content,
+                parent=self.window(),
+            )
+
+    def _on_dns_flush_cache_failed(self, request_id: int, error: str) -> None:
+        if request_id != self._dns_flush_cache_request_id or self._cleanup_in_progress:
+            return
+        plan = dns_page_plans.build_flush_dns_cache_result_plan(
+            success=False,
+            message=str(error or ""),
+            language=self._ui_language,
+        )
+        InfoBar.warning(
+            title=plan.title,
+            content=plan.content,
+            parent=self.window(),
+        )
+
+    def _on_dns_flush_cache_worker_finished(self, worker) -> None:
+        if self.__dict__.get("_dns_flush_cache_worker") is worker:
+            self._dns_flush_cache_worker = None
+        worker.deleteLater()
+        if self._dns_flush_cache_pending and not self._cleanup_in_progress:
+            self._dns_flush_cache_pending = False
+            self._start_dns_flush_cache_worker()
     
     def _set_force_dns_toggle(self, checked: bool):
         """Устанавливает состояние переключателя без триггера сигналов"""
@@ -972,13 +1035,7 @@ class NetworkPage(BasePage):
     
     def _flush_dns_cache(self):
         """Сбрасывает DNS кэш"""
-        flush_dns_cache_action(
-            flush_dns_cache_fn=self._dns_feature().flush_dns_cache,
-            build_result_plan_fn=dns_page_plans.build_flush_dns_cache_result_plan,
-            language=self._ui_language,
-            info_bar_cls=InfoBar,
-            parent_window=self.window(),
-        )
+        self._request_dns_flush_cache()
 
     def _confirm_flush_dns_cache(self):
         if not self._confirm_action(
@@ -1122,6 +1179,7 @@ class NetworkPage(BasePage):
         except Exception:
             pass
         self._force_dns_action_pending.clear()
+        self._dns_flush_cache_pending = False
         force_dns_worker = self.__dict__.get("_force_dns_action_worker")
         if force_dns_worker is not None:
             try:
@@ -1129,6 +1187,13 @@ class NetworkPage(BasePage):
             except Exception:
                 pass
             self._force_dns_action_worker = None
+        flush_cache_worker = self.__dict__.get("_dns_flush_cache_worker")
+        if flush_cache_worker is not None:
+            try:
+                flush_cache_worker.quit()
+            except Exception:
+                pass
+            self._dns_flush_cache_worker = None
         cleanup_network_page(
             set_cleanup_in_progress_fn=lambda value: setattr(self, "_cleanup_in_progress", value),
             set_test_in_progress_fn=lambda value: setattr(self, "_test_in_progress", value),
