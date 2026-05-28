@@ -71,11 +71,12 @@ def build_window_page_actions(*, window, appearance_actions) -> WindowPageAction
             profile_key,
             allow_internal=True,
         ),
-        on_profile_setup_changed=lambda method, profile_key, change_kind: apply_profile_setup_change_for_method(
+        on_profile_setup_changed=lambda method, profile_key, change_kind, profile_item=None: apply_profile_setup_change_for_method(
             window,
             method,
             profile_key,
             change_kind,
+            profile_item=profile_item,
         ),
         open_preset_raw_editor=lambda method, preset_name, *, allow_internal=True: open_preset_raw_editor_for_method(
             window,

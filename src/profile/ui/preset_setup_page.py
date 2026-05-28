@@ -484,6 +484,18 @@ class PresetSetupPageBase(BasePage):
         self._profile_payload_dirty = True
         self._schedule_profiles_payload_request(force=True)
 
+    def _replace_profile_item_locally(self, old_profile_key: str, item) -> bool:
+        profiles_list = self.__dict__.get("_profiles_list")
+        if profiles_list is None:
+            return False
+        profile_key = str(getattr(item, "key", "") or old_profile_key or "").strip()
+        if not profile_key:
+            return False
+        if not profiles_list.replace_profile_item(old_profile_key, item):
+            return False
+        self._profile_payload_dirty = True
+        return True
+
     def _apply_profile_enabled_locally(self, profile_key: str, enabled: bool) -> bool:
         profiles_list = self.__dict__.get("_profiles_list")
         if profiles_list is None:
@@ -1021,9 +1033,12 @@ class PresetSetupPageBase(BasePage):
                 context_extra=dict(pending.get("context_extra") or {}),
             )
 
-    def apply_profile_setup_change(self, profile_key: str, change_kind: str) -> None:
+    def apply_profile_setup_change(self, profile_key: str, change_kind: str, profile_item=None) -> None:
         clean_profile_key = str(profile_key or "").strip()
         kind = str(change_kind or "").strip()
+        if profile_item is not None and clean_profile_key:
+            if self._replace_profile_item_locally(clean_profile_key, profile_item):
+                return
         if (
             kind in {"strategy", "feedback", "settings", "raw_profile", "list_file", "user_profile_updated"}
             and clean_profile_key
@@ -1044,6 +1059,7 @@ class PresetSetupPageBase(BasePage):
             self.apply_profile_setup_change(
                 str((payload or {}).get("profile_key") or ""),
                 str((payload or {}).get("change_kind") or ""),
+                (payload or {}).get("profile_item"),
             )
             return True
         return False

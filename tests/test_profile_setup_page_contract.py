@@ -1132,6 +1132,19 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._refresh_profile_item_locally.assert_called_once_with("profile-1", "profile-1")
         page.refresh_from_preset_switch.assert_not_called()
 
+    def test_profile_setup_change_with_ready_item_replaces_visible_row_without_worker_refresh(self) -> None:
+        item = SimpleNamespace(key="profile-1")
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._replace_profile_item_locally = Mock(return_value=True)
+        page._refresh_profile_item_locally = Mock()
+        page.refresh_from_preset_switch = Mock()
+
+        PresetSetupPageBase.apply_profile_setup_change(page, "profile-1", "strategy", item)
+
+        page._replace_profile_item_locally.assert_called_once_with("profile-1", item)
+        page._refresh_profile_item_locally.assert_not_called()
+        page.refresh_from_preset_switch.assert_not_called()
+
     def test_enabled_change_refreshes_only_changed_profile_row(self) -> None:
         page = PresetSetupPageBase.__new__(PresetSetupPageBase)
         page._apply_profile_enabled_locally = Mock(return_value=True)
@@ -2091,6 +2104,22 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page.reload_current_profile.assert_not_called()
         page._on_profile_changed_callback.assert_not_called()
 
+    def test_strategy_apply_finish_passes_updated_item_to_preset_page(self) -> None:
+        updated_item = SimpleNamespace(strategy_id="tls_fake", in_preset=True, enabled=True)
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._profile_key = "profile-1"
+        page._strategy_apply_request_id = 1
+        page._pending_strategy_apply = None
+        page._payload = SimpleNamespace(item=updated_item)
+        page._apply_strategy_locally = Mock(return_value=True)
+        page.reload_current_profile = Mock()
+        page._on_profile_changed_callback = Mock()
+
+        ProfileSetupPageBase._on_strategy_apply_finished(page, 1, "profile-1", "profile-1", "tls_fake")
+
+        page.reload_current_profile.assert_not_called()
+        page._on_profile_changed_callback.assert_called_once_with("profile-1", "strategy", updated_item)
+
     def test_strategy_apply_worker_emits_new_profile_key(self) -> None:
         controller = Mock()
         controller.apply_strategy.return_value = "profile-1"
@@ -2197,7 +2226,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertEqual(page._payload.current_strategy_state.rating, "work")
         self.assertEqual(page._payload.item.rating, "work")
         page._apply_feedback_buttons.assert_called_once_with(page._payload)
-        page._on_profile_changed_callback.assert_called_once_with("profile-1", "feedback")
+        page._on_profile_changed_callback.assert_called_once_with("profile-1", "feedback", page._payload.item)
 
     def test_strategy_feedback_finish_for_previous_strategy_is_ignored(self) -> None:
         page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)

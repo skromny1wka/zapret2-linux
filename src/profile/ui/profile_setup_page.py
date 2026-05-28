@@ -1877,9 +1877,13 @@ class ProfileSetupPageBase(BasePage):
         new_key = str(profile_key or "").strip()
         if new_key:
             self._profile_key = new_key
-        if not self._apply_strategy_locally(strategy_id) or self._profile_key != previous_key:
+        applied_locally = self._apply_strategy_locally(strategy_id)
+        if not applied_locally or self._profile_key != previous_key:
             self.reload_current_profile()
-        self._on_profile_changed_callback(self._profile_key, "strategy")
+            self._on_profile_changed_callback(self._profile_key, "strategy")
+            return
+        item = getattr(getattr(self, "_payload", None), "item", None)
+        self._on_profile_changed_callback(self._profile_key, "strategy", item)
 
     def _on_strategy_apply_failed(self, request_id: int, error: str) -> None:
         if request_id != int(getattr(self, "_strategy_apply_request_id", 0) or 0):
@@ -1994,7 +1998,10 @@ class ProfileSetupPageBase(BasePage):
             return
         if not self._apply_strategy_feedback_locally(state):
             self.reload_current_profile()
-        self._on_profile_changed_callback(self._profile_key, "feedback")
+            self._on_profile_changed_callback(self._profile_key, "feedback")
+            return
+        item = getattr(getattr(self, "_payload", None), "item", None)
+        self._on_profile_changed_callback(self._profile_key, "feedback", item)
 
     def _on_strategy_feedback_save_failed(self, request_id: int, error: str) -> None:
         if request_id != int(getattr(self, "_strategy_feedback_save_request_id", 0) or 0):

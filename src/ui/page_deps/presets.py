@@ -76,10 +76,11 @@ def build_profile_setup_page_kwargs(
         "profile_feature": profile_feature,
         "open_profiles": lambda page=profiles_page: show_page(page, allow_internal=True),
         "open_root": lambda m=method: show_page(resolve_profile_setup_root_page_for_method(m), allow_internal=True),
-        "on_profile_changed": lambda profile_key, change_kind, m=method: on_profile_setup_changed(
+        "on_profile_changed": lambda profile_key, change_kind, profile_item=None, m=method: on_profile_setup_changed(
             m,
             profile_key,
             change_kind,
+            profile_item,
         ),
     }
 
