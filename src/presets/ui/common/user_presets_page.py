@@ -1524,7 +1524,41 @@ class UserPresetsPageBase(BasePage):
             log_fn=log,
         )
 
+    def _stop_action_workers_for_cleanup(self) -> None:
+        self._pending_preset_activation = None
+        self._preset_folder_action_pending.clear()
+        self._preset_bulk_action_kind = ""
+        self._bulk_reset_running = False
+
+        for attr in (
+            "_preset_activate_request_id",
+            "_preset_item_action_request_id",
+            "_preset_bulk_action_request_id",
+            "_preset_edit_action_request_id",
+            "_preset_storage_action_request_id",
+            "_preset_folder_action_request_id",
+        ):
+            setattr(self, attr, int(getattr(self, attr, 0) or 0) + 1)
+
+        for attr in (
+            "_preset_activate_worker",
+            "_preset_item_action_worker",
+            "_preset_bulk_action_worker",
+            "_preset_edit_action_worker",
+            "_preset_storage_action_worker",
+            "_preset_folder_action_worker",
+        ):
+            worker = self.__dict__.get(attr)
+            if worker is None:
+                continue
+            try:
+                worker.quit()
+            except Exception:
+                pass
+            setattr(self, attr, None)
+
     def cleanup(self) -> None:
+        self._stop_action_workers_for_cleanup()
         cleanup_user_presets_page(
             set_cleanup_in_progress_fn=lambda value: setattr(self, "_cleanup_in_progress", value),
             layout_resync_timer=self._layout_resync_timer,

@@ -310,6 +310,62 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertEqual(page._resolve_display_name("cached.txt"), "Cached Preset")
         self.assertEqual(page._resolve_display_name("fallback.txt"), "fallback")
 
+    def test_user_presets_cleanup_stops_action_workers_and_pending_requests(self) -> None:
+        class _Worker:
+            def __init__(self) -> None:
+                self.quit = Mock()
+
+        class _Timer:
+            def __init__(self) -> None:
+                self.stop = Mock()
+
+        worker_attrs = (
+            "_preset_activate_worker",
+            "_preset_item_action_worker",
+            "_preset_bulk_action_worker",
+            "_preset_edit_action_worker",
+            "_preset_storage_action_worker",
+            "_preset_folder_action_worker",
+        )
+        request_attrs = (
+            "_preset_activate_request_id",
+            "_preset_item_action_request_id",
+            "_preset_bulk_action_request_id",
+            "_preset_edit_action_request_id",
+            "_preset_storage_action_request_id",
+            "_preset_folder_action_request_id",
+        )
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        workers = {attr: _Worker() for attr in worker_attrs}
+        for attr, worker in workers.items():
+            setattr(page, attr, worker)
+        for attr in request_attrs:
+            setattr(page, attr, 7)
+        page._pending_preset_activation = ("next.txt", "Next")
+        page._preset_folder_action_pending = [{"action": "load_state"}]
+        page._preset_bulk_action_kind = "reset_all"
+        page._bulk_reset_running = True
+        page._layout_resync_timer = _Timer()
+        page._layout_resync_delayed_timer = _Timer()
+        page._preset_search_timer = _Timer()
+        page._ui_state_unsubscribe = Mock()
+        page._ui_state_store = object()
+        page._runtime_service = Mock()
+
+        UserPresetsPageBase.cleanup(page)
+
+        for worker in workers.values():
+            worker.quit.assert_called_once()
+        for attr in worker_attrs:
+            self.assertIsNone(getattr(page, attr))
+        for attr in request_attrs:
+            self.assertEqual(getattr(page, attr), 8)
+        self.assertIsNone(page._pending_preset_activation)
+        self.assertEqual(page._preset_folder_action_pending, [])
+        self.assertEqual(page._preset_bulk_action_kind, "")
+        self.assertFalse(page._bulk_reset_running)
+        page._runtime_service.stop_watching_presets.assert_called_once()
+
     def test_user_presets_menu_selected_check_uses_runtime_marker(self) -> None:
         source = inspect.getsource(UserPresetsPageBase._is_selected_source_preset_file)
 
