@@ -548,6 +548,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("load_page_initial_state", build_source)
         self.assertNotIn("load_page_initial_state", ensure_source)
         self.assertIn("_request_initial_state_load", build_source)
+        self.assertIn("initial_state.ui_language = self._ui_language", build_source)
         self.assertNotIn("appearance_settings.load_ui_language()", build_source)
         self.assertNotIn("appearance_settings.load_window_opacity()", build_source)
         self.assertNotIn("self._load_accent_color()", build_source)

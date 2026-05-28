@@ -249,6 +249,8 @@ class AppearancePage(BasePage):
         initial_state = warmed_state or appearance_settings.build_default_page_initial_state()
         if warmed_state is not None:
             self._initial_state_plan = warmed_state
+        else:
+            initial_state.ui_language = self._ui_language
         self._ui_language = initial_state.ui_language
         # ═══════════════════════════════════════════════════════════
         # РЕЖИМ ОТОБРАЖЕНИЯ
