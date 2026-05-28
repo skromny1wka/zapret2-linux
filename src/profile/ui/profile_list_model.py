@@ -153,11 +153,50 @@ class ProfileListModel(QAbstractListModel):
         key = str(group_key or "")
         if not key:
             return
-        if self._group_expanded.get(key, True) == bool(expanded):
+        expanded_value = bool(expanded)
+        if self._group_expanded.get(key, True) == expanded_value:
             return
+        next_group_expanded = dict(self._group_expanded)
+        next_group_expanded[key] = expanded_value
+        next_rows = self._build_rows_from(self._all_items, next_group_expanded)
+        old_ids = [_stable_row_identity(row) for row in self._rows]
+        next_ids = [_stable_row_identity(row) for row in next_rows]
+
+        if old_ids == next_ids:
+            changed_rows = tuple(index for index, row in enumerate(next_rows) if self._rows[index] != row)
+            self._group_expanded = next_group_expanded
+            self._rows = next_rows
+            self._emit_data_changed_for_rows(changed_rows)
+            return
+
+        old_group_index = _row_index_for_group(self._rows, key)
+        next_group_index = _row_index_for_group(next_rows, key)
+        if old_group_index >= 0 and old_group_index == next_group_index:
+            changed_rows = _changed_existing_row_indexes(
+                self._rows,
+                next_rows,
+                identity_fn=_stable_row_identity,
+            )
+            if expanded_value and _rows_match_single_group_insert(self._rows, next_rows, old_group_index):
+                insert_count = len(next_rows) - len(self._rows)
+                self.beginInsertRows(QModelIndex(), old_group_index + 1, old_group_index + insert_count)
+                self._group_expanded = next_group_expanded
+                self._rows = next_rows
+                self.endInsertRows()
+                self._emit_data_changed_for_rows(changed_rows)
+                return
+            if not expanded_value and _rows_match_single_group_remove(self._rows, next_rows, old_group_index):
+                remove_count = len(self._rows) - len(next_rows)
+                self.beginRemoveRows(QModelIndex(), old_group_index + 1, old_group_index + remove_count)
+                self._group_expanded = next_group_expanded
+                self._rows = next_rows
+                self.endRemoveRows()
+                self._emit_data_changed_for_rows(changed_rows)
+                return
+
         self.beginResetModel()
-        self._group_expanded[key] = bool(expanded)
-        self._rows = self._build_rows()
+        self._group_expanded = next_group_expanded
+        self._rows = next_rows
         self.endResetModel()
 
     def set_all_groups_expanded(self, expanded: bool) -> None:
@@ -588,6 +627,46 @@ def _changed_existing_row_indexes(
         if old_row is not None and old_row != row:
             changed.append(index)
     return tuple(changed)
+
+
+def _row_index_for_group(rows: list[dict[str, Any]], group_key: str) -> int:
+    key = str(group_key or "")
+    for index, row in enumerate(rows):
+        if str(row.get("kind") or "") == "folder" and str(row.get("group") or "") == key:
+            return index
+    return -1
+
+
+def _rows_match_single_group_insert(
+    old_rows: list[dict[str, Any]],
+    next_rows: list[dict[str, Any]],
+    group_index: int,
+) -> bool:
+    insert_count = len(next_rows) - len(old_rows)
+    if insert_count <= 0:
+        return False
+    old_ids = [_stable_row_identity(row) for row in old_rows]
+    next_ids = [_stable_row_identity(row) for row in next_rows]
+    return (
+        old_ids[: group_index + 1] == next_ids[: group_index + 1]
+        and old_ids[group_index + 1 :] == next_ids[group_index + 1 + insert_count :]
+    )
+
+
+def _rows_match_single_group_remove(
+    old_rows: list[dict[str, Any]],
+    next_rows: list[dict[str, Any]],
+    group_index: int,
+) -> bool:
+    remove_count = len(old_rows) - len(next_rows)
+    if remove_count <= 0:
+        return False
+    old_ids = [_stable_row_identity(row) for row in old_rows]
+    next_ids = [_stable_row_identity(row) for row in next_rows]
+    return (
+        old_ids[: group_index + 1] == next_ids[: group_index + 1]
+        and old_ids[group_index + 1 + remove_count :] == next_ids[group_index + 1 :]
+    )
 
 
 def _row_identity(row: dict[str, Any]) -> tuple[str, str]:
