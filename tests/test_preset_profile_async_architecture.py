@@ -46,6 +46,7 @@ import donater.ui.page_lifecycle as premium_page_lifecycle
 from settings.dpi.page import DpiSettingsPage
 from ui.pages.appearance_page import AppearancePage
 import settings.appearance as appearance_settings
+import settings.appearance_workers as appearance_workers
 from orchestra.ui.blocked_page import OrchestraBlockedPage
 from orchestra.ui.locked_page import OrchestraLockedPage
 from orchestra.ui.ratings_page import OrchestraRatingsPage
@@ -491,6 +492,46 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("QTimer.singleShot", schedule_source)
         self.assertIn("build_holiday_sections", ensure_source)
         self.assertIn("build_performance_section", ensure_source)
+
+    def test_appearance_settings_save_runs_through_worker(self) -> None:
+        page_source = inspect.getsource(AppearancePage)
+
+        self.assertTrue(hasattr(appearance_workers, "AppearanceSettingsSaveWorker"))
+        worker_source = inspect.getsource(appearance_workers.AppearanceSettingsSaveWorker.run)
+        request_source = inspect.getsource(AppearancePage._request_appearance_save)
+        finished_source = inspect.getsource(AppearancePage._on_appearance_save_worker_finished)
+
+        for method_name in (
+            "_on_display_mode_changed",
+            "_on_ui_language_changed",
+            "_on_rkn_background_changed",
+            "_on_bg_preset_toggled",
+            "_on_opacity_changed",
+            "_on_snowflakes_changed",
+            "_on_garland_changed",
+            "_on_accent_color_changed",
+            "_on_follow_windows_accent_changed",
+            "_on_tinted_bg_changed",
+            "_on_tinted_intensity_changed",
+            "set_premium_status",
+            "_on_animations_changed",
+            "_on_smooth_scroll_changed",
+            "_on_editor_smooth_scroll_changed",
+        ):
+            source = inspect.getsource(getattr(AppearancePage, method_name))
+            self.assertIn("_request_appearance_save", source)
+            self.assertNotIn("appearance_settings.save_", source)
+
+        self.assertIn("create_appearance_save_worker", page_source)
+        self.assertIn("_coalesce_appearance_save_pending", request_source)
+        self.assertIn("_appearance_save_pending.append", page_source)
+        self.assertIn("_appearance_save_pending.pop(0)", finished_source)
+        self.assertIn("save_display_mode", worker_source)
+        self.assertIn("save_ui_language", worker_source)
+        self.assertIn("save_background_preset", worker_source)
+        self.assertIn("save_window_opacity", worker_source)
+        self.assertIn("save_accent_color", worker_source)
+        self.assertIn("save_animations_enabled", worker_source)
 
     def test_premium_navigation_does_not_read_device_info_during_language_refresh(self) -> None:
         language_source = inspect.getsource(premium_page_lifecycle.apply_premium_language)

@@ -128,6 +128,9 @@ class AppearancePage(BasePage):
         self._ui_sync_depth = 0
         self._background_refresh_queued = False
         self._cleanup_in_progress = False
+        self._appearance_save_worker = None
+        self._appearance_save_request_id = 0
+        self._appearance_save_pending: list[dict[str, object]] = []
         self._build_ui()
         self.bind_ui_state_store(ui_state_store)
 
@@ -583,33 +586,75 @@ class AppearancePage(BasePage):
             finally:
                 self._end_ui_sync()
 
-    def _on_display_mode_changed(self, mode: str):
-        """Handle display mode toggle."""
-        if self._is_ui_syncing():
-            return
-        plan = appearance_settings.save_display_mode(mode)
-        effective_mode = plan.effective_mode
+    def create_appearance_save_worker(self, request_id: int, *, action: str, value=None, context_extra: dict | None = None):
+        from settings.appearance_workers import AppearanceSettingsSaveWorker
 
-        if self._display_mode_seg is not None and effective_mode != mode:
-            self._begin_ui_sync()
+        return AppearanceSettingsSaveWorker(
+            request_id,
+            action=action,
+            value=value,
+            context_extra=context_extra,
+            parent=self,
+        )
+
+    def _request_appearance_save(self, action: str, value=None, **context_extra) -> None:
+        payload = {
+            "action": str(action or ""),
+            "value": value,
+            "context_extra": dict(context_extra or {}),
+        }
+        worker = self.__dict__.get("_appearance_save_worker")
+        if worker is not None:
             try:
-                self._set_current_item_silently(self._display_mode_seg, effective_mode)
+                if worker.isRunning():
+                    self._queue_appearance_save_payload(payload)
+                    self._coalesce_appearance_save_pending()
+                    return
             except Exception:
-                pass
-            finally:
-                self._end_ui_sync()
+                self._queue_appearance_save_payload(payload)
+                self._coalesce_appearance_save_pending()
+                return
+        self._start_appearance_save_worker(payload)
 
+    def _queue_appearance_save_payload(self, payload: dict[str, object]) -> None:
+        self._appearance_save_pending.append(payload)
+
+    def _coalesce_appearance_save_pending(self) -> None:
+        latest_by_action: dict[str, dict[str, object]] = {}
+        order: list[str] = []
+        for payload in self._appearance_save_pending:
+            action = str(payload.get("action") or "")
+            if action not in latest_by_action:
+                order.append(action)
+            latest_by_action[action] = payload
+        self._appearance_save_pending = [latest_by_action[action] for action in order]
+
+    def _start_appearance_save_worker(self, payload: dict[str, object]) -> None:
+        self._appearance_save_request_id += 1
+        request_id = self._appearance_save_request_id
+        worker = self.create_appearance_save_worker(
+            request_id,
+            action=str(payload.get("action") or ""),
+            value=payload.get("value"),
+            context_extra=dict(payload.get("context_extra") or {}),
+        )
+        self._appearance_save_worker = worker
+        worker.completed.connect(self._on_appearance_save_finished)
+        worker.failed.connect(self._on_appearance_save_failed)
+        worker.finished.connect(lambda w=worker: self._on_appearance_save_worker_finished(w))
+        worker.start()
+
+    def _apply_display_mode_runtime(self, mode: str) -> None:
         try:
             from qfluentwidgets import setTheme, Theme
-            if effective_mode == "light":
+            if mode == "light":
                 setTheme(Theme.LIGHT)
-            elif effective_mode == "dark":
+            elif mode == "dark":
                 setTheme(Theme.DARK)
-            elif effective_mode == "system":
+            elif mode == "system":
                 setTheme(Theme.AUTO)
         except Exception:
             pass
-        # Update window background colors for the new mode
         try:
             from ui.theme import apply_window_background
             win = self.window()
@@ -617,6 +662,49 @@ class AppearancePage(BasePage):
                 apply_window_background(win)
         except Exception:
             pass
+
+    def _on_appearance_save_finished(self, request_id: int, action: str, result, context) -> None:
+        if request_id != self._appearance_save_request_id or self._cleanup_in_progress:
+            return
+        context = dict(context or {})
+        if action == "display_mode":
+            effective_mode = str(getattr(result, "effective_mode", context.get("value") or "dark") or "dark")
+            requested_mode = str(context.get("value") or "").strip()
+            if effective_mode and requested_mode and effective_mode != requested_mode:
+                self._apply_display_mode_value(effective_mode)
+                self._apply_display_mode_runtime(effective_mode)
+        elif action == "accent_color":
+            accent_plan = dict(result or {}).get("accent") if isinstance(result, dict) else result
+            tinted_plan = dict(result or {}).get("tinted") if isinstance(result, dict) else None
+            hex_color = str(getattr(accent_plan, "hex_color", context.get("value") or "") or "")
+            self._emit_accent_update(
+                hex_color,
+                refresh_background=bool(getattr(tinted_plan, "tinted_background", False)),
+            )
+        elif action == "animations_enabled":
+            editor_plan = dict(result or {}).get("editor_smooth_scroll") if isinstance(result, dict) else None
+            self._on_editor_smooth_scroll_changed_callback(bool(getattr(editor_plan, "enabled", False)))
+
+    def _on_appearance_save_failed(self, request_id: int, action: str, error: str, _context) -> None:
+        if request_id != self._appearance_save_request_id or self._cleanup_in_progress:
+            return
+        log(f"Ошибка сохранения настройки внешнего вида ({action}): {error}", "WARNING")
+
+    def _on_appearance_save_worker_finished(self, worker) -> None:
+        if self.__dict__.get("_appearance_save_worker") is worker:
+            self._appearance_save_worker = None
+        worker.deleteLater()
+        if self._appearance_save_pending and not self._cleanup_in_progress:
+            pending = self._appearance_save_pending.pop(0)
+            self._start_appearance_save_worker(dict(pending or {}))
+
+    def _on_display_mode_changed(self, mode: str):
+        """Handle display mode toggle."""
+        if self._is_ui_syncing():
+            return
+        effective_mode = str(mode or "dark")
+        self._request_appearance_save("display_mode", effective_mode)
+        self._apply_display_mode_runtime(effective_mode)
 
     def _on_ui_language_changed(self, index: int) -> None:
         if self._is_ui_syncing():
@@ -632,8 +720,9 @@ class AppearancePage(BasePage):
         if not isinstance(lang, str) or not lang:
             return
 
-        plan = appearance_settings.save_ui_language(lang)
-        self._on_ui_language_changed_callback(plan.language)
+        lang = appearance_settings.normalize_language(lang)
+        self._request_appearance_save("ui_language", lang)
+        self._on_ui_language_changed_callback(lang)
 
     def set_ui_language(self, language: str) -> None:
         super().set_ui_language(language)
@@ -668,6 +757,7 @@ class AppearancePage(BasePage):
                 self._set_checked_silently(radio, key == preset)
         self._update_rkn_background_control_state()
         self._update_display_mode_section_state(preset)
+        self._on_background_preset_changed_callback(preset)
 
     def _current_bg_preset_from_ui(self) -> str:
         if self._bg_radio_rkn_chan is not None and self._bg_radio_rkn_chan.isChecked():
@@ -728,7 +818,7 @@ class AppearancePage(BasePage):
 
                 selected_rel = self._rkn_background_combo.itemData(index)
                 if isinstance(selected_rel, str) and selected_rel:
-                    appearance_settings.save_rkn_background(selected_rel)
+                    self._request_appearance_save("rkn_background", selected_rel)
             else:
                 self._rkn_background_combo.addItem(
                     tr_catalog("page.appearance.background.rkn.none", language=self._ui_language, default="Фоны не найдены"),
@@ -768,7 +858,7 @@ class AppearancePage(BasePage):
         if not isinstance(selected_rel, str) or not selected_rel:
             return
 
-        appearance_settings.save_rkn_background(selected_rel)
+        self._request_appearance_save("rkn_background", selected_rel)
 
         if self._bg_radio_rkn_chan is not None and self._bg_radio_rkn_chan.isChecked():
             self._schedule_background_refresh()
@@ -779,8 +869,7 @@ class AppearancePage(BasePage):
             return
         if not checked:
             return
-        plan = appearance_settings.save_background_preset(preset)
-        preset = plan.preset
+        self._request_appearance_save("background_preset", preset)
         if self._mica_switch:
             self._mica_switch.setEnabled(preset == "standard")
         # AMOLED and РКН Тян require dark mode — force it automatically
@@ -798,7 +887,6 @@ class AppearancePage(BasePage):
             self._reload_rkn_background_options()
         self._update_rkn_background_control_state()
         self._update_display_mode_section_state(preset)
-        self._on_background_preset_changed_callback(preset)
 
     def _on_mica_changed(self, checked: bool):
         """Handle Mica SwitchButton toggle."""
@@ -827,30 +915,25 @@ class AppearancePage(BasePage):
         if self._opacity_label:
             self._opacity_label.setText(f"{value}%")
 
-        opacity_plan = appearance_settings.save_window_opacity(value)
-
-        # Уведомляем главное окно
-        self._on_opacity_changed_callback(opacity_plan.value)
-
-        from log.log import log
-
-        log(f"Прозрачность окна: {opacity_plan.value}%", "DEBUG")
+        self._request_appearance_save("window_opacity", int(value))
+        self._on_opacity_changed_callback(int(value))
+        log(f"Прозрачность окна: {int(value)}%", "DEBUG")
 
     def _on_snowflakes_changed(self, state):
         """Обработчик изменения состояния снежинок"""
         if self._is_ui_syncing():
             return
         enabled = state == Qt.CheckState.Checked.value
-        plan = appearance_settings.save_snowflakes_enabled(enabled)
-        self._on_snowflakes_changed_callback(plan.enabled)
+        self._request_appearance_save("snowflakes_enabled", enabled)
+        self._on_snowflakes_changed_callback(enabled)
 
     def _on_garland_changed(self, state):
         """Обработчик изменения состояния гирлянды"""
         if self._is_ui_syncing():
             return
         enabled = state == Qt.CheckState.Checked.value
-        plan = appearance_settings.save_garland_enabled(enabled)
-        self._on_garland_changed_callback(plan.enabled)
+        self._request_appearance_save("garland_enabled", enabled)
+        self._on_garland_changed_callback(enabled)
 
     def _on_accent_color_changed(self, color: QColor):
         """Обработчик изменения акцентного цвета через ColorPickerButton."""
@@ -861,12 +944,8 @@ class AppearancePage(BasePage):
         except Exception:
             pass
         hex_color = color.name()
-        plan = appearance_settings.save_accent_color(hex_color)
-        tinted_plan = appearance_settings.load_tinted_settings()
-        self._emit_accent_update(
-            plan.hex_color,
-            refresh_background=bool(tinted_plan.tinted_background),
-        )
+        self._request_appearance_save("accent_color", hex_color)
+        self._emit_accent_update(hex_color, refresh_background=False)
 
     def _refresh_accent_icons(self, tokens=None):
         """Обновляет иконки страницы при смене акцентного цвета."""
@@ -918,8 +997,8 @@ class AppearancePage(BasePage):
         if self._is_ui_syncing():
             return
         enabled = bool(state) if isinstance(state, bool) else state == Qt.CheckState.Checked.value
-        plan = appearance_settings.save_follow_windows_accent(enabled)
-        if plan.enabled:
+        self._request_appearance_save("follow_windows_accent", enabled)
+        if enabled:
             self._apply_windows_accent()
             if self._color_picker_btn is not None:
                 self._color_picker_btn.setEnabled(False)
@@ -938,7 +1017,7 @@ class AppearancePage(BasePage):
                     self._begin_ui_sync()
                     try:
                         setThemeColor(color)
-                        appearance_settings.save_accent_color(hex_color)
+                        self._request_appearance_save("accent_color", hex_color)
                         if self._color_picker_btn is not None:
                             self._color_picker_btn.setColor(color)
                     finally:
@@ -952,18 +1031,18 @@ class AppearancePage(BasePage):
         if self._is_ui_syncing():
             return
         enabled = bool(state) if isinstance(state, bool) else state == Qt.CheckState.Checked.value
-        plan = appearance_settings.save_tinted_background(enabled)
+        self._request_appearance_save("tinted_background", enabled)
         if self._tinted_intensity_container is not None:
-            self._tinted_intensity_container.setVisible(plan.enabled)
+            self._tinted_intensity_container.setVisible(enabled)
         self._schedule_background_refresh()
 
     def _on_tinted_intensity_changed(self, value: int):
         """Обработчик изменения интенсивности тонировки."""
         if self._is_ui_syncing():
             return
-        plan = appearance_settings.save_tinted_background_intensity(value)
+        self._request_appearance_save("tinted_intensity", int(value))
         if self._tinted_intensity_value_label is not None:
-            self._tinted_intensity_value_label.setText(str(plan.value))
+            self._tinted_intensity_value_label.setText(str(value))
         self._schedule_background_refresh()
 
     def set_premium_status(
@@ -993,9 +1072,9 @@ class AppearancePage(BasePage):
         )
 
         if premium_plan.effective_preset is not None:
-            preset_plan = appearance_settings.save_background_preset(premium_plan.effective_preset)
-            self._apply_bg_preset_ui(preset_plan.preset)
-            self._on_background_preset_changed_callback(preset_plan.preset)
+            self._request_appearance_save("background_preset", premium_plan.effective_preset)
+            self._apply_bg_preset_ui(premium_plan.effective_preset)
+            self._on_background_preset_changed_callback(premium_plan.effective_preset)
 
         if self._garland_checkbox:
             self._garland_checkbox.setEnabled(is_premium)
@@ -1006,12 +1085,12 @@ class AppearancePage(BasePage):
             self._set_checked_silently(self._snowflakes_checkbox, premium_plan.snowflakes_checked)
 
         if premium_plan.disable_garland:
-            plan = appearance_settings.save_garland_enabled(False)
-            self._on_garland_changed_callback(plan.enabled)
+            self._request_appearance_save("garland_enabled", False)
+            self._on_garland_changed_callback(False)
 
         if premium_plan.disable_snowflakes:
-            plan = appearance_settings.save_snowflakes_enabled(False)
-            self._on_snowflakes_changed_callback(plan.enabled)
+            self._request_appearance_save("snowflakes_enabled", False)
+            self._on_snowflakes_changed_callback(False)
 
         self._update_display_mode_section_state(premium_plan.effective_preset or current_preset)
 
@@ -1055,26 +1134,23 @@ class AppearancePage(BasePage):
         """Handle animations SwitchButton toggle."""
         if self._is_ui_syncing():
             return
-        plan = appearance_settings.save_animations_enabled(enabled)
-        self._on_animations_changed_callback(plan.enabled)
-        self._sync_performance_dependencies(plan.enabled)
-
-        editor_plan = appearance_settings.load_editor_smooth_scroll_enabled()
-        self._on_editor_smooth_scroll_changed_callback(editor_plan.enabled)
+        self._request_appearance_save("animations_enabled", enabled)
+        self._on_animations_changed_callback(bool(enabled))
+        self._sync_performance_dependencies(bool(enabled))
 
     def _on_smooth_scroll_changed(self, enabled: bool):
         """Handle smooth scroll SwitchButton toggle."""
         if self._is_ui_syncing():
             return
-        plan = appearance_settings.save_smooth_scroll_enabled(enabled)
-        self._on_smooth_scroll_changed_callback(plan.enabled)
+        self._request_appearance_save("smooth_scroll_enabled", enabled)
+        self._on_smooth_scroll_changed_callback(bool(enabled))
 
     def _on_editor_smooth_scroll_changed(self, enabled: bool):
         """Handle editor smooth scroll toggle."""
         if self._is_ui_syncing():
             return
-        plan = appearance_settings.save_editor_smooth_scroll_enabled(enabled)
-        self._on_editor_smooth_scroll_changed_callback(plan.enabled)
+        self._request_appearance_save("editor_smooth_scroll_enabled", enabled)
+        self._on_editor_smooth_scroll_changed_callback(bool(enabled))
 
     def _sync_performance_dependencies(self, animations_enabled: bool) -> None:
         """Редакторская плавность зависит от мастер-переключателя анимаций."""
@@ -1101,5 +1177,13 @@ class AppearancePage(BasePage):
             except Exception:
                 pass
 
+        self._appearance_save_pending.clear()
+        worker = self.__dict__.get("_appearance_save_worker")
+        if worker is not None:
+            try:
+                worker.quit()
+            except Exception:
+                pass
+            self._appearance_save_worker = None
         self._ui_state_unsubscribe = None
         self._ui_state_store = None
