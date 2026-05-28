@@ -570,7 +570,6 @@ class UpdatePageRuntime:
             update_pool_stats=False,
             telegram_only=telegram_only,
             language=self._view.get_ui_language(),
-            runtime_feature=self._runtime_feature,
         )
 
     def _create_version_worker(self):
@@ -595,7 +594,6 @@ class UpdatePageRuntime:
     def _bind_server_worker_signals(self, worker) -> None:
         worker.server_checked.connect(self._on_server_checked)
         worker.all_complete.connect(self._on_servers_complete)
-        worker.dpi_restart_needed.connect(self._restart_dpi_after_update)
 
     def _bind_version_worker_signals(self, worker) -> None:
         worker.version_found.connect(self._on_version_found)

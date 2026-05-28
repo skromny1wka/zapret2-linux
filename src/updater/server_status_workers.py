@@ -20,7 +20,6 @@ class ServerCheckWorker(QThread):
 
     server_checked = pyqtSignal(str, dict)
     all_complete = pyqtSignal()
-    dpi_restart_needed = pyqtSignal()
 
     def __init__(
         self,
@@ -28,13 +27,11 @@ class ServerCheckWorker(QThread):
         telegram_only: bool = False,
         *,
         language: str = "ru",
-        runtime_feature,
     ):
         super().__init__()
         self._update_pool_stats = update_pool_stats
         self._telegram_only = telegram_only
         self._ui_language = language
-        self._runtime_feature = runtime_feature
         self._first_online_server_id = None
         self._stop_requested = False
 
@@ -183,25 +180,6 @@ class ServerCheckWorker(QThread):
             self.all_complete.emit()
             return
 
-        dpi_was_stopped = False
-        if self.is_stop_requested():
-            self.all_complete.emit()
-            return
-        if pool.servers:
-            first = pool.servers[0]
-            test_url = f"https://{first['host']}:{first['https_port']}/api/all_versions.json"
-            data, error, _ = self._request_versions_json(
-                test_url,
-                timeout=(5, 5),
-                verify_ssl=should_verify_ssl(),
-            )
-            if data is None:
-                if self._runtime_feature.is_any_running():
-                    log("⚠️ DPI мешает проверке серверов — временно останавливаем", "🔄 UPDATE")
-                    self._runtime_feature.shutdown_sync(reason="server_status_probe", include_cleanup=True)
-                    _time.sleep(0.5)
-                    dpi_was_stopped = True
-
         for server in pool.servers:
             if self.is_stop_requested():
                 break
@@ -316,9 +294,6 @@ class ServerCheckWorker(QThread):
             }
 
         self.server_checked.emit("GitHub API", github_status)
-
-        if dpi_was_stopped:
-            self.dpi_restart_needed.emit()
 
         self.all_complete.emit()
 
