@@ -49,6 +49,28 @@ class PresetListModel(QAbstractListModel):
                 self.dataChanged.emit(model_index, model_index, roles)
             return True
 
+        single_move = _single_row_move(self._rows, next_rows)
+        if single_move is not None:
+            source_index, insert_index = single_move
+            destination_child = _move_destination_child(source_index, insert_index)
+            if destination_child not in {source_index, source_index + 1}:
+                previous_rows_by_identity = {
+                    _stable_row_identity(row): row
+                    for row in self._rows
+                }
+                self.beginMoveRows(QModelIndex(), source_index, source_index, QModelIndex(), destination_child)
+                self._rows = next_rows
+                self._rebuild_row_index()
+                self.endMoveRows()
+                roles = _all_data_roles()
+                for row_index, row in enumerate(self._rows):
+                    previous_row = previous_rows_by_identity.get(_stable_row_identity(row))
+                    if previous_row is None or previous_row == row:
+                        continue
+                    model_index = self.index(row_index, 0)
+                    self.dataChanged.emit(model_index, model_index, roles)
+                return True
+
         self.beginResetModel()
         self._rows = next_rows
         self._rebuild_row_index()
@@ -474,6 +496,28 @@ def _same_stable_rows(current_rows: list[dict[str, object]], next_rows: list[dic
         _stable_row_identity(current_row) == _stable_row_identity(next_row)
         for current_row, next_row in zip(current_rows, next_rows, strict=True)
     )
+
+
+def _single_row_move(
+    current_rows: list[dict[str, object]],
+    next_rows: list[dict[str, object]],
+) -> tuple[int, int] | None:
+    if len(current_rows) != len(next_rows):
+        return None
+    current_identities = [_stable_row_identity(row) for row in current_rows]
+    next_identities = [_stable_row_identity(row) for row in next_rows]
+    if current_identities == next_identities:
+        return None
+    if sorted(current_identities) != sorted(next_identities):
+        return None
+
+    for source_index, identity in enumerate(current_identities):
+        without_source = current_identities[:source_index] + current_identities[source_index + 1:]
+        for insert_index in range(len(current_identities)):
+            candidate = without_source[:insert_index] + [identity] + without_source[insert_index:]
+            if candidate == next_identities:
+                return source_index, insert_index
+    return None
 
 
 def _stable_row_identity(row: dict[str, object]) -> tuple[str, str]:
