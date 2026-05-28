@@ -615,6 +615,7 @@ class PresetSetupPageBase(BasePage):
         return ProfileUserProfileUpdateWorker(
             request_id,
             self._profile,
+            self.launch_method,
             profile_id=profile_id,
             name=name,
             protocol=protocol,
@@ -702,7 +703,13 @@ class PresetSetupPageBase(BasePage):
         worker.finished.connect(lambda w=worker: self._on_user_profile_update_worker_finished(w))
         worker.start()
 
-    def _on_user_profile_update_finished(self, request_id: int, _profile_id: str, changed: int) -> None:
+    def _on_user_profile_update_finished(
+        self,
+        request_id: int,
+        profile_id: str,
+        changed: int,
+        profile_items=(),
+    ) -> None:
         if request_id != int(getattr(self, "_user_profile_update_request_id", 0) or 0):
             return
         InfoBar.success(
@@ -710,7 +717,18 @@ class PresetSetupPageBase(BasePage):
             content=f"Обновлено profile-ов в preset-ах: {int(changed or 0)}.",
             parent=self.window(),
         )
+        if self._replace_user_profile_items_locally(profile_id, profile_items):
+            return
         self.refresh_from_preset_switch()
+
+    def _replace_user_profile_items_locally(self, profile_id: str, profile_items) -> bool:
+        profiles_list = self.__dict__.get("_profiles_list")
+        if profiles_list is None:
+            return False
+        if not profiles_list.replace_user_profile_items(profile_id, tuple(profile_items or ())):
+            return False
+        self._profile_payload_dirty = True
+        return True
 
     def _on_user_profile_update_failed(self, request_id: int, error: str) -> None:
         if request_id != int(getattr(self, "_user_profile_update_request_id", 0) or 0):
@@ -747,7 +765,18 @@ class PresetSetupPageBase(BasePage):
             content=f"Удалено profile-ов из preset-ов: {int(changed or 0)}.",
             parent=self.window(),
         )
+        if self._remove_user_profile_items_locally(_profile_id):
+            return
         self.refresh_from_preset_switch()
+
+    def _remove_user_profile_items_locally(self, profile_id: str) -> bool:
+        profiles_list = self.__dict__.get("_profiles_list")
+        if profiles_list is None:
+            return False
+        if not profiles_list.remove_user_profile_items(profile_id):
+            return False
+        self._profile_payload_dirty = True
+        return True
 
     def _on_user_profile_delete_failed(self, request_id: int, error: str) -> None:
         if request_id != int(getattr(self, "_user_profile_delete_request_id", 0) or 0):

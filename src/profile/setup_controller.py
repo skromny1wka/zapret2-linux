@@ -139,6 +139,7 @@ class ProfileSetupController:
         return ProfileUserProfileUpdateWorker(
             request_id,
             self,
+            self._launch_method,
             profile_id=profile_id,
             name=name,
             protocol=protocol,
@@ -245,6 +246,9 @@ class ProfileSetupController:
             protocol=protocol,
             ports=ports,
         ))
+
+    def list_profiles(self, launch_method: str = ""):
+        return self._profile.list_profiles(launch_method or self._launch_method)
 
     def delete_user_profile(self, *, profile_id: str) -> int:
         return int(self._profile.delete_user_profile(profile_id))

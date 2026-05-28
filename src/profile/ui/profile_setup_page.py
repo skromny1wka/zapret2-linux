@@ -1077,7 +1077,13 @@ class ProfileSetupPageBase(BasePage):
         worker.finished.connect(lambda w=worker: self._on_user_profile_update_worker_finished(w))
         worker.start()
 
-    def _on_user_profile_update_finished(self, request_id: int, profile_id: str, changed: int) -> None:
+    def _on_user_profile_update_finished(
+        self,
+        request_id: int,
+        profile_id: str,
+        changed: int,
+        _profile_items=(),
+    ) -> None:
         if request_id != int(getattr(self, "_user_profile_update_request_id", 0) or 0):
             return
         if str(profile_id or "").strip() != self._current_user_profile_id():

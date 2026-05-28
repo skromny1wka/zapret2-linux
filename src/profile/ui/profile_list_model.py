@@ -279,6 +279,35 @@ class ProfileListModel(QAbstractListModel):
         self.endResetModel()
         return True
 
+    def replace_user_profile_items(self, profile_id: str, items: tuple[Any, ...]) -> bool:
+        clean_profile_id = str(profile_id or "").strip()
+        replacement_items = build_profile_display_items(tuple(items or ()))
+        if not clean_profile_id or not replacement_items:
+            return False
+        existing_items = tuple(
+            item for item in self._all_items
+            if str(getattr(item, "user_profile_id", "") or "").strip() == clean_profile_id
+        )
+        if not existing_items:
+            return False
+        next_items = tuple(
+            item for item in self._all_items
+            if str(getattr(item, "user_profile_id", "") or "").strip() != clean_profile_id
+        )
+        return self.update_profiles(tuple((*next_items, *replacement_items)))
+
+    def remove_user_profile_items(self, profile_id: str) -> bool:
+        clean_profile_id = str(profile_id or "").strip()
+        if not clean_profile_id:
+            return False
+        next_items = tuple(
+            item for item in self._all_items
+            if str(getattr(item, "user_profile_id", "") or "").strip() != clean_profile_id
+        )
+        if len(next_items) == len(self._all_items):
+            return False
+        return self.update_profiles(next_items)
+
     def remove_profile(self, profile_key: str) -> bool:
         key = str(profile_key or "").strip()
         if not key or key not in self._profile_items:

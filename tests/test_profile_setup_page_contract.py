@@ -267,6 +267,109 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page.refresh_from_preset_switch.assert_not_called()
         self.assertTrue(page._profile_payload_dirty)
 
+    def test_preset_setup_user_profile_update_worker_emits_profile_items(self) -> None:
+        updated_item = ProfileListItem(
+            key="profile:user-1",
+            persistent_key="profile:user-1",
+            profile_index=1,
+            display_name="YouTube New",
+            enabled=True,
+            in_preset=True,
+            strategy_id="strategy",
+            strategy_name="Strategy",
+            match_lines=("--filter-tcp=443",),
+            list_type="hostlist",
+            rating="good",
+            favorite=True,
+            group="common",
+            group_name="",
+            order=1,
+            user_profile_id="user-1",
+            profile_name="YouTube New",
+        )
+        payload = SimpleNamespace(items=(updated_item,))
+        profile = Mock()
+        profile.update_user_profile.return_value = 2
+        profile.list_profiles.return_value = payload
+        worker = ProfileUserProfileUpdateWorker(
+            6,
+            profile,
+            "zapret2_mode",
+            profile_id="user-1",
+            name="YouTube New",
+            protocol="TCP",
+            ports="443",
+        )
+        updated = []
+
+        worker.updated.connect(
+            lambda request_id, profile_id, changed, items: updated.append((request_id, profile_id, changed, items))
+        )
+
+        worker.run()
+
+        profile.update_user_profile.assert_called_once_with(
+            profile_id="user-1",
+            name="YouTube New",
+            protocol="TCP",
+            ports="443",
+        )
+        profile.list_profiles.assert_called_once_with("zapret2_mode")
+        self.assertEqual(updated, [(6, "user-1", 2, (updated_item,))])
+
+    def test_preset_setup_user_profile_update_replaces_items_without_full_refresh(self) -> None:
+        updated_item = ProfileListItem(
+            key="profile:user-1",
+            persistent_key="profile:user-1",
+            profile_index=1,
+            display_name="YouTube New",
+            enabled=True,
+            in_preset=True,
+            strategy_id="strategy",
+            strategy_name="Strategy",
+            match_lines=("--filter-tcp=443",),
+            list_type="hostlist",
+            rating="good",
+            favorite=True,
+            group="common",
+            group_name="",
+            order=1,
+            user_profile_id="user-1",
+            profile_name="YouTube New",
+        )
+        profiles_list = Mock()
+        profiles_list.replace_user_profile_items.return_value = True
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._user_profile_update_request_id = 6
+        page._profiles_list = profiles_list
+        page._profile_payload_dirty = False
+        page.refresh_from_preset_switch = Mock()
+        page.window = Mock(return_value=None)
+
+        with patch("profile.ui.preset_setup_page.InfoBar.success"):
+            PresetSetupPageBase._on_user_profile_update_finished(page, 6, "user-1", 2, (updated_item,))
+
+        profiles_list.replace_user_profile_items.assert_called_once_with("user-1", (updated_item,))
+        page.refresh_from_preset_switch.assert_not_called()
+        self.assertTrue(page._profile_payload_dirty)
+
+    def test_preset_setup_user_profile_delete_removes_items_without_full_refresh(self) -> None:
+        profiles_list = Mock()
+        profiles_list.remove_user_profile_items.return_value = True
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._user_profile_delete_request_id = 7
+        page._profiles_list = profiles_list
+        page._profile_payload_dirty = False
+        page.refresh_from_preset_switch = Mock()
+        page.window = Mock(return_value=None)
+
+        with patch("profile.ui.preset_setup_page.InfoBar.success"):
+            PresetSetupPageBase._on_user_profile_delete_finished(page, 7, "user-1", 3)
+
+        profiles_list.remove_user_profile_items.assert_called_once_with("user-1")
+        page.refresh_from_preset_switch.assert_not_called()
+        self.assertTrue(page._profile_payload_dirty)
+
     def test_profile_rows_have_context_menu_path(self) -> None:
         list_source = inspect.getsource(ProfilesList)
         page_apply = inspect.getsource(PresetSetupPageBase._apply_payload)
@@ -1496,12 +1599,33 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page.reload_current_profile.assert_not_called()
         page._on_profile_changed_callback.assert_not_called()
 
-    def test_user_profile_update_worker_emits_changed_count(self) -> None:
+    def test_user_profile_update_worker_emits_changed_count_and_items(self) -> None:
+        updated_item = ProfileListItem(
+            key="profile:user-1",
+            persistent_key="profile:user-1",
+            profile_index=1,
+            display_name="YouTube",
+            enabled=True,
+            in_preset=True,
+            strategy_id="strategy",
+            strategy_name="Strategy",
+            match_lines=("--filter-tcp=443",),
+            list_type="hostlist",
+            rating="",
+            favorite=False,
+            group="common",
+            group_name="",
+            order=1,
+            user_profile_id="user-1",
+            profile_name="YouTube",
+        )
         controller = Mock()
         controller.update_user_profile.return_value = 3
+        controller.list_profiles.return_value = SimpleNamespace(items=(updated_item,))
         worker = ProfileUserProfileUpdateWorker(
             7,
             controller,
+            "zapret2_mode",
             profile_id="user-1",
             name="YouTube",
             protocol="TCP",
@@ -1510,7 +1634,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         updated = []
 
         worker.updated.connect(
-            lambda request_id, profile_id, changed: updated.append((request_id, profile_id, changed))
+            lambda request_id, profile_id, changed, items: updated.append((request_id, profile_id, changed, items))
         )
 
         worker.run()
@@ -1521,7 +1645,8 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             protocol="TCP",
             ports="443",
         )
-        self.assertEqual(updated, [(7, "user-1", 3)])
+        controller.list_profiles.assert_called_once_with("zapret2_mode")
+        self.assertEqual(updated, [(7, "user-1", 3, (updated_item,))])
 
     def test_user_profile_delete_worker_emits_changed_count(self) -> None:
         controller = Mock()

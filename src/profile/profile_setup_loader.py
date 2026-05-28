@@ -361,24 +361,19 @@ class ProfileUserProfileCreateWorker(QThread):
         self.created.emit(self._request_id, str(profile_id or ""), created_item)
 
     def _created_profile_item(self, profile_id: str):
-        clean_profile_id = str(profile_id or "").strip()
-        if not clean_profile_id:
-            return None
-        payload = self._profile.list_profiles(self._launch_method)
-        for item in tuple(getattr(payload, "items", ()) or ()):
-            if str(getattr(item, "user_profile_id", "") or "").strip() == clean_profile_id:
-                return item
-        return None
+        items = _user_profile_items(self._profile, self._launch_method, profile_id)
+        return items[0] if items else None
 
 
 class ProfileUserProfileUpdateWorker(QThread):
-    updated = pyqtSignal(int, str, int)
+    updated = pyqtSignal(int, str, int, object)
     failed = pyqtSignal(int, str)
 
     def __init__(
         self,
         request_id: int,
         controller,
+        launch_method: str,
         *,
         profile_id: str,
         name: str,
@@ -389,6 +384,7 @@ class ProfileUserProfileUpdateWorker(QThread):
         super().__init__(parent)
         self._request_id = int(request_id)
         self._controller = controller
+        self._launch_method = str(launch_method or "").strip()
         self._profile_id = str(profile_id or "").strip()
         self._name = str(name or "").strip()
         self._protocol = str(protocol or "").strip()
@@ -402,11 +398,12 @@ class ProfileUserProfileUpdateWorker(QThread):
                 protocol=self._protocol,
                 ports=self._ports,
             )
+            updated_items = _user_profile_items(self._controller, self._launch_method, self._profile_id)
         except Exception as exc:
             log(f"ProfileUserProfileUpdateWorker: не удалось изменить пользовательский profile: {exc}", "ERROR")
             self.failed.emit(self._request_id, str(exc))
             return
-        self.updated.emit(self._request_id, self._profile_id, int(changed or 0))
+        self.updated.emit(self._request_id, self._profile_id, int(changed or 0), updated_items)
 
 
 class ProfileUserProfileDeleteWorker(QThread):
@@ -427,6 +424,17 @@ class ProfileUserProfileDeleteWorker(QThread):
             self.failed.emit(self._request_id, str(exc))
             return
         self.deleted.emit(self._request_id, self._profile_id, int(changed or 0))
+
+
+def _user_profile_items(profile, launch_method: str, profile_id: str) -> tuple[object, ...]:
+    clean_profile_id = str(profile_id or "").strip()
+    if not clean_profile_id:
+        return ()
+    payload = profile.list_profiles(str(launch_method or "").strip())
+    return tuple(
+        item for item in tuple(getattr(payload, "items", ()) or ())
+        if str(getattr(item, "user_profile_id", "") or "").strip() == clean_profile_id
+    )
 
 
 class ProfileFolderActionWorker(QThread):

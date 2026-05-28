@@ -117,6 +117,12 @@ class ProfilesList(QWidget):
     def add_profile_item(self, item) -> bool:
         return self._model.add_profile(item)
 
+    def replace_user_profile_items(self, profile_id: str, items: tuple[Any, ...]) -> bool:
+        return self._model.replace_user_profile_items(profile_id, tuple(items or ()))
+
+    def remove_user_profile_items(self, profile_id: str) -> bool:
+        return self._model.remove_user_profile_items(profile_id)
+
     def remove_profile_item(self, profile_key: str) -> bool:
         return self._model.remove_profile(profile_key)
 
