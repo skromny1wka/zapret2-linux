@@ -1545,7 +1545,11 @@ class UserPresetsPageBase(BasePage):
             # Файл уже исчез: синхронизируем локальное состояние списка, не показывая лишнюю ошибку.
             self._runtime_service.recover_missing_deleted_preset(str(context.get("file_name") or ""))
             return
-        if bool(getattr(result, "structure_changed", False)):
+        structure_changed = bool(getattr(result, "structure_changed", False))
+        if action == "delete" and bool(getattr(result, "ok", False)):
+            if self._runtime_service.remove_deleted_preset_locally(str(context.get("file_name") or "")):
+                structure_changed = False
+        if structure_changed:
             self._runtime_service.mark_presets_structure_changed()
         level = str(getattr(result, "infobar_level", "") or "")
         title = str(getattr(result, "infobar_title", "") or self._tr("common.error.title", "Ошибка"))

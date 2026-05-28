@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import importlib
 import importlib.util
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
@@ -312,6 +313,68 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_request_preset_activation", handler_source)
         self.assertIn("create_preset_activate_worker", request_source)
         self.assertIn("actions_api.activate_preset", worker_source)
+
+    def test_preset_model_removes_visible_preset_without_full_reset(self) -> None:
+        model = PresetListModel()
+        model.set_rows([
+            {
+                "kind": "folder",
+                "folder_key": "common",
+                "text": "Общие",
+                "count": 2,
+                "is_collapsed": False,
+            },
+            {
+                "kind": "preset",
+                "file_name": "first.txt",
+                "name": "First",
+                "folder_key": "common",
+            },
+            {
+                "kind": "preset",
+                "file_name": "second.txt",
+                "name": "Second",
+                "folder_key": "common",
+            },
+        ])
+        model.beginResetModel = Mock(side_effect=AssertionError("delete must not reset the whole preset list"))
+
+        self.assertTrue(model.remove_preset("first.txt"))
+
+        self.assertEqual(model.rowCount(), 2)
+        self.assertEqual(model.find_preset_row("first.txt"), -1)
+        self.assertEqual(model.find_preset_row("second.txt"), 1)
+        self.assertEqual(model.index(0, 0).data(PresetListModel.CountRole), 1)
+
+    def test_user_presets_delete_updates_visible_row_without_reload(self) -> None:
+        result = SimpleNamespace(
+            ok=True,
+            structure_changed=True,
+            log_message="Удалён пресет",
+            log_level="INFO",
+            infobar_level="",
+            infobar_title="",
+            infobar_content="",
+            error_code="",
+        )
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_item_action_request_id = 4
+        page._runtime_service = Mock()
+        page._runtime_service.remove_deleted_preset_locally.return_value = True
+        page._tr = Mock(side_effect=lambda _key, default, **_kwargs: default)
+        page.window = Mock(return_value=None)
+
+        with patch("presets.ui.common.user_presets_page.InfoBar.success"):
+            UserPresetsPageBase._on_preset_item_action_finished(
+                page,
+                4,
+                "delete",
+                result,
+                {"file_name": "first.txt"},
+            )
+
+        page._runtime_service.remove_deleted_preset_locally.assert_called_once_with("first.txt")
+        page._runtime_service.mark_presets_structure_changed.assert_not_called()
 
     def test_user_presets_display_name_uses_visible_cache_not_backend_manifest(self) -> None:
         class _ListingApi:

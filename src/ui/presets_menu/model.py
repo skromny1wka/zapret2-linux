@@ -153,6 +153,30 @@ class PresetListModel(QAbstractListModel):
         self.dataChanged.emit(model_index, model_index, sorted(changed_roles))
         return True
 
+    def remove_preset(self, file_name: str) -> bool:
+        preset_file_name = str(file_name or "").strip()
+        row_index = self.find_preset_row(preset_file_name)
+        if row_index < 0:
+            return False
+
+        row = self._rows[row_index]
+        folder_key = str(row.get("folder_key") or "").strip()
+        rows = [dict(entry) for entry in self._rows]
+        if _folder_count(rows, folder_key) <= 1:
+            return False
+
+        rows.pop(row_index)
+        _shift_folder_count(rows, folder_key, -1)
+        self.beginRemoveRows(QModelIndex(), row_index, row_index)
+        self._rows = rows
+        self._rebuild_row_index()
+        self.endRemoveRows()
+        folder_index = _row_index_for_folder(self._rows, folder_key)
+        if folder_index >= 0:
+            model_index = self.index(folder_index, 0)
+            self.dataChanged.emit(model_index, model_index, [self.CountRole])
+        return True
+
     def set_active_preset(
         self,
         file_name: str,
@@ -295,6 +319,28 @@ def _folder_insert_index(rows: list[dict[str, object]], folder_key: str) -> int:
             continue
         break
     return insert_index
+
+
+def _folder_count(rows: list[dict[str, object]], folder_key: str) -> int:
+    index = _row_index_for_folder(rows, folder_key)
+    if index < 0:
+        return 2
+    try:
+        return int(rows[index].get("count", 0) or 0)
+    except Exception:
+        return 0
+
+
+def _row_index_for_folder(rows: list[dict[str, object]], folder_key: str) -> int:
+    key = str(folder_key or "").strip()
+    if not key:
+        return -1
+    for index, row in enumerate(rows):
+        if str(row.get("kind") or "") != "folder":
+            continue
+        if str(row.get("folder_key") or "") == key:
+            return index
+    return -1
 
 
 def _shift_folder_count(rows: list[dict[str, object]], folder_key: str, delta: int) -> None:

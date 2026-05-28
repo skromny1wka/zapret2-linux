@@ -680,6 +680,31 @@ class UserPresetsRuntimeService:
             return
         adapter.rebuild_rows(self._cached_presets_metadata, self._cached_folder_state, None)
 
+    def remove_deleted_preset_locally(self, name: str, page=None) -> bool:
+        page = self._resolve_page(page)
+        adapter = self._resolve_adapter()
+        normalized_name = str(name or "").strip()
+        if not normalized_name:
+            return False
+        try:
+            adapter.delete_preset_item_meta(normalized_name)
+        except Exception:
+            pass
+
+        removed_metadata = False
+        for key in _preset_metadata_keys(normalized_name):
+            if key in self._cached_presets_metadata:
+                self._cached_presets_metadata.pop(key, None)
+                removed_metadata = True
+
+        model = getattr(page, "_presets_model", None)
+        if model is None or not model.remove_preset(normalized_name):
+            return False
+
+        self.sync_watched_preset_files(page, set(self._cached_presets_metadata.keys()))
+        self._ui_dirty = not removed_metadata
+        return True
+
     def recover_missing_deleted_preset(self, name: str, page=None) -> None:
         page = self._resolve_page(page)
         adapter = self._resolve_adapter()
@@ -702,3 +727,12 @@ class UserPresetsRuntimeService:
         self._ui_dirty = True
         if page.isVisible():
             self.load_presets(page)
+
+
+def _preset_metadata_keys(name: str) -> tuple[str, ...]:
+    normalized_name = str(name or "").strip()
+    if not normalized_name:
+        return ()
+    if normalized_name.lower().endswith(".txt"):
+        return (normalized_name,)
+    return (normalized_name, f"{normalized_name}.txt")
