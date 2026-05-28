@@ -585,6 +585,82 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         runtime_service.ensure_preset_list_current_index.assert_not_called()
         runtime_service.restore_presets_view_state.assert_not_called()
 
+    def test_preset_rows_rebuild_skips_layout_when_row_count_is_unchanged(self) -> None:
+        from presets.ui.common.user_presets_page_runtime import rebuild_presets_rows
+
+        runtime_service = Mock()
+        runtime_service.capture_presets_view_state.return_value = {}
+        runtime_service.current_search_query.return_value = ""
+        presets_model = PresetListModel()
+        presets_model.set_rows([
+            {
+                "kind": "folder",
+                "folder_key": "common",
+                "text": "Общие",
+                "count": 2,
+                "is_collapsed": False,
+            },
+            {
+                "kind": "preset",
+                "file_name": "first.txt",
+                "name": "First",
+                "folder_key": "common",
+            },
+            {
+                "kind": "preset",
+                "file_name": "second.txt",
+                "name": "Second",
+                "folder_key": "common",
+            },
+        ])
+        listing_api = Mock()
+        listing_api.build_preset_rows_plan.return_value = SimpleNamespace(
+            rows=[
+                {
+                    "kind": "folder",
+                    "folder_key": "common",
+                    "text": "Общие",
+                    "count": 2,
+                    "is_collapsed": False,
+                },
+                {
+                    "kind": "preset",
+                    "file_name": "second.txt",
+                    "name": "Second",
+                    "folder_key": "common",
+                },
+                {
+                    "kind": "preset",
+                    "file_name": "first.txt",
+                    "name": "First",
+                    "folder_key": "common",
+                    "rating": 5,
+                },
+            ],
+            total_presets=2,
+        )
+        update_height = Mock()
+        schedule_resync = Mock()
+
+        rebuild_presets_rows(
+            runtime_service=runtime_service,
+            listing_api=listing_api,
+            presets_delegate=Mock(),
+            presets_model=presets_model,
+            presets_list=object(),
+            get_selected_source_preset_file_name_light_fn=Mock(return_value="first.txt"),
+            ui_language="ru",
+            schedule_layout_resync_fn=schedule_resync,
+            update_presets_view_height_fn=update_height,
+            log_fn=Mock(),
+            all_presets={"first.txt": {"display_name": "First"}, "second.txt": {"display_name": "Second"}},
+            folder_state={},
+        )
+
+        update_height.assert_not_called()
+        schedule_resync.assert_not_called()
+        runtime_service.ensure_preset_list_current_index.assert_called_once_with()
+
     def test_user_presets_delete_updates_visible_row_without_reload(self) -> None:
         result = SimpleNamespace(
             ok=True,

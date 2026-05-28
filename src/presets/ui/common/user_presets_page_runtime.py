@@ -237,6 +237,7 @@ def rebuild_presets_rows(
             folder_state=folder_state,
         )
 
+        previous_row_count = presets_model.rowCount() if presets_model else None
         rows_changed = True
         if presets_model:
             rows_changed = bool(presets_model.set_rows(plan.rows))
@@ -253,8 +254,10 @@ def rebuild_presets_rows(
         runtime_service.ensure_preset_list_current_index()
         if view_state:
             runtime_service.restore_presets_view_state(view_state)
-        update_presets_view_height_fn()
-        schedule_layout_resync_fn()
+        next_row_count = presets_model.rowCount() if presets_model else None
+        if previous_row_count is None or next_row_count != previous_row_count:
+            update_presets_view_height_fn()
+            schedule_layout_resync_fn()
         if started_at is not None:
             elapsed_ms = int((time.perf_counter() - started_at) * 1000)
             log_fn(
