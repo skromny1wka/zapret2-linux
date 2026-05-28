@@ -3040,6 +3040,24 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("create_open_hosts_file_worker", controller_source)
         self.assertIn("open_hosts_file", worker_source)
 
+    def test_hosts_restore_permissions_runs_through_worker(self) -> None:
+        spec = importlib.util.find_spec("hosts.permission_restore_worker")
+        self.assertIsNotNone(spec)
+        permission_restore_worker = importlib.import_module("hosts.permission_restore_worker")
+
+        init_source = inspect.getsource(HostsPage.__init__)
+        restore_source = inspect.getsource(HostsPage._restore_hosts_permissions)
+        request_source = inspect.getsource(HostsPage._request_restore_hosts_permissions)
+        controller_source = inspect.getsource(__import__("hosts.page_controller", fromlist=["HostsPageController"]).HostsPageController)
+        worker_source = inspect.getsource(permission_restore_worker.HostsPermissionRestoreWorker.run)
+
+        self.assertIn("_permission_restore_runtime", init_source)
+        self.assertIn("_request_restore_hosts_permissions", restore_source)
+        self.assertNotIn("restore_hosts_permissions_flow(", restore_source)
+        self.assertIn("create_permission_restore_worker", request_source)
+        self.assertIn("create_permission_restore_worker", controller_source)
+        self.assertIn("restore_hosts_permissions", worker_source)
+
     def test_hosts_page_cache_cannot_sync_read_runtime_state(self) -> None:
         page_source = inspect.getsource(HostsPage)
         cache_source = inspect.getsource(hosts_page_runtime.HostsPageRuntimeCache)

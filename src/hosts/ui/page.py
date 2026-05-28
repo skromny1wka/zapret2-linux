@@ -37,9 +37,9 @@ from hosts.catalog_workflow import (
     refresh_catalog_if_needed,
 )
 from hosts.ui.access_workflow import (
+    apply_restore_hosts_permissions_result_flow,
     check_hosts_access,
     dismiss_hosts_error_bar,
-    restore_hosts_permissions_flow,
     show_hosts_access_error,
 )
 from hosts.operation_workflow import (
@@ -159,6 +159,7 @@ class HostsPage(BasePage):
         self._state_load_request_context = {"show_access_errors": False, "update_status": False}
         self._open_file_runtime = OneShotWorkerRuntime()
         self._open_file_pending = False
+        self._permission_restore_runtime = OneShotWorkerRuntime()
         self._applying = False
         self._cleanup_in_progress = False
         self._runtime_cache = create_runtime_cache()
@@ -555,16 +556,48 @@ class HostsPage(BasePage):
             dismiss_hosts_error_bar(bar)
         self._hosts_error_bar = None
         self._last_error = None
-        restore_hosts_permissions_flow(
-            restore_hosts_permissions_fn=self._controller.restore_hosts_permissions,
+        self._request_restore_hosts_permissions()
+
+    def create_permission_restore_worker(self, request_id: int):
+        return self._controller.create_permission_restore_worker(request_id, self)
+
+    def _request_restore_hosts_permissions(self) -> None:
+        if self._permission_restore_runtime.is_running():
+            return
+        self._permission_restore_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: self.create_permission_restore_worker(request_id),
+            on_loaded=self._on_restore_hosts_permissions_finished,
+            on_failed=self._on_restore_hosts_permissions_failed,
+            on_finished=self._on_restore_hosts_permissions_worker_finished,
+        )
+
+    def _on_restore_hosts_permissions_finished(self, request_id: int, result) -> None:
+        if not self._permission_restore_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
+            return
+        apply_restore_hosts_permissions_result_flow(
+            result=result,
             info_bar_cls=InfoBar,
             window=self.window(),
             dismiss_error_bar=self._dismiss_hosts_error_bar,
             invalidate_cache=self._invalidate_cache,
             update_ui=self._update_ui,
             show_error=self._show_error,
-            log_error=lambda text: log(text, "ERROR"),
         )
+
+    def _on_restore_hosts_permissions_failed(self, request_id: int, error: str) -> None:
+        if not self._permission_restore_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
+            return
+        self._dismiss_hosts_error_bar()
+        self._show_error(str(error or ""))
+
+    def _on_restore_hosts_permissions_worker_finished(self, _worker) -> None:
+        pass
 
     def _check_hosts_access(self):
         """Проверяет доступ к hosts файлу при загрузке страницы"""
@@ -1117,6 +1150,11 @@ class HostsPage(BasePage):
                 blocking=True,
                 log_fn=log,
                 warning_prefix="Hosts open file worker",
+            )
+            self._permission_restore_runtime.stop(
+                blocking=True,
+                log_fn=log,
+                warning_prefix="Hosts permission restore worker",
             )
         except Exception as e:
             log(f"Ошибка при очистке hosts_page: {e}", "DEBUG")

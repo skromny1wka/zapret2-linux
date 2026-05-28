@@ -110,33 +110,54 @@ def restore_hosts_permissions_flow(
 ) -> tuple[bool, str | None]:
     try:
         result = restore_hosts_permissions_fn()
-        restore_plan = hosts_page_plans.build_restore_permissions_plan(
-            success=result.success,
-            message=result.message,
+        return apply_restore_hosts_permissions_result_flow(
+            result=result,
+            info_bar_cls=info_bar_cls,
+            window=window,
+            dismiss_error_bar=dismiss_error_bar,
+            invalidate_cache=invalidate_cache,
+            update_ui=update_ui,
+            show_error=show_error,
         )
-
-        if result.success:
-            dismiss_error_bar()
-            invalidate_cache()
-            update_ui()
-            if info_bar_cls and restore_plan.message_plan is not None:
-                from qfluentwidgets import InfoBarPosition
-
-                info_bar_cls.success(
-                    title=restore_plan.message_plan.title,
-                    content=restore_plan.message_plan.content,
-                    isClosable=True,
-                    position=InfoBarPosition.TOP,
-                    duration=5000,
-                    parent=window,
-                )
-            return True, None
-
-        dismiss_error_bar()
-        show_error(restore_plan.error_message)
-        return False, restore_plan.error_message
     except Exception as exc:
         log_error(f"Ошибка при восстановлении прав: {exc}")
         dismiss_error_bar()
         show_error(str(exc))
         return False, str(exc)
+
+
+def apply_restore_hosts_permissions_result_flow(
+    *,
+    result,
+    info_bar_cls,
+    window,
+    dismiss_error_bar,
+    invalidate_cache,
+    update_ui,
+    show_error,
+) -> tuple[bool, str | None]:
+    restore_plan = hosts_page_plans.build_restore_permissions_plan(
+        success=result.success,
+        message=result.message,
+    )
+
+    if result.success:
+        dismiss_error_bar()
+        invalidate_cache()
+        update_ui()
+        if info_bar_cls and restore_plan.message_plan is not None:
+            from qfluentwidgets import InfoBarPosition
+
+            info_bar_cls.success(
+                title=restore_plan.message_plan.title,
+                content=restore_plan.message_plan.content,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=5000,
+                parent=window,
+            )
+        return True, None
+
+    dismiss_error_bar()
+    show_error(restore_plan.error_message)
+    return False, restore_plan.error_message

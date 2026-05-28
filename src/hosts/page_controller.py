@@ -37,6 +37,11 @@ class HostsPageController:
 
         return HostsOpenFileWorker(request_id, self, parent)
 
+    def create_permission_restore_worker(self, request_id: int, parent=None):
+        from hosts.permission_restore_worker import HostsPermissionRestoreWorker
+
+        return HostsPermissionRestoreWorker(request_id, self, parent)
+
     def create_hosts_runtime(self, *, status_callback=None):
         return self._hosts.create_hosts_runtime(status_callback=status_callback)
 
