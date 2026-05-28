@@ -231,6 +231,8 @@ class ControlPageActionMixin:
                 self._show_windows_feature_action_result(result, self.defender_toggle)
             elif action == "max_block":
                 self._show_windows_feature_action_result(result, self.max_block_toggle)
+            elif action == "hide_to_tray":
+                self._program_settings.remember_hide_to_tray_on_minimize_close(bool(result))
         finally:
             sync_program_settings = getattr(self, "_sync_program_settings", None)
             if callable(sync_program_settings):

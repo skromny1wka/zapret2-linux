@@ -26,3 +26,11 @@ def load_program_settings_snapshot(runtime_service):
 
 def publish_program_settings_snapshot(runtime_service, snapshot) -> bool:
     return bool(runtime_service.publish_snapshot(snapshot))
+
+
+def peek_hide_to_tray_on_minimize_close(runtime_service, *, default: bool = False) -> bool:
+    return bool(runtime_service.peek_hide_to_tray_on_minimize_close(default=bool(default)))
+
+
+def remember_hide_to_tray_on_minimize_close(runtime_service, enabled: bool) -> bool:
+    return bool(runtime_service.remember_hide_to_tray_on_minimize_close(bool(enabled)))

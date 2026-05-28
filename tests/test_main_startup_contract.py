@@ -902,6 +902,23 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         self.assertEqual(created_services, [runtime_service])
         commands.refresh_program_settings_snapshot.assert_called_once_with(runtime_service)
 
+    def test_program_settings_runtime_service_peeks_warmed_hide_to_tray_without_settings_read(self) -> None:
+        from core.runtime.program_settings_runtime_service import (
+            ProgramSettingsRuntimeService,
+            store_warmed_hide_to_tray_on_minimize_close,
+        )
+
+        store_warmed_hide_to_tray_on_minimize_close(True)
+        service = ProgramSettingsRuntimeService()
+        store_warmed_hide_to_tray_on_minimize_close(None)
+
+        with patch(
+            "settings.store.get_hide_to_tray_on_minimize_close",
+            side_effect=AssertionError("settings read must not happen in click path"),
+            create=True,
+        ):
+            self.assertTrue(service.peek_hide_to_tray_on_minimize_close())
+
     def test_startup_checks_are_delayed_after_ui_ready(self) -> None:
         from main import post_startup_checks
         from main.post_startup_checks import install_startup_checks
@@ -1148,6 +1165,9 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             premium=object(),
             telegram_proxy=object(),
             tray=object(),
+            program_settings=SimpleNamespace(
+                hide_to_tray_on_minimize_close_enabled=Mock(return_value=False),
+            ),
         )
 
         with (
@@ -2249,13 +2269,21 @@ class WindowLifecycleEarlyEventTests(unittest.TestCase):
                 self.calls.append("hide_to_tray")
                 return True
 
+            window_close_flow = SimpleNamespace(
+                hide_to_tray_on_minimize_close_enabled=Mock(return_value=True),
+            )
+
         msg = wintypes.MSG()
         msg.message = WM_SYSCOMMAND
         msg.wParam = SC_MINIMIZE
         window = Window()
 
         with (
-            patch("settings.store.get_hide_to_tray_on_minimize_close", return_value=True, create=True),
+            patch(
+                "settings.store.get_hide_to_tray_on_minimize_close",
+                side_effect=AssertionError("settings read must not happen in minimize path"),
+                create=True,
+            ),
             patch("main.window_native_commands.sys.platform", "win32"),
         ):
             result = window.nativeEvent(b"windows_generic_MSG", int(addressof(msg)))
@@ -2273,13 +2301,21 @@ class WindowLifecycleEarlyEventTests(unittest.TestCase):
                 self.calls: list[str] = []
                 self.close_to_tray = Mock(return_value=True)
 
+            window_close_flow = SimpleNamespace(
+                hide_to_tray_on_minimize_close_enabled=Mock(return_value=False),
+            )
+
         msg = wintypes.MSG()
         msg.message = WM_SYSCOMMAND
         msg.wParam = SC_MINIMIZE
         window = Window()
 
         with (
-            patch("settings.store.get_hide_to_tray_on_minimize_close", return_value=False, create=True),
+            patch(
+                "settings.store.get_hide_to_tray_on_minimize_close",
+                side_effect=AssertionError("settings read must not happen in minimize path"),
+                create=True,
+            ),
             patch("main.window_native_commands.sys.platform", "win32"),
         ):
             result = window.nativeEvent(b"windows_generic_MSG", int(addressof(msg)))
@@ -2300,9 +2336,17 @@ class WindowLifecycleEarlyEventTests(unittest.TestCase):
                 self.calls.append("hide_to_tray")
                 return True
 
+            window_close_flow = SimpleNamespace(
+                hide_to_tray_on_minimize_close_enabled=Mock(return_value=True),
+            )
+
         window = Window()
 
-        with patch("settings.store.get_hide_to_tray_on_minimize_close", return_value=True, create=True):
+        with patch(
+            "settings.store.get_hide_to_tray_on_minimize_close",
+            side_effect=AssertionError("settings read must not happen in minimize path"),
+            create=True,
+        ):
             window.showMinimized()
 
         window.close_to_tray.assert_called_once()
@@ -2316,9 +2360,17 @@ class WindowLifecycleEarlyEventTests(unittest.TestCase):
                 self.calls: list[str] = []
                 self.close_to_tray = Mock(return_value=True)
 
+            window_close_flow = SimpleNamespace(
+                hide_to_tray_on_minimize_close_enabled=Mock(return_value=False),
+            )
+
         window = Window()
 
-        with patch("settings.store.get_hide_to_tray_on_minimize_close", return_value=False, create=True):
+        with patch(
+            "settings.store.get_hide_to_tray_on_minimize_close",
+            side_effect=AssertionError("settings read must not happen in minimize path"),
+            create=True,
+        ):
             window.showMinimized()
 
         window.close_to_tray.assert_not_called()
@@ -2382,9 +2434,14 @@ class WindowsSessionShutdownTests(unittest.TestCase):
                 close_to_tray=close_to_tray,
                 exit_stop_dpi=Mock(),
                 exit_keep_dpi=Mock(),
+                hide_to_tray_on_minimize_close=Mock(return_value=True),
             )
 
-            with patch("settings.store.get_hide_to_tray_on_minimize_close", return_value=True, create=True):
+            with patch(
+                "settings.store.get_hide_to_tray_on_minimize_close",
+                side_effect=AssertionError("settings read must not happen in close path"),
+                create=True,
+            ):
                 self.assertFalse(flow.should_continue_final_close(event))
         finally:
             if original_close_dialog is None:
@@ -2419,9 +2476,14 @@ class WindowsSessionShutdownTests(unittest.TestCase):
                 close_to_tray=close_to_tray,
                 exit_stop_dpi=Mock(),
                 exit_keep_dpi=Mock(),
+                hide_to_tray_on_minimize_close=Mock(return_value=False),
             )
 
-            with patch("settings.store.get_hide_to_tray_on_minimize_close", return_value=False, create=True):
+            with patch(
+                "settings.store.get_hide_to_tray_on_minimize_close",
+                side_effect=AssertionError("settings read must not happen in close path"),
+                create=True,
+            ):
                 self.assertFalse(flow.should_continue_final_close(event))
         finally:
             if original_close_dialog is None:
@@ -2458,9 +2520,14 @@ class WindowsSessionShutdownTests(unittest.TestCase):
                 close_to_tray=Mock(),
                 exit_stop_dpi=Mock(),
                 exit_keep_dpi=Mock(),
+                hide_to_tray_on_minimize_close=Mock(return_value=False),
             )
 
-            with patch("settings.store.get_hide_to_tray_on_minimize_close", return_value=False, create=True):
+            with patch(
+                "settings.store.get_hide_to_tray_on_minimize_close",
+                side_effect=AssertionError("settings read must not happen in close path"),
+                create=True,
+            ):
                 self.assertFalse(flow.should_continue_final_close(event))
         finally:
             if original_close_dialog is None:

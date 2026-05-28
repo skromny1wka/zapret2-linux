@@ -13,7 +13,9 @@ from program_settings.commands import (
 from program_settings.runtime import (
     attach_program_settings_runtime,
     load_program_settings_snapshot,
+    peek_hide_to_tray_on_minimize_close,
     publish_program_settings_snapshot,
+    remember_hide_to_tray_on_minimize_close,
     refresh_program_settings_snapshot,
 )
 
@@ -24,7 +26,9 @@ __all__ = [
     "is_auto_dpi_enabled",
     "is_user_admin",
     "load_program_settings_snapshot",
+    "peek_hide_to_tray_on_minimize_close",
     "publish_program_settings_snapshot",
+    "remember_hide_to_tray_on_minimize_close",
     "refresh_program_settings_snapshot",
     "set_auto_dpi_enabled",
     "set_defender_disabled",

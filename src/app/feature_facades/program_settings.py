@@ -43,6 +43,22 @@ class ProgramSettingsFeature:
     def publish_program_settings_snapshot(self, snapshot) -> bool:
         return bool(self._commands().publish_program_settings_snapshot(self.runtime_service, snapshot))
 
+    def hide_to_tray_on_minimize_close_enabled(self) -> bool:
+        return bool(
+            self._commands().peek_hide_to_tray_on_minimize_close(
+                self.runtime_service,
+                default=False,
+            )
+        )
+
+    def remember_hide_to_tray_on_minimize_close(self, enabled: bool) -> bool:
+        return bool(
+            self._commands().remember_hide_to_tray_on_minimize_close(
+                self.runtime_service,
+                bool(enabled),
+            )
+        )
+
     def attach_program_settings_runtime(self, owner, *, apply_snapshot_fn) -> None:
         return self._commands().attach_program_settings_runtime(
             owner,

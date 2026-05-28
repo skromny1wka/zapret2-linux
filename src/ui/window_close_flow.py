@@ -21,6 +21,7 @@ class WindowCloseFlow:
         close_to_tray,
         exit_stop_dpi,
         exit_keep_dpi,
+        hide_to_tray_on_minimize_close=None,
     ) -> None:
         self._parent = parent
         self._close_state = close_state
@@ -28,6 +29,17 @@ class WindowCloseFlow:
         self._close_to_tray = close_to_tray
         self._exit_stop_dpi = exit_stop_dpi
         self._exit_keep_dpi = exit_keep_dpi
+        self._hide_to_tray_on_minimize_close = hide_to_tray_on_minimize_close
+
+    def hide_to_tray_on_minimize_close_enabled(self) -> bool:
+        provider = self._hide_to_tray_on_minimize_close
+        if not callable(provider):
+            return False
+        try:
+            return bool(provider())
+        except Exception as exc:
+            log(f"Не удалось прочитать состояние 'закрывать в трей' из памяти: {exc}", "DEBUG")
+            return False
 
     def should_continue_final_close(self, event) -> bool:
         """Возвращает True только для окончательного закрытия приложения."""
@@ -43,9 +55,7 @@ class WindowCloseFlow:
             pass
 
         try:
-            from settings.store import get_hide_to_tray_on_minimize_close
-
-            if get_hide_to_tray_on_minimize_close():
+            if self.hide_to_tray_on_minimize_close_enabled():
                 minimized = bool(self._close_to_tray())
                 if not minimized:
                     log("Сценарий 'закрыть в трей' не выполнен: tray manager не готов", "WARNING")

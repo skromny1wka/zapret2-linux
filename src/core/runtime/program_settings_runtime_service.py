@@ -14,6 +14,22 @@ class ProgramSettingsSnapshot:
     max_blocked: bool
 
 
+_warmed_hide_to_tray_lock = RLock()
+_warmed_hide_to_tray_on_minimize_close: bool | None = None
+
+
+def store_warmed_hide_to_tray_on_minimize_close(enabled: bool | None) -> None:
+    global _warmed_hide_to_tray_on_minimize_close
+    normalized = None if enabled is None else bool(enabled)
+    with _warmed_hide_to_tray_lock:
+        _warmed_hide_to_tray_on_minimize_close = normalized
+
+
+def peek_warmed_hide_to_tray_on_minimize_close() -> bool | None:
+    with _warmed_hide_to_tray_lock:
+        return _warmed_hide_to_tray_on_minimize_close
+
+
 class ProgramSettingsRuntimeService:
     """Service-owned snapshot for shared program settings toggle state.
 
@@ -25,6 +41,9 @@ class ProgramSettingsRuntimeService:
     def __init__(self) -> None:
         self._lock = RLock()
         self._snapshot: ProgramSettingsSnapshot | None = None
+        self._hide_to_tray_on_minimize_close_cache: bool | None = (
+            peek_warmed_hide_to_tray_on_minimize_close()
+        )
         self._subscribers: list[object] = []
 
     @staticmethod
@@ -90,6 +109,9 @@ class ProgramSettingsRuntimeService:
         should_notify = False
         with self._lock:
             previous = self._snapshot
+            self._hide_to_tray_on_minimize_close_cache = bool(
+                snapshot.hide_to_tray_on_minimize_close
+            )
             if previous is None or previous.revision != snapshot.revision:
                 self._snapshot = snapshot
                 should_notify = True
@@ -99,6 +121,37 @@ class ProgramSettingsRuntimeService:
         if should_notify:
             self._notify(snapshot)
         return should_notify
+
+    def peek_hide_to_tray_on_minimize_close(self, *, default: bool = False) -> bool:
+        with self._lock:
+            snapshot = self._snapshot
+            cached = self._hide_to_tray_on_minimize_close_cache
+        if snapshot is not None:
+            return bool(snapshot.hide_to_tray_on_minimize_close)
+        if cached is not None:
+            return bool(cached)
+        return bool(default)
+
+    def remember_hide_to_tray_on_minimize_close(self, enabled: bool) -> bool:
+        enabled = bool(enabled)
+        with self._lock:
+            self._hide_to_tray_on_minimize_close_cache = enabled
+            snapshot = self._snapshot
+        if snapshot is None:
+            return False
+        updated = ProgramSettingsSnapshot(
+            revision=(
+                bool(snapshot.auto_dpi_enabled),
+                enabled,
+                bool(snapshot.defender_disabled),
+                bool(snapshot.max_blocked),
+            ),
+            auto_dpi_enabled=bool(snapshot.auto_dpi_enabled),
+            hide_to_tray_on_minimize_close=enabled,
+            defender_disabled=bool(snapshot.defender_disabled),
+            max_blocked=bool(snapshot.max_blocked),
+        )
+        return self.publish_snapshot(updated)
 
     @staticmethod
     def _make_callback_ref(callback):
