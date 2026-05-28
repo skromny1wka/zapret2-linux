@@ -79,6 +79,8 @@ class WindowGeometryRuntime:
         self._last_persisted_geometry: tuple[int, int, int, int] | None = None
         self._last_persisted_maximized: bool | None = None
         self._pending_window_maximized_state: bool | None = None
+        self._geometry_save_worker = None
+        self._geometry_save_pending: tuple[tuple[int, int, int, int] | None, bool] | None = None
         self._window_fsm_active = False
         self._window_fsm_target_mode: str | None = None
         self._window_fsm_retry_count = 0
@@ -350,8 +352,7 @@ class WindowGeometryRuntime:
 
         try:
             if self._last_persisted_maximized != state_bool:
-                self.store.save_maximized(state_bool)
-                self._last_persisted_maximized = state_bool
+                self._request_geometry_save(geometry=None, maximized=state_bool)
         except Exception as e:
             log(f"Ошибка сохранения состояния maximized: {e}", "DEBUG")
 
@@ -522,6 +523,10 @@ class WindowGeometryRuntime:
         return self._last_normal_geometry
 
     def _persist_geometry_now(self, force: bool = False) -> None:
+        if force:
+            self._persist_geometry_sync(force=True)
+            return
+
         if not force:
             if not self._persistence_enabled or self._restore_in_progress:
                 return
@@ -538,17 +543,12 @@ class WindowGeometryRuntime:
         try:
             is_maximized = bool(self.is_zoomed())
 
-            if force or self._last_persisted_maximized != is_maximized:
-                self.store.save_maximized(is_maximized)
-                self._last_persisted_maximized = is_maximized
-                self._pending_window_maximized_state = is_maximized
-                try:
-                    self._window_maximized_persist_timer.stop()
-                except Exception:
-                    pass
+            maximized_changed = self._last_persisted_maximized != is_maximized
 
             geometry = self._get_normal_geometry_to_save(is_maximized)
             if geometry is None:
+                if maximized_changed:
+                    self._request_geometry_save(geometry=None, maximized=is_maximized)
                 return
 
             x, y, width, height = geometry
@@ -556,8 +556,108 @@ class WindowGeometryRuntime:
             height = max(int(height), self.min_height)
             normalized = (int(x), int(y), int(width), int(height))
 
-            if force or self._last_persisted_geometry != normalized:
-                self.store.save_geometry(*normalized)
-                self._last_persisted_geometry = normalized
+            if maximized_changed or self._last_persisted_geometry != normalized:
+                self._pending_window_maximized_state = is_maximized
+                try:
+                    self._window_maximized_persist_timer.stop()
+                except Exception:
+                    pass
+                self._request_geometry_save(geometry=normalized, maximized=is_maximized)
         except Exception as e:
             log(f"Ошибка сохранения геометрии окна: {e}", "DEBUG")
+
+    def _persist_geometry_sync(self, force: bool = False) -> None:
+        if not force and (not self._persistence_enabled or self._restore_in_progress):
+            return
+        if force:
+            self._stop_geometry_save_worker_for_sync()
+
+        try:
+            if self.host.isMinimized():
+                return
+        except Exception:
+            pass
+
+        try:
+            is_maximized = bool(self.is_zoomed())
+            self.store.save_maximized(is_maximized)
+            self._last_persisted_maximized = is_maximized
+            geometry = self._get_normal_geometry_to_save(is_maximized)
+            if geometry is None:
+                return
+            x, y, width, height = geometry
+            width = max(int(width), self.min_width)
+            height = max(int(height), self.min_height)
+            normalized = (int(x), int(y), int(width), int(height))
+            self.store.save_geometry(*normalized)
+            self._last_persisted_geometry = normalized
+        except Exception as e:
+            log(f"Ошибка синхронного сохранения геометрии окна: {e}", "DEBUG")
+
+    def _stop_geometry_save_worker_for_sync(self) -> None:
+        self._geometry_save_pending = None
+        worker = self.__dict__.get("_geometry_save_worker")
+        if worker is None:
+            return
+        try:
+            if worker.isRunning():
+                worker.quit()
+                worker.wait(1000)
+        except RuntimeError:
+            pass
+        except Exception as e:
+            log(f"Ошибка ожидания сохранения геометрии окна: {e}", "DEBUG")
+        self._geometry_save_worker = None
+
+    def _request_geometry_save(self, *, geometry: tuple[int, int, int, int] | None, maximized: bool) -> None:
+        payload = (geometry, bool(maximized))
+        worker = self.__dict__.get("_geometry_save_worker")
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    self._geometry_save_pending = self._merge_geometry_save_payload(
+                        self._geometry_save_pending,
+                        payload,
+                    )
+                    return
+            except RuntimeError:
+                self._geometry_save_worker = None
+        self._start_geometry_save_worker(payload)
+
+    @staticmethod
+    def _merge_geometry_save_payload(current, requested):
+        if current is None:
+            return requested
+        current_geometry, _current_maximized = current
+        requested_geometry, requested_maximized = requested
+        geometry = requested_geometry if requested_geometry is not None else current_geometry
+        return (geometry, bool(requested_maximized))
+
+    def _start_geometry_save_worker(self, payload) -> None:
+        from ui.window_geometry_worker import WindowGeometrySaveWorker
+
+        geometry, maximized = payload
+        worker = WindowGeometrySaveWorker(geometry=geometry, maximized=bool(maximized), parent=self.host)
+        self._geometry_save_worker = worker
+        worker.saved.connect(self._on_geometry_save_finished)
+        worker.failed.connect(lambda error: log(f"Ошибка сохранения геометрии окна: {error}", "DEBUG"))
+        worker.finished.connect(lambda w=worker: self._on_geometry_save_worker_finished(w))
+        worker.start()
+
+    def _on_geometry_save_finished(self, geometry, maximized) -> None:
+        self._last_persisted_maximized = bool(maximized)
+        self._pending_window_maximized_state = bool(maximized)
+        if geometry is not None:
+            self._last_persisted_geometry = tuple(int(value) for value in geometry)
+
+    def _on_geometry_save_worker_finished(self, worker) -> None:
+        if self.__dict__.get("_geometry_save_worker") is worker:
+            self._geometry_save_worker = None
+        try:
+            worker.deleteLater()
+        except RuntimeError:
+            pass
+        pending = self._geometry_save_pending
+        self._geometry_save_pending = None
+        if pending is not None:
+            self._start_geometry_save_worker(pending)
