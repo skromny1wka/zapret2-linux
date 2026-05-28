@@ -17,6 +17,16 @@ class UpdaterFeature:
     def set_auto_update_enabled(self, enabled: bool) -> None:
         self._commands().set_auto_update_enabled(bool(enabled))
 
+    def create_auto_check_save_worker(self, request_id: int, *, enabled: bool, parent=None):
+        from updater.settings_workers import UpdaterAutoCheckSaveWorker
+
+        return UpdaterAutoCheckSaveWorker(
+            request_id,
+            updater_feature=self,
+            enabled=bool(enabled),
+            parent=parent,
+        )
+
     def run_startup_update_check(self) -> dict:
         return self._commands().run_startup_update_check()
 

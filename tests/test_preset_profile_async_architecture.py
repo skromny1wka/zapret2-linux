@@ -1027,6 +1027,21 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("blockcheck.page_runtime", worker_source)
         self.assertIn("prepare_support", worker_source)
 
+    def test_strategy_scan_support_bundle_prepares_through_worker(self) -> None:
+        blockcheck_workers = importlib.import_module("blockcheck.workers")
+        page_source = inspect.getsource(StrategyScanPage)
+        handler_source = inspect.getsource(StrategyScanPage._prepare_support_from_strategy_scan)
+        worker_source = inspect.getsource(blockcheck_workers.StrategyScanSupportPrepareWorker.run)
+        feature_source = inspect.getsource(BlockcheckFeature)
+
+        self.assertIn("_request_support_prepare", handler_source)
+        self.assertNotIn("prepare_strategy_scan_support", handler_source)
+        self.assertIn("create_support_prepare_worker", page_source)
+        self.assertIn("_support_prepare_worker", page_source)
+        self.assertIn("create_strategy_scan_support_prepare_worker", feature_source)
+        self.assertIn("blockcheck.strategy_scan_logs", worker_source)
+        self.assertIn("prepare_support", worker_source)
+
     def test_strategy_scan_apply_runs_through_worker(self) -> None:
         spec = importlib.util.find_spec("blockcheck.strategy_apply_worker")
         self.assertIsNotNone(spec)
@@ -1145,6 +1160,24 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
             updater_source + update_runtime_source,
         ):
             self.assertIn("OneShotWorkerRuntime", source)
+
+    def test_updater_auto_check_save_runs_through_worker(self) -> None:
+        settings_workers = importlib.import_module("updater.settings_workers")
+        update_runtime_cls = __import__("updater.update_page_runtime", fromlist=["UpdatePageRuntime"]).UpdatePageRuntime
+        updater_feature_cls = __import__("app.feature_facades.updater", fromlist=["UpdaterFeature"]).UpdaterFeature
+
+        handler_source = inspect.getsource(update_runtime_cls.set_auto_check_enabled)
+        runtime_source = inspect.getsource(update_runtime_cls)
+        feature_source = inspect.getsource(updater_feature_cls)
+
+        self.assertTrue(hasattr(settings_workers, "UpdaterAutoCheckSaveWorker"))
+        worker_source = inspect.getsource(settings_workers.UpdaterAutoCheckSaveWorker.run)
+
+        self.assertIn("_request_auto_check_save", handler_source)
+        self.assertNotIn("set_auto_update_enabled", handler_source)
+        self.assertIn("_auto_check_save_pending", runtime_source)
+        self.assertIn("create_auto_check_save_worker", feature_source)
+        self.assertIn("set_auto_update_enabled", worker_source)
 
     def test_logs_cleanup_stops_overview_worker(self) -> None:
         cleanup_source = inspect.getsource(LogsPage.cleanup)

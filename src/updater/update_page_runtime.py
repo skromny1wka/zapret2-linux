@@ -111,9 +111,11 @@ class UpdatePageRuntime:
 
         self._server_worker_runtime = OneShotWorkerRuntime()
         self._version_worker_runtime = OneShotWorkerRuntime()
+        self._auto_check_save_runtime = OneShotWorkerRuntime()
         self._update_thread = None
         self._update_worker = None
         self._cleanup_in_progress = False
+        self._auto_check_save_pending: bool | None = None
 
         self._found_state = UpdateFoundState()
         self._check_state = UpdateCheckState()
@@ -358,7 +360,7 @@ class UpdatePageRuntime:
 
     def set_auto_check_enabled(self, enabled: bool) -> None:
         self._auto_check_enabled = bool(enabled)
-        self._updater_feature.set_auto_update_enabled(bool(enabled))
+        self._request_auto_check_save(bool(enabled))
 
         if enabled:
             self._view.show_auto_enabled_hint()
@@ -367,6 +369,40 @@ class UpdatePageRuntime:
 
         log(f"Автопроверка при запуске: {'включена' if enabled else 'отключена'}", "🔄 UPDATE")
 
+    def _request_auto_check_save(self, enabled: bool) -> None:
+        if self._auto_check_save_runtime.is_running():
+            self._auto_check_save_pending = bool(enabled)
+            return
+        self._start_auto_check_save_worker(bool(enabled))
+
+    def _start_auto_check_save_worker(self, enabled: bool) -> None:
+        self._auto_check_save_pending = None
+        self._auto_check_save_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: self._updater_feature.create_auto_check_save_worker(
+                request_id,
+                enabled=bool(enabled),
+                parent=self._view.window(),
+            ),
+            on_failed=self._on_auto_check_save_failed,
+            on_finished=lambda _worker: self._on_auto_check_save_finished(),
+        )
+
+    def _on_auto_check_save_failed(self, request_id: int, error: str) -> None:
+        if not self._auto_check_save_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
+            return
+        log(f"Не удалось сохранить автопроверку обновлений: {error}", "WARNING")
+
+    def _on_auto_check_save_finished(self) -> None:
+        if self._cleanup_in_progress:
+            return
+        pending = self._auto_check_save_pending
+        if pending is None:
+            return
+        if bool(pending) == bool(self._auto_check_enabled):
+            self._start_auto_check_save_worker(bool(pending))
+        else:
+            self._auto_check_save_pending = None
+
     def open_update_channel(self, channel: str):
         return self._updater_feature.open_update_channel(channel)
 
@@ -374,6 +410,7 @@ class UpdatePageRuntime:
         self._cleanup_in_progress = True
         self._teardown_server_worker()
         self._teardown_version_worker()
+        self._teardown_auto_check_save_worker()
         self._teardown_update_runtime(wait_for_finish=True)
 
     def _resolve_idle_view_decision(self) -> UpdateIdleViewDecision:
@@ -559,6 +596,15 @@ class UpdatePageRuntime:
             warning_prefix="version_worker",
         )
         self._version_worker_runtime.cancel()
+
+    def _teardown_auto_check_save_worker(self) -> None:
+        self._auto_check_save_pending = None
+        self._auto_check_save_runtime.stop(
+            blocking=True,
+            log_fn=log,
+            warning_prefix="auto_check_save_worker",
+        )
+        self._auto_check_save_runtime.cancel()
 
     def _teardown_update_runtime(self, *, wait_for_finish: bool = False) -> None:
         thread = self._update_thread
