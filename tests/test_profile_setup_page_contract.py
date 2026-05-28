@@ -1629,6 +1629,62 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         widget._rebuild_tree.assert_not_called()
         widget._refresh_strategy_item.assert_called_once_with(strategy_item, "fake", is_current=True)
 
+    def test_strategy_list_moves_favorite_row_without_rebuild_when_order_changes(self) -> None:
+        class _FakeList:
+            def __init__(self, items):
+                self.items = list(items)
+
+            def row(self, item):
+                return self.items.index(item)
+
+            def takeItem(self, row):  # noqa: N802
+                return self.items.pop(row)
+
+            def insertItem(self, row, item):  # noqa: N802
+                self.items.insert(row, item)
+
+        widget = ProfileStrategyListWidget.__new__(ProfileStrategyListWidget)
+        first_item = object()
+        second_item = object()
+        entries = {
+            "first": SimpleNamespace(
+                name="Alpha",
+                args="--lua-desync=fake",
+                visual=SimpleNamespace(icon_name="bolt", color="#fff", label="Alpha", description="Alpha TLS"),
+            ),
+            "second": SimpleNamespace(
+                name="Beta",
+                args="--lua-desync=fake",
+                visual=SimpleNamespace(icon_name="bolt", color="#fff", label="Beta", description="Beta TLS"),
+            ),
+        }
+        fake_list = _FakeList([first_item, second_item])
+        widget._entries = dict(entries)
+        widget._states = {
+            "first": ProfileStrategyState(rating="", favorite=False),
+            "second": ProfileStrategyState(rating="", favorite=False),
+        }
+        widget._current_strategy_id = "second"
+        widget._rows_signature = (("entry",), ("old-state",))
+        widget._item_by_strategy_id = {"first": first_item, "second": second_item}
+        widget._list = fake_list
+        widget._rebuild_tree = Mock(side_effect=AssertionError("favorite move must not rebuild the whole list"))
+        widget._refresh_strategy_item = Mock()
+
+        ProfileStrategyListWidget.set_rows(
+            widget,
+            entries=dict(entries),
+            states={
+                "first": ProfileStrategyState(rating="", favorite=False),
+                "second": ProfileStrategyState(rating="", favorite=True),
+            },
+            current_strategy_id="second",
+        )
+
+        widget._rebuild_tree.assert_not_called()
+        self.assertEqual(fake_list.items, [second_item, first_item])
+        widget._refresh_strategy_item.assert_called_once_with(second_item, "second", is_current=True)
+
     def test_strategy_change_refreshes_only_changed_profile_row(self) -> None:
         page = PresetSetupPageBase.__new__(PresetSetupPageBase)
         page._refresh_profile_item_locally = Mock()
@@ -2162,9 +2218,11 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._enabled_checkbox.setEnabled.assert_called_once_with(False)
         worker.start.assert_called_once()
 
-    def test_enabled_save_worker_emits_new_profile_key(self) -> None:
+    def test_enabled_save_worker_emits_new_profile_key_and_payload(self) -> None:
         controller = Mock()
         controller.set_enabled.return_value = "profile-2"
+        payload = SimpleNamespace(item=SimpleNamespace(key="profile-2"))
+        controller.load.return_value = payload
         worker = ProfileEnabledSaveWorker(
             8,
             controller,
@@ -2175,7 +2233,11 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         )
         saved = []
 
-        worker.saved.connect(lambda request_id, profile_key, enabled: saved.append((request_id, profile_key, enabled)))
+        worker.saved.connect(
+            lambda request_id, profile_key, enabled, emitted_payload: saved.append(
+                (request_id, profile_key, enabled, emitted_payload)
+            )
+        )
 
         worker.run()
 
@@ -2185,7 +2247,8 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             filter_kind="hostlist",
             filter_value="lists/youtube.txt",
         )
-        self.assertEqual(saved, [(8, "profile-2", False)])
+        controller.load.assert_called_once_with("profile-2")
+        self.assertEqual(saved, [(8, "profile-2", False, payload)])
 
     def test_enabled_save_finish_updates_detail_without_reload(self) -> None:
         item = ProfileListItem(
@@ -2233,6 +2296,46 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             "enabled",
             page._payload.item,
         )
+
+    def test_enabled_save_finish_applies_worker_payload_without_reload(self) -> None:
+        item = ProfileListItem(
+            key="profile-2",
+            persistent_key="profile-2",
+            profile_index=2,
+            display_name="YouTube",
+            enabled=True,
+            in_preset=True,
+            strategy_id="strategy",
+            strategy_name="Strategy",
+            match_lines=("--filter-tcp=443",),
+            list_type="hostlist",
+            rating="",
+            favorite=False,
+            group="common",
+            group_name="",
+            order=2,
+        )
+        payload = ProfileSetupPayload(
+            item=item,
+            strategy_entries={},
+            strategy_states={},
+            raw_profile_text="",
+            raw_strategy_text="",
+            match_summary="",
+        )
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._enabled_save_request_id = 9
+        page._profile_key = "template:profile-1"
+        page._payload = None
+        page._apply_payload = Mock()
+        page.reload_current_profile = Mock()
+        page._on_profile_changed_callback = Mock()
+
+        ProfileSetupPageBase._on_enabled_save_finished(page, 9, "profile-2", True, payload)
+
+        page.reload_current_profile.assert_not_called()
+        page._apply_payload.assert_called_once_with(payload)
+        page._on_profile_changed_callback.assert_called_once_with("profile-2", "enabled", item)
 
     def test_profile_setup_page_has_list_file_editor_as_second_tab(self) -> None:
         build = inspect.getsource(ProfileSetupPageBase._build_content)

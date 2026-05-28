@@ -177,7 +177,7 @@ class ProfileRawTextSaveWorker(QThread):
 
 
 class ProfileEnabledSaveWorker(QThread):
-    saved = pyqtSignal(int, str, bool)
+    saved = pyqtSignal(int, str, bool, object)
     failed = pyqtSignal(int, str)
 
     def __init__(
@@ -211,7 +211,14 @@ class ProfileEnabledSaveWorker(QThread):
             log(f"ProfileEnabledSaveWorker: не удалось изменить состояние profile: {exc}", "ERROR")
             self.failed.emit(self._request_id, str(exc))
             return
-        self.saved.emit(self._request_id, str(profile_key or ""), self._enabled)
+        payload = None
+        clean_profile_key = str(profile_key or "").strip()
+        if clean_profile_key:
+            try:
+                payload = self._controller.load(clean_profile_key)
+            except Exception as exc:
+                log(f"ProfileEnabledSaveWorker: не удалось обновить payload profile: {exc}", "DEBUG")
+        self.saved.emit(self._request_id, clean_profile_key, self._enabled, payload)
 
 
 class ProfilePresetProfileActionWorker(QThread):

@@ -293,6 +293,25 @@ class ProfileStrategyListWidget(QWidget):
                 item = self._item_by_strategy_id.get(strategy_id)
                 self._refresh_strategy_item(item, strategy_id, is_current=strategy_id == self._current_strategy_id)
             return
+        single_move = self._move_strategy_row_in_place(next_entries, next_states)
+        if single_move is not None:
+            changed_strategy_ids = [
+                strategy_id
+                for strategy_id in next_entries
+                if self._states.get(strategy_id) != next_states.get(strategy_id)
+            ]
+            self._entries = next_entries
+            self._states = next_states
+            self._current_strategy_id = next_current_id
+            self._rows_signature = next_signature
+            item = self._item_by_strategy_id.get(single_move)
+            self._refresh_strategy_item(item, single_move, is_current=single_move == self._current_strategy_id)
+            for strategy_id in changed_strategy_ids:
+                if strategy_id == single_move:
+                    continue
+                item = self._item_by_strategy_id.get(strategy_id)
+                self._refresh_strategy_item(item, strategy_id, is_current=strategy_id == self._current_strategy_id)
+            return
         self._entries = next_entries
         self._states = next_states
         self._current_strategy_id = next_current_id
@@ -305,6 +324,35 @@ class ProfileStrategyListWidget(QWidget):
         if not self._item_by_strategy_id:
             return False
         return _strategy_visible_order(self._entries, self._states) == _strategy_visible_order(next_entries, next_states)
+
+    def _move_strategy_row_in_place(self, next_entries: dict, next_states: dict) -> str | None:
+        if set(self._entries.keys()) != set(next_entries.keys()):
+            return None
+        if set(self._item_by_strategy_id.keys()) != set(self._entries.keys()):
+            return None
+        if _strategy_entry_signature(self._entries) != _strategy_entry_signature(next_entries):
+            return None
+        current_order = _strategy_visible_order(self._entries, self._states)
+        next_order = _strategy_visible_order(next_entries, next_states)
+        changed_strategy_ids = {
+            strategy_id
+            for strategy_id in next_entries
+            if self._states.get(strategy_id) != next_states.get(strategy_id)
+        }
+        move = _single_strategy_order_move(current_order, next_order, preferred_strategy_ids=changed_strategy_ids)
+        if move is None:
+            return None
+        source_index, insert_index = move
+        strategy_id = current_order[source_index]
+        item = self._item_by_strategy_id.get(strategy_id)
+        if item is None:
+            return None
+        list_row = self._list.row(item)
+        if list_row != source_index:
+            return None
+        moved_item = self._list.takeItem(list_row)
+        self._list.insertItem(insert_index, moved_item)
+        return strategy_id
 
     def set_current_strategy_id(self, strategy_id: str) -> None:
         next_id = str(strategy_id or "none").strip() or "none"
@@ -441,6 +489,10 @@ def _strategy_rows_signature(entries, states) -> tuple[tuple, tuple]:
     return tuple(sorted(entry_rows)), tuple(sorted(state_rows))
 
 
+def _strategy_entry_signature(entries) -> tuple:
+    return _strategy_rows_signature(entries, {})[0]
+
+
 def _strategy_visible_order(entries, states) -> tuple[str, ...]:
     return tuple(
         strategy_id
@@ -452,6 +504,52 @@ def _strategy_visible_order(entries, states) -> tuple[str, ...]:
             ),
         )
     )
+
+
+def _single_strategy_order_move(
+    current_order: tuple[str, ...],
+    next_order: tuple[str, ...],
+    *,
+    preferred_strategy_ids: set[str] | None = None,
+) -> tuple[int, int] | None:
+    if len(current_order) != len(next_order):
+        return None
+    if current_order == next_order:
+        return None
+    if len(set(current_order)) != len(current_order):
+        return None
+    if set(current_order) != set(next_order):
+        return None
+
+    current_positions = {strategy_id: index for index, strategy_id in enumerate(current_order)}
+    first_changed = next(
+        (
+            index
+            for index, strategy_id in enumerate(next_order)
+            if current_positions.get(strategy_id) != index
+        ),
+        -1,
+    )
+    if first_changed < 0:
+        return None
+
+    last_changed = len(next_order) - 1
+    while last_changed > first_changed and current_order[last_changed] == next_order[last_changed]:
+        last_changed -= 1
+
+    candidates = []
+    if current_order[first_changed] == next_order[last_changed]:
+        candidates.append((first_changed, last_changed))
+    if current_order[last_changed] == next_order[first_changed]:
+        candidates.append((last_changed, first_changed))
+    if not candidates:
+        return None
+
+    preferred = set(preferred_strategy_ids or ())
+    for source_index, insert_index in candidates:
+        if current_order[source_index] in preferred:
+            return source_index, insert_index
+    return candidates[0]
 
 
 def _match_tab_text(payload) -> str:
@@ -1903,11 +2001,22 @@ class ProfileSetupPageBase(BasePage):
         worker.finished.connect(lambda w=worker: self._on_enabled_save_worker_finished(w))
         worker.start()
 
-    def _on_enabled_save_finished(self, request_id: int, profile_key: str, enabled: bool) -> None:
+    def _on_enabled_save_finished(self, request_id: int, profile_key: str, enabled: bool, payload=None) -> None:
         if request_id != self._enabled_save_request_id:
             return
         old_key = str(self._profile_key or "").strip()
         new_key = str(profile_key or "").strip()
+        if payload is not None:
+            if new_key:
+                self._profile_key = new_key
+            self._payload = payload
+            self._apply_payload(payload)
+            self._on_profile_changed_callback(
+                self._profile_key,
+                "enabled" if enabled else "disabled",
+                getattr(payload, "item", None),
+            )
+            return
         if new_key and new_key != old_key:
             self._profile_key = new_key
             self.reload_current_profile()
