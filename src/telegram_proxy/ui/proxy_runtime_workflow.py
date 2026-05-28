@@ -213,9 +213,27 @@ def apply_relay_result(
         )
 
 
-def stop_proxy_runtime(*, manager, request_proxy_enabled_save) -> None:
-    manager.stop_proxy()
-    request_proxy_enabled_save(False)
+def stop_proxy_runtime(*, page, manager, telegram_proxy_feature) -> None:
+    worker = getattr(page, "_proxy_stop_worker", None)
+    if worker is not None:
+        try:
+            if worker.isRunning():
+                return
+        except RuntimeError:
+            setattr(page, "_proxy_stop_worker", None)
+
+    worker = telegram_proxy_feature.create_stop_runtime_worker(
+        manager=manager,
+        emit_status=True,
+        parent=page,
+    )
+    setattr(page, "_proxy_stop_worker", worker)
+    worker.stopped.connect(
+        lambda: QMetaObject.invokeMethod(page, "_finish_stop_proxy", QtNS.ConnectionType.QueuedConnection)
+    )
+    worker.finished.connect(lambda w=worker: setattr(page, "_proxy_stop_worker", None))
+    worker.finished.connect(worker.deleteLater)
+    worker.start()
 
 
 def apply_status_changed(

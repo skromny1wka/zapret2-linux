@@ -58,10 +58,14 @@ class TelegramProxyFeature:
             parent=parent,
         )
 
-    def create_stop_runtime_worker(self, *, manager, parent=None):
+    def create_stop_runtime_worker(self, *, manager, emit_status: bool = False, parent=None):
         from telegram_proxy.workers import TelegramProxyStopRuntimeWorker
 
-        return TelegramProxyStopRuntimeWorker(manager=manager, parent=parent)
+        return TelegramProxyStopRuntimeWorker(
+            manager=manager,
+            emit_status=bool(emit_status),
+            parent=parent,
+        )
 
     def create_open_log_file_worker(self, *, path: str, parent=None):
         from telegram_proxy.workers import TelegramProxyOpenLogFileWorker

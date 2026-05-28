@@ -55,13 +55,17 @@ class TelegramProxyStartWorker(QThread):
 class TelegramProxyStopRuntimeWorker(QThread):
     stopped = pyqtSignal()
 
-    def __init__(self, *, manager, parent=None):
+    def __init__(self, *, manager, emit_status: bool = False, parent=None):
         super().__init__(parent)
         self._manager = manager
+        self._emit_status = bool(emit_status)
 
     def run(self) -> None:
         try:
-            self._manager._stop_runtime_only()
+            if self._emit_status:
+                self._manager.stop_proxy()
+            else:
+                self._manager._stop_runtime_only()
         except Exception as exc:
             log(f"TelegramProxyStopRuntimeWorker: ошибка остановки proxy: {exc}", "WARNING")
         self.stopped.emit()

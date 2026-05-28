@@ -119,6 +119,7 @@ class TelegramProxyPage(BasePage):
         self._upstream_restart_timer = None
         self._diag_worker = None
         self._proxy_start_worker = None
+        self._proxy_stop_worker = None
         self._restart_stop_worker = None
         self._relay_check_worker = None
         self._ensure_hosts_worker = None
@@ -891,12 +892,16 @@ class TelegramProxyPage(BasePage):
     def _stop_proxy(self):
         mgr = self._proxy_manager()
         stop_proxy_runtime(
+            page=self,
             manager=mgr,
-            request_proxy_enabled_save=lambda value: self._request_settings_save(
-                "proxy_enabled",
-                enabled=bool(value),
-            ),
+            telegram_proxy_feature=self._telegram_proxy,
         )
+
+    @pyqtSlot()
+    def _finish_stop_proxy(self):
+        if self._cleanup_in_progress:
+            return
+        self._request_settings_save("proxy_enabled", enabled=False)
 
     def _on_status_changed(self, running: bool):
         mgr = self._proxy_manager()
@@ -1225,6 +1230,20 @@ class TelegramProxyPage(BasePage):
             except Exception:
                 pass
             self._settings_save_worker = None
+        proxy_stop_worker = self.__dict__.get("_proxy_stop_worker")
+        if proxy_stop_worker is not None:
+            try:
+                proxy_stop_worker.quit()
+            except Exception:
+                pass
+            self._proxy_stop_worker = None
+        restart_stop_worker = self.__dict__.get("_restart_stop_worker")
+        if restart_stop_worker is not None:
+            try:
+                restart_stop_worker.quit()
+            except Exception:
+                pass
+            self._restart_stop_worker = None
         open_log_worker = self.__dict__.get("_open_log_file_worker")
         if open_log_worker is not None:
             try:

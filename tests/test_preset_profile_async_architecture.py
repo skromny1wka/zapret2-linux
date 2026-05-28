@@ -1406,6 +1406,24 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("create_external_link_worker", feature_source)
         self.assertIn("open_external_link", worker_source)
 
+    def test_telegram_proxy_stop_runs_through_worker(self) -> None:
+        page_source = inspect.getsource(TelegramProxyPage)
+        stop_source = inspect.getsource(TelegramProxyPage._stop_proxy)
+        runtime_source = inspect.getsource(telegram_runtime_workflow.stop_proxy_runtime)
+
+        self.assertTrue(hasattr(telegram_proxy_workers, "TelegramProxyStopRuntimeWorker"))
+        worker_source = inspect.getsource(telegram_proxy_workers.TelegramProxyStopRuntimeWorker.run)
+
+        self.assertIn("stop_proxy_runtime", stop_source)
+        self.assertNotIn("manager.stop_proxy()", stop_source)
+        self.assertNotIn("manager.stop_proxy()", runtime_source)
+        self.assertIn("create_stop_runtime_worker", runtime_source)
+        self.assertIn("_proxy_stop_worker", page_source)
+        self.assertIn("_finish_stop_proxy", runtime_source)
+        self.assertIn("QMetaObject.invokeMethod", runtime_source)
+        self.assertIn('_request_settings_save("proxy_enabled", enabled=False)', page_source)
+        self.assertIn("stop_proxy", worker_source)
+
     def test_blockcheck_initial_state_is_backend_plan_not_ui_loading(self) -> None:
         spec = importlib.util.find_spec("blockcheck.workers")
         self.assertIsNotNone(spec)
