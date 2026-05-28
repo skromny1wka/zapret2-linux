@@ -6,7 +6,7 @@ import math
 import random
 
 from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, QRect, QRectF, QTimer, Qt, pyqtProperty
-from PyQt6.QtGui import QColor, QPainter, QPainterPath, QPen, QRadialGradient, QRegion
+from PyQt6.QtGui import QColor, QPainter, QPainterPath, QPen, QPixmap, QRadialGradient, QRegion
 from PyQt6.QtWidgets import QWidget
 
 from ui.animation_policy import register_managed_animation, start_managed_animation
@@ -245,6 +245,8 @@ class GarlandOverlay(QWidget):
 
 
 class _Snowflake:
+    BASE_FRAME_MS = 33
+
     def __init__(self, x: float, y: float):
         self.x = x
         self.y = y
@@ -255,12 +257,12 @@ class _Snowflake:
         self.swing_width = random.uniform(0.3, 1.2)
         self.opacity = random.uniform(0.18, 0.42)
 
-    def step(self, max_height: int) -> bool:
-        self.y += self.speed
-        self.swing_phase += self.swing_speed
+    def step(self, max_height: int, frame_scale: float = 1.0) -> bool:
+        self.y += self.speed * frame_scale
+        self.swing_phase += self.swing_speed * frame_scale
         if self.swing_phase >= math.tau:
             self.swing_phase -= math.tau
-        self.x += math.sin(self.swing_phase) * self.swing_width
+        self.x += math.sin(self.swing_phase) * self.swing_width * frame_scale
         return self.y < max_height + 28
 
 
@@ -275,13 +277,14 @@ class SnowflakesOverlay(QWidget):
         self._fade_target = 0.0
         self._fade: QPropertyAnimation | None = None
         self._cached_height = 0
+        self._flake_pixmap_cache: dict[tuple[float, float], QPixmap] = {}
 
         self._animate_timer = QTimer(self)
-        self._animate_timer.setInterval(33)
+        self._animate_timer.setInterval(50)
         self._animate_timer.timeout.connect(self._animate)
 
         self._spawn_timer = QTimer(self)
-        self._spawn_timer.setInterval(240)
+        self._spawn_timer.setInterval(300)
         self._spawn_timer.timeout.connect(self._spawn)
 
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
@@ -309,6 +312,7 @@ class SnowflakesOverlay(QWidget):
         self._animate_timer.stop()
         self._spawn_timer.stop()
         self._flakes.clear()
+        self._flake_pixmap_cache.clear()
         self._opacity = 0.0
         self.hide()
 
@@ -381,7 +385,7 @@ class SnowflakesOverlay(QWidget):
     def _seed_visible_flakes(self) -> None:
         width = max(1, int(self.width()))
         height = max(1, int(self.height()))
-        initial_count = max(24, (width * height) // 22000)
+        initial_count = self._initial_flake_count(width, height)
         for _ in range(initial_count):
             self._flakes.append(
                 _Snowflake(
@@ -400,12 +404,12 @@ class SnowflakesOverlay(QWidget):
             return
 
         self._cached_height = max(self._cached_height, height)
-        max_count = max(70, (width * height) // 9000)
+        max_count = self._max_flake_count(width, height)
         free_slots = max_count - len(self._flakes)
         if free_slots <= 0:
             return
 
-        spawn_count = min(random.randint(1, 3), free_slots)
+        spawn_count = min(random.randint(1, 2), free_slots)
         for _ in range(spawn_count):
             self._flakes.append(
                 _Snowflake(
@@ -417,13 +421,14 @@ class SnowflakesOverlay(QWidget):
     def _animate(self) -> None:
         self.sync_geometry()
         max_height = max(1, self._cached_height, int(self.height()))
+        frame_scale = max(0.1, self._animate_timer.interval() / _Snowflake.BASE_FRAME_MS)
 
         dirty_region = QRegion()
         visible_flakes: list[_Snowflake] = []
         for flake in self._flakes:
             old_x = flake.x
             old_y = flake.y
-            if flake.step(max_height):
+            if flake.step(max_height, frame_scale):
                 visible_flakes.append(flake)
             dirty_region = dirty_region.united(QRegion(self._snowflake_motion_rect(flake, old_x, old_y)))
 
@@ -432,6 +437,12 @@ class SnowflakesOverlay(QWidget):
             return
         self.update(dirty_region)
 
+    def _initial_flake_count(self, width: int, height: int) -> int:
+        return max(18, (int(width) * int(height)) // 32000)
+
+    def _max_flake_count(self, width: int, height: int) -> int:
+        return max(45, (int(width) * int(height)) // 14000)
+
     def _snowflake_paint_rect(self, flake: _Snowflake) -> QRect:
         glow_size = flake.size * 1.45
         return QRectF(
@@ -439,7 +450,7 @@ class SnowflakesOverlay(QWidget):
             flake.y - glow_size,
             glow_size * 2.0,
             glow_size * 2.0,
-        ).toAlignedRect().adjusted(-2, -2, 2, 2)
+        ).toAlignedRect().adjusted(-4, -4, 4, 4)
 
     def _snowflake_motion_rect(self, flake: _Snowflake, old_x: float, old_y: float) -> QRect:
         current_x = flake.x
@@ -451,6 +462,52 @@ class SnowflakesOverlay(QWidget):
         flake.y = current_y
         return old_rect.united(self._snowflake_paint_rect(flake))
 
+    def _snowflake_pixmap_key(self, flake: _Snowflake) -> tuple[float, float]:
+        size_bucket = round(flake.size * 2.0) / 2.0
+        opacity_bucket = round(flake.opacity * 10.0) / 10.0
+        return (size_bucket, opacity_bucket)
+
+    def _snowflake_pixmap(self, flake: _Snowflake, overlay_opacity: float) -> QPixmap:
+        del overlay_opacity
+        key = self._snowflake_pixmap_key(flake)
+        cached = self._flake_pixmap_cache.get(key)
+        if cached is not None:
+            return cached
+
+        size, opacity = key
+        glow_size = size * 1.45
+        pixmap_size = max(6, math.ceil(glow_size * 2.0) + 4)
+        center = pixmap_size / 2.0
+
+        pixmap = QPixmap(pixmap_size, pixmap_size)
+        pixmap.fill(Qt.GlobalColor.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setPen(Qt.PenStyle.NoPen)
+
+        alpha = int(180 * opacity)
+        gradient = QRadialGradient(center, center, glow_size)
+        gradient.setColorAt(0.0, QColor(255, 255, 255, alpha // 3))
+        gradient.setColorAt(0.75, QColor(200, 220, 255, alpha // 7))
+        gradient.setColorAt(1.0, QColor(255, 255, 255, 0))
+        painter.setBrush(gradient)
+        painter.drawEllipse(
+            QRectF(
+                center - glow_size,
+                center - glow_size,
+                glow_size * 2.0,
+                glow_size * 2.0,
+            )
+        )
+
+        painter.setBrush(QColor(255, 255, 255, int(alpha * 0.72)))
+        painter.drawEllipse(QRectF(center - size * 0.5, center - size * 0.5, size, size))
+        painter.end()
+
+        self._flake_pixmap_cache[key] = pixmap
+        return pixmap
+
     def paintEvent(self, event) -> None:
         if self._opacity <= 0.0 or not self._flakes:
             return
@@ -458,37 +515,18 @@ class SnowflakesOverlay(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         painter.setPen(Qt.PenStyle.NoPen)
+        painter.setOpacity(float(self._opacity))
         dirty_region = event.region()
 
         for flake in self._flakes:
             if not dirty_region.intersects(self._snowflake_paint_rect(flake)):
                 continue
 
-            alpha = int(180 * flake.opacity * self._opacity)
-
-            glow_size = flake.size * 1.45
-            gradient = QRadialGradient(flake.x, flake.y, glow_size)
-            gradient.setColorAt(0.0, QColor(255, 255, 255, alpha // 3))
-            gradient.setColorAt(0.75, QColor(200, 220, 255, alpha // 7))
-            gradient.setColorAt(1.0, QColor(255, 255, 255, 0))
-            painter.setBrush(gradient)
-            painter.drawEllipse(
-                QRectF(
-                    flake.x - glow_size,
-                    flake.y - glow_size,
-                    glow_size * 2.0,
-                    glow_size * 2.0,
-                )
-            )
-
-            painter.setBrush(QColor(255, 255, 255, int(alpha * 0.72)))
-            painter.drawEllipse(
-                QRectF(
-                    flake.x - flake.size * 0.5,
-                    flake.y - flake.size * 0.5,
-                    flake.size,
-                    flake.size,
-                )
+            pixmap = self._snowflake_pixmap(flake, self._opacity)
+            painter.drawPixmap(
+                round(flake.x - pixmap.width() * 0.5),
+                round(flake.y - pixmap.height() * 0.5),
+                pixmap,
             )
 
 
