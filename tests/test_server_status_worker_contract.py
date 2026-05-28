@@ -64,5 +64,105 @@ class ServerStatusWorkerContractTests(unittest.TestCase):
         self.assertNotIn("is_any_running", worker_source)
 
 
+class UpdatePageRuntimeServerRecoveryTests(unittest.TestCase):
+    def _make_runtime(self):
+        from updater.update_page_runtime import UpdatePageRuntime
+
+        view = SimpleNamespace(
+            get_ui_language=Mock(return_value="ru"),
+            window=Mock(return_value=None),
+            is_update_download_in_progress=Mock(return_value=False),
+            reset_server_rows=Mock(),
+            upsert_server_status=Mock(),
+            start_checking=Mock(),
+            finish_checking=Mock(),
+            show_found_update_source=Mock(),
+            show_update_offer=Mock(),
+            hide_update_offer=Mock(),
+            start_update_download=Mock(),
+            update_download_progress=Mock(),
+            mark_update_download_complete=Mock(),
+            mark_update_download_failed=Mock(),
+            show_update_download_error=Mock(),
+            show_update_deferred=Mock(),
+            show_checked_ago=Mock(),
+            show_manual_hint=Mock(),
+            show_auto_enabled_hint=Mock(),
+            hide_update_status_card=Mock(),
+            show_update_status_card=Mock(),
+            set_update_check_enabled=Mock(),
+            set_auto_check_toggle_checked=Mock(),
+        )
+        runtime_feature = SimpleNamespace(
+            is_any_running=Mock(return_value=True),
+            shutdown_sync=Mock(return_value=SimpleNamespace(still_running=False)),
+            is_available=Mock(return_value=True),
+            restart=Mock(),
+        )
+        runtime = UpdatePageRuntime(
+            view,
+            runtime_feature=runtime_feature,
+            updater_feature=SimpleNamespace(),
+        )
+        return runtime, view, runtime_feature
+
+    def test_page_runtime_retries_server_check_without_dpi_after_full_source_failure(self) -> None:
+        runtime, _view, runtime_feature = self._make_runtime()
+
+        with (
+            patch("updater.update_page_runtime.UpdateRateLimiter.record_servers_full_check"),
+            patch.object(runtime, "_start_server_check_workflow") as start_server_check,
+            patch.object(runtime, "_start_version_check_workflow") as start_version_check,
+        ):
+            runtime.start_checks(telegram_only=False, skip_server_rate_limit=True)
+            runtime._on_server_checked("Telegram Bot", {"status": "offline"})
+            runtime._on_server_checked("Primary", {"status": "error"})
+            runtime._on_server_checked("GitHub API", {"status": "error"})
+            runtime._on_servers_complete()
+
+        runtime_feature.shutdown_sync.assert_called_once_with(
+            reason="server_status_probe_retry",
+            include_cleanup=True,
+        )
+        self.assertEqual(start_server_check.call_count, 2)
+        start_server_check.assert_called_with(telegram_only=False)
+        start_version_check.assert_not_called()
+
+    def test_page_runtime_restarts_dpi_after_retry_before_version_check(self) -> None:
+        runtime, _view, runtime_feature = self._make_runtime()
+
+        with (
+            patch("updater.update_page_runtime.UpdateRateLimiter.record_servers_full_check"),
+            patch.object(runtime, "_start_server_check_workflow"),
+            patch.object(runtime, "_start_version_check_workflow") as start_version_check,
+        ):
+            runtime.start_checks(telegram_only=False, skip_server_rate_limit=True)
+            runtime._on_server_checked("GitHub API", {"status": "error"})
+            runtime._on_servers_complete()
+            runtime._on_server_checked("Primary", {"status": "online", "is_current": True})
+            runtime._on_servers_complete()
+
+        runtime_feature.shutdown_sync.assert_called_once()
+        runtime_feature.restart.assert_called_once()
+        start_version_check.assert_called_once()
+
+    def test_page_runtime_does_not_retry_without_dpi_when_any_source_is_online(self) -> None:
+        runtime, _view, runtime_feature = self._make_runtime()
+
+        with (
+            patch("updater.update_page_runtime.UpdateRateLimiter.record_servers_full_check"),
+            patch.object(runtime, "_start_server_check_workflow"),
+            patch.object(runtime, "_start_version_check_workflow") as start_version_check,
+        ):
+            runtime.start_checks(telegram_only=False, skip_server_rate_limit=True)
+            runtime._on_server_checked("Telegram Bot", {"status": "offline"})
+            runtime._on_server_checked("Primary", {"status": "online", "is_current": True})
+            runtime._on_servers_complete()
+
+        runtime_feature.shutdown_sync.assert_not_called()
+        runtime_feature.restart.assert_not_called()
+        start_version_check.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -28,6 +28,15 @@ class UpdateCheckState:
 
 
 @dataclass(slots=True)
+class ServerCheckRecoveryState:
+    enabled: bool = False
+    attempted: bool = False
+    retry_running: bool = False
+    dpi_stopped: bool = False
+    online_source_seen: bool = False
+
+
+@dataclass(slots=True)
 class UpdateDownloadState:
     is_installing: bool = False
 
@@ -122,6 +131,7 @@ class UpdatePageRuntime:
 
         self._found_state = UpdateFoundState()
         self._check_state = UpdateCheckState()
+        self._server_check_recovery = ServerCheckRecoveryState()
         self._download_state = UpdateDownloadState()
 
         self._auto_check_enabled = False
@@ -173,6 +183,9 @@ class UpdatePageRuntime:
                 "request_manual_check",
                 "install_update",
                 "_on_servers_complete",
+                "_observe_server_check_status",
+                "_maybe_retry_server_check_without_dpi",
+                "_restart_dpi_after_server_check_retry",
                 "_on_version_found",
                 "_on_versions_complete",
                 "_maybe_offer_update_from_server",
@@ -187,6 +200,7 @@ class UpdatePageRuntime:
             required_state_fields=(
                 "_found_state",
                 "_check_state",
+                "_server_check_recovery",
                 "_download_state",
                 "_auto_check_enabled",
             ),
@@ -236,6 +250,9 @@ class UpdatePageRuntime:
                 "_start_server_check_workflow",
                 "_start_version_check_workflow",
                 "_on_servers_complete",
+                "_observe_server_check_status",
+                "_maybe_retry_server_check_without_dpi",
+                "_restart_dpi_after_server_check_retry",
                 "_on_version_found",
                 "_on_versions_complete",
                 "_maybe_offer_update_from_server",
@@ -339,6 +356,7 @@ class UpdatePageRuntime:
 
         self._reset_check_state(keep_cached_data=True)
         self._check_state.is_active = True
+        self._server_check_recovery = ServerCheckRecoveryState(enabled=not telegram_only)
         self._reset_found_update_state()
 
         self._view.start_checking()
@@ -710,13 +728,71 @@ class UpdatePageRuntime:
     def _on_server_checked(self, server_name: str, status: dict) -> None:
         if self._cleanup_in_progress:
             return
+        self._observe_server_check_status(status)
         self._view.upsert_server_status(server_name, status)
         self._maybe_offer_update_from_server(server_name, status)
 
     def _on_servers_complete(self) -> None:
         if self._cleanup_in_progress:
             return
+        if self._maybe_retry_server_check_without_dpi():
+            return
+        self._restart_dpi_after_server_check_retry()
         self._start_version_check_workflow()
+
+    def _observe_server_check_status(self, status: dict) -> None:
+        if not isinstance(status, dict):
+            return
+        if str(status.get("status") or "").lower() == "online":
+            self._server_check_recovery.online_source_seen = True
+
+    def _maybe_retry_server_check_without_dpi(self) -> bool:
+        recovery = self._server_check_recovery
+        if (
+            not recovery.enabled
+            or recovery.attempted
+            or recovery.retry_running
+            or recovery.online_source_seen
+        ):
+            return False
+
+        try:
+            if not self._runtime_feature.is_any_running():
+                return False
+        except Exception as e:
+            log(f"Не удалось проверить состояние DPI перед повторной проверкой серверов: {e}", "DEBUG")
+            return False
+
+        recovery.attempted = True
+        recovery.retry_running = True
+        recovery.online_source_seen = False
+
+        try:
+            log("⚠️ Серверы недоступны при запущенном DPI — делаем один повтор без DPI", "🔄 UPDATE")
+            shutdown_result = self._runtime_feature.shutdown_sync(
+                reason="server_status_probe_retry",
+                include_cleanup=True,
+            )
+            if bool(getattr(shutdown_result, "still_running", False)):
+                log("Повтор проверки серверов без DPI пропущен: DPI не остановился", "🔄 UPDATE")
+                recovery.retry_running = False
+                return False
+        except Exception as e:
+            log(f"Не удалось временно остановить DPI для проверки серверов: {e}", "❌ ERROR")
+            recovery.retry_running = False
+            return False
+
+        recovery.dpi_stopped = True
+        self._start_server_check_workflow(telegram_only=False)
+        return True
+
+    def _restart_dpi_after_server_check_retry(self) -> None:
+        recovery = self._server_check_recovery
+        if not recovery.dpi_stopped:
+            return
+        recovery.dpi_stopped = False
+        recovery.retry_running = False
+        self._restart_dpi_after_update(context="повторной проверки серверов")
 
     def _on_version_found(self, channel: str, version_info: dict) -> None:
         if self._cleanup_in_progress:
@@ -804,12 +880,12 @@ class UpdatePageRuntime:
         except Exception:
             return None, ""
 
-    def _restart_dpi_after_update(self) -> None:
+    def _restart_dpi_after_update(self, *, context: str = "скачивания обновления") -> None:
         if self._cleanup_in_progress:
             return
         try:
             if self._runtime_feature.is_available():
-                log("🔄 Перезапуск DPI после скачивания обновления", "🔁 UPDATE")
+                log(f"🔄 Перезапуск DPI после {context}", "🔁 UPDATE")
                 self._runtime_feature.restart()
         except Exception as e:
             log(f"Не удалось перезапустить DPI: {e}", "❌ ERROR")
