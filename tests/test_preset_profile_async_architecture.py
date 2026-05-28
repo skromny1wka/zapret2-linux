@@ -376,6 +376,60 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         page._runtime_service.remove_deleted_preset_locally.assert_called_once_with("first.txt")
         page._runtime_service.mark_presets_structure_changed.assert_not_called()
 
+    def test_preset_model_renames_visible_preset_without_full_reset(self) -> None:
+        model = PresetListModel()
+        model.set_rows([
+            {
+                "kind": "preset",
+                "file_name": "old.txt",
+                "name": "Old",
+                "folder_key": "common",
+                "is_active": True,
+            },
+        ])
+        model.beginResetModel = Mock(side_effect=AssertionError("rename must not reset the whole preset list"))
+
+        self.assertTrue(model.rename_preset("old.txt", "new.txt", name="New"))
+
+        self.assertEqual(model.find_preset_row("old.txt"), -1)
+        self.assertEqual(model.find_preset_row("new.txt"), 0)
+        self.assertEqual(model.index(0, 0).data(PresetListModel.FileNameRole), "new.txt")
+        self.assertEqual(model.index(0, 0).data(PresetListModel.NameRole), "New")
+        self.assertEqual(model.active_preset_file_name(), "new.txt")
+
+    def test_user_presets_rename_updates_visible_row_without_reload(self) -> None:
+        result = SimpleNamespace(
+            ok=True,
+            structure_changed=True,
+            log_message="Переименован",
+            log_level="INFO",
+            infobar_level="",
+            infobar_title="",
+            infobar_content="",
+            error_code="",
+            preset_file_name="new.txt",
+            preset_display_name="New",
+        )
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_edit_action_request_id = 5
+        page._runtime_service = Mock()
+        page._runtime_service.rename_preset_locally.return_value = True
+
+        UserPresetsPageBase._on_preset_edit_action_finished(
+            page,
+            5,
+            "rename",
+            result,
+            {"current_name": "old.txt", "new_name": "New"},
+        )
+
+        page._runtime_service.rename_preset_locally.assert_called_once_with(
+            "old.txt",
+            "new.txt",
+            "New",
+        )
+        page._runtime_service.mark_presets_structure_changed.assert_not_called()
+
     def test_user_presets_display_name_uses_visible_cache_not_backend_manifest(self) -> None:
         class _ListingApi:
             def resolve_display_name(self, _reference: str) -> str:

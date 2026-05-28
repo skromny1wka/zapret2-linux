@@ -705,6 +705,37 @@ class UserPresetsRuntimeService:
         self._ui_dirty = not removed_metadata
         return True
 
+    def rename_preset_locally(self, current_name: str, next_file_name: str, display_name: str, page=None) -> bool:
+        page = self._resolve_page(page)
+        current_file_name = str(current_name or "").strip()
+        new_file_name = str(next_file_name or "").strip()
+        new_display_name = str(display_name or "").strip()
+        if not current_file_name or not new_file_name:
+            return False
+
+        query = self.current_search_query(page)
+        if query and query not in new_display_name.lower():
+            return False
+
+        model = getattr(page, "_presets_model", None)
+        if model is None or not model.rename_preset(current_file_name, new_file_name, name=new_display_name):
+            return False
+
+        metadata = None
+        for key in _preset_metadata_keys(current_file_name):
+            candidate = self._cached_presets_metadata.pop(key, None)
+            if isinstance(candidate, dict):
+                metadata = dict(candidate)
+                break
+        if metadata is None:
+            metadata = {}
+        metadata["file_name"] = new_file_name
+        metadata["display_name"] = new_display_name or new_file_name
+        self._cached_presets_metadata[new_file_name] = metadata
+        self.sync_watched_preset_files(page, set(self._cached_presets_metadata.keys()))
+        self._ui_dirty = False
+        return True
+
     def recover_missing_deleted_preset(self, name: str, page=None) -> None:
         page = self._resolve_page(page)
         adapter = self._resolve_adapter()

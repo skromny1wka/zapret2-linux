@@ -21,6 +21,8 @@ class UserPresetActionResult:
     structure_changed: bool
     switched_file_name: str | None = None
     error_code: str | None = None
+    preset_file_name: str | None = None
+    preset_display_name: str | None = None
 
 
 @dataclass(slots=True)
@@ -436,6 +438,8 @@ class UserPresetsPageRuntime:
             infobar_content="",
             structure_changed=True,
             switched_file_name=switched_file_name,
+            preset_file_name=updated.file_name,
+            preset_display_name=updated.name,
         )
 
     def import_preset_from_file(self, *, file_path: str) -> UserPresetImportResult:

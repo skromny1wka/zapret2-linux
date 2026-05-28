@@ -741,10 +741,21 @@ class UserPresetsPageBase(BasePage):
         worker.finished.connect(lambda w=worker: self._on_preset_edit_action_worker_finished(w))
         worker.start()
 
-    def _on_preset_edit_action_finished(self, request_id: int, _action: str, result, _context) -> None:
+    def _on_preset_edit_action_finished(self, request_id: int, action: str, result, context) -> None:
         if request_id != int(getattr(self, "_preset_edit_action_request_id", 0) or 0):
             return
-        if bool(getattr(result, "structure_changed", False)):
+        context = dict(context or {})
+        structure_changed = bool(getattr(result, "structure_changed", False))
+        if action == "rename" and bool(getattr(result, "ok", False)):
+            preset_file_name = str(getattr(result, "preset_file_name", "") or "").strip()
+            preset_display_name = str(getattr(result, "preset_display_name", "") or context.get("new_name") or "").strip()
+            if self._runtime_service.rename_preset_locally(
+                str(context.get("current_name") or ""),
+                preset_file_name,
+                preset_display_name,
+            ):
+                structure_changed = False
+        if structure_changed:
             self._runtime_service.mark_presets_structure_changed()
         log(str(getattr(result, "log_message", "") or ""), str(getattr(result, "log_level", "") or "INFO"))
 

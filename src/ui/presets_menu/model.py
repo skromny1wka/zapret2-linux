@@ -177,6 +177,32 @@ class PresetListModel(QAbstractListModel):
             self.dataChanged.emit(model_index, model_index, [self.CountRole])
         return True
 
+    def rename_preset(self, current_file_name: str, next_file_name: str, *, name: str = "") -> bool:
+        current_name = str(current_file_name or "").strip()
+        next_name = str(next_file_name or "").strip()
+        if not current_name or not next_name:
+            return False
+        row_index = self.find_preset_row(current_name)
+        if row_index < 0:
+            return False
+
+        row = self._rows[row_index]
+        row["file_name"] = next_name
+        if str(name or "").strip():
+            row["name"] = str(name or "").strip()
+        if current_name in self._active_preset_file_names:
+            self._active_preset_file_names.discard(current_name)
+            self._active_preset_file_names.add(next_name)
+            row["is_active"] = True
+        self._rebuild_row_index()
+        model_index = self.index(row_index, 0)
+        self.dataChanged.emit(
+            model_index,
+            model_index,
+            [int(Qt.ItemDataRole.DisplayRole), self.FileNameRole, self.NameRole, self.ActiveRole],
+        )
+        return True
+
     def set_active_preset(
         self,
         file_name: str,
