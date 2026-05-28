@@ -400,6 +400,7 @@ class PresetSidebarNavigationTests(unittest.TestCase):
 
     def test_initial_sidebar_build_restores_saved_expanded_state(self) -> None:
         from settings.mode import ZAPRET2_MODE
+        from ui.navigation.sidebar_state import store_warmed_sidebar_expanded
         import ui.navigation.sidebar_builder as sidebar_builder
 
         class FakeSignal:
@@ -444,6 +445,7 @@ class PresetSidebarNavigationTests(unittest.TestCase):
             navigationInterface=nav,
             get_launch_method=lambda: ZAPRET2_MODE,
         )
+        store_warmed_sidebar_expanded(True)
 
         with (
             patch.object(
@@ -461,7 +463,10 @@ class PresetSidebarNavigationTests(unittest.TestCase):
                 "add_nav_item",
                 side_effect=lambda current_window, page_name, *_args, **_kwargs: None,
             ),
-            patch("settings.store.get_ui_state_settings", return_value={"sidebar_expanded": True}),
+            patch(
+                "settings.store.get_ui_state_settings",
+                side_effect=AssertionError("sidebar restore must use warmed state"),
+            ),
         ):
             sidebar_builder.init_navigation(window)
 
@@ -469,6 +474,7 @@ class PresetSidebarNavigationTests(unittest.TestCase):
 
     def test_initial_sidebar_build_restores_saved_collapsed_state(self) -> None:
         from settings.mode import ZAPRET2_MODE
+        from ui.navigation.sidebar_state import store_warmed_sidebar_expanded
         import ui.navigation.sidebar_builder as sidebar_builder
 
         class FakeSignal:
@@ -517,6 +523,7 @@ class PresetSidebarNavigationTests(unittest.TestCase):
             navigationInterface=nav,
             get_launch_method=lambda: ZAPRET2_MODE,
         )
+        store_warmed_sidebar_expanded(False)
 
         with (
             patch.object(
@@ -534,7 +541,10 @@ class PresetSidebarNavigationTests(unittest.TestCase):
                 "add_nav_item",
                 side_effect=lambda current_window, page_name, *_args, **_kwargs: None,
             ),
-            patch("settings.store.get_ui_state_settings", return_value={"sidebar_expanded": False}),
+            patch(
+                "settings.store.get_ui_state_settings",
+                side_effect=AssertionError("sidebar restore must use warmed state"),
+            ),
         ):
             sidebar_builder.init_navigation(window)
 

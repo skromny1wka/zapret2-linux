@@ -17,6 +17,9 @@ def build_initial_ui_state() -> AppUiState:
         window = settings.get("window") if isinstance(settings, dict) else {}
         if not isinstance(window, dict):
             window = {}
+        ui_state = settings.get("ui_state") if isinstance(settings, dict) else {}
+        if not isinstance(ui_state, dict):
+            ui_state = {}
         from settings.appearance import (
             store_warmed_accent_color,
             store_warmed_animations_enabled,
@@ -49,6 +52,9 @@ def build_initial_ui_state() -> AppUiState:
         from core.runtime.program_settings_runtime_service import store_warmed_hide_to_tray_on_minimize_close
 
         store_warmed_hide_to_tray_on_minimize_close(window.get("hide_to_tray_on_minimize_close"))
+        from ui.navigation.sidebar_state import store_warmed_sidebar_expanded
+
+        store_warmed_sidebar_expanded(ui_state.get("sidebar_expanded"))
         program = settings.get("program") if isinstance(settings, dict) else {}
         if not isinstance(program, dict):
             program = {}

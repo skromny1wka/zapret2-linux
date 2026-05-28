@@ -1203,6 +1203,9 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             "window": {
                 "opacity": 72,
             },
+            "ui_state": {
+                "sidebar_expanded": False,
+            },
             "program": {
                 "dpi_autostart": True,
                 "gui_autostart_enabled": False,
@@ -1215,6 +1218,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         self.assertNotIn("from winws_runtime.public import LaunchRuntimeService", source)
 
         import settings.appearance as appearance_settings
+        from ui.navigation.sidebar_state import clear_warmed_sidebar_expanded, peek_warmed_sidebar_expanded
 
         appearance_settings.clear_warmed_ui_language_cache()
         appearance_settings.clear_warmed_rkn_background_cache()
@@ -1225,6 +1229,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         appearance_settings.clear_warmed_smooth_scroll_enabled_cache()
         appearance_settings.clear_warmed_editor_smooth_scroll_enabled_cache()
         appearance_settings.clear_warmed_premium_effects_cache()
+        clear_warmed_sidebar_expanded()
         with patch("settings.store.read_settings", return_value=data) as read_settings:
             state = build_initial_ui_state()
 
@@ -1238,6 +1243,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         self.assertEqual(appearance_settings.peek_warmed_animations_enabled(), True)
         self.assertEqual(appearance_settings.peek_warmed_smooth_scroll_enabled(), True)
         self.assertEqual(appearance_settings.peek_warmed_editor_smooth_scroll_enabled(), True)
+        self.assertEqual(peek_warmed_sidebar_expanded(), False)
         premium_effects = appearance_settings.peek_warmed_premium_effects()
         self.assertIsNotNone(premium_effects)
         self.assertEqual(premium_effects.garland_enabled, True)

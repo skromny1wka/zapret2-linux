@@ -19,6 +19,7 @@ from app.page_names import PageName
 from ui.startup_ui_metrics import pump_startup_ui
 from app.ui_texts import tr as tr_catalog
 from ui.window_ui_session import get_window_ui_session
+from ui.navigation.sidebar_state import peek_warmed_sidebar_expanded
 from ui.navigation.sidebar_state_worker import create_sidebar_expanded_save_worker
 
 
@@ -62,13 +63,10 @@ def _is_expanded_display_mode(display_mode) -> bool | None:
 
 
 def _read_saved_sidebar_expanded() -> bool:
-    try:
-        from settings.store import get_ui_state_settings
-
-        ui_state = get_ui_state_settings()
-    except Exception:
+    saved = peek_warmed_sidebar_expanded()
+    if saved is None:
         return True
-    return bool(ui_state.get(SIDEBAR_EXPANDED_UI_STATE_KEY, True))
+    return bool(saved)
 
 
 def _start_sidebar_expanded_save_worker(window, expanded: bool) -> None:
