@@ -268,6 +268,9 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
             self.assertNotIn(".delete_preset(", source)
             self.assertNotIn(".export_preset(", source)
 
+        delete_source = inspect.getsource(UserPresetsPageBase._on_delete_preset)
+        self.assertIn("_is_builtin_preset_file", delete_source)
+        self.assertNotIn("_storage_api().is_builtin_preset_file", delete_source)
         self.assertIn("create_preset_item_action_worker", request_source)
         self.assertIn("actions_api.duplicate_preset", worker_source)
         self.assertIn("actions_api.reset_preset_to_builtin", worker_source)

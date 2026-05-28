@@ -1354,7 +1354,7 @@ class UserPresetsPageBase(BasePage):
 
     def _on_delete_preset(self, name: str):
         display_name = self._resolve_display_name(name)
-        if not self._storage_api().is_builtin_preset_file(name) and MessageBox:
+        if not self._is_builtin_preset_file(name) and MessageBox:
             box = MessageBox(
                 self._tr(f"{self._config.tr_prefix}.dialog.delete_single.title", "Удалить пресет?"),
                 self._tr(
