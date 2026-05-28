@@ -15,6 +15,7 @@ class BlobsFeature:
     open_blobs_json: Callable
     create_blobs_load_worker: Callable
     create_blob_action_worker: Callable
+    create_blob_open_action_worker: Callable
 
 
 def build_blobs_feature() -> BlobsFeature:
@@ -56,6 +57,16 @@ def build_blobs_feature() -> BlobsFeature:
             parent=parent,
         )
 
+    def _create_blob_open_action_worker(request_id: int, *, action: str, parent=None):
+        from blobs.workers import BlobOpenActionWorker
+
+        return BlobOpenActionWorker(
+            request_id,
+            blobs_feature=feature,
+            action=action,
+            parent=parent,
+        )
+
     feature = BlobsFeature(
         get_blobs_info=lambda: _public().get_blobs_info(),
         get_bin_folder=lambda: _public().get_bin_folder(),
@@ -66,5 +77,6 @@ def build_blobs_feature() -> BlobsFeature:
         open_blobs_json=lambda: _public().open_blobs_json(),
         create_blobs_load_worker=_create_blobs_load_worker,
         create_blob_action_worker=_create_blob_action_worker,
+        create_blob_open_action_worker=_create_blob_open_action_worker,
     )
     return feature

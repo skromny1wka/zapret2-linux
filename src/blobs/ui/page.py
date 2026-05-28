@@ -15,8 +15,6 @@ from blobs.ui.runtime_helpers import (
     delete_blob_named,
     filter_blobs_in_ui,
     load_blobs_into_ui,
-    open_bin_folder_action,
-    open_json_action,
 )
 from ui.fluent_widgets import (
     QuickActionsBar,
@@ -56,6 +54,9 @@ class BlobsPage(BasePage):
         self._blob_action_worker = None
         self._blob_action_request_id = 0
         self._blob_action_pending: list[dict[str, str]] = []
+        self._blob_open_action_worker = None
+        self._blob_open_action_request_id = 0
+        self._blob_open_action_pending: list[str] = []
 
         self._build_ui()
         self._apply_page_theme(force=True)
@@ -395,23 +396,61 @@ class BlobsPage(BasePage):
             
     def _open_bin_folder(self):
         """Открывает папку bin"""
-        open_bin_folder_action(
-            tr_fn=self._tr,
-            info_bar_cls=InfoBar,
-            window=self.window(),
-            open_bin_folder_fn=self._blobs.open_bin_folder,
-            log_error=lambda text: log(text, "ERROR"),
-        )
+        self._request_blob_open_action("bin_folder")
             
     def _open_json(self):
         """Открывает settings.json в редакторе."""
-        open_json_action(
-            tr_fn=self._tr,
-            info_bar_cls=InfoBar,
-            window=self.window(),
-            open_blobs_json_fn=self._blobs.open_blobs_json,
-            log_error=lambda text: log(text, "ERROR"),
+        self._request_blob_open_action("blobs_json")
+
+    def create_blob_open_action_worker(self, request_id: int, *, action: str):
+        return self._blobs.create_blob_open_action_worker(
+            request_id,
+            action=action,
+            parent=self,
         )
+
+    def _request_blob_open_action(self, action: str) -> None:
+        action = str(action or "").strip()
+        if not action:
+            return
+        worker = self.__dict__.get("_blob_open_action_worker")
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    self._blob_open_action_pending.append(action)
+                    return
+            except RuntimeError:
+                self._blob_open_action_worker = None
+        self._start_blob_open_action_worker(action)
+
+    def _start_blob_open_action_worker(self, action: str) -> None:
+        self._blob_open_action_request_id += 1
+        request_id = self._blob_open_action_request_id
+        worker = self.create_blob_open_action_worker(request_id, action=action)
+        self._blob_open_action_worker = worker
+        worker.failed.connect(self._on_blob_open_action_failed)
+        worker.finished.connect(lambda w=worker: self._on_blob_open_action_worker_finished(w))
+        worker.start()
+
+    def _on_blob_open_action_failed(self, request_id: int, action: str, error: str) -> None:
+        if request_id != self._blob_open_action_request_id or self._cleanup_in_progress:
+            return
+        log(f"Ошибка открытия blobs action {action}: {error}", "ERROR")
+        message_key = "page.blobs.error.open_file" if action == "blobs_json" else "page.blobs.error.open_folder"
+        fallback = "Не удалось открыть файл: {error}" if action == "blobs_json" else "Не удалось открыть папку: {error}"
+        InfoBar.warning(
+            title=self._tr("common.error.title", "Ошибка"),
+            content=self._tr(message_key, fallback, error=error),
+            parent=self.window(),
+        )
+
+    def _on_blob_open_action_worker_finished(self, worker) -> None:
+        if self.__dict__.get("_blob_open_action_worker") is worker:
+            self._blob_open_action_worker = None
+        worker.deleteLater()
+        if self._blob_open_action_pending and not self._cleanup_in_progress:
+            pending = self._blob_open_action_pending.pop(0)
+            self._start_blob_open_action_worker(pending)
 
     def set_ui_language(self, language: str) -> None:
         super().set_ui_language(language)
@@ -431,6 +470,7 @@ class BlobsPage(BasePage):
     def cleanup(self) -> None:
         self._cleanup_in_progress = True
         self._blob_action_pending.clear()
+        self._blob_open_action_pending.clear()
         self._blobs_load_pending = False
         self._blobs_load_pending_reload = False
         load_worker = self.__dict__.get("_blobs_load_worker")
@@ -447,3 +487,10 @@ class BlobsPage(BasePage):
             except Exception:
                 pass
             self._blob_action_worker = None
+        open_action_worker = self.__dict__.get("_blob_open_action_worker")
+        if open_action_worker is not None:
+            try:
+                open_action_worker.quit()
+            except Exception:
+                pass
+            self._blob_open_action_worker = None

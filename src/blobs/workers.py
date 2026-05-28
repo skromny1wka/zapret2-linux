@@ -81,4 +81,29 @@ class BlobActionWorker(QThread):
         self.completed.emit(self._request_id, self._action, result, context)
 
 
-__all__ = ["BlobActionWorker", "BlobsLoadWorker"]
+class BlobOpenActionWorker(QThread):
+    completed = pyqtSignal(int, str)
+    failed = pyqtSignal(int, str, str)
+
+    def __init__(self, request_id: int, blobs_feature, *, action: str, parent=None):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self._blobs = blobs_feature
+        self._action = str(action or "").strip()
+
+    def run(self) -> None:
+        try:
+            if self._action == "bin_folder":
+                self._blobs.open_bin_folder()
+            elif self._action == "blobs_json":
+                self._blobs.open_blobs_json()
+            else:
+                raise ValueError(f"Неизвестное действие открытия blob: {self._action}")
+        except Exception as exc:
+            log(f"BlobOpenActionWorker: действие {self._action} не выполнено: {exc}", "ERROR")
+            self.failed.emit(self._request_id, self._action, str(exc))
+            return
+        self.completed.emit(self._request_id, self._action)
+
+
+__all__ = ["BlobActionWorker", "BlobOpenActionWorker", "BlobsLoadWorker"]
