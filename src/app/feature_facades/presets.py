@@ -72,6 +72,15 @@ class PresetsFeature:
             return None
         return dict(cached_metadata)
 
+    def peek_cached_preset_list_metadata(self, launch_method: str):
+        method = str(launch_method or "").strip()
+        with self._metadata_lock():
+            cached = self._metadata_cache().get(method)
+        if cached is None:
+            return None
+        _cached_signature, cached_metadata = cached
+        return dict(cached_metadata)
+
     def _build_preset_list_metadata_snapshot(self, launch_method: str):
         from presets.lightweight_metadata import build_lightweight_preset_metadata
 

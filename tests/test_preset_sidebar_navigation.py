@@ -938,6 +938,36 @@ class PresetSidebarNavigationTests(unittest.TestCase):
         session.sidebar_search_profile_loader.assert_called_once_with(ZAPRET2_MODE)
         session.sidebar_search_preset_loader.assert_called_once_with(ZAPRET2_MODE)
 
+    def test_sidebar_search_loaders_use_peek_cache_without_sync_rebuild(self) -> None:
+        import ui.window_bootstrap_runtime as bootstrap_runtime
+
+        profile_source = inspect.getsource(bootstrap_runtime.load_sidebar_search_profile_items)
+        preset_source = inspect.getsource(bootstrap_runtime.load_sidebar_search_preset_manifests)
+
+        self.assertIn("peek_cached_profile_list", profile_source)
+        self.assertIn("peek_cached_preset_list_metadata", preset_source)
+        self.assertNotIn(".list_profiles(", profile_source)
+        self.assertNotIn(".list_preset_manifests(", preset_source)
+
+    def test_sidebar_search_loaders_return_empty_when_cache_missing(self) -> None:
+        import ui.window_bootstrap_runtime as bootstrap_runtime
+
+        profile_feature = SimpleNamespace(
+            peek_cached_profile_list=Mock(return_value=None),
+            list_profiles=Mock(side_effect=AssertionError("sync profile rebuild")),
+        )
+        presets_feature = SimpleNamespace(
+            peek_cached_preset_list_metadata=Mock(return_value=None),
+            list_preset_manifests=Mock(side_effect=AssertionError("sync preset rebuild")),
+        )
+
+        self.assertEqual(bootstrap_runtime.load_sidebar_search_profile_items(profile_feature, "preset"), ())
+        self.assertEqual(bootstrap_runtime.load_sidebar_search_preset_manifests(presets_feature, "preset"), ())
+        profile_feature.peek_cached_profile_list.assert_called_once_with("preset")
+        presets_feature.peek_cached_preset_list_metadata.assert_called_once_with("preset")
+        profile_feature.list_profiles.assert_not_called()
+        presets_feature.list_preset_manifests.assert_not_called()
+
     def test_preset_setup_page_exposes_sidebar_search_handler(self) -> None:
         from profile.ui.preset_setup_page import PresetSetupPageBase
 

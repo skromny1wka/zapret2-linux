@@ -153,6 +153,15 @@ class ProfilePresetService:
         finally:
             self._profile_list_lock.release()
 
+    def peek_cached_profile_list(self) -> ProfileListPayload | None:
+        lock_acquired = self._profile_list_lock.acquire(blocking=False)
+        if not lock_acquired:
+            return None
+        try:
+            return self._profile_list_snapshot
+        finally:
+            self._profile_list_lock.release()
+
     def list_preset_order_profiles(self) -> ProfileListPayload:
         preset, manifest = self.load_selected_preset()
         catalogs = load_strategy_catalogs(self._app_paths, self._engine)

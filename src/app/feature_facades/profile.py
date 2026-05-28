@@ -28,6 +28,9 @@ class ProfileFeature:
     def get_cached_profile_list(self, launch_method: str):
         return self._commands().get_cached_profile_list(self, launch_method)
 
+    def peek_cached_profile_list(self, launch_method: str):
+        return self._commands().peek_cached_profile_list(self, launch_method)
+
     def list_preset_order_profiles(self, launch_method: str):
         return self._commands().list_preset_order_profiles(self, launch_method)
 

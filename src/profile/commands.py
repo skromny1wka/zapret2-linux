@@ -25,6 +25,10 @@ def get_cached_profile_list(profile_services, launch_method: str):
     return _profile_preset_service(profile_services, launch_method).get_cached_profile_list()
 
 
+def peek_cached_profile_list(profile_services, launch_method: str):
+    return _profile_preset_service(profile_services, launch_method).peek_cached_profile_list()
+
+
 def list_preset_order_profiles(profile_services, launch_method: str):
     return _profile_preset_service(profile_services, launch_method).list_preset_order_profiles()
 
