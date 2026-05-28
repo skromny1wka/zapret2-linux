@@ -840,7 +840,14 @@ class UserPresetsPageBase(BasePage):
         if request_id != int(getattr(self, "_preset_bulk_action_request_id", 0) or 0):
             return
         log(str(getattr(result, "log_message", "") or ""), str(getattr(result, "log_level", "") or "INFO"))
-        if bool(getattr(result, "structure_changed", False)):
+        structure_changed = bool(getattr(result, "structure_changed", False))
+        if action == "import" and bool(getattr(result, "ok", False)):
+            if self._runtime_service.add_created_preset_locally(
+                str(getattr(result, "actual_file_name", "") or ""),
+                str(getattr(result, "actual_name", "") or ""),
+            ):
+                structure_changed = False
+        if structure_changed:
             self._runtime_service.mark_presets_structure_changed()
         if action == "import":
             level = str(getattr(result, "infobar_level", "") or "")
@@ -1565,6 +1572,12 @@ class UserPresetsPageBase(BasePage):
             self._runtime_service.recover_missing_deleted_preset(str(context.get("file_name") or ""))
             return
         structure_changed = bool(getattr(result, "structure_changed", False))
+        if action == "duplicate" and bool(getattr(result, "ok", False)):
+            if self._runtime_service.add_created_preset_locally(
+                str(getattr(result, "preset_file_name", "") or ""),
+                str(getattr(result, "preset_display_name", "") or ""),
+            ):
+                structure_changed = False
         if action == "delete" and bool(getattr(result, "ok", False)):
             if self._runtime_service.remove_deleted_preset_locally(str(context.get("file_name") or "")):
                 structure_changed = False

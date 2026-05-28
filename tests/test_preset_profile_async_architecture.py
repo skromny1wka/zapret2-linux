@@ -494,6 +494,73 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         )
         page._runtime_service.mark_presets_structure_changed.assert_not_called()
 
+    def test_user_presets_duplicate_updates_visible_row_without_reload(self) -> None:
+        result = SimpleNamespace(
+            ok=True,
+            structure_changed=True,
+            log_message="Дублирован",
+            log_level="INFO",
+            infobar_level="",
+            infobar_title="",
+            infobar_content="",
+            error_code="",
+            preset_file_name="copy.txt",
+            preset_display_name="Copy",
+        )
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_item_action_request_id = 7
+        page._runtime_service = Mock()
+        page._runtime_service.add_created_preset_locally.return_value = True
+        page._tr = Mock(side_effect=lambda _key, default, **_kwargs: default)
+        page.window = Mock(return_value=None)
+
+        UserPresetsPageBase._on_preset_item_action_finished(
+            page,
+            7,
+            "duplicate",
+            result,
+            {"file_name": "source.txt", "display_name": "Source"},
+        )
+
+        page._runtime_service.add_created_preset_locally.assert_called_once_with(
+            "copy.txt",
+            "Copy",
+        )
+        page._runtime_service.mark_presets_structure_changed.assert_not_called()
+
+    def test_user_presets_import_updates_visible_row_without_reload(self) -> None:
+        result = SimpleNamespace(
+            ok=True,
+            structure_changed=True,
+            log_message="Импортирован",
+            log_level="INFO",
+            infobar_level="success",
+            infobar_title="Пресет импортирован",
+            infobar_content="Готово",
+            actual_file_name="imported.txt",
+            actual_name="Imported",
+        )
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_bulk_action_request_id = 8
+        page._runtime_service = Mock()
+        page._runtime_service.add_created_preset_locally.return_value = True
+        page.window = Mock(return_value=None)
+
+        with patch("presets.ui.common.user_presets_page.InfoBar.success"):
+            UserPresetsPageBase._on_preset_bulk_action_finished(
+                page,
+                8,
+                "import",
+                result,
+                {},
+            )
+
+        page._runtime_service.add_created_preset_locally.assert_called_once_with(
+            "imported.txt",
+            "Imported",
+        )
+        page._runtime_service.mark_presets_structure_changed.assert_not_called()
+
     def test_user_presets_display_name_uses_visible_cache_not_backend_manifest(self) -> None:
         class _ListingApi:
             def resolve_display_name(self, _reference: str) -> str:

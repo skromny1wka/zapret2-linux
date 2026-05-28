@@ -513,7 +513,7 @@ class UserPresetsPageRuntime:
 
     def duplicate_preset(self, *, file_name: str, display_name: str) -> UserPresetActionResult:
         new_name = f"{display_name} (копия)"
-        self._presets().duplicate_preset_by_file_name(
+        duplicated = self._presets().duplicate_preset_by_file_name(
             self._config.launch_method,
             file_name,
             new_name,
@@ -526,6 +526,8 @@ class UserPresetsPageRuntime:
             infobar_title="",
             infobar_content="",
             structure_changed=True,
+            preset_file_name=duplicated.file_name,
+            preset_display_name=duplicated.name,
         )
 
     def reset_preset_to_builtin(self, *, file_name: str, display_name: str) -> UserPresetActionResult:
