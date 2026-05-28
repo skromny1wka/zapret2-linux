@@ -812,6 +812,63 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertIn(("profile", "youtube", "profile:0"), rows)
         self.assertLess(rows.index(("profile", "youtube", "profile:1")), rows.index(("profile", "youtube", "profile:0")))
 
+    def test_profile_model_moves_profile_inside_folder_without_full_reset(self) -> None:
+        from profile.ui.profile_list_model import ProfileListModel
+
+        first = SimpleNamespace(
+            key="profile:0",
+            persistent_key="p0",
+            profile_index=0,
+            display_name="Discord",
+            enabled=True,
+            in_preset=True,
+            strategy_id="fake",
+            strategy_name="Fake",
+            match_lines=("--filter-udp=443-65535", "--hostlist=lists/discord.txt"),
+            list_type="hostlist",
+            rating="",
+            favorite=False,
+            group="common",
+            group_name="Общие",
+            order=0,
+            order_is_manual=True,
+            group_collapsed=False,
+        )
+        second = SimpleNamespace(
+            key="profile:1",
+            persistent_key="p1",
+            profile_index=1,
+            display_name="YouTube",
+            enabled=True,
+            in_preset=True,
+            strategy_id="none",
+            strategy_name="Стратегия не выбрана",
+            match_lines=("--filter-tcp=443", "--hostlist=lists/youtube.txt"),
+            list_type="hostlist",
+            rating="",
+            favorite=False,
+            group="common",
+            group_name="Общие",
+            order=1,
+            order_is_manual=True,
+            group_collapsed=False,
+        )
+
+        model = ProfileListModel()
+        model.set_profiles((first, second))
+        model.beginResetModel = Mock(side_effect=AssertionError("profile move must not reset the whole model"))
+
+        self.assertTrue(model.move_profile("profile:0", "profile_after", "profile:1", "common"))
+
+        rows = [
+            (
+                model.index(row, 0).data(ProfileListModel.KindRole),
+                model.index(row, 0).data(ProfileListModel.ProfileKeyRole),
+            )
+            for row in range(model.rowCount())
+        ]
+        self.assertLess(rows.index(("profile", "profile:1")), rows.index(("profile", "profile:0")))
+
     def test_profile_model_replaces_single_profile_row_without_reset(self) -> None:
         from profile.ui.profile_list_model import ProfileListModel
 

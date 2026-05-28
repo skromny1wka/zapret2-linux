@@ -401,11 +401,34 @@ class ProfileListModel(QAbstractListModel):
             else:
                 next_items.append(item)
 
+        next_items_tuple = tuple(next_items)
+        next_group_expanded = dict(self._group_expanded)
+        next_group_expanded.setdefault(target_group, True)
+        next_rows = self._build_rows_from(next_items_tuple, next_group_expanded)
+        move = _single_row_move(self._rows, next_rows, identity_fn=_stable_row_identity)
+        if move is not None:
+            source_row, insert_row = move
+            destination_child = _move_destination_child(source_row, insert_row)
+            if destination_child not in {source_row, source_row + 1}:
+                changed_rows = _changed_existing_row_indexes(
+                    self._rows,
+                    next_rows,
+                    identity_fn=_stable_row_identity,
+                )
+                self.beginMoveRows(QModelIndex(), source_row, source_row, QModelIndex(), destination_child)
+                self._all_items = next_items_tuple
+                self._profile_items = {item.key: item for item in self._all_items}
+                self._group_expanded = next_group_expanded
+                self._rows = next_rows
+                self.endMoveRows()
+                self._emit_data_changed_for_rows(changed_rows)
+                return True
+
         self.beginResetModel()
-        self._all_items = tuple(next_items)
+        self._all_items = next_items_tuple
         self._profile_items = {item.key: item for item in self._all_items}
-        self._group_expanded.setdefault(target_group, True)
-        self._rows = self._build_rows()
+        self._group_expanded = next_group_expanded
+        self._rows = next_rows
         self.endResetModel()
         return True
 
@@ -703,6 +726,51 @@ def _changed_existing_row_indexes(
         if old_row is not None and old_row != row:
             changed.append(index)
     return tuple(changed)
+
+
+def _single_row_move(
+    old_rows: list[dict[str, Any]],
+    next_rows: list[dict[str, Any]],
+    *,
+    identity_fn=None,
+) -> tuple[int, int] | None:
+    identity_fn = identity_fn or _row_identity
+    if len(old_rows) != len(next_rows):
+        return None
+    old_ids = [identity_fn(row) for row in old_rows]
+    next_ids = [identity_fn(row) for row in next_rows]
+    if old_ids == next_ids:
+        return None
+    if len(set(old_ids)) != len(old_ids) or set(old_ids) != set(next_ids):
+        return None
+
+    old_positions = {identity: index for index, identity in enumerate(old_ids)}
+    first_changed = next(
+        (
+            index
+            for index, identity in enumerate(next_ids)
+            if old_positions.get(identity) != index
+        ),
+        -1,
+    )
+    if first_changed < 0:
+        return None
+
+    last_changed = len(next_ids) - 1
+    while last_changed > first_changed and old_ids[last_changed] == next_ids[last_changed]:
+        last_changed -= 1
+
+    if old_ids[first_changed] == next_ids[last_changed]:
+        return first_changed, last_changed
+    if old_ids[last_changed] == next_ids[first_changed]:
+        return last_changed, first_changed
+    return None
+
+
+def _move_destination_child(source_index: int, insert_index_after_removal: int) -> int:
+    if insert_index_after_removal > source_index:
+        return insert_index_after_removal + 1
+    return insert_index_after_removal
 
 
 def _row_index_for_group(rows: list[dict[str, Any]], group_key: str) -> int:
