@@ -119,6 +119,8 @@ class LogsPage(BasePage):
         self._logs_overview_runtime = OneShotWorkerRuntime()
         self._logs_overview_pending_cleanup = False
         self._support_prepare_runtime = OneShotWorkerRuntime()
+        self._open_folder_runtime = OneShotWorkerRuntime()
+        self._open_folder_pending = False
 
         # Error panel height tuning (avoid large empty block when no errors).
         self._errors_text_min_height = 52
@@ -986,10 +988,31 @@ class LogsPage(BasePage):
         
     def _open_folder(self):
         """Открывает папку с логами"""
-        try:
-            self._logs.open_logs_folder()
-        except Exception as e:
-            log(f"Ошибка открытия папки: {e}", "ERROR")
+        self._request_open_logs_folder()
+
+    def create_open_folder_worker(self, request_id: int):
+        return self._logs.create_open_folder_worker(request_id, parent=self)
+
+    def _request_open_logs_folder(self) -> None:
+        if self._open_folder_runtime.is_running():
+            self._open_folder_pending = True
+            return
+        self._open_folder_pending = False
+        self._open_folder_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: self.create_open_folder_worker(request_id),
+            on_failed=self._on_open_logs_folder_failed,
+            on_finished=self._on_open_logs_folder_worker_finished,
+        )
+
+    def _on_open_logs_folder_failed(self, request_id: int, error: str) -> None:
+        if not self._open_folder_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
+            return
+        log(f"Ошибка открытия папки: {error}", "ERROR")
+
+    def _on_open_logs_folder_worker_finished(self, _worker) -> None:
+        if self._open_folder_pending and not self._cleanup_in_progress:
+            self._open_folder_pending = False
+            self._request_open_logs_folder()
             
     def _update_stats(self):
         """Обновляет статистику"""
@@ -1062,4 +1085,9 @@ class LogsPage(BasePage):
         self._spin_timer.stop()
         self._stop_logs_overview_worker(blocking=True)
         self._stop_support_prepare_worker(blocking=True)
+        self._open_folder_runtime.stop(
+            blocking=True,
+            log_fn=log,
+            warning_prefix="Logs open folder worker",
+        )
         self._stop_tail_worker(blocking=True)

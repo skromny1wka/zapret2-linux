@@ -50,6 +50,11 @@ class LogsFeature:
     def create_logs_overview_worker(self, *, run_cleanup: bool):
         return self._commands().create_logs_overview_worker(run_cleanup=run_cleanup)
 
+    def create_open_folder_worker(self, request_id: int, *, parent=None):
+        from log.open_folder_worker import LogsOpenFolderWorker
+
+        return LogsOpenFolderWorker(request_id, logs_feature=self, parent=parent)
+
     def create_support_prepare_worker(
         self,
         request_id: int,

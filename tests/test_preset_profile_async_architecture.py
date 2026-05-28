@@ -1583,6 +1583,24 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("create_support_prepare_worker", feature_source)
         self.assertIn("prepare_support_bundle", worker_source)
 
+    def test_logs_open_folder_runs_through_worker(self) -> None:
+        spec = importlib.util.find_spec("log.open_folder_worker")
+        self.assertIsNotNone(spec)
+        open_worker = importlib.import_module("log.open_folder_worker")
+        page_source = inspect.getsource(LogsPage)
+        handler_source = inspect.getsource(LogsPage._open_folder)
+        feature_source = inspect.getsource(__import__("app.feature_facades.logs", fromlist=["LogsFeature"]).LogsFeature)
+
+        self.assertTrue(hasattr(open_worker, "LogsOpenFolderWorker"))
+        worker_source = inspect.getsource(open_worker.LogsOpenFolderWorker.run)
+
+        self.assertIn("_request_open_logs_folder", handler_source)
+        self.assertNotIn(".open_logs_folder(", handler_source)
+        self.assertIn("create_open_folder_worker", page_source)
+        self.assertIn("_open_folder_runtime", page_source)
+        self.assertIn("create_open_folder_worker", feature_source)
+        self.assertIn("open_logs_folder", worker_source)
+
     def test_profile_setup_page_loads_profile_payload_through_worker(self) -> None:
         source = inspect.getsource(ProfileSetupPageBase.reload_current_profile)
 
