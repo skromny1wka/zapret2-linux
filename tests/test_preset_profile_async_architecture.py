@@ -84,6 +84,8 @@ import telegram_proxy.ui.upstream_workflow as telegram_upstream_workflow
 import telegram_proxy.workers as telegram_proxy_workers
 from telegram_proxy.ui.page import TelegramProxyPage
 from telegram_proxy.workers import TelegramProxyDiagnosticsWorker
+from diagnostics.ui.page import ConnectionTestPage
+from app.feature_facades.diagnostics import DiagnosticsFeature
 import ui.navigation.text_sync as navigation_text_sync
 from app.page_names import PageName
 from ui.widgets.win11_controls import Win11RadioOption
@@ -1924,6 +1926,22 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("worker.progress.connect(publish_diag_result)", workflow_source)
         self.assertIn("progress = pyqtSignal", worker_source)
         self.assertIn("progress_callback=self.progress.emit", worker_source)
+
+    def test_connection_support_bundle_prepares_through_worker(self) -> None:
+        support_worker = importlib.import_module("diagnostics.support_worker")
+        page_source = inspect.getsource(ConnectionTestPage)
+        handler_source = inspect.getsource(ConnectionTestPage.open_support_with_log)
+        handler_body = handler_source.split("\n", 1)[1]
+        worker_source = inspect.getsource(support_worker.ConnectionSupportPrepareWorker.run)
+        feature_source = inspect.getsource(DiagnosticsFeature)
+
+        self.assertIn("_request_support_prepare", handler_source)
+        self.assertNotIn("open_support_with_log(", handler_body)
+        self.assertIn("create_support_prepare_worker", page_source)
+        self.assertIn("_support_prepare_worker", page_source)
+        self.assertIn("create_connection_support_prepare_worker", feature_source)
+        self.assertIn("diagnostics.commands", worker_source)
+        self.assertIn("prepare_connection_support", worker_source)
 
 
 if __name__ == "__main__":

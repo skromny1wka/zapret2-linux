@@ -7,6 +7,7 @@ from typing import Callable
 @dataclass(frozen=True, slots=True)
 class DiagnosticsFeature:
     create_connection_test_worker: Callable
+    create_connection_support_prepare_worker: Callable
 
 
 def build_diagnostics_feature() -> DiagnosticsFeature:
@@ -17,4 +18,5 @@ def build_diagnostics_feature() -> DiagnosticsFeature:
 
     return DiagnosticsFeature(
         create_connection_test_worker=lambda *args, **kwargs: _commands().create_connection_test_worker(*args, **kwargs),
+        create_connection_support_prepare_worker=lambda *args, **kwargs: _commands().create_connection_support_prepare_worker(*args, **kwargs),
     )
