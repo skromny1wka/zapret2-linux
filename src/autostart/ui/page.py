@@ -219,6 +219,9 @@ class AutostartPage(BasePage):
 
         self._ui_state_store = None
         self._ui_state_unsubscribe = None
+        self._autostart_action_worker = None
+        self._autostart_action_request_id = 0
+        self._autostart_action_pending: list[tuple[str, bool | None, str | None]] = []
 
         self._build_ui()
         self._apply_page_theme(force=True)
@@ -256,12 +259,125 @@ class AutostartPage(BasePage):
         enabled: bool,
         strategy_name: str | None = None,
     ) -> None:
-        try:
-            self._autostart.set_autostart_enabled(bool(enabled))
-        except Exception as exc:
-            log(f"Не удалось сохранить состояние автозапуска GUI в settings.json: {exc}", "WARNING")
-
+        self._autostart.set_autostart_runtime_state(bool(enabled))
+        self._request_autostart_action(
+            "save_state",
+            enabled=bool(enabled),
+            strategy_name=strategy_name,
+        )
         self.update_status(enabled, strategy_name)
+
+    def create_autostart_action_worker(
+        self,
+        request_id: int,
+        *,
+        action: str,
+        enabled=None,
+        strategy_name=None,
+    ):
+        return self._autostart.create_autostart_action_worker(
+            request_id,
+            action=action,
+            enabled=enabled,
+            strategy_name=strategy_name,
+            parent=self,
+        )
+
+    def _request_autostart_action(
+        self,
+        action: str,
+        *,
+        enabled=None,
+        strategy_name=None,
+    ) -> None:
+        payload = (str(action or "").strip(), enabled, strategy_name)
+        worker = self.__dict__.get("_autostart_action_worker")
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    self._autostart_action_pending.append(payload)
+                    return
+            except Exception:
+                self._autostart_action_pending.append(payload)
+                return
+        self._start_autostart_action_worker(payload)
+
+    def _start_autostart_action_worker(self, payload: tuple[str, bool | None, str | None]) -> None:
+        self._autostart_action_request_id += 1
+        request_id = self._autostart_action_request_id
+        worker = self.create_autostart_action_worker(
+            request_id,
+            action=payload[0],
+            enabled=payload[1],
+            strategy_name=payload[2],
+        )
+        self._autostart_action_worker = worker
+        worker.completed.connect(self._on_autostart_action_finished)
+        worker.failed.connect(self._on_autostart_action_failed)
+        worker.status.connect(self._on_autostart_action_status)
+        worker.finished.connect(lambda w=worker: self._on_autostart_action_worker_finished(w))
+        worker.start()
+
+    def _on_autostart_action_status(self, request_id: int, _action: str, message: str) -> None:
+        if request_id != self._autostart_action_request_id:
+            return
+        if message:
+            log(message, "INFO")
+
+    def _on_autostart_action_finished(self, request_id: int, action: str, result, context) -> None:
+        if request_id != self._autostart_action_request_id or self._cleanup_in_progress:
+            return
+        context = context if isinstance(context, dict) else {}
+        if action == "save_state":
+            enabled = bool(context.get("enabled"))
+            strategy_name = context.get("strategy_name")
+            self._autostart.set_autostart_runtime_state(enabled)
+            self.update_status(enabled, strategy_name)
+            return
+
+        if action == "disable":
+            self._autostart.set_autostart_runtime_state(False)
+            self.update_status(False, self.strategy_name)
+            removed_count = int(getattr(result, "removed_count", 0) or 0)
+            if removed_count > 0:
+                log(f"Автозапуск отключён, удалена задача: {removed_count}", "INFO")
+            else:
+                log("Автозапуск отключён", "INFO")
+            return
+
+        if action == "enable":
+            if getattr(result, "restart_requested", False):
+                log("Для включения автозапуска нужны права администратора", "WARNING")
+                from PyQt6.QtWidgets import QApplication
+
+                QApplication.quit()
+                return
+            if not getattr(result, "success", False):
+                message = str(
+                    getattr(result, "message", "")
+                    or "Не удалось включить автозапуск. Windows не принял задачу Планировщика заданий."
+                )
+                log(message, "WARNING")
+                self._show_autostart_error(message)
+                return
+            strategy_name = context.get("strategy_name") or self.strategy_name
+            self._autostart.set_autostart_runtime_state(True)
+            self.update_status(True, strategy_name)
+
+    def _on_autostart_action_failed(self, request_id: int, _action: str, error: str, _context) -> None:
+        if request_id != self._autostart_action_request_id or self._cleanup_in_progress:
+            return
+        message = f"Не удалось изменить автозапуск: {error}"
+        log(message, "WARNING")
+        self._show_autostart_error(message)
+
+    def _on_autostart_action_worker_finished(self, worker) -> None:
+        if self.__dict__.get("_autostart_action_worker") is worker:
+            self._autostart_action_worker = None
+        worker.deleteLater()
+        if self._autostart_action_pending and not self._cleanup_in_progress:
+            pending = self._autostart_action_pending.pop(0)
+            self._start_autostart_action_worker(pending)
 
     def _on_ui_state_changed(self, state: AppUiState, _changed_fields: frozenset[str]) -> None:
         strategy_name = state.current_strategy_summary or self.strategy_name
@@ -547,41 +663,10 @@ class AutostartPage(BasePage):
         self.gui_option.set_disabled(bool(autostart_enabled), is_active=bool(autostart_enabled))
 
     def _on_disable_clicked(self):
-        try:
-            result = self._autostart.disable_gui_autostart()
-            self._push_autostart_state(False)
-            if result.removed_count > 0:
-                log(f"Автозапуск отключён, удалена задача: {result.removed_count}", "INFO")
-            else:
-                log("Автозапуск отключён", "INFO")
-        except Exception as exc:
-            message = f"Не удалось отключить автозапуск: {exc}"
-            log(message, "WARNING")
-            self._show_autostart_error(message)
+        self._request_autostart_action("disable", enabled=False, strategy_name=self.strategy_name)
 
     def _on_gui_autostart(self):
-        try:
-            result = self._autostart.enable_gui_autostart(status_cb=lambda msg: log(msg, "INFO"))
-            if result.restart_requested:
-                log("Для включения автозапуска нужны права администратора", "WARNING")
-                from PyQt6.QtWidgets import QApplication
-
-                QApplication.quit()
-                return
-
-            if not result.success:
-                message = str(
-                    getattr(result, "message", "")
-                    or "Не удалось включить автозапуск. Windows не принял задачу Планировщика заданий."
-                )
-                log(message, "WARNING")
-                self._show_autostart_error(message)
-                return
-            self._push_autostart_state(True, self.strategy_name)
-        except Exception as exc:
-            message = f"Не удалось включить автозапуск: {exc}"
-            log(message, "WARNING")
-            self._show_autostart_error(message)
+        self._request_autostart_action("enable", enabled=True, strategy_name=self.strategy_name)
 
     def _show_autostart_error(self, message: str) -> None:
         notify = getattr(self, "_notify", None)
@@ -594,3 +679,11 @@ class AutostartPage(BasePage):
 
     def cleanup(self):
         self._cleanup_in_progress = True
+        self._autostart_action_pending.clear()
+        worker = self.__dict__.get("_autostart_action_worker")
+        if worker is not None:
+            try:
+                worker.quit()
+            except Exception:
+                pass
+            self._autostart_action_worker = None

@@ -33,6 +33,7 @@ import presets.ui.control.zapret2.page_runtime as zapret2_page_runtime
 from presets.ui.control.zapret2.page import Zapret2ModeControlPage
 from presets.user_presets_runtime_service import UserPresetsRuntimeService
 from hosts.ui.page import HostsPage
+from autostart.ui.page import AutostartPage
 import log.commands as log_commands
 from log.ui.page import LogsPage
 from blobs.ui.page import BlobsPage
@@ -1376,6 +1377,31 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_orchestra_settings_save_pending", request_source)
         self.assertIn("_orchestra_settings_save_pending.pop(0)", finished_source)
         self.assertIn("set_setting", worker_source)
+
+    def test_autostart_page_actions_run_through_worker(self) -> None:
+        spec = importlib.util.find_spec("autostart.workers")
+        self.assertIsNotNone(spec)
+        autostart_workers = importlib.import_module("autostart.workers")
+
+        page_source = inspect.getsource(AutostartPage)
+        enable_source = inspect.getsource(AutostartPage._on_gui_autostart)
+        disable_source = inspect.getsource(AutostartPage._on_disable_clicked)
+        push_source = inspect.getsource(AutostartPage._push_autostart_state)
+        finished_source = inspect.getsource(AutostartPage._on_autostart_action_finished)
+        worker_source = inspect.getsource(autostart_workers.AutostartActionWorker.run)
+
+        for source in (enable_source, disable_source, push_source):
+            self.assertIn("_request_autostart_action", source)
+            self.assertNotIn("self._autostart.enable_gui_autostart", source)
+            self.assertNotIn("self._autostart.disable_gui_autostart", source)
+            self.assertNotIn("self._autostart.set_autostart_enabled", source)
+
+        self.assertIn("create_autostart_action_worker", page_source)
+        self.assertIn("_autostart_action_pending", page_source)
+        self.assertIn("set_autostart_runtime_state", finished_source)
+        self.assertIn("enable_gui_autostart", worker_source)
+        self.assertIn("disable_gui_autostart", worker_source)
+        self.assertIn("save_gui_autostart_enabled", worker_source)
 
     def test_network_and_telegram_ui_do_not_create_python_threads(self) -> None:
         modules = (
