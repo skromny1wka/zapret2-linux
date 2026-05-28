@@ -196,6 +196,32 @@ class UserPresetOpenFolderWorker(QThread):
         self.completed.emit(self._request_id)
 
 
+class UserPresetLinkActionWorker(QThread):
+    completed = pyqtSignal(int, str, object, object)
+    failed = pyqtSignal(int, str, str, object)
+
+    def __init__(self, request_id: int, actions_api, *, action: str, parent=None):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self.actions_api = actions_api
+        self._action = str(action or "").strip()
+
+    def run(self) -> None:
+        context = {"action": self._action}
+        try:
+            if self._action == "info":
+                result = self.actions_api.open_presets_info()
+            elif self._action == "new_configs":
+                result = self.actions_api.open_new_configs_post()
+            else:
+                raise ValueError(f"Неизвестное действие ссылки preset: {self._action}")
+        except Exception as exc:
+            log(f"UserPresetLinkActionWorker: действие {self._action} не выполнено: {exc}", "ERROR")
+            self.failed.emit(self._request_id, self._action, str(exc), context)
+            return
+        self.completed.emit(self._request_id, self._action, result, context)
+
+
 class UserPresetStorageActionWorker(QThread):
     completed = pyqtSignal(int, str, object, object)
     failed = pyqtSignal(int, str, str, object)
@@ -380,6 +406,7 @@ __all__ = [
     "UserPresetEditActionWorker",
     "UserPresetFolderActionWorker",
     "UserPresetItemActionWorker",
+    "UserPresetLinkActionWorker",
     "UserPresetOpenFolderWorker",
     "UserPresetStorageActionWorker",
 ]

@@ -373,6 +373,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
             "_preset_edit_action_worker",
             "_preset_storage_action_worker",
             "_preset_folder_action_worker",
+            "_preset_open_folder_worker",
+            "_preset_link_action_worker",
         )
         request_attrs = (
             "_preset_activate_request_id",
@@ -381,6 +383,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
             "_preset_edit_action_request_id",
             "_preset_storage_action_request_id",
             "_preset_folder_action_request_id",
+            "_preset_open_folder_request_id",
+            "_preset_link_action_request_id",
         )
         page = UserPresetsPageBase.__new__(UserPresetsPageBase)
         workers = {attr: _Worker() for attr in worker_attrs}
@@ -390,6 +394,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
             setattr(page, attr, 7)
         page._pending_preset_activation = ("next.txt", "Next")
         page._preset_folder_action_pending = [{"action": "load_state"}]
+        page._preset_open_folder_pending = True
+        page._preset_link_action_pending = "info"
         page._preset_bulk_action_kind = "reset_all"
         page._bulk_reset_running = True
         page._layout_resync_timer = _Timer()
@@ -409,6 +415,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
             self.assertEqual(getattr(page, attr), 8)
         self.assertIsNone(page._pending_preset_activation)
         self.assertEqual(page._preset_folder_action_pending, [])
+        self.assertFalse(page._preset_open_folder_pending)
+        self.assertEqual(page._preset_link_action_pending, "")
         self.assertEqual(page._preset_bulk_action_kind, "")
         self.assertFalse(page._bulk_reset_running)
         page._runtime_service.stop_watching_presets.assert_called_once()
@@ -487,6 +495,25 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("create_preset_edit_action_worker", request_source)
         self.assertIn("actions_api.create_preset", worker_source)
         self.assertIn("actions_api.rename_preset", worker_source)
+
+    def test_user_presets_info_links_open_through_worker(self) -> None:
+        info_source = inspect.getsource(UserPresetsPageBase._open_presets_info)
+        post_source = inspect.getsource(UserPresetsPageBase._open_new_configs_post)
+        request_source = inspect.getsource(UserPresetsPageBase._request_preset_link_action)
+        cleanup_source = inspect.getsource(UserPresetsPageBase._stop_action_workers_for_cleanup)
+
+        self.assertTrue(hasattr(user_presets_action_workers, "UserPresetLinkActionWorker"))
+        worker_source = inspect.getsource(user_presets_action_workers.UserPresetLinkActionWorker.run)
+
+        for source in (info_source, post_source):
+            self.assertIn("_request_preset_link_action", source)
+            self.assertNotIn("open_presets_info_action", source)
+            self.assertNotIn("open_new_configs_post_action", source)
+
+        self.assertIn("create_preset_link_action_worker", request_source)
+        self.assertIn("actions_api.open_presets_info", worker_source)
+        self.assertIn("actions_api.open_new_configs_post", worker_source)
+        self.assertIn("_preset_link_action_worker", cleanup_source)
 
     def test_user_presets_storage_actions_run_through_worker(self) -> None:
         pin_source = inspect.getsource(UserPresetsPageBase._on_toggle_pin_preset)

@@ -29,6 +29,7 @@ from presets.user_presets_action_workers import (
     UserPresetEditActionWorker,
     UserPresetFolderActionWorker,
     UserPresetItemActionWorker,
+    UserPresetLinkActionWorker,
     UserPresetOpenFolderWorker,
     UserPresetStorageActionWorker,
 )
@@ -56,8 +57,6 @@ from presets.ui.common.user_presets_actions_workflow import (
 )
 from presets.ui.common.user_presets_item_actions_workflow import (
     open_edit_preset_menu_action,
-    open_new_configs_post_action,
-    open_presets_info_action,
     rename_preset_action,
 )
 from presets.ui.common.user_presets_page_lifecycle import (
@@ -178,6 +177,9 @@ class UserPresetsPageBase(BasePage):
         self._preset_open_folder_worker = None
         self._preset_open_folder_request_id = 0
         self._preset_open_folder_pending = False
+        self._preset_link_action_worker = None
+        self._preset_link_action_request_id = 0
+        self._preset_link_action_pending = ""
         self._build_ui()
         self._after_ui_built()
         self.bind_ui_state_store(ui_state_store)
@@ -1570,28 +1572,76 @@ class UserPresetsPageBase(BasePage):
             self._preset_item_action_worker = None
         worker.deleteLater()
 
-    def _open_presets_info(self):
-        open_presets_info_action(
-            actions_api=self._actions_api(),
-            info_bar_cls=InfoBar,
-            tr_fn=self._tr,
-            parent_window=self.window(),
-            log_fn=log,
+    def create_preset_link_action_worker(self, request_id: int, *, action: str):
+        return UserPresetLinkActionWorker(
+            request_id,
+            self._actions_api(),
+            action=action,
+            parent=self,
         )
 
-    def _open_new_configs_post(self):
-        open_new_configs_post_action(
-            actions_api=self._actions_api(),
-            info_bar_cls=InfoBar,
-            tr_fn=self._tr,
-            parent_window=self.window(),
-            log_fn=log,
+    def _request_preset_link_action(self, action: str) -> None:
+        action = str(action or "").strip()
+        if not action:
+            return
+        worker = self.__dict__.get("_preset_link_action_worker")
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    self._preset_link_action_pending = action
+                    return
+            except Exception:
+                return
+        self._preset_link_action_request_id = int(getattr(self, "_preset_link_action_request_id", 0) or 0) + 1
+        request_id = self._preset_link_action_request_id
+        worker = self.create_preset_link_action_worker(request_id, action=action)
+        self._preset_link_action_worker = worker
+        worker.completed.connect(self._on_preset_link_action_finished)
+        worker.failed.connect(self._on_preset_link_action_failed)
+        worker.finished.connect(lambda w=worker: self._on_preset_link_action_worker_finished(w))
+        worker.start()
+
+    def _on_preset_link_action_finished(self, request_id: int, _action: str, result, _context) -> None:
+        if request_id != int(getattr(self, "_preset_link_action_request_id", 0) or 0):
+            return
+        log(str(getattr(result, "log_message", "") or ""), str(getattr(result, "log_level", "") or "INFO"))
+        if (not bool(getattr(result, "ok", False))) and getattr(result, "infobar_level", "") == "warning":
+            InfoBar.warning(
+                title=str(getattr(result, "infobar_title", "") or self._tr("common.error.title", "Ошибка")),
+                content=str(getattr(result, "infobar_content", "") or ""),
+                parent=self.window(),
+            )
+
+    def _on_preset_link_action_failed(self, request_id: int, _action: str, error: str, _context) -> None:
+        if request_id != int(getattr(self, "_preset_link_action_request_id", 0) or 0):
+            return
+        log(f"{self.__class__.__name__}: не удалось открыть ссылку preset: {error}", "ERROR")
+        InfoBar.warning(
+            title=self._tr("common.error.title", "Ошибка"),
+            content=str(error),
+            parent=self.window(),
         )
+
+    def _on_preset_link_action_worker_finished(self, worker) -> None:
+        if self.__dict__.get("_preset_link_action_worker") is worker:
+            self._preset_link_action_worker = None
+        worker.deleteLater()
+        pending = str(self.__dict__.get("_preset_link_action_pending") or "").strip()
+        self._preset_link_action_pending = ""
+        if pending and not self._cleanup_in_progress:
+            self._request_preset_link_action(pending)
+
+    def _open_presets_info(self):
+        self._request_preset_link_action("info")
+
+    def _open_new_configs_post(self):
+        self._request_preset_link_action("new_configs")
 
     def _stop_action_workers_for_cleanup(self) -> None:
         self._pending_preset_activation = None
         self._preset_folder_action_pending.clear()
         self._preset_open_folder_pending = False
+        self._preset_link_action_pending = ""
         self._preset_bulk_action_kind = ""
         self._bulk_reset_running = False
 
@@ -1603,6 +1653,7 @@ class UserPresetsPageBase(BasePage):
             "_preset_storage_action_request_id",
             "_preset_folder_action_request_id",
             "_preset_open_folder_request_id",
+            "_preset_link_action_request_id",
         ):
             setattr(self, attr, int(getattr(self, attr, 0) or 0) + 1)
 
@@ -1614,6 +1665,7 @@ class UserPresetsPageBase(BasePage):
             "_preset_storage_action_worker",
             "_preset_folder_action_worker",
             "_preset_open_folder_worker",
+            "_preset_link_action_worker",
         ):
             worker = self.__dict__.get(attr)
             if worker is None:
