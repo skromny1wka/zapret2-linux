@@ -50,7 +50,6 @@ from qfluentwidgets import (
 from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE, is_preset_launch_method, is_zapret2_launch_method
 from ui.pages.base_page import BasePage
 from ui.fluent_widgets import set_tooltip
-from ui.holiday_effects import suspend_window_holiday_effects_for_ui_work
 from app.ui_texts import tr as tr_catalog
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens, to_qcolor
 from ui.widgets.fluent_item_tooltip import FluentItemToolTipController
@@ -215,6 +214,7 @@ class ProfileStrategyListWidget(QWidget):
         self._current_strategy_id = "none"
         self._entries = {}
         self._states = {}
+        self._item_by_strategy_id = {}
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -279,34 +279,15 @@ class ProfileStrategyListWidget(QWidget):
             return
         previous_id = self._current_strategy_id
         self._current_strategy_id = next_id
-        for row in range(self._list.count()):
-            item = self._list.item(row)
-            item_id = self._strategy_id_for_item(item)
-            if item_id not in {previous_id, next_id}:
-                continue
-            state = self._states.get(item_id)
-            is_current = item_id == next_id
-            status_parts = []
-            if is_current:
-                status_parts.append("Выбрана")
-            if bool(getattr(state, "favorite", False)):
-                status_parts.append("В избранном")
-            rating = str(getattr(state, "rating", "") or "")
-            if rating == "work":
-                status_parts.append("Работает")
-            elif rating == "notwork":
-                status_parts.append("Не работает")
-            item.setData(self._ROLE_STATUS_TEXT, " • ".join(status_parts))
-            item.setData(self._ROLE_IS_ACTIVE, is_current)
-            if is_current:
-                self._list.setCurrentItem(item)
-                item.setSelected(True)
-            else:
-                item.setSelected(False)
-            self._list.viewport().update(self._list.visualItemRect(item))
+        previous_item = self._item_by_strategy_id.get(previous_id)
+        next_item = self._item_by_strategy_id.get(next_id)
+        self._refresh_strategy_item(previous_item, previous_id, is_current=False)
+        if next_item is not previous_item:
+            self._refresh_strategy_item(next_item, next_id, is_current=True)
 
     def _rebuild_tree(self) -> None:
         search_text = self._search.text().strip().lower()
+        self._item_by_strategy_id.clear()
         self._list.clear()
         visible = 0
         current_item = None
@@ -355,6 +336,7 @@ class ProfileStrategyListWidget(QWidget):
             item.setSizeHint(QSize(0, 31))
             if is_current:
                 current_item = item
+            self._item_by_strategy_id[strategy_id] = item
             self._list.addItem(item)
             visible += 1
 
@@ -362,6 +344,29 @@ class ProfileStrategyListWidget(QWidget):
         if current_item is not None:
             self._list.setCurrentItem(current_item)
             current_item.setSelected(True)
+
+    def _refresh_strategy_item(self, item, strategy_id: str, *, is_current: bool) -> None:
+        if item is None:
+            return
+        state = self._states.get(strategy_id)
+        status_parts = []
+        if is_current:
+            status_parts.append("Выбрана")
+        if bool(getattr(state, "favorite", False)):
+            status_parts.append("В избранном")
+        rating = str(getattr(state, "rating", "") or "")
+        if rating == "work":
+            status_parts.append("Работает")
+        elif rating == "notwork":
+            status_parts.append("Не работает")
+        item.setData(self._ROLE_STATUS_TEXT, " • ".join(status_parts))
+        item.setData(self._ROLE_IS_ACTIVE, is_current)
+        if is_current:
+            self._list.setCurrentItem(item)
+            item.setSelected(True)
+        else:
+            item.setSelected(False)
+        self._list.viewport().update(self._list.visualItemRect(item))
 
     def _apply_filter(self) -> None:
         self._rebuild_tree()
@@ -1172,7 +1177,6 @@ class ProfileSetupPageBase(BasePage):
         worker.deleteLater()
 
     def _apply_payload(self, payload) -> None:
-        suspend_window_holiday_effects_for_ui_work(self, duration_ms=260)
         self._loading = True
         try:
             item = payload.item
@@ -1904,7 +1908,6 @@ class ProfileSetupPageBase(BasePage):
         if entry is None:
             return False
 
-        suspend_window_holiday_effects_for_ui_work(self, duration_ms=180)
         state = (getattr(payload, "strategy_states", {}) or {}).get(strategy_id, ProfileStrategyState())
         updated_item = replace(
             item,

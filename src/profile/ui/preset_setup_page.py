@@ -22,7 +22,6 @@ from profile.ui.user_profile_dialog import CreateUserProfileDialog
 from qfluentwidgets import BodyLabel, InfoBar, MessageBox
 from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE
 from ui.pages.base_page import BasePage
-from ui.holiday_effects import suspend_window_holiday_effects_for_ui_work
 from app.ui_texts import tr as tr_catalog
 
 
@@ -239,7 +238,6 @@ class PresetSetupPageBase(BasePage):
     def _apply_payload(self, payload) -> None:
         if self._content_host_layout is None:
             return
-        suspend_window_holiday_effects_for_ui_work(self, duration_ms=260)
         total_started_at = time.perf_counter()
         self._apply_selected_preset_title(payload)
         self._show_profile_normalization_info(payload)

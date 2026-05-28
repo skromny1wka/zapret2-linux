@@ -1106,9 +1106,21 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
     def test_strategy_list_repaints_viewport_rect_after_current_strategy_changes(self) -> None:
         source = inspect.getsource(ProfileStrategyListWidget.set_current_strategy_id)
+        helper_source = inspect.getsource(ProfileStrategyListWidget._refresh_strategy_item)
 
-        self.assertIn("viewport().update", source)
-        self.assertNotIn("_list.update(self._list.visualItemRect", source)
+        self.assertIn("_refresh_strategy_item", source)
+        self.assertIn("viewport().update", helper_source)
+        self.assertNotIn("_list.update(self._list.visualItemRect", helper_source)
+
+    def test_strategy_list_updates_current_rows_by_id_without_full_scan(self) -> None:
+        init_source = inspect.getsource(ProfileStrategyListWidget.__init__)
+        rebuild_source = inspect.getsource(ProfileStrategyListWidget._rebuild_tree)
+        source = inspect.getsource(ProfileStrategyListWidget.set_current_strategy_id)
+
+        self.assertIn("_item_by_strategy_id", init_source)
+        self.assertIn("_item_by_strategy_id.clear()", rebuild_source)
+        self.assertIn("_item_by_strategy_id[strategy_id] = item", rebuild_source)
+        self.assertNotIn("for row in range", source)
 
     def test_strategy_change_refreshes_only_changed_profile_row(self) -> None:
         page = PresetSetupPageBase.__new__(PresetSetupPageBase)
