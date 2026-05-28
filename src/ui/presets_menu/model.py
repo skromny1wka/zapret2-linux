@@ -31,8 +31,26 @@ class PresetListModel(QAbstractListModel):
         self._active_preset_file_names: set[str] = set()
 
     def set_rows(self, rows: list[dict[str, object]]) -> None:
+        next_rows = list(rows)
+        if self._rows == next_rows:
+            return
+
+        if _same_stable_rows(self._rows, next_rows):
+            changed_rows = [
+                row_index
+                for row_index, (current_row, next_row) in enumerate(zip(self._rows, next_rows, strict=True))
+                if current_row != next_row
+            ]
+            self._rows = next_rows
+            self._rebuild_row_index()
+            roles = _all_data_roles()
+            for row_index in changed_rows:
+                model_index = self.index(row_index, 0)
+                self.dataChanged.emit(model_index, model_index, roles)
+            return
+
         self.beginResetModel()
-        self._rows = rows
+        self._rows = next_rows
         self._rebuild_row_index()
         self.endResetModel()
 
@@ -446,6 +464,49 @@ def _shift_folder_count(rows: list[dict[str, object]], folder_key: str, delta: i
         except Exception:
             row["count"] = max(0, int(delta))
         return
+
+
+def _same_stable_rows(current_rows: list[dict[str, object]], next_rows: list[dict[str, object]]) -> bool:
+    if len(current_rows) != len(next_rows):
+        return False
+    return all(
+        _stable_row_identity(current_row) == _stable_row_identity(next_row)
+        for current_row, next_row in zip(current_rows, next_rows, strict=True)
+    )
+
+
+def _stable_row_identity(row: dict[str, object]) -> tuple[str, str]:
+    kind = str(row.get("kind") or "preset")
+    if kind == "preset":
+        return kind, str(row.get("file_name") or "").strip()
+    if kind == "folder":
+        return kind, str(row.get("folder_key") or "").strip()
+    if kind == "empty":
+        return kind, str(row.get("text") or "")
+    return kind, str(row.get("file_name") or row.get("folder_key") or row.get("text") or row.get("name") or "")
+
+
+def _all_data_roles() -> list[int]:
+    return [
+        int(Qt.ItemDataRole.DisplayRole),
+        PresetListModel.KindRole,
+        PresetListModel.NameRole,
+        PresetListModel.FileNameRole,
+        PresetListModel.DescriptionRole,
+        PresetListModel.DateRole,
+        PresetListModel.ActiveRole,
+        PresetListModel.TextRole,
+        PresetListModel.IconColorRole,
+        PresetListModel.BuiltinRole,
+        PresetListModel.DepthRole,
+        PresetListModel.PinnedRole,
+        PresetListModel.RatingRole,
+        PresetListModel.FolderKeyRole,
+        PresetListModel.CollapsedRole,
+        PresetListModel.CountRole,
+        PresetListModel.SystemRole,
+        PresetListModel.ServiceRole,
+    ]
 
 
 __all__ = ["PresetListModel"]

@@ -346,6 +346,76 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertEqual(model.find_preset_row("second.txt"), 1)
         self.assertEqual(model.index(0, 0).data(PresetListModel.CountRole), 1)
 
+    def test_preset_model_skips_identical_rows_without_full_reset(self) -> None:
+        rows = [
+            {
+                "kind": "folder",
+                "folder_key": "common",
+                "text": "Общие",
+                "count": 1,
+                "is_collapsed": False,
+            },
+            {
+                "kind": "preset",
+                "file_name": "first.txt",
+                "name": "First",
+                "folder_key": "common",
+            },
+        ]
+        model = PresetListModel()
+        model.set_rows(rows)
+        model.beginResetModel = Mock(side_effect=AssertionError("same rows must not reset the preset list"))
+
+        model.set_rows([dict(row) for row in rows])
+
+        self.assertEqual(model.rowCount(), 2)
+        self.assertEqual(model.find_preset_row("first.txt"), 1)
+
+    def test_preset_model_updates_stable_rows_without_full_reset(self) -> None:
+        model = PresetListModel()
+        model.set_rows([
+            {
+                "kind": "folder",
+                "folder_key": "common",
+                "text": "Общие",
+                "count": 1,
+                "is_collapsed": False,
+            },
+            {
+                "kind": "preset",
+                "file_name": "first.txt",
+                "name": "First",
+                "folder_key": "common",
+                "description": "old",
+                "rating": 1,
+            },
+        ])
+        model.beginResetModel = Mock(side_effect=AssertionError("stable rows must not reset the preset list"))
+
+        model.set_rows([
+            {
+                "kind": "folder",
+                "folder_key": "common",
+                "text": "Общие",
+                "count": 1,
+                "is_collapsed": False,
+            },
+            {
+                "kind": "preset",
+                "file_name": "first.txt",
+                "name": "First updated",
+                "folder_key": "common",
+                "description": "new",
+                "rating": 5,
+            },
+        ])
+
+        self.assertEqual(model.rowCount(), 2)
+        self.assertEqual(model.find_preset_row("first.txt"), 1)
+        self.assertEqual(model.index(1, 0).data(PresetListModel.NameRole), "First updated")
+        self.assertEqual(model.index(1, 0).data(PresetListModel.DescriptionRole), "new")
+        self.assertEqual(model.index(1, 0).data(PresetListModel.RatingRole), 5)
+
     def test_user_presets_delete_updates_visible_row_without_reload(self) -> None:
         result = SimpleNamespace(
             ok=True,
