@@ -15,6 +15,7 @@ from presets.ui.control.additional_settings_runtime import (
     create_additional_settings_save_worker,
     create_additional_settings_worker,
     create_refresh_runtime,
+    create_top_summary_worker,
 )
 
 

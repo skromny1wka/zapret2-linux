@@ -989,13 +989,15 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("get_profile_selection_details", source)
 
     def test_control_pages_use_cached_profile_count(self) -> None:
-        zapret2_source = inspect.getsource(Zapret2ModeControlPage._load_enabled_profile_count)
-        zapret1_source = inspect.getsource(Zapret1ModeControlPage._load_enabled_profile_count)
+        zapret2_source = inspect.getsource(Zapret2ModeControlPage)
+        zapret1_source = inspect.getsource(Zapret1ModeControlPage)
+        worker_source = inspect.getsource(control_additional_settings_runtime.ControlTopSummaryWorker.run)
 
+        self.assertFalse(hasattr(Zapret2ModeControlPage, "_load_enabled_profile_count"))
+        self.assertFalse(hasattr(Zapret1ModeControlPage, "_load_enabled_profile_count"))
         self.assertNotIn("count_enabled_profiles", zapret2_source)
         self.assertNotIn("count_enabled_profiles", zapret1_source)
-        self.assertIn("get_enabled_profile_count_snapshot", zapret2_source)
-        self.assertIn("get_enabled_profile_count_snapshot", zapret1_source)
+        self.assertIn("get_enabled_profile_count_snapshot", worker_source)
 
     def test_zapret1_additional_settings_loads_through_worker(self) -> None:
         page_source = inspect.getsource(Zapret1ModeControlPage)
@@ -1230,6 +1232,28 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn(".load_state(", ratings_refresh_source)
         self.assertIn("create_snapshot_load_worker", managed_controller_source)
         self.assertIn("create_state_load_worker", ratings_controller_source)
+
+    def test_control_top_summary_loads_preset_and_profile_count_through_worker(self) -> None:
+        winws1_refresh_source = inspect.getsource(Zapret1ModeControlPage._refresh_top_summary)
+        winws2_refresh_source = inspect.getsource(Zapret2ModeControlPage._refresh_top_summary)
+        winws1_page_source = inspect.getsource(Zapret1ModeControlPage)
+        winws2_page_source = inspect.getsource(Zapret2ModeControlPage)
+        runtime_source = inspect.getsource(control_additional_settings_runtime)
+        worker_source = inspect.getsource(control_additional_settings_runtime.ControlTopSummaryWorker.run)
+
+        self.assertIn("_request_top_summary_worker", winws1_refresh_source)
+        self.assertIn("_request_top_summary_worker", winws2_refresh_source)
+        self.assertNotIn("_load_preset_name()", winws1_refresh_source)
+        self.assertNotIn("_load_selected_preset_name()", winws2_refresh_source)
+        self.assertNotIn("_load_enabled_profile_count()", winws1_refresh_source)
+        self.assertNotIn("_load_enabled_profile_count()", winws2_refresh_source)
+        self.assertNotIn("get_selected_source_preset_display", winws1_page_source)
+        self.assertNotIn("get_selected_source_preset_display", winws2_page_source)
+        self.assertNotIn("get_enabled_profile_count_snapshot", winws1_page_source)
+        self.assertNotIn("get_enabled_profile_count_snapshot", winws2_page_source)
+        self.assertIn("create_top_summary_worker", runtime_source)
+        self.assertIn("get_selected_source_preset_display", worker_source)
+        self.assertIn("get_enabled_profile_count_snapshot", worker_source)
 
     def test_orchestra_clear_learned_runs_through_worker(self) -> None:
         spec = importlib.util.find_spec("orchestra.page_workers")

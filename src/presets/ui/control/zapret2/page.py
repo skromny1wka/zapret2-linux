@@ -39,8 +39,10 @@ from presets.ui.control.top_summary_widget import ControlTopSummaryWidget
 from presets.ui.control.additional_settings_runtime import (
     create_additional_settings_save_worker as create_control_additional_settings_save_worker,
     create_additional_settings_worker as create_control_additional_settings_worker,
+    create_top_summary_worker as create_control_top_summary_worker,
 )
 import presets.ui.control.zapret2.page_runtime as zapret2_page_runtime
+from log.log import log
 
 from qfluentwidgets import (
     CaptionLabel, StrongBodyLabel, SubtitleLabel, BodyLabel,
@@ -471,36 +473,8 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             (_time.perf_counter() - _t_summary) * 1000,
         )
 
-    def _load_selected_preset_name(self) -> tuple[str, str]:
-        try:
-            return self._presets.get_selected_source_preset_display(
-                ZAPRET2_MODE,
-            )
-        except Exception:
-            return "", ""
-
     def _apply_selected_preset_name_fast(self) -> None:
-        default_text = tr_catalog(
-            "page.winws2_control.preset.not_selected",
-            language=self._ui_language,
-            default="Не выбран",
-        )
-
-        try:
-            preset_name_text, _preset_name_tooltip = self._load_selected_preset_name()
-        except Exception:
-            preset_name_text = ""
-
-        text = str(preset_name_text or "").strip() or default_text
-        if self.top_summary is not None:
-            self.top_summary.set_preset(text)
-
-    def _load_enabled_profile_count(self) -> int | None:
-        try:
-            count = self._profile.get_enabled_profile_count_snapshot(ZAPRET2_MODE)
-            return int(count) if count is not None else None
-        except Exception:
-            return None
+        self._request_top_summary_worker()
 
     def _schedule_top_summary_profile_retry(self) -> None:
         if self._cleanup_in_progress:
@@ -520,25 +494,69 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             return
         self._refresh_top_summary()
 
-    def _refresh_top_summary(self, state: AppUiState | None = None) -> None:
+    def _request_top_summary_worker(self) -> None:
+        runtime = self._refresh_runtime
+        worker = runtime.top_summary_worker
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    runtime.top_summary_pending = True
+                    return
+            except Exception:
+                runtime.top_summary_worker = None
+
+        request_id = runtime.next_top_summary_request_id()
+        worker = create_control_top_summary_worker(
+            request_id,
+            self._presets,
+            self._profile,
+            launch_method=ZAPRET2_MODE,
+            parent=self,
+        )
+        runtime.top_summary_worker = worker
+        worker.loaded.connect(self._on_top_summary_loaded)
+        worker.failed.connect(self._on_top_summary_failed)
+        worker.finished.connect(lambda w=worker: self._on_top_summary_worker_finished(w))
+        worker.start()
+
+    def _on_top_summary_loaded(self, request_id: int, state) -> None:
+        runtime = self._refresh_runtime
+        if request_id != runtime.top_summary_request_id or self._cleanup_in_progress:
+            return
         summary = self.top_summary
         if summary is None:
             return
-        try:
-            preset_name_text, _preset_name_tooltip = self._load_selected_preset_name()
-        except Exception:
-            preset_name_text = ""
+        preset_text = str(getattr(state, "preset_text", "") or "").strip()
         summary.set_preset(
-            str(preset_name_text or "").strip()
+            preset_text
             or tr_catalog("page.winws2_control.preset.not_selected", language=self._ui_language, default="Не выбран")
         )
-        profile_count = self._load_enabled_profile_count()
+        profile_count = getattr(state, "profile_count", None)
         summary.set_profile_count(profile_count)
         if profile_count is None:
             self._schedule_top_summary_profile_retry()
         else:
             self._top_summary_profile_retry_count = 0
             self._top_summary_profile_retry_pending = False
+
+    def _on_top_summary_failed(self, request_id: int, error: str) -> None:
+        if request_id != self._refresh_runtime.top_summary_request_id or self._cleanup_in_progress:
+            return
+        log(f"Не удалось обновить сводку Zapret 2: {error}", "WARNING")
+
+    def _on_top_summary_worker_finished(self, worker) -> None:
+        runtime = self._refresh_runtime
+        if runtime.top_summary_worker is worker:
+            runtime.top_summary_worker = None
+        worker.deleteLater()
+        if runtime.top_summary_pending and not self._cleanup_in_progress:
+            runtime.top_summary_pending = False
+            self._request_top_summary_worker()
+
+    def _refresh_top_summary(self, state: AppUiState | None = None) -> None:
+        summary = self.top_summary
+        if summary is None:
+            return
         snapshot = state
         if snapshot is None and self._ui_state_store is not None:
             try:
@@ -549,6 +567,7 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             is_premium=bool(getattr(snapshot, "subscription_is_premium", False)),
             days_remaining=getattr(snapshot, "subscription_days_remaining", None),
         )
+        self._request_top_summary_worker()
 
     def _run_deferred_show_work(self) -> None:
         if self._cleanup_in_progress:

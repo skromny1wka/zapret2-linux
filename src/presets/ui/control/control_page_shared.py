@@ -245,6 +245,15 @@ def cleanup_control_page_subscriptions(owner) -> None:
 
     runtime = getattr(owner, "_refresh_runtime", None)
     if runtime is not None:
+        runtime.top_summary_pending = False
+        worker = getattr(runtime, "top_summary_worker", None)
+        if worker is not None:
+            try:
+                worker.quit()
+            except Exception:
+                pass
+            runtime.top_summary_worker = None
+
         runtime.program_settings_save_pending = None
         worker = getattr(runtime, "program_settings_save_worker", None)
         if worker is not None:

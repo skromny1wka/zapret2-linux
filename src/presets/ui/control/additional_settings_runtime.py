@@ -12,6 +12,13 @@ class ControlAdditionalSettingsState:
         self.debug_log_enabled = bool(debug_log_enabled)
 
 
+class ControlTopSummaryState:
+    def __init__(self, *, preset_text: str, preset_tooltip: str, profile_count: int | None):
+        self.preset_text = str(preset_text or "")
+        self.preset_tooltip = str(preset_tooltip or "")
+        self.profile_count = profile_count
+
+
 class ModeControlRefreshRuntime:
     def __init__(self) -> None:
         self.additional_settings_worker = None
@@ -20,6 +27,9 @@ class ModeControlRefreshRuntime:
         self.additional_settings_request_id = 0
         self.additional_settings_save_request_id = 0
         self.additional_settings_dirty = True
+        self.top_summary_worker = None
+        self.top_summary_pending = False
+        self.top_summary_request_id = 0
         self.program_settings_save_worker = None
         self.program_settings_save_pending = None
         self.program_settings_save_request_id = 0
@@ -51,6 +61,10 @@ class ModeControlRefreshRuntime:
         self.program_settings_save_request_id += 1
         return self.program_settings_save_request_id
 
+    def next_top_summary_request_id(self) -> int:
+        self.top_summary_request_id += 1
+        return self.top_summary_request_id
+
     def accept_additional_settings_result(self, request_id: int) -> bool:
         if int(request_id) != int(self.additional_settings_request_id):
             return False
@@ -67,6 +81,77 @@ def create_additional_settings_worker(request_id: int, profile_feature, *, launc
         request_id,
         parent,
         launch_method=launch_method,
+    )
+
+
+class ControlTopSummaryWorker(QThread):
+    loaded = pyqtSignal(int, object)
+    failed = pyqtSignal(int, str)
+
+    def __init__(
+        self,
+        request_id: int,
+        presets_feature,
+        profile_feature,
+        *,
+        launch_method: str,
+        parent=None,
+    ):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self._presets_feature = presets_feature
+        self._profile_feature = profile_feature
+        self._launch_method = str(launch_method or "").strip()
+
+    def run(self) -> None:
+        try:
+            preset_text = ""
+            preset_tooltip = ""
+            try:
+                preset_display = self._presets_feature.get_selected_source_preset_display(
+                    self._launch_method,
+                )
+                if preset_display:
+                    preset_text = str(preset_display[0] or "")
+                    preset_tooltip = str(preset_display[1] or "")
+            except Exception as exc:
+                log(f"ControlTopSummaryWorker: не удалось прочитать выбранный preset: {exc}", "DEBUG")
+
+            profile_count = None
+            try:
+                count = self._profile_feature.get_enabled_profile_count_snapshot(
+                    self._launch_method,
+                )
+                profile_count = int(count) if count is not None else None
+            except Exception as exc:
+                log(f"ControlTopSummaryWorker: не удалось прочитать количество profile: {exc}", "DEBUG")
+
+            state = ControlTopSummaryState(
+                preset_text=preset_text,
+                preset_tooltip=preset_tooltip,
+                profile_count=profile_count,
+            )
+        except Exception as exc:
+            log(f"ControlTopSummaryWorker: не удалось загрузить сводку: {exc}", "WARNING")
+            self.failed.emit(self._request_id, str(exc))
+            return
+        self.loaded.emit(self._request_id, state)
+
+
+def create_top_summary_worker(
+    request_id: int,
+    presets_feature,
+    profile_feature,
+    *,
+    launch_method: str,
+    parent=None,
+):
+    return ControlTopSummaryWorker(
+        request_id,
+        presets_feature,
+        profile_feature,
+        launch_method=launch_method,
+        parent=parent,
     )
 
 
