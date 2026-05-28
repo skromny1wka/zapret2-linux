@@ -1599,6 +1599,26 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page.reload_current_profile.assert_not_called()
         page._on_profile_changed_callback.assert_not_called()
 
+    def test_user_profile_update_result_passes_updated_item_to_preset_page(self) -> None:
+        updated_item = SimpleNamespace(key="profile-1", user_profile_id="user-1")
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._user_profile_update_request_id = 1
+        page._profile_key = "profile-1"
+        page._payload = SimpleNamespace(item=SimpleNamespace(user_profile_id="user-1"))
+        page.reload_current_profile = Mock()
+        page._on_profile_changed_callback = Mock()
+        page.window = Mock(return_value=None)
+
+        with patch("profile.ui.profile_setup_page.InfoBar.success"):
+            ProfileSetupPageBase._on_user_profile_update_finished(page, 1, "user-1", 3, (updated_item,))
+
+        page.reload_current_profile.assert_called_once()
+        page._on_profile_changed_callback.assert_called_once_with(
+            "profile-1",
+            "user_profile_updated",
+            updated_item,
+        )
+
     def test_user_profile_update_worker_emits_changed_count_and_items(self) -> None:
         updated_item = ProfileListItem(
             key="profile:user-1",

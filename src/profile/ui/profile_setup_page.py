@@ -1094,6 +1094,10 @@ class ProfileSetupPageBase(BasePage):
             parent=self.window(),
         )
         self.reload_current_profile()
+        updated_item = _updated_user_profile_item(profile_id, self._profile_key, _profile_items)
+        if updated_item is not None:
+            self._on_profile_changed_callback(self._profile_key, "user_profile_updated", updated_item)
+            return
         self._on_profile_changed_callback(self._profile_key, "user_profile_updated")
 
     def _on_user_profile_update_failed(self, request_id: int, error: str) -> None:
@@ -2197,3 +2201,16 @@ def _user_profile_id_from_payload(profile_key: str, payload) -> str:
     if key.startswith("template:user:"):
         return key.split("template:user:", 1)[1].strip()
     return ""
+
+
+def _updated_user_profile_item(profile_id: str, profile_key: str, profile_items):
+    clean_profile_id = str(profile_id or "").strip()
+    clean_profile_key = str(profile_key or "").strip()
+    candidates = tuple(profile_items or ())
+    for item in candidates:
+        if clean_profile_key and str(getattr(item, "key", "") or "").strip() == clean_profile_key:
+            return item
+    for item in candidates:
+        if clean_profile_id and str(getattr(item, "user_profile_id", "") or "").strip() == clean_profile_id:
+            return item
+    return None
