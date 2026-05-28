@@ -153,6 +153,8 @@ class HostsPage(BasePage):
         self._worker = None
         self._thread = None
         self._services_catalog_runtime = OneShotWorkerRuntime()
+        self._selection_load_runtime = OneShotWorkerRuntime()
+        self._selection_load_show_access_errors = False
         self._selection_save_runtime = OneShotWorkerRuntime()
         self._selection_save_pending = None
         self._applying = False
@@ -226,9 +228,61 @@ class HostsPage(BasePage):
                 self._runtime_access_checked = True
             return
         if not self._runtime_initialized:
-            selection_started_at = time.perf_counter()
-            self._service_dns_selection = self._controller.load_user_selection()
-            self._log_ui_timing("hosts_ui.user_selection.load", selection_started_at)
+            self._start_user_selection_load_worker(show_access_errors=show_access_errors)
+            return
+        self._finish_runtime_init_after_selection(show_access_errors=show_access_errors)
+
+    def _start_user_selection_load_worker(self, *, show_access_errors: bool) -> None:
+        self._selection_load_show_access_errors = (
+            bool(self._selection_load_show_access_errors) or bool(show_access_errors)
+        )
+        if self._selection_load_runtime.is_running():
+            return
+        started_at = time.perf_counter()
+        self._selection_load_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: self._controller.create_selection_load_worker(
+                request_id,
+                self,
+            ),
+            on_loaded=self._on_user_selection_load_finished,
+            on_failed=self._on_user_selection_load_failed,
+            on_finished=self._on_user_selection_load_worker_finished,
+        )
+        self._log_ui_timing("hosts_ui.user_selection.load.start_worker", started_at)
+
+    def _on_user_selection_load_finished(self, request_id: int, selection) -> None:
+        if not self._selection_load_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
+            return
+        self._service_dns_selection = dict(selection or {})
+        show_access_errors = bool(self._selection_load_show_access_errors)
+        self._selection_load_show_access_errors = False
+        self._finish_runtime_init_after_selection(show_access_errors=show_access_errors)
+
+    def _on_user_selection_load_failed(self, request_id: int, error: str) -> None:
+        if not self._selection_load_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
+            return
+        log(f"Hosts: ошибка загрузки выбора профилей: {error}", "ERROR")
+        show_access_errors = bool(self._selection_load_show_access_errors)
+        self._selection_load_show_access_errors = False
+        self._service_dns_selection = {}
+        self._finish_runtime_init_after_selection(show_access_errors=show_access_errors)
+
+    def _on_user_selection_load_worker_finished(self, _worker) -> None:
+        pass
+
+    def _finish_runtime_init_after_selection(self, *, show_access_errors: bool) -> None:
+        started_at = time.perf_counter()
+        if self._runtime_initialized:
+            if show_access_errors and not self._runtime_access_checked:
+                self._check_hosts_access()
+                self._runtime_access_checked = True
+            return
         if show_access_errors:
             check_access_fn = self._check_hosts_access
             self._runtime_access_checked = True
@@ -969,6 +1023,11 @@ class HostsPage(BasePage):
                 log_fn=log,
             )
             self._stop_services_catalog_worker(blocking=True)
+            self._selection_load_runtime.stop(
+                blocking=True,
+                log_fn=log,
+                warning_prefix="Hosts selection load worker",
+            )
             self._selection_save_runtime.stop(
                 blocking=True,
                 log_fn=log,

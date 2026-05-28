@@ -1290,6 +1290,22 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("read_active_domains_map", build_source)
         self.assertNotIn("build_services_catalog_plan", build_source)
 
+    def test_hosts_user_selection_loads_through_worker(self) -> None:
+        spec = importlib.util.find_spec("hosts.selection_load_worker")
+        self.assertIsNotNone(spec)
+        selection_load_worker = importlib.import_module("hosts.selection_load_worker")
+
+        init_source = inspect.getsource(HostsPage.__init__)
+        runtime_source = inspect.getsource(HostsPage._run_runtime_init_once)
+        worker_source = inspect.getsource(selection_load_worker.HostsSelectionLoadWorker.run)
+        controller_source = inspect.getsource(__import__("hosts.page_controller", fromlist=["HostsPageController"]).HostsPageController)
+
+        self.assertIn("_selection_load_runtime", init_source)
+        self.assertIn("_start_user_selection_load_worker", runtime_source)
+        self.assertNotIn("self._controller.load_user_selection()", runtime_source)
+        self.assertIn("create_selection_load_worker", controller_source)
+        self.assertIn("load_user_selection", worker_source)
+
     def test_lazy_pages_start_runtime_after_activation_not_constructor(self) -> None:
         page_classes = (
             dns_page.NetworkPage,

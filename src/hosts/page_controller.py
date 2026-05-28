@@ -22,6 +22,11 @@ class HostsPageController:
 
         return HostsSelectionSaveWorker(request_id, self, selection, parent)
 
+    def create_selection_load_worker(self, request_id: int, parent=None):
+        from hosts.selection_load_worker import HostsSelectionLoadWorker
+
+        return HostsSelectionLoadWorker(request_id, self, parent)
+
     def create_hosts_runtime(self, *, status_callback=None):
         return self._hosts.create_hosts_runtime(status_callback=status_callback)
 
