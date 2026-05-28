@@ -324,13 +324,14 @@ class ProfilePresetProfileMoveWorker(QThread):
 
 
 class ProfileUserProfileCreateWorker(QThread):
-    created = pyqtSignal(int, str)
+    created = pyqtSignal(int, str, object)
     failed = pyqtSignal(int, str)
 
     def __init__(
         self,
         request_id: int,
         profile,
+        launch_method: str,
         *,
         name: str,
         protocol: str,
@@ -340,6 +341,7 @@ class ProfileUserProfileCreateWorker(QThread):
         super().__init__(parent)
         self._request_id = int(request_id)
         self._profile = profile
+        self._launch_method = str(launch_method or "").strip()
         self._name = str(name or "").strip()
         self._protocol = str(protocol or "").strip()
         self._ports = str(ports or "").strip()
@@ -351,11 +353,22 @@ class ProfileUserProfileCreateWorker(QThread):
                 protocol=self._protocol,
                 ports=self._ports,
             )
+            created_item = self._created_profile_item(str(profile_id or ""))
         except Exception as exc:
             log(f"ProfileUserProfileCreateWorker: не удалось создать пользовательский profile: {exc}", "ERROR")
             self.failed.emit(self._request_id, str(exc))
             return
-        self.created.emit(self._request_id, str(profile_id or ""))
+        self.created.emit(self._request_id, str(profile_id or ""), created_item)
+
+    def _created_profile_item(self, profile_id: str):
+        clean_profile_id = str(profile_id or "").strip()
+        if not clean_profile_id:
+            return None
+        payload = self._profile.list_profiles(self._launch_method)
+        for item in tuple(getattr(payload, "items", ()) or ()):
+            if str(getattr(item, "user_profile_id", "") or "").strip() == clean_profile_id:
+                return item
+        return None
 
 
 class ProfileUserProfileUpdateWorker(QThread):

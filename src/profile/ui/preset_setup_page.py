@@ -597,6 +597,7 @@ class PresetSetupPageBase(BasePage):
         return ProfileUserProfileCreateWorker(
             request_id,
             self._profile,
+            self.launch_method,
             name=name,
             protocol=protocol,
             ports=ports,
@@ -648,7 +649,7 @@ class PresetSetupPageBase(BasePage):
         worker.finished.connect(lambda w=worker: self._on_user_profile_create_worker_finished(w))
         worker.start()
 
-    def _on_user_profile_create_finished(self, request_id: int, _profile_id: str) -> None:
+    def _on_user_profile_create_finished(self, request_id: int, _profile_id: str, profile_item=None) -> None:
         if request_id != int(getattr(self, "_user_profile_create_request_id", 0) or 0):
             return
         InfoBar.success(
@@ -656,7 +657,18 @@ class PresetSetupPageBase(BasePage):
             content="Он появился в общем списке и пока выключен во всех preset-ах.",
             parent=self.window(),
         )
+        if self._add_created_user_profile_locally(profile_item):
+            return
         self.refresh_from_preset_switch()
+
+    def _add_created_user_profile_locally(self, profile_item) -> bool:
+        profiles_list = self.__dict__.get("_profiles_list")
+        if profiles_list is None or profile_item is None:
+            return False
+        if not profiles_list.add_profile_item(profile_item):
+            return False
+        self._profile_payload_dirty = True
+        return True
 
     def _on_user_profile_create_failed(self, request_id: int, error: str) -> None:
         if request_id != int(getattr(self, "_user_profile_create_request_id", 0) or 0):

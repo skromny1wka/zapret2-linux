@@ -183,19 +183,43 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         update_worker.start.assert_called_once()
         delete_worker.start.assert_called_once()
 
-    def test_preset_setup_user_profile_create_worker_emits_profile_id(self) -> None:
+    def test_preset_setup_user_profile_create_worker_emits_profile_item(self) -> None:
+        created_item = ProfileListItem(
+            key="profile:user-1",
+            persistent_key="profile:user-1",
+            profile_index=1,
+            display_name="YouTube",
+            enabled=False,
+            in_preset=False,
+            strategy_id="",
+            strategy_name="",
+            match_lines=(),
+            list_type="",
+            rating="",
+            favorite=False,
+            group="common",
+            group_name="",
+            order=1,
+            user_profile_id="user-1",
+            profile_name="YouTube",
+        )
+        payload = SimpleNamespace(items=(created_item,))
         profile = Mock()
         profile.create_user_profile.return_value = "user-1"
+        profile.list_profiles.return_value = payload
         worker = ProfileUserProfileCreateWorker(
             5,
             profile,
+            "zapret2_mode",
             name="YouTube",
             protocol="TCP",
             ports="443",
         )
         created = []
 
-        worker.created.connect(lambda request_id, profile_id: created.append((request_id, profile_id)))
+        worker.created.connect(
+            lambda request_id, profile_id, item: created.append((request_id, profile_id, item))
+        )
 
         worker.run()
 
@@ -204,7 +228,44 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             protocol="TCP",
             ports="443",
         )
-        self.assertEqual(created, [(5, "user-1")])
+        profile.list_profiles.assert_called_once_with("zapret2_mode")
+        self.assertEqual(created, [(5, "user-1", created_item)])
+
+    def test_preset_setup_user_profile_create_adds_item_without_full_refresh(self) -> None:
+        created_item = ProfileListItem(
+            key="profile:user-1",
+            persistent_key="profile:user-1",
+            profile_index=1,
+            display_name="YouTube",
+            enabled=False,
+            in_preset=False,
+            strategy_id="",
+            strategy_name="",
+            match_lines=(),
+            list_type="",
+            rating="",
+            favorite=False,
+            group="common",
+            group_name="",
+            order=1,
+            user_profile_id="user-1",
+            profile_name="YouTube",
+        )
+        profiles_list = Mock()
+        profiles_list.add_profile_item.return_value = True
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._user_profile_create_request_id = 5
+        page._profiles_list = profiles_list
+        page._profile_payload_dirty = False
+        page.refresh_from_preset_switch = Mock()
+        page.window = Mock(return_value=None)
+
+        with patch("profile.ui.preset_setup_page.InfoBar.success"):
+            PresetSetupPageBase._on_user_profile_create_finished(page, 5, "user-1", created_item)
+
+        profiles_list.add_profile_item.assert_called_once_with(created_item)
+        page.refresh_from_preset_switch.assert_not_called()
+        self.assertTrue(page._profile_payload_dirty)
 
     def test_profile_rows_have_context_menu_path(self) -> None:
         list_source = inspect.getsource(ProfilesList)
