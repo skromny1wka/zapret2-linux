@@ -142,8 +142,17 @@ class ControlPageActionMixin:
         runtime.program_settings_save_worker = worker
         worker.saved.connect(self._on_program_settings_save_finished)
         worker.failed.connect(self._on_program_settings_save_failed)
+        status_signal = getattr(worker, "status", None)
+        if status_signal is not None:
+            status_signal.connect(self._on_program_settings_save_status)
         worker.finished.connect(lambda w=worker: self._on_program_settings_save_worker_finished(w))
         worker.start()
+
+    def _on_program_settings_save_status(self, request_id: int, _action: str, message: str) -> None:
+        runtime = self._refresh_runtime
+        if request_id != runtime.program_settings_save_request_id:
+            return
+        self._set_status(str(message or ""))
 
     def _on_program_settings_save_finished(self, request_id: int, action: str, result) -> None:
         runtime = self._refresh_runtime
@@ -159,6 +168,10 @@ class ControlPageActionMixin:
                     content=str(getattr(result, "message", "") or ""),
                     parent=self.window(),
                 )
+            elif action == "defender_disabled":
+                self._show_windows_feature_action_result(result, self.defender_toggle)
+            elif action == "max_block":
+                self._show_windows_feature_action_result(result, self.max_block_toggle)
         finally:
             sync_program_settings = getattr(self, "_sync_program_settings", None)
             if callable(sync_program_settings):
@@ -171,6 +184,9 @@ class ControlPageActionMixin:
         from qfluentwidgets import InfoBar
 
         InfoBar.warning(title="Ошибка", content=f"Не удалось сохранить настройку: {error}", parent=self.window())
+        sync_program_settings = getattr(self, "_sync_program_settings", None)
+        if callable(sync_program_settings):
+            sync_program_settings()
 
     def _on_program_settings_save_worker_finished(self, worker) -> None:
         runtime = self._refresh_runtime

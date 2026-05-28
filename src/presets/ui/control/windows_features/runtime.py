@@ -47,39 +47,27 @@ class ControlPageWindowsFeatureMixin:
                 self._set_toggle_checked(self.defender_toggle, start_plan.blocked_revert_checked)
             return
 
-        try:
-            for dialog_plan in start_plan.confirmations:
-                if not self._confirm_windows_feature_action(dialog_plan, self.defender_toggle):
-                    return
+        for dialog_plan in start_plan.confirmations:
+            if not self._confirm_windows_feature_action(dialog_plan, self.defender_toggle):
+                self._sync_program_settings()
+                return
 
-            if start_plan.start_status:
-                self._set_status(start_plan.start_status)
+        if start_plan.start_status:
+            self._set_status(start_plan.start_status)
 
-            result_plan = self._program_settings.set_defender_disabled(
-                disable=disable,
-                status_callback=self._set_status,
-            )
-            self._show_windows_feature_action_result(result_plan, self.defender_toggle)
-        finally:
-            self._sync_program_settings()
+        self._request_program_settings_save("defender_disabled", bool(disable))
 
     def _on_max_blocker_toggled(self, enable: bool) -> None:
         start_plan = control_runtime.build_max_block_toggle_start_plan(
             enable=enable,
             language=self._ui_language,
         )
-        try:
-            for dialog_plan in start_plan.confirmations:
-                if not self._confirm_windows_feature_action(dialog_plan, self.max_block_toggle):
-                    return
+        for dialog_plan in start_plan.confirmations:
+            if not self._confirm_windows_feature_action(dialog_plan, self.max_block_toggle):
+                self._sync_program_settings()
+                return
 
-            if start_plan.start_status:
-                self._set_status(start_plan.start_status)
+        if start_plan.start_status:
+            self._set_status(start_plan.start_status)
 
-            result_plan = self._program_settings.set_max_block_enabled(
-                enable=enable,
-                status_callback=self._set_status,
-            )
-            self._show_windows_feature_action_result(result_plan, self.max_block_toggle)
-        finally:
-            self._sync_program_settings()
+        self._request_program_settings_save("max_block", bool(enable))
