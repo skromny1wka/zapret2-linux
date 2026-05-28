@@ -748,6 +748,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
     def test_telegram_proxy_settings_save_runs_through_worker(self) -> None:
         page_source = inspect.getsource(TelegramProxyPage)
         upstream_source = inspect.getsource(telegram_upstream_workflow)
+        runtime_source = inspect.getsource(telegram_runtime_workflow)
         request_source = inspect.getsource(TelegramProxyPage._request_settings_save)
         finished_source = inspect.getsource(TelegramProxyPage._on_settings_save_worker_finished)
 
@@ -776,8 +777,12 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_settings_save_pending.pop(0)", finished_source)
         self.assertNotIn("import telegram_proxy.settings", upstream_source)
         self.assertNotIn("telegram_proxy_settings.set_", upstream_source)
+        self.assertNotIn("telegram_proxy_settings.set_proxy_enabled", runtime_source)
+        self.assertIn("request_proxy_enabled_save", runtime_source)
+        self.assertIn('"proxy_enabled"', page_source)
         self.assertIn("set_host", worker_source)
         self.assertIn("set_port", worker_source)
+        self.assertIn("set_proxy_enabled", worker_source)
         self.assertIn("set_upstream_enabled", worker_source)
         self.assertIn("set_upstream_fields", worker_source)
         self.assertIn("set_upstream_mode", worker_source)

@@ -603,6 +603,10 @@ class TelegramProxyPage(BasePage):
             set_restarting=lambda value: setattr(self, "_restarting", value),
             stop_proxy=self._stop_proxy,
             start_proxy=self._start_proxy,
+            request_proxy_enabled_save=lambda value: self._request_settings_save(
+                "proxy_enabled",
+                enabled=bool(value),
+            ),
         )
 
     def _restart_if_running(self):
@@ -751,6 +755,10 @@ class TelegramProxyPage(BasePage):
             btn_toggle=self._btn_toggle,
             check_relay_after_start=self._check_relay_after_start,
             on_status_changed=self._on_status_changed,
+            request_proxy_enabled_save=lambda value: self._request_settings_save(
+                "proxy_enabled",
+                enabled=bool(value),
+            ),
         )
 
     def _check_relay_after_start(self):
@@ -783,7 +791,13 @@ class TelegramProxyPage(BasePage):
 
     def _stop_proxy(self):
         mgr = self._proxy_manager()
-        stop_proxy_runtime(manager=mgr)
+        stop_proxy_runtime(
+            manager=mgr,
+            request_proxy_enabled_save=lambda value: self._request_settings_save(
+                "proxy_enabled",
+                enabled=bool(value),
+            ),
+        )
 
     def _on_status_changed(self, running: bool):
         mgr = self._proxy_manager()

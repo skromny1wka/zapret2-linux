@@ -164,6 +164,8 @@ class TelegramProxySettingsSaveWorker(QThread):
                 result = telegram_proxy_settings.set_host(self._host)
             elif self._action == "port":
                 result = telegram_proxy_settings.set_port(self._port)
+            elif self._action == "proxy_enabled":
+                result = telegram_proxy_settings.set_proxy_enabled(self._enabled)
             elif self._action == "upstream_enabled":
                 result = telegram_proxy_settings.set_upstream_enabled(self._enabled)
             elif self._action == "upstream_fields":

@@ -17,6 +17,7 @@ def handle_toggle_proxy(
     set_restarting,
     stop_proxy,
     start_proxy,
+    request_proxy_enabled_save,
 ) -> None:
     plan = telegram_proxy_page_runtime.build_toggle_action_plan(
         running=bool(manager.is_running),
@@ -27,7 +28,7 @@ def handle_toggle_proxy(
         set_restarting(False)
         manager.status_changed.emit(False)
         if plan.persist_enabled is not None:
-            telegram_proxy_settings.set_proxy_enabled(plan.persist_enabled)
+            request_proxy_enabled_save(bool(plan.persist_enabled))
         return
     if plan.action == "ignore":
         return
@@ -118,12 +119,13 @@ def finish_proxy_start(
     btn_toggle,
     check_relay_after_start,
     on_status_changed,
+    request_proxy_enabled_save,
 ) -> None:
     set_starting(False)
     plan = telegram_proxy_page_runtime.build_finish_start_plan(start_ok)
     btn_toggle.setEnabled(plan.toggle_enabled)
     if plan.persist_enabled is not None:
-        telegram_proxy_settings.set_proxy_enabled(plan.persist_enabled)
+        request_proxy_enabled_save(bool(plan.persist_enabled))
     if plan.should_check_relay:
         check_relay_after_start()
     elif plan.fallback_to_stopped_status:
@@ -211,9 +213,9 @@ def apply_relay_result(
         )
 
 
-def stop_proxy_runtime(*, manager) -> None:
+def stop_proxy_runtime(*, manager, request_proxy_enabled_save) -> None:
     manager.stop_proxy()
-    telegram_proxy_settings.set_proxy_enabled(False)
+    request_proxy_enabled_save(False)
 
 
 def apply_status_changed(
