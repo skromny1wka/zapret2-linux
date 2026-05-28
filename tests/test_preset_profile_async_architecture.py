@@ -234,6 +234,16 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("get_page_smooth_scroll_enabled", source)
         self.assertNotIn("load_smooth_scroll_enabled", source)
 
+    def test_user_presets_page_uses_current_presets_feature_attribute(self) -> None:
+        after_ui_source = inspect.getsource(UserPresetsPageBase._after_ui_built)
+        open_folder_source = inspect.getsource(UserPresetsPageBase._open_presets_folder)
+
+        self.assertIn("self._presets_feature.connect_preset_signals", after_ui_source)
+        self.assertIn("self._presets_feature.open_user_presets_folder", open_folder_source)
+        self.assertIn("self._config.launch_method", open_folder_source)
+        self.assertNotIn("self._presets.", after_ui_source)
+        self.assertNotIn("self._presets.", open_folder_source)
+
     def test_preset_list_active_marker_updates_indexed_rows_only(self) -> None:
         class CountingRow(dict):
             def __init__(self, *args, **kwargs) -> None:

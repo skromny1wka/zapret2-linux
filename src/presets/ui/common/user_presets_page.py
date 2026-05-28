@@ -369,7 +369,7 @@ class UserPresetsPageBase(BasePage):
     def _after_ui_built(self) -> None:
         after_user_presets_ui_built(
             apply_page_theme_fn=self._apply_page_theme,
-            connect_preset_signals_fn=lambda **callbacks: self._presets.connect_preset_signals(
+            connect_preset_signals_fn=lambda **callbacks: self._presets_feature.connect_preset_signals(
                 self._config.launch_method,
                 **callbacks,
             ),
@@ -548,7 +548,7 @@ class UserPresetsPageBase(BasePage):
 
     def _open_presets_folder(self) -> None:
         open_presets_folder_action(
-            open_presets_folder_fn=lambda: self._presets.open_user_presets_folder(self.launch_method),
+            open_presets_folder_fn=lambda: self._presets_feature.open_user_presets_folder(self._config.launch_method),
             info_bar_cls=InfoBar,
             tr_fn=self._tr,
             parent_window=self.window(),
