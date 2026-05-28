@@ -476,9 +476,9 @@ def apply_window_background(window, theme_name: str | None = None, preset: str |
                     from settings.appearance import peek_warmed_window_opacity
                     opacity_pct = peek_warmed_window_opacity()
                     if opacity_pct is None:
-                        opacity_pct = 0
+                        opacity_pct = 100
                 except Exception:
-                    opacity_pct = 0
+                    opacity_pct = 100
                 r, g, b, overlay_alpha = _compute_tint_color(opacity_pct)
                 window.set_tint_overlay(r, g, b, overlay_alpha)
             # Reset Win10 window opacity (may have been set by apply_aero_effect)
