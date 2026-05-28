@@ -247,15 +247,6 @@ def finish_connection_test(
     }
 
 
-def open_support_with_log(*, selection: str, append_callback, set_status_callback) -> None:
-    plan = connection_page_plans.prepare_support_request_for_connection(
-        selection=selection,
-    )
-    for line in plan.log_lines:
-        append_callback(line)
-    set_status_callback(plan.status_text, plan.status_tone)
-
-
 def apply_connection_language(
     *,
     language: str,
