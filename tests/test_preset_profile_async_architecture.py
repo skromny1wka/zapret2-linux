@@ -17,7 +17,7 @@ from presets import display_state
 from presets import commands as preset_commands
 from presets.ui.common.preset_subpage_base import PresetRawEditorPage
 from presets.ui.common.user_presets_page import UserPresetsPageBase
-from presets.raw_preset_loader import RawPresetActionWorker, RawPresetActivateWorker, RawPresetSaveWorker
+from presets.raw_preset_loader import RawPresetActionWorker, RawPresetActivateWorker, RawPresetLoadWorker, RawPresetSaveWorker
 from presets.user_presets_action_workers import UserPresetActivateWorker, UserPresetItemActionWorker
 from presets.user_presets_page_plans import build_preset_rows_plan
 from ui.presets_menu.model import PresetListModel
@@ -1400,9 +1400,16 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
     def test_raw_preset_editor_loads_file_through_worker(self) -> None:
         source = inspect.getsource(PresetRawEditorPage._load_file)
+        set_source = inspect.getsource(PresetRawEditorPage.set_preset_file_name)
+        header_source = inspect.getsource(PresetRawEditorPage._refresh_header)
+        worker_source = inspect.getsource(RawPresetLoadWorker.run)
 
         self.assertNotIn("self._controller.load_text(", source)
         self.assertIn("_request_raw_preset_text", source)
+        self.assertNotIn("self._controller.manifest", set_source)
+        self.assertNotIn("self._controller.source_path", set_source)
+        self.assertNotIn("self._controller.manifest", header_source)
+        self.assertIn("self._controller.load_preset", worker_source)
 
     def test_raw_preset_editor_saves_file_through_worker(self) -> None:
         save_source = inspect.getsource(PresetRawEditorPage._save_file)

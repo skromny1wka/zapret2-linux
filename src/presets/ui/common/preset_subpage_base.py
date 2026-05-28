@@ -155,6 +155,7 @@ class PresetRawEditorPage(BasePage):
         self._preset_name = ""
         self._preset_file_name = ""
         self._preset_path: Path | None = None
+        self._preset_origin = "user"
         self._is_loading = False
         self._raw_load_request_id = 0
         self._raw_load_worker = None
@@ -204,9 +205,6 @@ class PresetRawEditorPage(BasePage):
 
     def on_page_hidden(self) -> None:
         self._commit_pending_content_change()
-
-    def _get_preset_path(self, name: str) -> Path:
-        return self._controller.source_path(str(name or "").strip())
 
     def _preset_launch_method(self) -> str | None:
         return self._launch_method
@@ -277,9 +275,7 @@ class PresetRawEditorPage(BasePage):
 
     def _is_current_builtin(self) -> bool:
         try:
-            if not self._preset_file_name:
-                return False
-            return self._controller.is_builtin(self._preset_file_name)
+            return str(self._preset_origin or "").strip().lower() == "builtin"
         except Exception:
             return False
 
@@ -374,17 +370,8 @@ class PresetRawEditorPage(BasePage):
             return
         self._preset_file_name = str(file_name or "").strip()
         self._preset_name = Path(self._preset_file_name).stem if self._preset_file_name else ""
-        if self._preset_file_name:
-            try:
-                manifest = self._controller.manifest(self._preset_file_name)
-                if manifest is not None:
-                    self._preset_name = manifest.name
-                    self._preset_file_name = manifest.file_name
-                self._preset_path = self._controller.source_path(self._preset_file_name)
-            except Exception:
-                self._preset_path = self._get_preset_path(self._preset_name)
-        else:
-            self._preset_path = self._get_preset_path(self._preset_name)
+        self._preset_path = None
+        self._preset_origin = "user"
         self._load_file()
         self._refresh_header()
 
@@ -432,16 +419,7 @@ class PresetRawEditorPage(BasePage):
             is_active = active_file_name.lower() == self._preset_file_name.lower()
         elif self._preset_name:
             is_active = active_name.lower() == self._preset_name.lower()
-        origin = "builtin" if self._is_current_builtin() else "user"
-        if self._preset_file_name:
-            try:
-                manifest = self._controller.manifest(self._preset_file_name)
-                if manifest is not None:
-                    kind = str(manifest.kind or "").strip().lower()
-                    if kind in {"builtin", "imported", "user"}:
-                        origin = kind
-            except Exception:
-                pass
+        origin = str(self._preset_origin or "user").strip().lower() or "user"
 
         if is_active and origin == "builtin":
             status = "Активный встроенный пресет"
@@ -468,7 +446,7 @@ class PresetRawEditorPage(BasePage):
         request_id = self._raw_load_request_id
         self._is_loading = True
         self._set_footer("Загрузка...")
-        worker = self._controller.create_load_worker(request_id, self._preset_path, self)
+        worker = self._controller.create_load_worker(request_id, self._preset_file_name, self)
         self._raw_load_worker = worker
         worker.loaded.connect(self._on_raw_preset_text_loaded)
         worker.failed.connect(self._on_raw_preset_text_failed)
@@ -478,9 +456,16 @@ class PresetRawEditorPage(BasePage):
     def _on_raw_preset_text_loaded(self, request_id: int, result) -> None:
         if request_id != self._raw_load_request_id:
             return
+        if getattr(result, "file_name", ""):
+            self._preset_file_name = str(result.file_name or "").strip()
+        if getattr(result, "display_name", ""):
+            self._preset_name = str(result.display_name or "").strip()
+        self._preset_path = getattr(result, "path", None)
+        self._preset_origin = str(getattr(result, "origin", "") or "user").strip().lower() or "user"
         self.editor.setPlainText(result.text)
         self._set_footer(result.footer_text)
         self._is_loading = False
+        self._refresh_header()
 
     def _on_raw_preset_text_failed(self, request_id: int, error: str) -> None:
         if request_id != self._raw_load_request_id:
@@ -599,6 +584,7 @@ class PresetRawEditorPage(BasePage):
         self._preset_name = updated.name
         self._preset_file_name = updated.file_name
         self._preset_path = result.path
+        self._preset_origin = str(getattr(updated, "kind", "") or self._preset_origin or "user").strip().lower() or "user"
         if publish_content_changed:
             self._content_publish_pending = False
         self._set_footer(result.footer_text)
@@ -884,6 +870,7 @@ class PresetRawEditorPage(BasePage):
             self._preset_name = updated.name
             self._preset_file_name = updated.file_name
             self._preset_path = path
+            self._preset_origin = str(getattr(updated, "kind", "") or "user").strip().lower() or "user"
             self._load_file()
             self._refresh_header()
             self._show_success(f"Пресет переименован: {payload.get('new_name') or updated.name}")
@@ -893,6 +880,7 @@ class PresetRawEditorPage(BasePage):
             self._preset_name = duplicated.name
             self._preset_file_name = duplicated.file_name
             self._preset_path = path
+            self._preset_origin = str(getattr(duplicated, "kind", "") or "user").strip().lower() or "user"
             self._load_file()
             self._refresh_header()
             self._show_success(f"Создан дубликат: {payload.get('new_name') or duplicated.name}")
@@ -903,6 +891,7 @@ class PresetRawEditorPage(BasePage):
             self._preset_name = updated.name
             self._preset_file_name = updated.file_name
             self._preset_path = path
+            self._preset_origin = str(getattr(updated, "kind", "") or "builtin").strip().lower() or "builtin"
             self._load_file()
             self._refresh_header()
             self._show_success(f"Восстановлен встроенный пресет «{self._preset_name}»")

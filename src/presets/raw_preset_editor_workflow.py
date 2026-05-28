@@ -11,6 +11,10 @@ from pathlib import Path
 class RawPresetLoadResult:
     text: str
     footer_text: str
+    file_name: str = ""
+    display_name: str = ""
+    path: Path | None = None
+    origin: str = "user"
 
 
 @dataclass(frozen=True)
@@ -23,10 +27,11 @@ class RawPresetSaveResult:
 def load_raw_preset_text(path: Path | None) -> RawPresetLoadResult:
     """Читает текст preset-файла для редактора."""
     if path is None or not path.exists():
-        return RawPresetLoadResult(text="", footer_text="Файл не найден")
+        return RawPresetLoadResult(text="", footer_text="Файл не найден", path=path)
     return RawPresetLoadResult(
         text=path.read_text(encoding="utf-8", errors="replace"),
         footer_text="Загружено",
+        path=path,
     )
 
 
@@ -71,6 +76,40 @@ def get_raw_preset_manifest(*, presets_feature, launch_method: str | None, file_
     return presets_feature.get_preset_manifest_by_file_name(
         launch_method,
         file_name,
+    )
+
+
+def load_raw_preset_for_file(*, presets_feature, launch_method: str | None, file_name: str) -> RawPresetLoadResult:
+    candidate = str(file_name or "").strip()
+    if not candidate:
+        return load_raw_preset_text(None)
+
+    manifest = get_raw_preset_manifest(
+        presets_feature=presets_feature,
+        launch_method=launch_method,
+        file_name=candidate,
+    )
+    resolved_file_name = candidate
+    display_name = Path(candidate).stem
+    origin = "user"
+    if manifest is not None:
+        resolved_file_name = str(manifest.file_name or candidate).strip() or candidate
+        display_name = str(manifest.name or display_name).strip() or display_name
+        origin = str(manifest.kind or "user").strip().lower() or "user"
+
+    path = get_raw_preset_source_path(
+        presets_feature=presets_feature,
+        launch_method=launch_method,
+        file_name=resolved_file_name,
+    )
+    text_result = load_raw_preset_text(path)
+    return RawPresetLoadResult(
+        text=text_result.text,
+        footer_text=text_result.footer_text,
+        file_name=resolved_file_name,
+        display_name=display_name,
+        path=path,
+        origin=origin,
     )
 
 
@@ -199,10 +238,17 @@ class RawPresetEditorController:
     def load_text(self, path: Path | None) -> RawPresetLoadResult:
         return load_raw_preset_text(path)
 
-    def create_load_worker(self, request_id: int, path: Path | None, parent=None):
+    def load_preset(self, file_name: str) -> RawPresetLoadResult:
+        return load_raw_preset_for_file(
+            presets_feature=self._presets,
+            launch_method=self._launch_method,
+            file_name=file_name,
+        )
+
+    def create_load_worker(self, request_id: int, file_name: str, parent=None):
         from presets.raw_preset_loader import RawPresetLoadWorker
 
-        return RawPresetLoadWorker(request_id, self, path, parent)
+        return RawPresetLoadWorker(request_id, self, file_name, parent)
 
     def create_save_worker(
         self,
