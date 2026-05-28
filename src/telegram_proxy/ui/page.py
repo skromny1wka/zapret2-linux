@@ -47,6 +47,7 @@ from telegram_proxy.ui.upstream_workflow import (
     handle_upstream_toggle,
     schedule_upstream_restart,
 )
+from telegram_proxy.ui.settings_save_flow import merge_restart_request
 from telegram_proxy.ui.settings_build import (
     build_telegram_proxy_settings_panel,
 )
@@ -124,6 +125,7 @@ class TelegramProxyPage(BasePage):
         self._settings_save_worker = None
         self._settings_save_request_id = 0
         self._settings_save_pending: list[dict[str, object]] = []
+        self._settings_save_restart_pending = ""
         self._initial_state_worker = None
         self._initial_state_request_id = 0
         self._initial_state_load_started_at = 0.0
@@ -753,12 +755,18 @@ class TelegramProxyPage(BasePage):
     def _on_settings_save_finished(self, request_id: int, _action: str, _result, context) -> None:
         if request_id != int(getattr(self, "_settings_save_request_id", 0) or 0):
             return
+        context = dict(context or {})
+        restart = str(context.get("restart") or "")
+        self._settings_save_restart_pending = merge_restart_request(
+            getattr(self, "_settings_save_restart_pending", ""),
+            restart,
+        )
         if self.__dict__.get("_settings_save_pending"):
             return
-        context = dict(context or {})
         if bool(context.get("update_manual")):
             self._update_manual_instructions()
-        restart = str(context.get("restart") or "")
+        restart = str(getattr(self, "_settings_save_restart_pending", "") or "")
+        self._settings_save_restart_pending = ""
         if restart == "schedule":
             self._schedule_upstream_restart()
         elif restart == "now":
@@ -767,6 +775,7 @@ class TelegramProxyPage(BasePage):
     def _on_settings_save_failed(self, request_id: int, action: str, error: str, _context) -> None:
         if request_id != int(getattr(self, "_settings_save_request_id", 0) or 0):
             return
+        self._settings_save_restart_pending = ""
         log(f"{self.__class__.__name__}: не удалось сохранить настройку Telegram Proxy ({action}): {error}", "WARNING")
 
     def _on_settings_save_worker_finished(self, worker) -> None:
@@ -1114,6 +1123,7 @@ class TelegramProxyPage(BasePage):
             self._upstream_restart_timer.deleteLater()
             self._upstream_restart_timer = None
         self._settings_save_pending.clear()
+        self._settings_save_restart_pending = ""
         initial_state_worker = self.__dict__.get("_initial_state_worker")
         if initial_state_worker is not None:
             try:

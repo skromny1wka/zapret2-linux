@@ -653,6 +653,21 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("save_accent_color", worker_source)
         self.assertIn("save_animations_enabled", worker_source)
 
+    def test_telegram_proxy_restart_request_survives_queued_settings_saves(self) -> None:
+        from telegram_proxy.ui.settings_save_flow import merge_restart_request
+
+        self.assertEqual(merge_restart_request("", "schedule"), "schedule")
+        self.assertEqual(merge_restart_request("schedule", ""), "schedule")
+        self.assertEqual(merge_restart_request("schedule", "now"), "now")
+        self.assertEqual(merge_restart_request("now", "schedule"), "now")
+
+        init_source = inspect.getsource(TelegramProxyPage.__init__)
+        finished_source = inspect.getsource(TelegramProxyPage._on_settings_save_finished)
+
+        self.assertIn("_settings_save_restart_pending", init_source)
+        self.assertIn("merge_restart_request", finished_source)
+        self.assertIn("_settings_save_restart_pending", finished_source)
+
     def test_appearance_rkn_background_options_load_through_worker(self) -> None:
         page_source = inspect.getsource(AppearancePage)
         reload_source = inspect.getsource(AppearancePage._reload_rkn_background_options)
