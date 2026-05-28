@@ -32,6 +32,11 @@ class HostsPageController:
 
         return HostsStateLoadWorker(request_id, self, hosts_runtime, parent)
 
+    def create_open_hosts_file_worker(self, request_id: int, parent=None):
+        from hosts.open_file_worker import HostsOpenFileWorker
+
+        return HostsOpenFileWorker(request_id, self, parent)
+
     def create_hosts_runtime(self, *, status_callback=None):
         return self._hosts.create_hosts_runtime(status_callback=status_callback)
 

@@ -2076,6 +2076,24 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("create_state_load_worker", controller_source)
         self.assertIn("get_hosts_state", worker_source)
 
+    def test_hosts_open_file_runs_through_worker(self) -> None:
+        spec = importlib.util.find_spec("hosts.open_file_worker")
+        self.assertIsNotNone(spec)
+        open_file_worker = importlib.import_module("hosts.open_file_worker")
+
+        init_source = inspect.getsource(HostsPage.__init__)
+        open_source = inspect.getsource(HostsPage._open_hosts_file)
+        page_source = inspect.getsource(HostsPage)
+        controller_source = inspect.getsource(__import__("hosts.page_controller", fromlist=["HostsPageController"]).HostsPageController)
+        worker_source = inspect.getsource(open_file_worker.HostsOpenFileWorker.run)
+
+        self.assertIn("_open_file_runtime", init_source)
+        self.assertIn("_request_open_hosts_file", open_source)
+        self.assertNotIn(".open_hosts_file(", open_source)
+        self.assertIn("create_open_hosts_file_worker", page_source)
+        self.assertIn("create_open_hosts_file_worker", controller_source)
+        self.assertIn("open_hosts_file", worker_source)
+
     def test_hosts_page_cache_cannot_sync_read_runtime_state(self) -> None:
         page_source = inspect.getsource(HostsPage)
         cache_source = inspect.getsource(hosts_page_runtime.HostsPageRuntimeCache)

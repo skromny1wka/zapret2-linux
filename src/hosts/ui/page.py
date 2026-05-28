@@ -157,6 +157,8 @@ class HostsPage(BasePage):
         self._state_load_runtime = OneShotWorkerRuntime()
         self._state_load_pending = {"show_access_errors": False, "update_status": False}
         self._state_load_request_context = {"show_access_errors": False, "update_status": False}
+        self._open_file_runtime = OneShotWorkerRuntime()
+        self._open_file_pending = False
         self._applying = False
         self._cleanup_in_progress = False
         self._runtime_cache = create_runtime_cache()
@@ -815,13 +817,45 @@ class HostsPage(BasePage):
         self._run_operation('clear_all')
 
     def _open_hosts_file(self):
-        result = self._controller.open_hosts_file()
+        self._request_open_hosts_file()
+
+    def create_open_hosts_file_worker(self, request_id: int):
+        return self._controller.create_open_hosts_file_worker(request_id, self)
+
+    def _request_open_hosts_file(self) -> None:
+        if self._open_file_runtime.is_running():
+            self._open_file_pending = True
+            return
+        self._open_file_pending = False
+        self._open_file_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: self.create_open_hosts_file_worker(request_id),
+            on_loaded=self._on_open_hosts_file_finished,
+            on_failed=self._on_open_hosts_file_failed,
+            on_finished=self._on_open_hosts_file_worker_finished,
+        )
+
+    def _on_open_hosts_file_finished(self, request_id: int, result) -> None:
+        if not self._open_file_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
+            return
         if result.success:
             return
+        self._show_open_hosts_file_error(str(getattr(result, "message", "") or getattr(result, "error", "")))
+
+    def _on_open_hosts_file_failed(self, request_id: int, error: str) -> None:
+        if not self._open_file_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
+            return
+        self._show_open_hosts_file_error(str(error))
+
+    def _on_open_hosts_file_worker_finished(self, _worker) -> None:
+        if self._open_file_pending and not self._cleanup_in_progress:
+            self._open_file_pending = False
+            self._request_open_hosts_file()
+
+    def _show_open_hosts_file_error(self, error: str) -> None:
         if InfoBar:
             InfoBar.warning(
                 title=self._tr("page.hosts.open.error.title", "Ошибка"),
-                content=self._tr("page.hosts.open.error.content", "Не удалось открыть: {error}", error=result.message),
+                content=self._tr("page.hosts.open.error.content", "Не удалось открыть: {error}", error=error),
                 parent=self.window(),
             )
 
@@ -1078,6 +1112,11 @@ class HostsPage(BasePage):
                 blocking=True,
                 log_fn=log,
                 warning_prefix="Hosts state load worker",
+            )
+            self._open_file_runtime.stop(
+                blocking=True,
+                log_fn=log,
+                warning_prefix="Hosts open file worker",
             )
         except Exception as e:
             log(f"Ошибка при очистке hosts_page: {e}", "DEBUG")
