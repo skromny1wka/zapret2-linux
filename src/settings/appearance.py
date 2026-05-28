@@ -101,6 +101,12 @@ _warmed_ui_language_lock = threading.Lock()
 _warmed_ui_language_cache: str | None = None
 _warmed_rkn_background_lock = threading.Lock()
 _warmed_rkn_background_cache: str | None = None
+_warmed_background_preset_lock = threading.Lock()
+_warmed_background_preset_cache: str | None = None
+_warmed_mica_enabled_lock = threading.Lock()
+_warmed_mica_enabled_cache: bool | None = None
+_warmed_window_opacity_lock = threading.Lock()
+_warmed_window_opacity_cache: int | None = None
 
 
 def store_warmed_ui_language(language: str | None) -> None:
@@ -138,11 +144,76 @@ def clear_warmed_rkn_background_cache() -> None:
         _warmed_rkn_background_cache = None
 
 
+def store_warmed_background_preset(preset: str | None) -> None:
+    global _warmed_background_preset_cache
+    default = str(schema.default_appearance()["background_preset"])
+    normalized = str(preset or default).strip() or default
+    if normalized not in schema.VALID_BACKGROUND_PRESETS:
+        normalized = default
+    with _warmed_background_preset_lock:
+        _warmed_background_preset_cache = normalized
+
+
+def peek_warmed_background_preset() -> str | None:
+    with _warmed_background_preset_lock:
+        return _warmed_background_preset_cache
+
+
+def clear_warmed_background_preset_cache() -> None:
+    global _warmed_background_preset_cache
+    with _warmed_background_preset_lock:
+        _warmed_background_preset_cache = None
+
+
+def store_warmed_mica_enabled(enabled: bool | None) -> None:
+    global _warmed_mica_enabled_cache
+    normalized = bool(schema.default_appearance()["mica_enabled"]) if enabled is None else bool(enabled)
+    with _warmed_mica_enabled_lock:
+        _warmed_mica_enabled_cache = normalized
+
+
+def peek_warmed_mica_enabled() -> bool | None:
+    with _warmed_mica_enabled_lock:
+        return _warmed_mica_enabled_cache
+
+
+def clear_warmed_mica_enabled_cache() -> None:
+    global _warmed_mica_enabled_cache
+    with _warmed_mica_enabled_lock:
+        _warmed_mica_enabled_cache = None
+
+
+def store_warmed_window_opacity(value: int | None) -> None:
+    global _warmed_window_opacity_cache
+    default = int(schema.default_window()["opacity"])
+    try:
+        normalized = int(default if value is None else value)
+    except Exception:
+        normalized = default
+    normalized = max(0, min(100, normalized))
+    with _warmed_window_opacity_lock:
+        _warmed_window_opacity_cache = normalized
+
+
+def peek_warmed_window_opacity() -> int | None:
+    with _warmed_window_opacity_lock:
+        return _warmed_window_opacity_cache
+
+
+def clear_warmed_window_opacity_cache() -> None:
+    global _warmed_window_opacity_cache
+    with _warmed_window_opacity_lock:
+        _warmed_window_opacity_cache = None
+
+
 def store_warmed_page_initial_state(state: AppearancePageInitialStatePlan) -> None:
     global _warmed_page_initial_state_cache
     with _warmed_page_initial_state_lock:
         _warmed_page_initial_state_cache = state
     store_warmed_ui_language(state.ui_language)
+    store_warmed_background_preset(state.background_preset)
+    store_warmed_mica_enabled(state.mica_enabled)
+    store_warmed_window_opacity(state.window_opacity)
     store_warmed_rkn_background(state.rkn_background)
 
 
@@ -302,6 +373,7 @@ def save_background_preset(preset: str) -> AppearanceBackgroundPresetPlan:
         set_background_preset(normalized)
     except Exception:
         pass
+    store_warmed_background_preset(normalized)
     return AppearanceBackgroundPresetPlan(preset=normalized)
 
 def load_mica_enabled() -> AppearanceMicaPlan:
@@ -320,6 +392,7 @@ def save_mica_enabled(enabled: bool) -> AppearanceMicaPlan:
         set_mica_enabled(bool(enabled))
     except Exception:
         pass
+    store_warmed_mica_enabled(bool(enabled))
     return AppearanceMicaPlan(enabled=bool(enabled))
 
 def load_window_opacity() -> AppearanceOpacityPlan:
@@ -339,6 +412,7 @@ def save_window_opacity(value: int) -> AppearanceOpacityPlan:
         set_window_opacity(normalized)
     except Exception:
         pass
+    store_warmed_window_opacity(normalized)
     return AppearanceOpacityPlan(value=normalized)
 
 def load_animations_enabled() -> AppearanceTogglePlan:

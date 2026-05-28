@@ -14,9 +14,21 @@ def build_initial_ui_state() -> AppUiState:
         appearance = settings.get("appearance") if isinstance(settings, dict) else {}
         if not isinstance(appearance, dict):
             appearance = {}
-        from settings.appearance import store_warmed_rkn_background, store_warmed_ui_language
+        window = settings.get("window") if isinstance(settings, dict) else {}
+        if not isinstance(window, dict):
+            window = {}
+        from settings.appearance import (
+            store_warmed_background_preset,
+            store_warmed_mica_enabled,
+            store_warmed_rkn_background,
+            store_warmed_ui_language,
+            store_warmed_window_opacity,
+        )
 
         store_warmed_ui_language(appearance.get("ui_language"))
+        store_warmed_background_preset(appearance.get("background_preset"))
+        store_warmed_mica_enabled(appearance.get("mica_enabled"))
+        store_warmed_window_opacity(window.get("opacity"))
         store_warmed_rkn_background(appearance.get("rkn_background"))
         program = settings.get("program") if isinstance(settings, dict) else {}
         if not isinstance(program, dict):

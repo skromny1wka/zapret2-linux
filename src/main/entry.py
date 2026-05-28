@@ -58,10 +58,10 @@ def _install_post_startup_tasks_after_interactive(window, deps) -> None:
 
 def _configure_window_appearance(window, appearance_actions) -> None:
     try:
-        from settings.appearance import load_background_preset
+        from settings.appearance import peek_warmed_background_preset
         from ui.theme import apply_window_background
 
-        background_preset = load_background_preset().preset
+        background_preset = peek_warmed_background_preset() or "standard"
         apply_window_background(window, preset=background_preset)
     except Exception:
         pass
@@ -75,10 +75,10 @@ def _configure_window_appearance(window, appearance_actions) -> None:
         pass
 
     try:
-        from settings.appearance import load_window_opacity
+        from settings.appearance import peek_warmed_window_opacity
 
-        opacity = load_window_opacity().value
-        if opacity != 100:
+        opacity = peek_warmed_window_opacity()
+        if opacity is not None and opacity != 100:
             appearance_actions.set_window_opacity(opacity)
     except Exception:
         pass

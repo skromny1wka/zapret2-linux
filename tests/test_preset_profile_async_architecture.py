@@ -90,6 +90,8 @@ import diagnostics.ui.runtime_helpers as diagnostics_runtime_helpers
 from app.feature_facades.diagnostics import DiagnosticsFeature
 import ui.navigation.text_sync as navigation_text_sync
 import ui.theme as ui_theme
+import ui.window_appearance_state as window_appearance_state
+import main.entry as main_entry
 from app.page_names import PageName
 from ui.widgets.win11_controls import Win11RadioOption
 from ui.page_host import WindowPageHost
@@ -665,6 +667,19 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("load_rkn_background", apply_source)
         self.assertNotIn("get_rkn_background_options", resolve_source)
         self.assertIn("_RKN_BG_PREFERRED", resolve_source)
+
+    def test_window_appearance_uses_warmed_state_without_settings_reads(self) -> None:
+        background_source = inspect.getsource(ui_theme.apply_window_background)
+        opacity_source = inspect.getsource(window_appearance_state.apply_window_opacity_value)
+        startup_source = inspect.getsource(main_entry._configure_window_appearance)
+
+        combined = "\n".join((background_source, opacity_source, startup_source))
+        self.assertIn("peek_warmed_background_preset", combined)
+        self.assertIn("peek_warmed_mica_enabled", combined)
+        self.assertIn("peek_warmed_window_opacity", combined)
+        self.assertNotIn("load_background_preset", combined)
+        self.assertNotIn("load_mica_enabled", combined)
+        self.assertNotIn("load_window_opacity", combined)
 
     def test_appearance_windows_accent_loads_through_worker(self) -> None:
         self.assertTrue(hasattr(appearance_workers, "AppearanceWindowsAccentLoadWorker"))

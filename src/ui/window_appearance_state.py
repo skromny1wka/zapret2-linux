@@ -95,16 +95,16 @@ def apply_snowflakes_enabled(window, enabled: bool) -> None:
 
 def apply_window_opacity_value(window, value: int) -> None:
     """Применяет готовое значение прозрачности к окну."""
-    from settings.appearance import load_background_preset
+    from settings.appearance import peek_warmed_background_preset, peek_warmed_mica_enabled
 
-    if load_background_preset().preset != "standard":
+    if (peek_warmed_background_preset() or "standard") != "standard":
         log("Transparent effect проигнорирован (не standard пресет)", "DEBUG")
         return
 
-    from settings.appearance import load_mica_enabled
     from ui.theme import apply_aero_effect, apply_window_background
 
-    if load_mica_enabled().enabled:
+    mica_enabled = peek_warmed_mica_enabled()
+    if mica_enabled is None or bool(mica_enabled):
         apply_aero_effect(window, value)
     else:
         apply_window_background(window)

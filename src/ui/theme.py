@@ -391,14 +391,15 @@ def apply_window_background(window, theme_name: str | None = None, preset: str |
     # Determine preset
     if preset is None:
         try:
-            from settings.appearance import load_background_preset
-            preset = load_background_preset().preset
+            from settings.appearance import peek_warmed_background_preset
+            preset = peek_warmed_background_preset() or "standard"
         except Exception:
             preset = "standard"
 
     try:
-        from settings.appearance import load_mica_enabled
-        mica_enabled = bool(load_mica_enabled().enabled)
+        from settings.appearance import peek_warmed_mica_enabled
+        mica_saved = peek_warmed_mica_enabled()
+        mica_enabled = True if mica_saved is None else bool(mica_saved)
     except Exception:
         mica_enabled = True
 
@@ -472,8 +473,10 @@ def apply_window_background(window, theme_name: str | None = None, preset: str |
             # Apply tint overlay based on current slider value (0%=pure Mica, 100%=heavy tint)
             if hasattr(window, 'set_tint_overlay'):
                 try:
-                    from settings.appearance import load_window_opacity
-                    opacity_pct = load_window_opacity().value
+                    from settings.appearance import peek_warmed_window_opacity
+                    opacity_pct = peek_warmed_window_opacity()
+                    if opacity_pct is None:
+                        opacity_pct = 0
                 except Exception:
                     opacity_pct = 0
                 r, g, b, overlay_alpha = _compute_tint_color(opacity_pct)
@@ -505,8 +508,10 @@ def apply_window_background(window, theme_name: str | None = None, preset: str |
 
         # Non-standard fallback path.
         try:
-            from settings.appearance import load_window_opacity
-            opacity_pct = load_window_opacity().value
+            from settings.appearance import peek_warmed_window_opacity
+            opacity_pct = peek_warmed_window_opacity()
+            if opacity_pct is None:
+                opacity_pct = 100
         except Exception:
             opacity_pct = 100
 
