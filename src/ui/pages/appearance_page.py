@@ -136,6 +136,8 @@ class AppearancePage(BasePage):
         self._rkn_background_options_worker = None
         self._rkn_background_options_request_id = 0
         self._rkn_background_options_pending = False
+        self._windows_accent_load_worker = None
+        self._windows_accent_load_request_id = 0
         self._build_ui()
         self.bind_ui_state_store(ui_state_store)
 
@@ -1113,17 +1115,58 @@ class AppearancePage(BasePage):
         enabled = bool(state) if isinstance(state, bool) else state == Qt.CheckState.Checked.value
         self._request_appearance_save("follow_windows_accent", enabled)
         if enabled:
-            self._apply_windows_accent()
+            self._request_windows_accent_load()
             if self._color_picker_btn is not None:
                 self._color_picker_btn.setEnabled(False)
         else:
             if self._color_picker_btn is not None:
                 self._color_picker_btn.setEnabled(True)
 
-    def _apply_windows_accent(self):
-        """Читает системный акцент Windows и применяет его."""
+    def create_windows_accent_load_worker(self, request_id: int):
+        from settings.appearance_workers import AppearanceWindowsAccentLoadWorker
+
+        return AppearanceWindowsAccentLoadWorker(request_id, parent=self)
+
+    def _request_windows_accent_load(self) -> None:
+        if self._cleanup_in_progress:
+            return
+        worker = self.__dict__.get("_windows_accent_load_worker")
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    return
+            except Exception:
+                return
+        self._start_windows_accent_load_worker()
+
+    def _start_windows_accent_load_worker(self) -> None:
+        self._windows_accent_load_request_id += 1
+        request_id = self._windows_accent_load_request_id
+        worker = self.create_windows_accent_load_worker(request_id)
+        self._windows_accent_load_worker = worker
+        worker.loaded.connect(self._on_windows_accent_loaded)
+        worker.failed.connect(self._on_windows_accent_failed)
+        worker.finished.connect(lambda w=worker: self._on_windows_accent_worker_finished(w))
+        worker.start()
+
+    def _on_windows_accent_loaded(self, request_id: int, plan) -> None:
+        if request_id != self._windows_accent_load_request_id or self._cleanup_in_progress:
+            return
+        self._apply_windows_accent(plan)
+
+    def _on_windows_accent_failed(self, request_id: int, error: str) -> None:
+        if request_id != self._windows_accent_load_request_id or self._cleanup_in_progress:
+            return
+        log(f"Ошибка загрузки системного акцента Windows: {error}", "WARNING")
+
+    def _on_windows_accent_worker_finished(self, worker) -> None:
+        if self.__dict__.get("_windows_accent_load_worker") is worker:
+            self._windows_accent_load_worker = None
+        worker.deleteLater()
+
+    def _apply_windows_accent(self, plan):
+        """Применяет уже загруженный системный акцент Windows."""
         try:
-            plan = appearance_settings.load_windows_system_accent()
             hex_color = plan.hex_color
             if hex_color:
                 color = QColor(hex_color)
@@ -1313,5 +1356,12 @@ class AppearancePage(BasePage):
             except Exception:
                 pass
             self._rkn_background_options_worker = None
+        windows_accent_worker = self.__dict__.get("_windows_accent_load_worker")
+        if windows_accent_worker is not None:
+            try:
+                windows_accent_worker.quit()
+            except Exception:
+                pass
+            self._windows_accent_load_worker = None
         self._ui_state_unsubscribe = None
         self._ui_state_store = None

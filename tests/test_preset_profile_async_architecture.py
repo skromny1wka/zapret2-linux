@@ -653,6 +653,19 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("load_rkn_background", worker_source)
         self.assertIn("get_rkn_background_options", worker_source)
 
+    def test_appearance_windows_accent_loads_through_worker(self) -> None:
+        self.assertTrue(hasattr(appearance_workers, "AppearanceWindowsAccentLoadWorker"))
+        worker_source = inspect.getsource(appearance_workers.AppearanceWindowsAccentLoadWorker.run)
+        page_source = inspect.getsource(AppearancePage)
+        handler_source = inspect.getsource(AppearancePage._on_follow_windows_accent_changed)
+        apply_source = inspect.getsource(AppearancePage._apply_windows_accent)
+
+        self.assertIn("load_windows_system_accent", worker_source)
+        self.assertIn("create_windows_accent_load_worker", page_source)
+        self.assertIn("_windows_accent_load_worker", page_source)
+        self.assertIn("_request_windows_accent_load", handler_source)
+        self.assertNotIn("load_windows_system_accent", apply_source)
+
     def test_premium_navigation_does_not_read_device_info_during_language_refresh(self) -> None:
         language_source = inspect.getsource(premium_page_lifecycle.apply_premium_language)
 

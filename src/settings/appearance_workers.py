@@ -121,3 +121,25 @@ class AppearanceRknBackgroundOptionsLoadWorker(QThread):
             self.failed.emit(self._request_id, str(exc))
             return
         self.loaded.emit(self._request_id, result)
+
+
+class AppearanceWindowsAccentLoadWorker(QThread):
+    """Читает системный акцент Windows вне UI-потока."""
+
+    loaded = pyqtSignal(int, object)
+    failed = pyqtSignal(int, str)
+
+    def __init__(self, request_id: int, parent=None):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+
+    def run(self) -> None:
+        try:
+            import settings.appearance as appearance_settings
+
+            result = appearance_settings.load_windows_system_accent()
+        except Exception as exc:
+            log(f"AppearanceWindowsAccentLoadWorker: не удалось загрузить системный акцент: {exc}", "WARNING")
+            self.failed.emit(self._request_id, str(exc))
+            return
+        self.loaded.emit(self._request_id, result)
