@@ -58,3 +58,44 @@ class BlockcheckSupportPrepareWorker(QThread):
             self.failed.emit(self._request_id, str(exc))
             return
         self.completed.emit(self._request_id, result)
+
+
+class StrategyScanSupportPrepareWorker(QThread):
+    completed = pyqtSignal(int, object)
+    failed = pyqtSignal(int, str)
+
+    def __init__(
+        self,
+        request_id: int,
+        *,
+        run_log_file,
+        target: str,
+        protocol_label: str,
+        mode_label: str,
+        scan_protocol: str,
+        parent=None,
+    ):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self._run_log_file = run_log_file
+        self._target = str(target or "")
+        self._protocol_label = str(protocol_label or "")
+        self._mode_label = str(mode_label or "")
+        self._scan_protocol = str(scan_protocol or "")
+
+    def run(self) -> None:
+        try:
+            from blockcheck.strategy_scan_logs import prepare_support
+
+            result = prepare_support(
+                run_log_file=self._run_log_file,
+                target=self._target,
+                protocol_label=self._protocol_label,
+                mode_label=self._mode_label,
+                scan_protocol=self._scan_protocol,
+            )
+        except Exception as exc:
+            log(f"StrategyScanSupportPrepareWorker: не удалось подготовить обращение: {exc}", "WARNING")
+            self.failed.emit(self._request_id, str(exc))
+            return
+        self.completed.emit(self._request_id, result)

@@ -35,7 +35,6 @@ from blockcheck.strategy_scan_run_workflow import (
 from blockcheck.ui.strategy_scan_page_runtime_helpers import (
     apply_language_plan_ui,
     apply_log_expand_state,
-    prepare_strategy_scan_support,
     set_support_status,
 )
 from ui.popup_menu import exec_popup_menu
@@ -100,6 +99,8 @@ class StrategyScanPage(BasePage):
         self._cleanup_in_progress = False
         self._strategy_apply_worker = None
         self._strategy_apply_request_id = 0
+        self._support_prepare_worker = None
+        self._support_prepare_request_id = 0
 
         self._build_ui()
         if self._embedded:
@@ -114,6 +115,26 @@ class StrategyScanPage(BasePage):
                 self.vBoxLayout.setContentsMargins(0, 8, 0, 0)
             except Exception:
                 pass
+
+    def create_support_prepare_worker(
+        self,
+        request_id: int,
+        *,
+        run_log_file,
+        target: str,
+        protocol_label: str,
+        mode_label: str,
+        scan_protocol: str,
+    ):
+        return self._blockcheck.create_strategy_scan_support_prepare_worker(
+            request_id,
+            run_log_file=run_log_file,
+            target=target,
+            protocol_label=protocol_label,
+            mode_label=mode_label,
+            scan_protocol=scan_protocol,
+            parent=self,
+        )
 
     # ------------------------------------------------------------------
     # UI construction
@@ -613,10 +634,9 @@ class StrategyScanPage(BasePage):
         set_support_status(self._support_status_label, text)
 
     def _prepare_support_from_strategy_scan(self) -> None:
-        prepare_strategy_scan_support(
-            blockcheck_feature=self._blockcheck,
-            cleanup_in_progress=self._cleanup_in_progress,
-            run_log_file=self._run_log_file,
+        if self._cleanup_in_progress:
+            return
+        support_context = self._blockcheck.build_support_context(
             stored_scan_protocol=self._scan_protocol,
             stored_scan_target=self._scan_target,
             raw_protocol_value=self._protocol_combo.currentData() if self._protocol_combo is not None else None,
@@ -624,9 +644,96 @@ class StrategyScanPage(BasePage):
             raw_protocol_label=self._protocol_combo.currentText() if self._protocol_combo is not None else "",
             raw_mode_label=self._mode_combo.currentText() if self._mode_combo is not None else "",
             stored_mode=self._scan_mode,
-            parent_widget=self.window(),
-            support_status_label=self._support_status_label,
         )
+        self._request_support_prepare(
+            run_log_file=self._run_log_file,
+            target=support_context.target,
+            protocol_label=support_context.protocol_label,
+            mode_label=support_context.mode_label,
+            scan_protocol=support_context.scan_protocol,
+        )
+
+    def _request_support_prepare(
+        self,
+        *,
+        run_log_file,
+        target: str,
+        protocol_label: str,
+        mode_label: str,
+        scan_protocol: str,
+    ) -> None:
+        worker = self.__dict__.get("_support_prepare_worker")
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    self._set_support_status("Подготовка уже идёт...")
+                    return
+            except Exception:
+                return
+
+        self._support_prepare_request_id += 1
+        request_id = self._support_prepare_request_id
+        self._set_support_status("Подготовка обращения...")
+        if self._prepare_support_btn is not None:
+            self._prepare_support_btn.setEnabled(False)
+
+        worker = self.create_support_prepare_worker(
+            request_id,
+            run_log_file=run_log_file,
+            target=target,
+            protocol_label=protocol_label,
+            mode_label=mode_label,
+            scan_protocol=scan_protocol,
+        )
+        self._support_prepare_worker = worker
+        worker.completed.connect(self._on_support_prepare_finished)
+        worker.failed.connect(self._on_support_prepare_failed)
+        worker.finished.connect(lambda w=worker: self._on_support_prepare_worker_finished(w))
+        worker.start()
+
+    def _on_support_prepare_finished(self, request_id: int, feedback) -> None:
+        if request_id != self._support_prepare_request_id or self._cleanup_in_progress:
+            return
+        result = feedback.result
+        if result.zip_path:
+            logger.info("Prepared Strategy Scan support archive: %s", result.zip_path)
+
+        message_plan = self._blockcheck.build_support_success_plan(feedback)
+        self._set_support_status(message_plan.status_text)
+
+        try:
+            InfoBarHelper.success(
+                self.window(),
+                tr_catalog(message_plan.title_key, default=message_plan.title_default),
+                message_plan.body_text,
+            )
+        except Exception:
+            pass
+
+    def _on_support_prepare_failed(self, request_id: int, error: str) -> None:
+        if request_id != self._support_prepare_request_id or self._cleanup_in_progress:
+            return
+        logger.warning("Failed to prepare strategy-scan support bundle: %s", error)
+        message_plan = self._blockcheck.build_support_error_plan(str(error))
+        self._set_support_status(message_plan.status_text)
+        try:
+            InfoBarHelper.warning(
+                self.window(),
+                tr_catalog(message_plan.title_key, default=message_plan.title_default),
+                message_plan.body_text,
+            )
+        except Exception:
+            pass
+
+    def _on_support_prepare_worker_finished(self, worker) -> None:
+        if self.__dict__.get("_support_prepare_worker") is worker:
+            self._support_prepare_worker = None
+        try:
+            worker.deleteLater()
+        except Exception:
+            pass
+        if not self._cleanup_in_progress and self._prepare_support_btn is not None:
+            self._prepare_support_btn.setEnabled(True)
 
     # ------------------------------------------------------------------
     # Language
@@ -649,4 +756,11 @@ class StrategyScanPage(BasePage):
             except Exception:
                 pass
             self._strategy_apply_worker = None
+        support_worker = self.__dict__.get("_support_prepare_worker")
+        if support_worker is not None:
+            try:
+                support_worker.quit()
+            except Exception:
+                pass
+            self._support_prepare_worker = None
         self._worker = cleanup_strategy_scan_worker(self._worker)

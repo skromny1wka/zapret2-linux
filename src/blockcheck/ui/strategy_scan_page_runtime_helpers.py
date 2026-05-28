@@ -2,13 +2,8 @@
 
 from __future__ import annotations
 
-import logging
-
-from ui.fluent_widgets import InfoBarHelper, set_tooltip
+from ui.fluent_widgets import set_tooltip
 from app.ui_texts import tr as tr_catalog
-
-
-logger = logging.getLogger(__name__)
 
 
 def apply_log_expand_state(
@@ -104,68 +99,3 @@ def set_support_status(label, text: str) -> None:
     if label is None:
         return
     label.setText(str(text or "").strip())
-
-
-def prepare_strategy_scan_support(
-    *,
-    blockcheck_feature,
-    cleanup_in_progress: bool,
-    run_log_file,
-    stored_scan_protocol: str,
-    stored_scan_target: str,
-    raw_protocol_value,
-    raw_target_input: str,
-    raw_protocol_label: str,
-    raw_mode_label: str,
-    stored_mode: str,
-    parent_widget,
-    support_status_label,
-) -> None:
-    if cleanup_in_progress:
-        return
-
-    support_context = blockcheck_feature.build_support_context(
-        stored_scan_protocol=stored_scan_protocol,
-        stored_scan_target=stored_scan_target,
-        raw_protocol_value=raw_protocol_value,
-        raw_target_input=raw_target_input,
-        raw_protocol_label=raw_protocol_label,
-        raw_mode_label=raw_mode_label,
-        stored_mode=stored_mode,
-    )
-
-    try:
-        feedback = blockcheck_feature.prepare_support(
-            run_log_file=run_log_file,
-            target=support_context.target,
-            protocol_label=support_context.protocol_label,
-            mode_label=support_context.mode_label,
-            scan_protocol=support_context.scan_protocol,
-        )
-        result = feedback.result
-        if result.zip_path:
-            logger.info("Prepared Strategy Scan support archive: %s", result.zip_path)
-
-        message_plan = blockcheck_feature.build_support_success_plan(feedback)
-        set_support_status(support_status_label, message_plan.status_text)
-
-        try:
-            InfoBarHelper.success(
-                parent_widget,
-                tr_catalog(message_plan.title_key, default=message_plan.title_default),
-                message_plan.body_text,
-            )
-        except Exception:
-            pass
-    except Exception as exc:
-        logger.warning("Failed to prepare strategy-scan support bundle: %s", exc)
-        message_plan = blockcheck_feature.build_support_error_plan(str(exc))
-        set_support_status(support_status_label, message_plan.status_text)
-        try:
-            InfoBarHelper.warning(
-                parent_widget,
-                tr_catalog(message_plan.title_key, default=message_plan.title_default),
-                message_plan.body_text,
-            )
-        except Exception:
-            pass
