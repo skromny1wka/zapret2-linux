@@ -15,9 +15,9 @@ class BlockcheckInitialStateWorker(QThread):
 
     def run(self) -> None:
         try:
-            from blockcheck.page_runtime import load_page_initial_state
+            import blockcheck.commands as blockcheck_commands
 
-            result = load_page_initial_state()
+            result = blockcheck_commands.load_page_initial_state()
         except Exception as exc:
             log(f"BlockcheckInitialStateWorker: не удалось загрузить начальное состояние: {exc}", "WARNING")
             self.failed.emit(self._request_id, str(exc))
@@ -46,9 +46,9 @@ class BlockcheckSupportPrepareWorker(QThread):
 
     def run(self) -> None:
         try:
-            from blockcheck.page_runtime import prepare_support
+            import blockcheck.commands as blockcheck_commands
 
-            result = prepare_support(
+            result = blockcheck_commands.prepare_support(
                 run_log_file=self._run_log_file,
                 mode_label=self._mode_label,
                 extra_domains=self._extra_domains,
@@ -71,17 +71,11 @@ class BlockcheckUserDomainActionWorker(QThread):
         self._domain = str(domain or "").strip()
 
     def run(self) -> None:
-        import blockcheck.page_runtime as blockcheck_page_runtime
+        import blockcheck.commands as blockcheck_commands
 
         context = {"domain": self._domain}
         try:
-            if self._action == "add":
-                result = blockcheck_page_runtime.add_user_domain(self._domain)
-            elif self._action == "remove":
-                blockcheck_page_runtime.remove_user_domain(self._domain)
-                result = self._domain
-            else:
-                raise ValueError(f"Неизвестное действие домена BlockCheck: {self._action}")
+            result = blockcheck_commands.run_user_domain_action(self._action, self._domain)
         except Exception as exc:
             log(f"BlockcheckUserDomainActionWorker: не удалось выполнить {self._action}: {exc}", "WARNING")
             self.failed.emit(self._request_id, self._action, str(exc), context)

@@ -21,12 +21,6 @@ class BlockcheckFeature:
 
         return blockcheck_worker_commands
 
-    @staticmethod
-    def _page_runtime():
-        import blockcheck.page_runtime as blockcheck_page_runtime
-
-        return blockcheck_page_runtime
-
     def create_blockcheck_worker(self, **kwargs):
         return self._worker_commands().create_blockcheck_worker(**kwargs)
 

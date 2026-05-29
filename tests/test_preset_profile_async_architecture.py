@@ -2226,6 +2226,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("create_initial_state_worker", page_source)
         self.assertIn("create_page_initial_state_worker", feature_source)
         self.assertNotIn("def load_page_initial_state", feature_source)
+        self.assertIn("blockcheck.commands", worker_source)
+        self.assertNotIn("blockcheck.page_runtime", worker_source)
         self.assertIn("load_page_initial_state", worker_source)
 
     def test_blockcheck_initial_state_plan_reads_settings_once(self) -> None:
@@ -2282,8 +2284,21 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("create_support_prepare_worker", page_source)
         self.assertIn("_support_prepare_worker", page_source)
         self.assertIn("create_blockcheck_support_prepare_worker", feature_source)
-        self.assertIn("blockcheck.page_runtime", worker_source)
+        self.assertIn("blockcheck.commands", worker_source)
+        self.assertNotIn("blockcheck.page_runtime", worker_source)
         self.assertIn("prepare_support", worker_source)
+
+    def test_blockcheck_user_domain_actions_run_through_commands(self) -> None:
+        blockcheck_workers = importlib.import_module("blockcheck.workers")
+        page_source = inspect.getsource(BlockcheckPage)
+        feature_source = inspect.getsource(BlockcheckFeature)
+        worker_source = inspect.getsource(blockcheck_workers.BlockcheckUserDomainActionWorker.run)
+
+        self.assertIn("create_user_domain_action_worker", page_source)
+        self.assertIn("create_user_domain_action_worker", feature_source)
+        self.assertIn("blockcheck.commands", worker_source)
+        self.assertNotIn("blockcheck.page_runtime", worker_source)
+        self.assertIn("run_user_domain_action", worker_source)
 
     def test_strategy_scan_support_bundle_prepares_through_worker(self) -> None:
         blockcheck_workers = importlib.import_module("blockcheck.workers")
