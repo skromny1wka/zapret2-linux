@@ -2647,6 +2647,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
         self.assertTrue(hasattr(retry_workers, "UpdaterServerRetryWithoutDpiWorker"))
         worker_source = inspect.getsource(retry_workers.UpdaterServerRetryWithoutDpiWorker.run)
+        command_source = inspect.getsource(importlib.import_module("updater.commands").retry_server_check_without_dpi)
 
         self.assertIn("_request_server_retry_without_dpi", retry_source)
         self.assertNotIn("shutdown_sync", retry_source)
@@ -2654,8 +2655,12 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_server_retry_without_dpi_runtime", runtime_source)
         self.assertIn("create_server_retry_without_dpi_worker", runtime_source)
         self.assertIn("_teardown_server_retry_without_dpi_worker", runtime_source)
-        self.assertIn("is_any_running", worker_source)
-        self.assertIn("shutdown_sync", worker_source)
+        self.assertIn("updater.commands", worker_source)
+        self.assertIn("retry_server_check_without_dpi", worker_source)
+        self.assertNotIn("is_any_running", worker_source)
+        self.assertNotIn("shutdown_sync", worker_source)
+        self.assertIn("is_any_running", command_source)
+        self.assertIn("shutdown_sync", command_source)
 
     def test_updater_dpi_restart_runs_through_worker(self) -> None:
         retry_workers = importlib.import_module("updater.retry_workers")
@@ -2666,6 +2671,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
         self.assertTrue(hasattr(retry_workers, "UpdaterDpiRestartWorker"))
         worker_source = inspect.getsource(retry_workers.UpdaterDpiRestartWorker.run)
+        command_source = inspect.getsource(importlib.import_module("updater.commands").restart_dpi_after_update)
 
         self.assertIn("_request_dpi_restart", restart_source)
         self.assertNotIn(".restart(", restart_source)
@@ -2673,8 +2679,12 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_dpi_restart_runtime", runtime_source)
         self.assertIn("create_dpi_restart_worker", runtime_source)
         self.assertIn("_teardown_dpi_restart_worker", runtime_source)
-        self.assertIn("is_available", worker_source)
-        self.assertIn("restart", worker_source)
+        self.assertIn("updater.commands", worker_source)
+        self.assertIn("restart_dpi_after_update", worker_source)
+        self.assertNotIn(".is_available(", worker_source)
+        self.assertNotIn(".restart(", worker_source)
+        self.assertIn("is_available", command_source)
+        self.assertIn("restart", command_source)
 
     def test_logs_cleanup_stops_overview_worker(self) -> None:
         cleanup_source = inspect.getsource(LogsPage.cleanup)
