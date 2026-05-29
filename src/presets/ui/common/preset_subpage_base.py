@@ -98,13 +98,18 @@ def apply_runtime_toggle_button_plan(
     icon_factory=_fluent_icon,
 ) -> bool:
     enabled = bool(plan.enabled and runtime_available)
-    plan_key = (plan.text, plan.icon_name, bool(plan.should_stop), enabled)
+    visual_key = (plan.text, plan.icon_name, bool(plan.should_stop))
+    plan_key = (*visual_key, enabled)
     if getattr(button, "_last_runtime_toggle_button_plan_key", None) == plan_key:
         return plan.should_stop
     setattr(button, "_last_runtime_toggle_button_plan_key", plan_key)
-    button.setText(plan.text)
-    button.setIcon(icon_factory(plan.icon_name))
-    button.setEnabled(enabled)
+    if getattr(button, "_last_runtime_toggle_button_visual_key", None) != visual_key:
+        setattr(button, "_last_runtime_toggle_button_visual_key", visual_key)
+        button.setText(plan.text)
+        button.setIcon(icon_factory(plan.icon_name))
+    if getattr(button, "_last_runtime_toggle_button_enabled", None) != enabled:
+        setattr(button, "_last_runtime_toggle_button_enabled", enabled)
+        button.setEnabled(enabled)
     return plan.should_stop
 
 

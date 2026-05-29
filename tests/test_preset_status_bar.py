@@ -504,6 +504,40 @@ class PresetStatusBarPlanTests(unittest.TestCase):
         button.setIcon.assert_not_called()
         button.setEnabled.assert_not_called()
 
+    def test_raw_editor_runtime_toggle_enabled_change_keeps_same_text_and_icon(self) -> None:
+        from presets.ui.common.preset_subpage_base import (
+            RuntimeToggleButtonPlan,
+            apply_runtime_toggle_button_plan,
+        )
+
+        button = _RuntimeToggleButton()
+        plan = RuntimeToggleButtonPlan(
+            text="Запустить",
+            icon_name="PLAY",
+            should_stop=False,
+            enabled=True,
+        )
+
+        apply_runtime_toggle_button_plan(
+            button,
+            plan,
+            runtime_available=False,
+            icon_factory=lambda name: f"icon:{name}",
+        )
+        button.setText = Mock(side_effect=AssertionError("enabled-only change must not rewrite text"))
+        button.setIcon = Mock(side_effect=AssertionError("enabled-only change must not rewrite icon"))
+
+        apply_runtime_toggle_button_plan(
+            button,
+            plan,
+            runtime_available=True,
+            icon_factory=lambda name: f"icon:{name}",
+        )
+
+        button.setText.assert_not_called()
+        button.setIcon.assert_not_called()
+        self.assertEqual(button.enabled_calls, [False, True])
+
 
 if __name__ == "__main__":
     unittest.main()
