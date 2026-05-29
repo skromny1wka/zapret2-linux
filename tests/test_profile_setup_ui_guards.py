@@ -264,6 +264,40 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         self.assertEqual(page._list_file_text.read_only_calls, [])
         self.assertEqual(page._list_file_status_label.calls, [])
 
+    def test_match_tab_payload_skips_duplicate_plain_text(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        from profile.ui.profile_setup_page import ProfileSetupPageBase, _match_tab_text
+
+        payload = SimpleNamespace(
+            item=SimpleNamespace(
+                in_preset=True,
+                strategy_id="tls_fake",
+                strategy_name="Fake TLS",
+            ),
+            strategy_entries={
+                "tls_fake": SimpleNamespace(args="--lua-desync=fake"),
+            },
+            match_summary="hostlist: youtube.txt",
+            raw_profile_text="--new\n--lua-desync=fake",
+        )
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._payload = payload
+        page._match_tab_built = True
+        page._match_text = _PlainTextWidget(_match_tab_text(payload))
+        page._raw_profile_text = _PlainTextWidget(payload.raw_profile_text, read_only=False)
+        page._raw_profile_save_button = _BoolWidget(enabled=True)
+        page._apply_feedback_buttons = Mock()
+
+        ProfileSetupPageBase._apply_match_tab_payload(page)
+
+        self.assertEqual(page._match_text.plain_text_calls, [])
+        self.assertEqual(page._raw_profile_text.plain_text_calls, [])
+        self.assertEqual(page._raw_profile_text.read_only_calls, [])
+        self.assertEqual(page._raw_profile_save_button.enabled_calls, [])
+        page._apply_feedback_buttons.assert_called_once_with(payload)
+
 
 if __name__ == "__main__":
     unittest.main()

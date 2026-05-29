@@ -1054,13 +1054,13 @@ class ProfileSetupPageBase(BasePage):
             return
         item = payload.item
         if self._match_text is not None:
-            self._match_text.setPlainText(_match_tab_text(payload))
+            set_plain_text_if_changed(self._match_text, _match_tab_text(payload))
         if self._raw_profile_text is not None:
-            self._raw_profile_text.setPlainText(str(getattr(payload, "raw_profile_text", "") or ""))
+            set_plain_text_if_changed(self._raw_profile_text, str(getattr(payload, "raw_profile_text", "") or ""))
             raw_editable = bool(getattr(item, "in_preset", False))
-            self._raw_profile_text.setReadOnly(not raw_editable)
+            set_read_only_if_changed(self._raw_profile_text, not raw_editable)
         if self._raw_profile_save_button is not None:
-            self._raw_profile_save_button.setEnabled(bool(getattr(item, "in_preset", False)))
+            set_widget_enabled_if_changed(self._raw_profile_save_button, bool(getattr(item, "in_preset", False)))
         self._apply_feedback_buttons(payload)
 
     def _request_list_file_editor_state(self) -> None:
