@@ -28,11 +28,21 @@ class Win11Spinner(QWidget):
 
     def start(self):
         """Запускает анимацию"""
+        try:
+            if self._timer.isActive():
+                return
+        except Exception:
+            pass
         self._timer.start(16)  # ~60 FPS
         self.show()
 
     def stop(self):
         """Останавливает анимацию"""
+        try:
+            if not self._timer.isActive():
+                return
+        except Exception:
+            pass
         self._timer.stop()
         self.hide()
 
