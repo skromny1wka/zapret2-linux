@@ -11,6 +11,7 @@ from .common import (
     preset_canonical_drop_target_for_next_row,
     preset_drop_marker_for_target,
     preset_drop_target_for_position,
+    set_current_index_if_changed,
 )
 from .model import PresetListModel
 from qfluentwidgets import ListView
@@ -165,14 +166,14 @@ class LinkedWheelListView(ListView):
             if index.isValid() and str(index.data(PresetListModel.KindRole) or "") == "folder":
                 folder_key = str(index.data(PresetListModel.FolderKeyRole) or "")
                 if folder_key:
-                    self.setCurrentIndex(index)
+                    set_current_index_if_changed(self, index)
                     self.folder_context_requested.emit(folder_key, self.viewport().mapToGlobal(event.position().toPoint()))
                     event.accept()
                     return
             if index.isValid() and str(index.data(PresetListModel.KindRole) or "") == "preset":
                 name = str(index.data(PresetListModel.FileNameRole) or "")
                 if name:
-                    self.setCurrentIndex(index)
+                    set_current_index_if_changed(self, index)
                     self.preset_context_requested.emit(name, self.viewport().mapToGlobal(event.position().toPoint()))
                     event.accept()
                     return

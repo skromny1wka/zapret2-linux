@@ -16,6 +16,7 @@ from .common import (
     cached_icon,
     normalize_preset_icon_color,
     pick_contrast_color,
+    set_current_index_if_changed,
     to_qcolor,
     tr_text,
 )
@@ -152,7 +153,7 @@ class PresetListDelegate(QStyledItemDelegate):
                 return False
             folder_key = str(index.data(PresetListModel.FolderKeyRole) or "")
             if folder_key:
-                self._view.setCurrentIndex(index)
+                set_current_index_if_changed(self._view, index)
                 self.action_triggered.emit("toggle_folder", folder_key)
                 return True
             return False
@@ -170,7 +171,7 @@ class PresetListDelegate(QStyledItemDelegate):
         if not item_id:
             return False
 
-        self._view.setCurrentIndex(index)
+        set_current_index_if_changed(self._view, index)
         is_active = bool(index.data(PresetListModel.ActiveRole))
         is_builtin = bool(index.data(PresetListModel.BuiltinRole))
         depth = int(index.data(PresetListModel.DepthRole) or 0)

@@ -21,6 +21,16 @@ _CSS_RGBA_COLOR_RE = re.compile(
 PRESET_DROP_MARKER_PROPERTY = "presetDropMarker"
 
 
+def set_current_index_if_changed(view, index) -> bool:
+    try:
+        if view.currentIndex() == index:
+            return False
+    except Exception:
+        pass
+    view.setCurrentIndex(index)
+    return True
+
+
 def preset_drop_marker_for_target(row: int, destination_kind: str) -> dict[str, object]:
     kind = str(destination_kind or "").strip()
     try:
