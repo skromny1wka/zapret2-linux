@@ -9,6 +9,17 @@ from PyQt6.QtCore import pyqtSignal
 from qfluentwidgets import PillPushButton
 
 
+def set_button_checked_if_changed(button, checked: bool) -> bool:
+    value = bool(checked)
+    try:
+        if bool(button.isChecked()) == value:
+            return False
+    except Exception:
+        pass
+    button.setChecked(value)
+    return True
+
+
 class _ProfileTypeButton(PillPushButton):
     """PillPushButton с привязанным ключом типа профиля."""
 
@@ -80,16 +91,16 @@ class ProfileTypeSelector(QWidget):
             if is_checked:
                 for key, btn in self._buttons.items():
                     if key != "all":
-                        btn.setChecked(False)
+                        set_button_checked_if_changed(btn, False)
             else:
                 if not self._has_other_selected():
-                    sender.setChecked(True)
+                    set_button_checked_if_changed(sender, True)
         else:
             if is_checked:
-                self._buttons["all"].setChecked(False)
+                set_button_checked_if_changed(self._buttons["all"], False)
             else:
                 if not self._has_other_selected():
-                    self._buttons["all"].setChecked(True)
+                    set_button_checked_if_changed(self._buttons["all"], True)
 
         self.profile_types_changed.emit(self.get_active_profile_types())
 
@@ -105,12 +116,12 @@ class ProfileTypeSelector(QWidget):
     def set_active_profile_types(self, profile_types: set):
         self.blockSignals(True)
         for key, btn in self._buttons.items():
-            btn.setChecked(key in profile_types)
+            set_button_checked_if_changed(btn, key in profile_types)
         if not profile_types or not self._has_other_selected():
-            self._buttons["all"].setChecked(True)
+            set_button_checked_if_changed(self._buttons["all"], True)
             for key, btn in self._buttons.items():
                 if key != "all":
-                    btn.setChecked(False)
+                    set_button_checked_if_changed(btn, False)
         self.blockSignals(False)
 
     def reset(self):
