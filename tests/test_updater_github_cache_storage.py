@@ -48,6 +48,33 @@ class UpdaterGithubCacheStorageTests(unittest.TestCase):
                 self.assertEqual(settings_data["updater"]["github_cache"], {})
                 self.assertEqual(github_cache_storage.load_github_cache(), cache_payload)
 
+    def test_materialize_settings_file_rewrites_legacy_github_cache_payload(self) -> None:
+        from settings import store as settings_store
+        from settings.schema import build_default_settings
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            settings_path = root / "settings" / "settings.json"
+            settings_path.parent.mkdir(parents=True, exist_ok=True)
+            data = build_default_settings()
+            data["updater"]["github_cache"] = {
+                "https://api.github.test/releases": {
+                    "timestamp": 123,
+                    "content": [{"body": "x" * 10_000}],
+                }
+            }
+            settings_path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+            original_size = settings_path.stat().st_size
+
+            with patch("settings.store.MAIN_DIRECTORY", str(root)):
+                materialized = settings_store.materialize_settings_file()
+
+            rewritten = json.loads(settings_path.read_text(encoding="utf-8"))
+            self.assertEqual(materialized["updater"]["github_cache"], {})
+            self.assertEqual(rewritten["updater"]["github_cache"], {})
+            self.assertNotIn("x" * 1_000, settings_path.read_text(encoding="utf-8"))
+            self.assertLess(settings_path.stat().st_size, original_size)
+
 
 if __name__ == "__main__":
     unittest.main()
