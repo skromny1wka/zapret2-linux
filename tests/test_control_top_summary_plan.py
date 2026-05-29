@@ -145,6 +145,18 @@ class ControlTopSummaryPlanTests(unittest.TestCase):
             item._details_label.setText.assert_not_called()
             item._details_label.setVisible.assert_not_called()
 
+    def test_top_summary_visibility_update_skips_duplicate_state(self) -> None:
+        from presets.ui.control.top_summary_widget import set_visible_if_changed
+
+        widget = Mock()
+        widget.isHidden.return_value = False
+
+        self.assertFalse(set_visible_if_changed(widget, True))
+        widget.setVisible.assert_not_called()
+
+        self.assertTrue(set_visible_if_changed(widget, False))
+        widget.setVisible.assert_called_once_with(False)
+
 
 if __name__ == "__main__":
     unittest.main()

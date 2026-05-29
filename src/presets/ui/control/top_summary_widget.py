@@ -9,6 +9,21 @@ from app.ui_texts import tr as tr_catalog
 from presets.ui.control.top_summary_plan import build_premium_summary, build_profiles_value
 
 
+def set_visible_if_changed(widget, visible: bool) -> bool:
+    value = bool(visible)
+    try:
+        current = not bool(widget.isHidden())
+    except Exception:
+        try:
+            current = bool(widget.isVisible())
+        except Exception:
+            current = not value
+    if current == value:
+        return False
+    widget.setVisible(value)
+    return True
+
+
 class ControlTopSummaryItem(QWidget):
     clicked = pyqtSignal()
 
@@ -67,10 +82,10 @@ class ControlTopSummaryItem(QWidget):
         self._last_texts = next_texts
         caption_text, value_text, details_text = next_texts
         self._caption_label.setText(caption_text)
-        self._caption_label.setVisible(bool(caption_text.strip()))
+        set_visible_if_changed(self._caption_label, bool(caption_text.strip()))
         self._value_label.setText(value_text)
         self._details_label.setText(details_text)
-        self._details_label.setVisible(bool(details_text.strip()))
+        set_visible_if_changed(self._details_label, bool(details_text.strip()))
 
     def mousePressEvent(self, event):  # noqa: N802
         if self._clickable and event.button() == Qt.MouseButton.LeftButton:
