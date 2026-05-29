@@ -73,6 +73,24 @@ def _install_animation_py314_compat() -> None:
                 pass
 
 
+def _connect_qfluent_accent_signal_lazy() -> None:
+    """Подписывает сброс кэша темы без раннего импорта всего ui.theme."""
+    try:
+        from qfluentwidgets.common.config import qconfig
+
+        def _invalidate_theme_cache(_color) -> None:
+            try:
+                from ui.theme import invalidate_theme_tokens_cache
+
+                invalidate_theme_tokens_cache()
+            except Exception:
+                pass
+
+        qconfig.themeColorChanged.connect(_invalidate_theme_cache)
+    except Exception:
+        pass
+
+
 def ensure_qt_runtime() -> QApplication:
     global _QT_RUNTIME_READY
 
@@ -92,14 +110,26 @@ def ensure_qt_runtime() -> QApplication:
         return app
 
     t_hooks = _time.perf_counter()
+    t_combo_guard = _time.perf_counter()
     from ui.combo_popup_guard import install_global_combo_popup_closer
 
     install_global_combo_popup_closer(app)
+    emit_startup_metric(
+        "StartupQtComboPopupGuard",
+        f"{(_time.perf_counter() - t_combo_guard) * 1000:.0f}ms",
+    )
+    t_animation = _time.perf_counter()
     _install_animation_py314_compat()
-
-    from ui.theme import connect_qfluent_accent_signal
-
-    connect_qfluent_accent_signal()
+    emit_startup_metric(
+        "StartupQtAnimationCompat",
+        f"{(_time.perf_counter() - t_animation) * 1000:.0f}ms",
+    )
+    t_accent_signal = _time.perf_counter()
+    _connect_qfluent_accent_signal_lazy()
+    emit_startup_metric(
+        "StartupQtAccentSignal",
+        f"{(_time.perf_counter() - t_accent_signal) * 1000:.0f}ms",
+    )
     emit_startup_metric(
         "StartupQtRuntimeReadyHooks",
         f"{(_time.perf_counter() - t_hooks) * 1000:.0f}ms",

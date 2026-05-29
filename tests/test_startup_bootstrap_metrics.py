@@ -16,10 +16,23 @@ class StartupBootstrapMetricsTests(unittest.TestCase):
         )
 
         self.assertIn("StartupQtRuntimeQApplication", source)
+        self.assertIn("_connect_qfluent_accent_signal_lazy", source)
+        self.assertIn("StartupQtComboPopupGuard", source)
+        self.assertIn("StartupQtAnimationCompat", source)
+        self.assertIn("StartupQtAccentSignal", source)
         self.assertIn("StartupQtRuntimeReadyHooks", source)
         self.assertIn("StartupQtCrashHandler", source)
         self.assertIn("StartupQtThemeMode", source)
         self.assertIn("StartupQtAccent", source)
+
+    def test_qt_runtime_defers_theme_module_import_for_accent_signal(self) -> None:
+        from main import qt_runtime
+
+        source = inspect.getsource(qt_runtime.ensure_qt_runtime)
+        lazy_source = inspect.getsource(qt_runtime._connect_qfluent_accent_signal_lazy)
+
+        self.assertNotIn("from ui.theme import connect_qfluent_accent_signal", source)
+        self.assertIn("from ui.theme import invalidate_theme_tokens_cache", lazy_source)
 
     def test_entry_logs_pre_window_bootstrap_substeps(self) -> None:
         from main import entry
