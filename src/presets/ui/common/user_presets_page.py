@@ -1291,6 +1291,9 @@ class UserPresetsPageBase(BasePage):
         preset_file_name = str(name or "").strip()
         if not preset_file_name:
             return False
+        current_file_name = str(self._runtime_service.active_preset_file_name() or "").strip()
+        if current_file_name and current_file_name.lower() == preset_file_name.lower():
+            return True
         display_name = self._resolve_display_name(preset_file_name) or preset_file_name
         self._runtime_service.apply_active_preset_marker_for_file(preset_file_name)
         self._request_preset_activation(preset_file_name, display_name)
