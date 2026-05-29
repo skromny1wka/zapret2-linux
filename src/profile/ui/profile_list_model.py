@@ -271,6 +271,8 @@ class ProfileListModel(QAbstractListModel):
         current = self._profile_items.get(source_key)
         if current is None:
             return False
+        if current == replacement:
+            return True
 
         next_items = tuple(replacement if existing.key == source_key else existing for existing in self._all_items)
         can_update_row = (
