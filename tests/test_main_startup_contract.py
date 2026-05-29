@@ -379,6 +379,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             patch.object(post_startup, "install_lists_check"),
             patch.object(post_startup, "install_dns_startup"),
             patch.object(post_startup, "install_dns_page_data_warmup"),
+            patch.object(post_startup, "install_hosts_page_warmup"),
             patch.object(post_startup, "install_profile_warmup"),
             patch.object(post_startup, "install_update_check"),
             patch.object(post_startup, "install_cpu_diagnostic"),
@@ -1996,6 +1997,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             patch.object(post_startup, "install_lists_check"),
             patch.object(post_startup, "install_dns_startup"),
             patch.object(post_startup, "install_dns_page_data_warmup"),
+            patch.object(post_startup, "install_hosts_page_warmup"),
             patch.object(post_startup, "install_profile_warmup") as install_profile_warmup,
             patch.object(post_startup, "install_update_check"),
             patch.object(post_startup, "install_cpu_diagnostic"),
@@ -2043,6 +2045,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             patch.object(post_startup, "install_lists_check"),
             patch.object(post_startup, "install_dns_startup"),
             patch.object(post_startup, "install_dns_page_data_warmup"),
+            patch.object(post_startup, "install_hosts_page_warmup"),
             patch.object(post_startup, "install_profile_warmup") as install_profile_warmup,
             patch.object(post_startup, "install_user_presets_warmup"),
             patch.object(post_startup, "install_update_check"),
@@ -2093,6 +2096,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             patch.object(post_startup, "install_lists_check"),
             patch.object(post_startup, "install_dns_startup"),
             patch.object(post_startup, "install_dns_page_data_warmup"),
+            patch.object(post_startup, "install_hosts_page_warmup"),
             patch.object(post_startup, "install_profile_warmup"),
             patch.object(post_startup, "install_user_presets_warmup") as install_user_presets_warmup,
             patch.object(post_startup, "install_update_check"),
@@ -2164,6 +2168,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             patch.object(post_startup, "install_lists_check"),
             patch.object(post_startup, "install_dns_startup"),
             patch.object(post_startup, "install_dns_page_data_warmup") as install_dns_page_data_warmup,
+            patch.object(post_startup, "install_hosts_page_warmup"),
             patch.object(post_startup, "install_profile_warmup"),
             patch.object(post_startup, "install_update_check"),
             patch.object(post_startup, "install_cpu_diagnostic"),
@@ -2210,6 +2215,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             patch.object(post_startup, "install_lists_check"),
             patch.object(post_startup, "install_dns_startup"),
             patch.object(post_startup, "install_dns_page_data_warmup"),
+            patch.object(post_startup, "install_hosts_page_warmup"),
             patch.object(post_startup, "install_backend_page_data_warmup") as install_backend_page_data_warmup,
             patch.object(post_startup, "install_profile_warmup"),
             patch.object(post_startup, "install_update_check"),
@@ -2340,7 +2346,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             )
             signal.emit("interactive")
 
-        self.assertEqual(delays, [9000, 18000])
+        self.assertEqual(delays, [1800, 9000])
         self.assertEqual(thread_names, ["ProfileWarmup-zapret1_mode", "ProfileWarmup-zapret2_mode"])
         self.assertEqual(ready_methods, ["zapret1_mode", "zapret2_mode"])
         self.assertEqual(
@@ -2349,7 +2355,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         )
         metric.assert_any_call(
             "StartupProfileWarmupQueued",
-            "9000ms current after interactive; 18000ms secondary after interactive",
+            "1800ms current after interactive; 9000ms secondary after interactive",
         )
         metric.assert_any_call("StartupProfileWarmupStarted", "zapret1_mode")
         metric.assert_any_call("StartupProfileWarmupStarted", "zapret2_mode")
