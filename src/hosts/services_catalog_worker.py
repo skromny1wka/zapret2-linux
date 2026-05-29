@@ -15,7 +15,6 @@ class HostsServicesCatalogWorker(QObject):
     def __init__(
         self,
         *,
-        controller,
         hosts_runtime,
         current_selection: dict[str, str],
         direct_title: str,
@@ -23,7 +22,6 @@ class HostsServicesCatalogWorker(QObject):
         other_title: str,
     ):
         super().__init__()
-        self._controller = controller
         self._hosts_runtime = hosts_runtime
         self._current_selection = dict(current_selection or {})
         self._direct_title = str(direct_title or "")
@@ -32,16 +30,18 @@ class HostsServicesCatalogWorker(QObject):
         self._stopped = False
 
     def run(self) -> None:
+        from hosts import commands as hosts_commands
+
         started_at = time.perf_counter()
         try:
-            plan = self._controller.build_services_catalog_plan(
+            plan = hosts_commands.build_services_catalog_plan(
                 hosts_runtime=self._hosts_runtime,
                 current_selection=self._current_selection,
                 direct_title=self._direct_title,
                 ai_title=self._ai_title,
                 other_title=self._other_title,
             )
-            catalog_sig = self._controller.get_catalog_signature()
+            catalog_sig = hosts_commands.get_catalog_signature()
             if not self._stopped:
                 self.loaded.emit(plan, catalog_sig)
         except Exception as exc:

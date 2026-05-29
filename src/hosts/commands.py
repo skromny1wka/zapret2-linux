@@ -145,6 +145,26 @@ def read_active_domains_map(hosts_manager) -> dict[str, str]:
         return {}
 
 
+def build_services_catalog_plan(
+    *,
+    hosts_runtime,
+    current_selection: dict[str, str],
+    direct_title: str,
+    ai_title: str,
+    other_title: str,
+):
+    import hosts.page_plans as hosts_page_plans
+
+    active_domains_map = read_active_domains_map(hosts_runtime)
+    return hosts_page_plans.build_services_catalog_plan(
+        current_selection=current_selection,
+        active_domains_map=active_domains_map,
+        direct_title=direct_title,
+        ai_title=ai_title,
+        other_title=other_title,
+    )
+
+
 def get_hosts_path_str() -> str:
     import os
 
