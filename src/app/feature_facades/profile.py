@@ -365,12 +365,15 @@ class ProfileFeature:
         enabled: bool | None = None,
         parent=None,
     ):
-        from profile.profile_setup_loader import ProfilePresetProfileActionWorker
+        from profile.profile_setup_loader import ProfilePresetProfileActionWorker, load_profile_item_from_payload
 
         service = self._commands()._profile_preset_service(self, launch_method)
         return ProfilePresetProfileActionWorker(
             request_id,
-            service,
+            service.set_profile_enabled,
+            service.duplicate_profile,
+            service.delete_profile,
+            lambda profile_key: load_profile_item_from_payload(service.list_profiles, profile_key),
             action=action,
             profile_key=profile_key,
             enabled=enabled,
@@ -393,7 +396,10 @@ class ProfileFeature:
         service = self._commands()._profile_preset_service(self, launch_method)
         return ProfilePresetProfileMoveWorker(
             request_id,
-            service,
+            service.move_profile_before,
+            service.move_profile_after,
+            service.move_profile_to_end,
+            service.move_profile_to_folder,
             action=action,
             source_profile_key=source_profile_key,
             destination_profile_key=destination_profile_key,

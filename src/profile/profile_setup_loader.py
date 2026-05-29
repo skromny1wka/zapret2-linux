@@ -234,7 +234,10 @@ class ProfilePresetProfileActionWorker(QThread):
     def __init__(
         self,
         request_id: int,
-        profile_service,
+        set_profile_enabled,
+        duplicate_profile,
+        delete_profile,
+        load_profile_item,
         *,
         action: str,
         profile_key: str,
@@ -243,7 +246,10 @@ class ProfilePresetProfileActionWorker(QThread):
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._service = profile_service
+        self._set_profile_enabled = set_profile_enabled
+        self._duplicate_profile = duplicate_profile
+        self._delete_profile = delete_profile
+        self._load_profile_item = load_profile_item
         self._action = str(action or "").strip()
         self._target_profile_key = str(profile_key or "").strip()
         self._enabled = enabled
@@ -251,21 +257,21 @@ class ProfilePresetProfileActionWorker(QThread):
     def run(self) -> None:
         try:
             if self._action == "set_enabled":
-                result = self._service.set_profile_enabled(
+                result = self._set_profile_enabled(
                     self._target_profile_key,
                     bool(self._enabled),
                 )
                 if result and str(result or "").strip() != self._target_profile_key:
-                    item = _profile_item_by_key(self._service, str(result or ""))
+                    item = self._load_profile_item(str(result or ""))
                     if item is not None:
                         result = {"profile_key": str(result or "").strip(), "profile_item": item}
             elif self._action == "duplicate":
-                result = self._service.duplicate_profile(self._target_profile_key)
-                item = _profile_item_by_key(self._service, str(result or ""))
+                result = self._duplicate_profile(self._target_profile_key)
+                item = self._load_profile_item(str(result or ""))
                 if item is not None:
                     result = {"profile_key": str(result or "").strip(), "profile_item": item}
             elif self._action == "delete":
-                result = bool(self._service.delete_profile(self._target_profile_key))
+                result = bool(self._delete_profile(self._target_profile_key))
             else:
                 raise ValueError(f"Неизвестное действие profile: {self._action}")
         except Exception as exc:
@@ -282,7 +288,10 @@ class ProfilePresetProfileMoveWorker(QThread):
     def __init__(
         self,
         request_id: int,
-        profile_service,
+        move_profile_before,
+        move_profile_after,
+        move_profile_to_end,
+        move_profile_to_folder,
         *,
         action: str,
         source_profile_key: str,
@@ -292,7 +301,10 @@ class ProfilePresetProfileMoveWorker(QThread):
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._service = profile_service
+        self._move_profile_before = move_profile_before
+        self._move_profile_after = move_profile_after
+        self._move_profile_to_end = move_profile_to_end
+        self._move_profile_to_folder = move_profile_to_folder
         self._action = str(action or "").strip()
         self._source_profile_key = str(source_profile_key or "").strip()
         self._destination_profile_key = str(destination_profile_key or "").strip()
@@ -301,21 +313,21 @@ class ProfilePresetProfileMoveWorker(QThread):
     def run(self) -> None:
         try:
             if self._action == "before":
-                result = self._service.move_profile_before(
+                result = self._move_profile_before(
                     self._source_profile_key,
                     self._destination_profile_key,
                     destination_folder_key=self._destination_group_key,
                 )
             elif self._action == "after":
-                result = self._service.move_profile_after(
+                result = self._move_profile_after(
                     self._source_profile_key,
                     self._destination_profile_key,
                     destination_folder_key=self._destination_group_key,
                 )
             elif self._action == "end":
-                result = self._service.move_profile_to_end(self._source_profile_key)
+                result = self._move_profile_to_end(self._source_profile_key)
             elif self._action == "folder":
-                result = self._service.move_profile_to_folder(
+                result = self._move_profile_to_folder(
                     self._source_profile_key,
                     self._destination_group_key,
                 )
@@ -448,13 +460,12 @@ def load_user_profile_items_from_payload(load_profiles, profile_id: str) -> tupl
     )
 
 
-def _profile_item_by_key(profile, profile_key: str, launch_method: str = ""):
+def load_profile_item_from_payload(load_profiles, profile_key: str):
     clean_key = str(profile_key or "").strip()
     if not clean_key:
         return None
     try:
-        clean_method = str(launch_method or "").strip()
-        payload = profile.list_profiles(clean_method) if clean_method else profile.list_profiles()
+        payload = load_profiles()
     except Exception:
         return None
     try:

@@ -1567,11 +1567,16 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._create_profile_move_worker.return_value.start.assert_called_once()
 
     def test_profile_move_worker_emits_move_result(self) -> None:
-        service = Mock()
-        service.move_profile_before.return_value = "profile-1"
+        move_profile_before = Mock(return_value="profile-1")
+        move_profile_after = Mock()
+        move_profile_to_end = Mock()
+        move_profile_to_folder = Mock()
         worker = ProfilePresetProfileMoveWorker(
             9,
-            service,
+            move_profile_before,
+            move_profile_after,
+            move_profile_to_end,
+            move_profile_to_folder,
             action="before",
             source_profile_key="profile-1",
             destination_profile_key="profile-2",
@@ -1592,7 +1597,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         worker.run()
 
-        service.move_profile_before.assert_called_once_with(
+        move_profile_before.assert_called_once_with(
             "profile-1",
             "profile-2",
             destination_folder_key="youtube",
@@ -1839,11 +1844,16 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         worker.start.assert_called_once()
 
     def test_profile_context_action_worker_emits_result(self) -> None:
-        service = Mock()
-        service.set_profile_enabled.return_value = "profile-2"
+        set_profile_enabled = Mock(return_value="profile-2")
+        duplicate_profile = Mock()
+        delete_profile = Mock()
+        load_profile_item = Mock(return_value=None)
         worker = ProfilePresetProfileActionWorker(
             6,
-            service,
+            set_profile_enabled,
+            duplicate_profile,
+            delete_profile,
+            load_profile_item,
             action="set_enabled",
             profile_key="profile-1",
             enabled=True,
@@ -1861,7 +1871,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         worker.run()
 
-        service.set_profile_enabled.assert_called_once_with("profile-1", True)
+        set_profile_enabled.assert_called_once_with("profile-1", True)
         self.assertEqual(finished, [(6, "set_enabled", "profile-1", "profile-2")])
 
     def test_profile_context_action_worker_emits_duplicated_item(self) -> None:
@@ -1882,12 +1892,16 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             group_name="",
             order=2,
         )
-        service = Mock()
-        service.duplicate_profile.return_value = "profile-2"
-        service.list_profiles.return_value = SimpleNamespace(items=(duplicated_item,))
+        set_profile_enabled = Mock()
+        duplicate_profile = Mock(return_value="profile-2")
+        delete_profile = Mock()
+        load_profile_item = Mock(return_value=duplicated_item)
         worker = ProfilePresetProfileActionWorker(
             8,
-            service,
+            set_profile_enabled,
+            duplicate_profile,
+            delete_profile,
+            load_profile_item,
             action="duplicate",
             profile_key="profile-1",
         )
@@ -1904,8 +1918,8 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         worker.run()
 
-        service.duplicate_profile.assert_called_once_with("profile-1")
-        service.list_profiles.assert_called_once_with()
+        duplicate_profile.assert_called_once_with("profile-1")
+        load_profile_item.assert_called_once_with("profile-2")
         self.assertEqual(finished[0][:3], (8, "duplicate", "profile-1"))
         self.assertEqual(finished[0][3], {"profile_key": "profile-2", "profile_item": duplicated_item})
 
@@ -1927,12 +1941,16 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             group_name="",
             order=2,
         )
-        service = Mock()
-        service.set_profile_enabled.return_value = "profile-2"
-        service.list_profiles.return_value = SimpleNamespace(items=(created_item,))
+        set_profile_enabled = Mock(return_value="profile-2")
+        duplicate_profile = Mock()
+        delete_profile = Mock()
+        load_profile_item = Mock(return_value=created_item)
         worker = ProfilePresetProfileActionWorker(
             7,
-            service,
+            set_profile_enabled,
+            duplicate_profile,
+            delete_profile,
+            load_profile_item,
             action="set_enabled",
             profile_key="template:youtube",
             enabled=True,
@@ -1950,8 +1968,8 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         worker.run()
 
-        service.set_profile_enabled.assert_called_once_with("template:youtube", True)
-        service.list_profiles.assert_called_once_with()
+        set_profile_enabled.assert_called_once_with("template:youtube", True)
+        load_profile_item.assert_called_once_with("profile-2")
         self.assertEqual(finished[0][:3], (7, "set_enabled", "template:youtube"))
         self.assertEqual(finished[0][3], {"profile_key": "profile-2", "profile_item": created_item})
 
