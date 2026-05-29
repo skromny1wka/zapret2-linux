@@ -93,7 +93,7 @@ class PremiumFeature:
 
         return PremiumDeviceInfoLoadWorker(
             request_id,
-            premium_feature=self,
+            read_device_info_snapshot=self.read_device_info_snapshot,
             current_time=int(current_time),
             parent=parent,
         )
@@ -101,7 +101,7 @@ class PremiumFeature:
     def create_reset_storage_worker(self, request_id: int, *, parent=None):
         from donater.reset_worker import PremiumResetStorageWorker
 
-        return PremiumResetStorageWorker(request_id, premium_feature=self, parent=parent)
+        return PremiumResetStorageWorker(request_id, reset_storage=self.reset_premium_storage, parent=parent)
 
     def create_premium_worker_thread(self, task):
         return self._commands().create_premium_worker_thread(task)

@@ -13,18 +13,18 @@ class PremiumDeviceInfoLoadWorker(QThread):
         self,
         request_id: int,
         *,
-        premium_feature,
+        read_device_info_snapshot,
         current_time: int,
         parent=None,
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._premium = premium_feature
+        self._read_device_info_snapshot = read_device_info_snapshot
         self._current_time = int(current_time)
 
     def run(self) -> None:
         try:
-            snapshot = self._premium.read_device_info_snapshot(current_time=self._current_time)
+            snapshot = self._read_device_info_snapshot(current_time=self._current_time)
         except Exception as exc:
             log(f"PremiumDeviceInfoLoadWorker: не удалось загрузить данные устройства: {exc}", "DEBUG")
             self.failed.emit(self._request_id, str(exc))

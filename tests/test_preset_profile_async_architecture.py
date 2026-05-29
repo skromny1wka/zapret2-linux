@@ -1776,6 +1776,9 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("create_device_info_load_worker", page_source)
         self.assertIn("_device_info_runtime", page_source)
         self.assertIn("create_device_info_load_worker", feature_source)
+        self.assertIn("read_device_info_snapshot=self.read_device_info_snapshot", feature_source)
+        self.assertNotIn("premium_feature=self", feature_source)
+        self.assertNotIn("self._premium", inspect.getsource(device_info_worker.PremiumDeviceInfoLoadWorker))
         self.assertIn("read_device_info_snapshot", worker_source)
 
     def test_premium_click_actions_initialize_checker_through_worker(self) -> None:
@@ -1848,7 +1851,10 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("create_reset_storage_worker", page_source)
         self.assertIn("_reset_storage_runtime", page_source)
         self.assertIn("create_reset_storage_worker", feature_source)
-        self.assertIn("reset_premium_storage", worker_source)
+        self.assertIn("reset_storage=self.reset_premium_storage", feature_source)
+        self.assertNotIn("premium_feature=self", feature_source)
+        self.assertNotIn("self._premium", inspect.getsource(reset_worker.PremiumResetStorageWorker))
+        self.assertIn("_reset_storage", worker_source)
 
     def test_support_page_external_links_run_through_worker(self) -> None:
         spec = importlib.util.find_spec("ui.pages.support_open_worker")

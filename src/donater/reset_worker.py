@@ -11,14 +11,14 @@ class PremiumResetStorageWorker(QThread):
     loaded = pyqtSignal(int, object)
     failed = pyqtSignal(int, str)
 
-    def __init__(self, request_id: int, *, premium_feature, parent=None):
+    def __init__(self, request_id: int, *, reset_storage, parent=None):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._premium = premium_feature
+        self._reset_storage = reset_storage
 
     def run(self) -> None:
         try:
-            self._premium.reset_premium_storage()
+            self._reset_storage()
         except Exception as exc:
             log(f"PremiumResetStorageWorker: не удалось сбросить Premium-активацию: {exc}", "ERROR")
             self.failed.emit(self._request_id, str(exc))
