@@ -87,7 +87,7 @@ class ProgramSettingsFeature:
 
         return ProgramSettingsLoadWorker(
             request_id,
-            program_settings_feature=self,
+            runtime_service=self.runtime_service,
             parent=parent,
         )
 
@@ -96,7 +96,6 @@ class ProgramSettingsFeature:
 
         return ProgramSettingsAdminCheckWorker(
             request_id,
-            program_settings_feature=self,
             parent=parent,
         )
 

@@ -13,16 +13,18 @@ class ProgramSettingsLoadWorker(QThread):
         self,
         request_id: int,
         *,
-        program_settings_feature,
+        runtime_service,
         parent=None,
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._program_settings = program_settings_feature
+        self._runtime_service = runtime_service
 
     def run(self) -> None:
+        import program_settings.public as program_settings_commands
+
         try:
-            snapshot = self._program_settings.load_program_settings_snapshot()
+            snapshot = program_settings_commands.load_program_settings_snapshot(self._runtime_service)
         except Exception as exc:
             log(f"ProgramSettingsLoadWorker: не удалось загрузить настройки программы: {exc}", "WARNING")
             self.failed.emit(self._request_id, str(exc))
@@ -38,16 +40,16 @@ class ProgramSettingsAdminCheckWorker(QThread):
         self,
         request_id: int,
         *,
-        program_settings_feature,
         parent=None,
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._program_settings = program_settings_feature
 
     def run(self) -> None:
+        import program_settings.public as program_settings_commands
+
         try:
-            is_admin = bool(self._program_settings.is_user_admin())
+            is_admin = bool(program_settings_commands.is_user_admin())
         except Exception as exc:
             log(f"ProgramSettingsAdminCheckWorker: не удалось проверить права администратора: {exc}", "WARNING")
             self.failed.emit(self._request_id, str(exc))
