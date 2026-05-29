@@ -31,8 +31,8 @@ def install_profile_warmup(
     *,
     profile_feature,
     log_startup_metric,
-    delay_ms: int = 9_000,
-    secondary_delay_ms: int = 18_000,
+    delay_ms: int = 1_800,
+    secondary_delay_ms: int = 9_000,
     on_profile_warmup_ready: Callable[[str], None] | None = None,
 ) -> None:
     warmup_bridge = _ProfileWarmupBridge()
