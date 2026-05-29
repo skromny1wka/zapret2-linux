@@ -2951,6 +2951,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         source = inspect.getsource(PresetRawEditorPage._load_file)
         set_source = inspect.getsource(PresetRawEditorPage.set_preset_file_name)
         header_source = inspect.getsource(PresetRawEditorPage._refresh_header)
+        worker_init_source = inspect.getsource(RawPresetLoadWorker.__init__)
         worker_source = inspect.getsource(RawPresetLoadWorker.run)
 
         self.assertNotIn("self._controller.load_text(", source)
@@ -2958,18 +2959,27 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("self._controller.manifest", set_source)
         self.assertNotIn("self._controller.source_path", set_source)
         self.assertNotIn("self._controller.manifest", header_source)
-        self.assertIn("self._controller.load_preset", worker_source)
+        self.assertIn("load_preset", worker_init_source)
+        self.assertIn("self._load_preset", worker_init_source)
+        self.assertNotIn("self._controller", worker_init_source)
+        self.assertIn("self._load_preset(self._file_name)", worker_source)
+        self.assertNotIn("self._controller.load_preset", worker_source)
 
     def test_raw_preset_editor_saves_file_through_worker(self) -> None:
         save_source = inspect.getsource(PresetRawEditorPage._save_file)
         workflow_source = inspect.getsource(__import__("presets.raw_preset_editor_workflow", fromlist=["RawPresetEditorController"]).RawPresetEditorController)
+        worker_init_source = inspect.getsource(RawPresetSaveWorker.__init__)
         worker_source = inspect.getsource(RawPresetSaveWorker.run)
 
         self.assertNotIn("self._controller.save_text(", save_source)
         self.assertIn("_request_raw_preset_save", save_source)
         self.assertIn("create_save_worker", workflow_source)
         self.assertIn("RawPresetSaveWorker", workflow_source)
-        self.assertIn("controller.save_text", worker_source)
+        self.assertIn("save_text", worker_init_source)
+        self.assertIn("self._save_text", worker_init_source)
+        self.assertNotIn("controller", worker_init_source)
+        self.assertIn("self._save_text(", worker_source)
+        self.assertNotIn("controller.save_text", worker_source)
 
     def test_raw_preset_editor_waits_for_pending_save_before_file_actions(self) -> None:
         set_file_source = inspect.getsource(PresetRawEditorPage.set_preset_file_name)
@@ -2999,13 +3009,18 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
     def test_raw_preset_editor_activation_runs_through_worker(self) -> None:
         source = inspect.getsource(PresetRawEditorPage._activate_preset)
         request_source = inspect.getsource(PresetRawEditorPage._request_preset_activation)
+        worker_init_source = inspect.getsource(RawPresetActivateWorker.__init__)
         worker_source = inspect.getsource(RawPresetActivateWorker.run)
 
         self.assertNotIn("_activate_selected_preset()", source)
         self.assertNotIn("self._controller.activate(", source)
         self.assertIn("_request_preset_activation", source)
         self.assertIn("create_activate_worker", request_source)
-        self.assertIn("controller.activate", worker_source)
+        self.assertIn("activate", worker_init_source)
+        self.assertIn("self._activate", worker_init_source)
+        self.assertNotIn("controller", worker_init_source)
+        self.assertIn("self._activate(file_name=self._file_name)", worker_source)
+        self.assertNotIn("controller.activate", worker_source)
 
     def test_raw_preset_editor_file_actions_run_through_worker(self) -> None:
         action_sources = "\n".join(
@@ -3020,6 +3035,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
             )
         )
         workflow_source = inspect.getsource(__import__("presets.raw_preset_editor_workflow", fromlist=["RawPresetEditorController"]).RawPresetEditorController)
+        worker_init_source = inspect.getsource(RawPresetActionWorker.__init__)
         worker_source = inspect.getsource(RawPresetActionWorker.run)
 
         for call in (
@@ -3034,11 +3050,15 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_request_raw_preset_action", action_sources)
         self.assertIn("create_action_worker", workflow_source)
         self.assertIn("RawPresetActionWorker", workflow_source)
-        self.assertIn("controller.rename", worker_source)
-        self.assertIn("controller.duplicate", worker_source)
-        self.assertIn("controller.export", worker_source)
-        self.assertIn("controller.reset_to_builtin", worker_source)
-        self.assertIn("controller.delete", worker_source)
+        self.assertIn("run_action", worker_init_source)
+        self.assertIn("self._run_action", worker_init_source)
+        self.assertNotIn("controller", worker_init_source)
+        self.assertIn("self._run_action(action, payload)", worker_source)
+        self.assertNotIn("controller.rename", worker_source)
+        self.assertNotIn("controller.duplicate", worker_source)
+        self.assertNotIn("controller.export", worker_source)
+        self.assertNotIn("controller.reset_to_builtin", worker_source)
+        self.assertNotIn("controller.delete", worker_source)
 
     def test_profile_setup_builds_hidden_tabs_lazily(self) -> None:
         build_source = inspect.getsource(ProfileSetupPageBase._build_content)

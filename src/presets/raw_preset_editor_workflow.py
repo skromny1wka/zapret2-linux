@@ -248,7 +248,7 @@ class RawPresetEditorController:
     def create_load_worker(self, request_id: int, file_name: str, parent=None):
         from presets.raw_preset_loader import RawPresetLoadWorker
 
-        return RawPresetLoadWorker(request_id, self, file_name, parent)
+        return RawPresetLoadWorker(request_id, self.load_preset, file_name, parent)
 
     def create_save_worker(
         self,
@@ -263,7 +263,7 @@ class RawPresetEditorController:
 
         return RawPresetSaveWorker(
             request_id,
-            self,
+            self.save_text,
             file_name=file_name,
             source_text=source_text,
             publish_content_changed=publish_content_changed,
@@ -273,7 +273,7 @@ class RawPresetEditorController:
     def create_activate_worker(self, request_id: int, file_name: str, parent=None):
         from presets.raw_preset_loader import RawPresetActivateWorker
 
-        return RawPresetActivateWorker(request_id, self, file_name, parent)
+        return RawPresetActivateWorker(request_id, self.activate, file_name, parent)
 
     def create_action_worker(
         self,
@@ -287,11 +287,46 @@ class RawPresetEditorController:
 
         return RawPresetActionWorker(
             request_id,
-            self,
+            self.run_action,
             action=action,
             payload=payload,
             parent=parent,
         )
+
+    def run_action(self, action: str, payload: dict | None = None):
+        action = str(action or "").strip()
+        payload = dict(payload or {})
+        if action == "open":
+            return self.open_source_file(payload.get("path"))
+        if action == "rename":
+            updated = self.rename(
+                file_name=str(payload.get("file_name") or ""),
+                new_name=str(payload.get("new_name") or ""),
+            )
+            return (updated, self.source_path(updated.file_name))
+        if action == "duplicate":
+            updated = self.duplicate(
+                file_name=str(payload.get("file_name") or ""),
+                new_name=str(payload.get("new_name") or ""),
+            )
+            return (updated, self.source_path(updated.file_name))
+        if action == "export":
+            target_path = str(payload.get("target_path") or "")
+            self.export(
+                file_name=str(payload.get("file_name") or ""),
+                target_path=target_path,
+            )
+            return target_path
+        if action == "reset":
+            updated = self.reset_to_builtin(
+                file_name=str(payload.get("file_name") or ""),
+            )
+            return (updated, self.source_path(updated.file_name))
+        if action == "delete":
+            return self.delete(
+                file_name=str(payload.get("file_name") or ""),
+            )
+        raise ValueError(f"Неизвестное действие preset: {action}")
 
     def save_text(
         self,
