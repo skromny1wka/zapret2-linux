@@ -1180,10 +1180,11 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_is_builtin_preset_file", delete_source)
         self.assertNotIn("_storage_api().is_builtin_preset_file", delete_source)
         self.assertIn("create_preset_item_action_worker", request_source)
-        self.assertIn("actions_api.duplicate_preset", worker_source)
-        self.assertIn("actions_api.reset_preset_to_builtin", worker_source)
-        self.assertIn("actions_api.delete_preset", worker_source)
-        self.assertIn("actions_api.export_preset", worker_source)
+        self.assertIn("self._duplicate_preset", worker_source)
+        self.assertIn("self._reset_preset_to_builtin", worker_source)
+        self.assertIn("self._delete_preset", worker_source)
+        self.assertIn("self._export_preset", worker_source)
+        self.assertNotIn("actions_api.", worker_source)
 
     def test_user_presets_import_and_reset_all_run_through_worker(self) -> None:
         import_source = inspect.getsource(UserPresetsPageBase._on_import_clicked)
@@ -1201,8 +1202,9 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
             self.assertNotIn(".reset_all_presets(", source)
 
         self.assertIn("create_preset_bulk_action_worker", request_source)
-        self.assertIn("actions_api.import_preset_from_file", worker_source)
-        self.assertIn("actions_api.reset_all_presets", worker_source)
+        self.assertIn("self._import_preset_from_file", worker_source)
+        self.assertIn("self._reset_all_presets", worker_source)
+        self.assertNotIn("actions_api.", worker_source)
 
     def test_user_presets_create_and_rename_run_through_worker(self) -> None:
         create_source = inspect.getsource(UserPresetsPageBase._show_inline_action_create)
@@ -1221,8 +1223,9 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
             self.assertNotIn(".rename_preset(", source)
 
         self.assertIn("create_preset_edit_action_worker", request_source)
-        self.assertIn("actions_api.create_preset", worker_source)
-        self.assertIn("actions_api.rename_preset", worker_source)
+        self.assertIn("self._create_preset", worker_source)
+        self.assertIn("self._rename_preset", worker_source)
+        self.assertNotIn("actions_api.", worker_source)
 
     def test_user_presets_info_links_open_through_worker(self) -> None:
         info_source = inspect.getsource(UserPresetsPageBase._open_presets_info)
@@ -1239,8 +1242,9 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
             self.assertNotIn("open_new_configs_post_action", source)
 
         self.assertIn("create_preset_link_action_worker", request_source)
-        self.assertIn("actions_api.open_presets_info", worker_source)
-        self.assertIn("actions_api.open_new_configs_post", worker_source)
+        self.assertIn("self._open_presets_info", worker_source)
+        self.assertIn("self._open_new_configs_post", worker_source)
+        self.assertNotIn("actions_api.", worker_source)
         self.assertIn("_preset_link_action_worker", cleanup_source)
 
     def test_user_presets_storage_actions_run_through_worker(self) -> None:
@@ -1272,10 +1276,12 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("cached_presets_metadata", rating_source)
         self.assertIn("_update_cached_preset_rating", finished_source)
         self.assertIn("create_preset_storage_action_worker", request_source)
-        self.assertIn("storage_api.toggle_preset_pin", worker_source)
-        self.assertIn("storage_api.set_preset_rating", worker_source)
-        self.assertIn("storage_api.move_preset_by_step", worker_source)
-        self.assertIn("storage_api.move_preset_on_drop", worker_source)
+        self.assertIn("self._toggle_preset_pin", worker_source)
+        self.assertIn("self._set_preset_rating", worker_source)
+        self.assertIn("self._move_preset_by_step", worker_source)
+        self.assertIn("self._move_preset_on_drop", worker_source)
+        self.assertIn("self._load_folder_state", worker_source)
+        self.assertNotIn("storage_api.", worker_source)
         self.assertIn('self._action == "pin"', worker_source)
         self.assertIn('context["folder_state"]', worker_source)
         self.assertIn("update_cached_folder_state", finished_source)

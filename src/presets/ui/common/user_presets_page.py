@@ -696,9 +696,11 @@ class UserPresetsPageBase(BasePage):
         new_name: str = "",
         from_current: bool = False,
     ):
+        actions_api = self._actions_api()
         return UserPresetEditActionWorker(
             request_id,
-            self._actions_api(),
+            actions_api.create_preset,
+            actions_api.rename_preset,
             action=action,
             name=name,
             current_name=current_name,
@@ -803,9 +805,11 @@ class UserPresetsPageBase(BasePage):
             self._bulk_reset_running = False
 
     def create_preset_bulk_action_worker(self, request_id: int, *, action: str, file_path: str = ""):
+        actions_api = self._actions_api()
         return UserPresetBulkActionWorker(
             request_id,
-            self._actions_api(),
+            actions_api.import_preset_from_file,
+            actions_api.reset_all_presets,
             action=action,
             file_path=file_path,
             parent=self,
@@ -1173,16 +1177,20 @@ class UserPresetsPageBase(BasePage):
         destination_id: str = "",
         destination_folder_key: str = "",
     ):
+        storage_api = self._storage_api()
         return UserPresetStorageActionWorker(
             request_id,
-            self._storage_api(),
+            storage_api.toggle_preset_pin,
+            storage_api.set_preset_rating,
+            storage_api.move_preset_by_step,
+            storage_api.move_preset_on_drop,
+            self._load_preset_folder_state_light,
             action=action,
             name=name,
             display_name=display_name,
             rating=rating,
             direction=direction,
             cached_metadata=cached_metadata,
-            folder_scope=self._folder_scope_key(),
             source_kind=source_kind,
             source_id=source_id,
             destination_kind=destination_kind,
@@ -1524,9 +1532,13 @@ class UserPresetsPageBase(BasePage):
         display_name: str,
         file_path: str = "",
     ):
+        actions_api = self._actions_api()
         return UserPresetItemActionWorker(
             request_id,
-            self._actions_api(),
+            actions_api.duplicate_preset,
+            actions_api.reset_preset_to_builtin,
+            actions_api.delete_preset,
+            actions_api.export_preset,
             action=action,
             file_name=file_name,
             display_name=display_name,
@@ -1611,9 +1623,11 @@ class UserPresetsPageBase(BasePage):
         worker.deleteLater()
 
     def create_preset_link_action_worker(self, request_id: int, *, action: str):
+        actions_api = self._actions_api()
         return UserPresetLinkActionWorker(
             request_id,
-            self._actions_api(),
+            actions_api.open_presets_info,
+            actions_api.open_new_configs_post,
             action=action,
             parent=self,
         )

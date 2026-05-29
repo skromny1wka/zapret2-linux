@@ -36,7 +36,10 @@ class UserPresetItemActionWorker(QThread):
     def __init__(
         self,
         request_id: int,
-        actions_api,
+        duplicate_preset,
+        reset_preset_to_builtin,
+        delete_preset,
+        export_preset,
         *,
         action: str,
         file_name: str,
@@ -46,7 +49,10 @@ class UserPresetItemActionWorker(QThread):
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self.actions_api = actions_api
+        self._duplicate_preset = duplicate_preset
+        self._reset_preset_to_builtin = reset_preset_to_builtin
+        self._delete_preset = delete_preset
+        self._export_preset = export_preset
         self._action = str(action or "").strip()
         self._file_name = str(file_name or "").strip()
         self._display_name = str(display_name or self._file_name).strip()
@@ -55,22 +61,22 @@ class UserPresetItemActionWorker(QThread):
     def run(self) -> None:
         try:
             if self._action == "duplicate":
-                result = self.actions_api.duplicate_preset(
+                result = self._duplicate_preset(
                     file_name=self._file_name,
                     display_name=self._display_name,
                 )
             elif self._action == "reset":
-                result = self.actions_api.reset_preset_to_builtin(
+                result = self._reset_preset_to_builtin(
                     file_name=self._file_name,
                     display_name=self._display_name,
                 )
             elif self._action == "delete":
-                result = self.actions_api.delete_preset(
+                result = self._delete_preset(
                     file_name=self._file_name,
                     display_name=self._display_name,
                 )
             elif self._action == "export":
-                result = self.actions_api.export_preset(
+                result = self._export_preset(
                     file_name=self._file_name,
                     file_path=self._file_path,
                     display_name=self._display_name,
@@ -96,7 +102,8 @@ class UserPresetBulkActionWorker(QThread):
     def __init__(
         self,
         request_id: int,
-        actions_api,
+        import_preset_from_file,
+        reset_all_presets,
         *,
         action: str,
         file_path: str = "",
@@ -104,7 +111,8 @@ class UserPresetBulkActionWorker(QThread):
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self.actions_api = actions_api
+        self._import_preset_from_file = import_preset_from_file
+        self._reset_all_presets = reset_all_presets
         self._action = str(action or "").strip()
         self._file_path = str(file_path or "").strip()
 
@@ -112,9 +120,9 @@ class UserPresetBulkActionWorker(QThread):
         context = {"file_path": self._file_path}
         try:
             if self._action == "import":
-                result = self.actions_api.import_preset_from_file(file_path=self._file_path)
+                result = self._import_preset_from_file(file_path=self._file_path)
             elif self._action == "reset_all":
-                result = self.actions_api.reset_all_presets()
+                result = self._reset_all_presets()
             else:
                 raise ValueError(f"Неизвестное массовое действие preset: {self._action}")
         except Exception as exc:
@@ -131,7 +139,8 @@ class UserPresetEditActionWorker(QThread):
     def __init__(
         self,
         request_id: int,
-        actions_api,
+        create_preset,
+        rename_preset,
         *,
         action: str,
         name: str = "",
@@ -142,7 +151,8 @@ class UserPresetEditActionWorker(QThread):
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self.actions_api = actions_api
+        self._create_preset = create_preset
+        self._rename_preset = rename_preset
         self._action = str(action or "").strip()
         self._name = str(name or "").strip()
         self._current_name = str(current_name or "").strip()
@@ -158,12 +168,12 @@ class UserPresetEditActionWorker(QThread):
         }
         try:
             if self._action == "create":
-                result = self.actions_api.create_preset(
+                result = self._create_preset(
                     name=self._name,
                     from_current=self._from_current,
                 )
             elif self._action == "rename":
-                result = self.actions_api.rename_preset(
+                result = self._rename_preset(
                     current_name=self._current_name,
                     new_name=self._new_name,
                 )
@@ -199,19 +209,20 @@ class UserPresetLinkActionWorker(QThread):
     completed = pyqtSignal(int, str, object, object)
     failed = pyqtSignal(int, str, str, object)
 
-    def __init__(self, request_id: int, actions_api, *, action: str, parent=None):
+    def __init__(self, request_id: int, open_presets_info, open_new_configs_post, *, action: str, parent=None):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self.actions_api = actions_api
+        self._open_presets_info = open_presets_info
+        self._open_new_configs_post = open_new_configs_post
         self._action = str(action or "").strip()
 
     def run(self) -> None:
         context = {"action": self._action}
         try:
             if self._action == "info":
-                result = self.actions_api.open_presets_info()
+                result = self._open_presets_info()
             elif self._action == "new_configs":
-                result = self.actions_api.open_new_configs_post()
+                result = self._open_new_configs_post()
             else:
                 raise ValueError(f"Неизвестное действие ссылки preset: {self._action}")
         except Exception as exc:
@@ -228,7 +239,11 @@ class UserPresetStorageActionWorker(QThread):
     def __init__(
         self,
         request_id: int,
-        storage_api,
+        toggle_preset_pin,
+        set_preset_rating,
+        move_preset_by_step,
+        move_preset_on_drop,
+        load_folder_state,
         *,
         action: str,
         name: str = "",
@@ -236,7 +251,6 @@ class UserPresetStorageActionWorker(QThread):
         rating: int = 0,
         direction: int = 0,
         cached_metadata=None,
-        folder_scope: str = "",
         source_kind: str = "",
         source_id: str = "",
         destination_kind: str = "",
@@ -246,14 +260,17 @@ class UserPresetStorageActionWorker(QThread):
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self.storage_api = storage_api
+        self._toggle_preset_pin = toggle_preset_pin
+        self._set_preset_rating = set_preset_rating
+        self._move_preset_by_step = move_preset_by_step
+        self._move_preset_on_drop = move_preset_on_drop
+        self._load_folder_state = load_folder_state
         self._action = str(action or "").strip()
         self._name = str(name or "").strip()
         self._display_name = str(display_name or self._name).strip()
         self._rating = int(rating or 0)
         self._direction = int(direction or 0)
         self._cached_metadata = cached_metadata
-        self._folder_scope = str(folder_scope or "").strip()
         self._source_kind = str(source_kind or "").strip()
         self._source_id = str(source_id or "").strip()
         self._destination_kind = str(destination_kind or "").strip()
@@ -272,27 +289,26 @@ class UserPresetStorageActionWorker(QThread):
             "destination_id": self._destination_id,
             "destination_folder_key": self._destination_folder_key,
         }
-        storage_api = self.storage_api
         try:
             if self._action == "pin":
-                result = storage_api.toggle_preset_pin(
+                result = self._toggle_preset_pin(
                     self._name,
                     display_name=self._display_name,
                 )
             elif self._action == "rating":
-                result = storage_api.set_preset_rating(
+                result = self._set_preset_rating(
                     self._name,
                     self._rating,
                     display_name=self._display_name,
                 )
             elif self._action == "move_step":
-                result = storage_api.move_preset_by_step(
+                result = self._move_preset_by_step(
                     self._name,
                     self._direction,
                     cached_metadata=self._cached_metadata,
                 )
             elif self._action == "drop":
-                result = storage_api.move_preset_on_drop(
+                result = self._move_preset_on_drop(
                     source_kind=self._source_kind,
                     source_id=self._source_id,
                     destination_kind=self._destination_kind,
@@ -305,11 +321,9 @@ class UserPresetStorageActionWorker(QThread):
             log(f"UserPresetStorageActionWorker: действие {self._action} не выполнено: {exc}", "ERROR")
             self.failed.emit(self._request_id, self._action, str(exc), context)
             return
-        if self._folder_scope and (self._action == "pin" or bool(result)):
+        if self._load_folder_state is not None and (self._action == "pin" or bool(result)):
             try:
-                from presets.folders import load_preset_folder_state
-
-                context["folder_state"] = load_preset_folder_state(self._folder_scope)
+                context["folder_state"] = self._load_folder_state()
             except Exception as exc:
                 log(f"UserPresetStorageActionWorker: не удалось обновить состояние папок preset: {exc}", "DEBUG")
         self.completed.emit(self._request_id, self._action, result, context)
