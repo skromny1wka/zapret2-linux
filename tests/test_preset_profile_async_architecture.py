@@ -43,6 +43,7 @@ from presets.user_presets_runtime_service import (
 )
 from hosts.ui.page import HostsPage
 import hosts.ui.page_runtime as hosts_page_runtime
+import hosts.commands as hosts_commands
 from autostart.ui.page import AutostartPage
 import log.commands as log_commands
 from log.ui.page import LogsPage
@@ -3287,7 +3288,9 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_start_user_selection_load_worker", runtime_source)
         self.assertNotIn("self._controller.load_user_selection()", runtime_source)
         self.assertIn("create_selection_load_worker", controller_source)
-        self.assertIn("load_user_selection", worker_source)
+        self.assertIn("hosts_commands.load_user_selection", worker_source)
+        self.assertNotIn("self._controller", worker_source)
+        self.assertIn("load_user_selection", inspect.getsource(hosts_commands.load_user_selection))
 
     def test_hosts_runtime_state_loads_through_worker(self) -> None:
         spec = importlib.util.find_spec("hosts.state_load_worker")

@@ -20,12 +20,12 @@ class HostsPageController:
     def create_selection_save_worker(self, request_id: int, selection: dict[str, str], parent=None):
         from hosts.selection_save_worker import HostsSelectionSaveWorker
 
-        return HostsSelectionSaveWorker(request_id, self, selection, parent)
+        return HostsSelectionSaveWorker(request_id, selection, parent)
 
     def create_selection_load_worker(self, request_id: int, parent=None):
         from hosts.selection_load_worker import HostsSelectionLoadWorker
 
-        return HostsSelectionLoadWorker(request_id, self, parent)
+        return HostsSelectionLoadWorker(request_id, parent)
 
     def create_state_load_worker(self, request_id: int, hosts_runtime, parent=None):
         from hosts.state_load_worker import HostsStateLoadWorker

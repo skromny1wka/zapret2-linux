@@ -33,6 +33,7 @@ class HostsPageRuntimeTests(unittest.TestCase):
     def test_user_selection_save_runs_through_worker(self) -> None:
         from hosts.page_controller import HostsPageController
         from hosts.ui.page import HostsPage
+        import hosts.commands as hosts_commands
         import hosts.selection_save_worker as selection_save_worker
 
         self.assertTrue(hasattr(selection_save_worker, "HostsSelectionSaveWorker"))
@@ -47,7 +48,9 @@ class HostsPageRuntimeTests(unittest.TestCase):
         self.assertIn("start_qthread_worker", request_source)
         self.assertIn("_selection_save_pending", request_source)
         self.assertIn("_selection_save_pending", finished_source)
-        self.assertIn("save_user_selection", worker_source)
+        self.assertIn("hosts_commands.save_user_selection", worker_source)
+        self.assertNotIn("self._controller", worker_source)
+        self.assertIn("save_user_selection", inspect.getsource(hosts_commands.save_user_selection))
 
         for method_name in (
             "_bulk_apply_dns_profile",
