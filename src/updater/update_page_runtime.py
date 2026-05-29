@@ -104,6 +104,7 @@ class UpdatePageView(Protocol):
     def show_update_status_card(self) -> None: ...
     def set_update_check_enabled(self, enabled: bool) -> None: ...
     def set_auto_check_toggle_checked(self, enabled: bool) -> None: ...
+    def show_update_channel_open_error(self, error: str) -> None: ...
 
 
 class UpdatePageRuntime:
@@ -123,6 +124,7 @@ class UpdatePageRuntime:
         self._version_worker_runtime = OneShotWorkerRuntime()
         self._auto_check_load_runtime = OneShotWorkerRuntime()
         self._auto_check_save_runtime = OneShotWorkerRuntime()
+        self._update_channel_open_runtime = OneShotWorkerRuntime()
         self._update_thread = None
         self._update_worker = None
         self._cleanup_in_progress = False
@@ -176,6 +178,7 @@ class UpdatePageRuntime:
                 "_teardown_server_worker",
                 "_teardown_version_worker",
                 "_request_auto_check_load",
+                "request_open_update_channel",
                 "_teardown_update_runtime",
             ),
             state_and_network_workflow_methods=(
@@ -208,6 +211,7 @@ class UpdatePageRuntime:
                 "_server_worker_runtime",
                 "_version_worker_runtime",
                 "_auto_check_load_runtime",
+                "_update_channel_open_runtime",
                 "_update_thread",
                 "_update_worker",
             ),
@@ -236,6 +240,7 @@ class UpdatePageRuntime:
                 "_teardown_server_worker",
                 "_teardown_version_worker",
                 "_teardown_auto_check_load_worker",
+                "_teardown_update_channel_open_worker",
                 "_teardown_update_runtime",
             ),
             download_orchestration_candidates=(
@@ -461,8 +466,36 @@ class UpdatePageRuntime:
         else:
             self._auto_check_save_pending = None
 
-    def open_update_channel(self, channel: str):
-        return self._updater_feature.open_update_channel(channel)
+    def request_open_update_channel(self, channel: str) -> None:
+        if self._update_channel_open_runtime.is_running():
+            return
+        self._update_channel_open_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: self._updater_feature.create_update_channel_open_worker(
+                request_id,
+                channel=channel,
+                parent=self._view.window(),
+            ),
+            on_loaded=self._on_update_channel_open_finished,
+            on_failed=self._on_update_channel_open_failed,
+        )
+
+    def _on_update_channel_open_finished(self, request_id: int, result) -> None:
+        if not self._update_channel_open_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
+            return
+        if bool(getattr(result, "ok", False)):
+            return
+        self._view.show_update_channel_open_error(str(getattr(result, "message", "") or ""))
+
+    def _on_update_channel_open_failed(self, request_id: int, error: str) -> None:
+        if not self._update_channel_open_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
+            return
+        self._view.show_update_channel_open_error(str(error or ""))
 
     def cleanup(self) -> None:
         self._cleanup_in_progress = True
@@ -470,6 +503,7 @@ class UpdatePageRuntime:
         self._teardown_version_worker()
         self._teardown_auto_check_load_worker()
         self._teardown_auto_check_save_worker()
+        self._teardown_update_channel_open_worker()
         self._teardown_update_runtime(wait_for_finish=True)
 
     def _resolve_idle_view_decision(self) -> UpdateIdleViewDecision:
@@ -670,6 +704,14 @@ class UpdatePageRuntime:
             warning_prefix="auto_check_load_worker",
         )
         self._auto_check_load_runtime.cancel()
+
+    def _teardown_update_channel_open_worker(self) -> None:
+        self._update_channel_open_runtime.stop(
+            blocking=True,
+            log_fn=log,
+            warning_prefix="update_channel_open_worker",
+        )
+        self._update_channel_open_runtime.cancel()
 
     def _teardown_update_runtime(self, *, wait_for_finish: bool = False) -> None:
         thread = self._update_thread

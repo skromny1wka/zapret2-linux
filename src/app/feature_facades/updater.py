@@ -36,6 +36,16 @@ class UpdaterFeature:
             parent=parent,
         )
 
+    def create_update_channel_open_worker(self, request_id: int, *, channel: str, parent=None):
+        from updater.settings_workers import UpdaterChannelOpenWorker
+
+        return UpdaterChannelOpenWorker(
+            request_id,
+            updater_feature=self,
+            channel=channel,
+            parent=parent,
+        )
+
     def run_startup_update_check(self) -> dict:
         return self._commands().run_startup_update_check()
 

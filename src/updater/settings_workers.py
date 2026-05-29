@@ -42,3 +42,23 @@ class UpdaterAutoCheckLoadWorker(QThread):
             self.failed.emit(self._request_id, str(exc))
             return
         self.loaded.emit(self._request_id, enabled)
+
+
+class UpdaterChannelOpenWorker(QThread):
+    loaded = pyqtSignal(int, object)
+    failed = pyqtSignal(int, str)
+
+    def __init__(self, request_id: int, updater_feature, *, channel: str, parent=None):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self._updater = updater_feature
+        self._channel = str(channel or "")
+
+    def run(self) -> None:
+        try:
+            result = self._updater.open_update_channel(self._channel)
+        except Exception as exc:
+            log(f"UpdaterChannelOpenWorker: канал обновлений не открыт: {exc}", "ERROR")
+            self.failed.emit(self._request_id, str(exc))
+            return
+        self.loaded.emit(self._request_id, result)

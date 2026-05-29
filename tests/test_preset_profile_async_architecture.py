@@ -2454,6 +2454,24 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("create_auto_check_load_worker", feature_source)
         self.assertIn("is_auto_update_enabled", worker_source)
 
+    def test_updater_open_channel_runs_through_worker(self) -> None:
+        settings_workers = importlib.import_module("updater.settings_workers")
+        update_runtime_cls = __import__("updater.update_page_runtime", fromlist=["UpdatePageRuntime"]).UpdatePageRuntime
+        updater_feature_cls = __import__("app.feature_facades.updater", fromlist=["UpdaterFeature"]).UpdaterFeature
+
+        page_handler_source = inspect.getsource(ServersPage._open_telegram_channel)
+        runtime_source = inspect.getsource(update_runtime_cls)
+        feature_source = inspect.getsource(updater_feature_cls)
+
+        self.assertTrue(hasattr(settings_workers, "UpdaterChannelOpenWorker"))
+        worker_source = inspect.getsource(settings_workers.UpdaterChannelOpenWorker.run)
+
+        self.assertIn("request_open_update_channel", page_handler_source)
+        self.assertNotIn("self._update_runtime.open_update_channel", page_handler_source)
+        self.assertIn("_update_channel_open_runtime", runtime_source)
+        self.assertIn("create_update_channel_open_worker", feature_source)
+        self.assertIn("open_update_channel", worker_source)
+
     def test_logs_cleanup_stops_overview_worker(self) -> None:
         cleanup_source = inspect.getsource(LogsPage.cleanup)
 

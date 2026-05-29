@@ -336,16 +336,17 @@ class ServersPage(BasePage):
         self._update_runtime.dismiss_update()
 
     def _open_telegram_channel(self):
-        result = self._update_runtime.open_update_channel(CHANNEL)
-        if not result.ok:
-            InfoBar.warning(
-                title=self._tr("page.servers.telegram.error.title", "Ошибка"),
-                content=self._tr(
-                    "page.servers.telegram.error.open_channel",
-                    "Не удалось открыть Telegram канал:\n{error}",
-                ).format(error=result.message),
-                parent=self.window(),
-            )
+        self._update_runtime.request_open_update_channel(CHANNEL)
+
+    def show_update_channel_open_error(self, error: str) -> None:
+        InfoBar.warning(
+            title=self._tr("page.servers.telegram.error.title", "Ошибка"),
+            content=self._tr(
+                "page.servers.telegram.error.open_channel",
+                "Не удалось открыть Telegram канал:\n{error}",
+            ).format(error=str(error or "")),
+            parent=self.window(),
+        )
 
     def _on_back_to_about(self):
         try:
