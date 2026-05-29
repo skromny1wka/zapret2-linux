@@ -55,7 +55,6 @@ def build_dns_feature() -> DnsFeature:
 
         return DnsForceDnsActionWorker(
             request_id,
-            dns_feature=feature,
             action=action,
             enabled=enabled,
             adapters=adapters,
@@ -73,7 +72,6 @@ def build_dns_feature() -> DnsFeature:
 
         return DnsFlushCacheWorker(
             request_id,
-            dns_feature=feature,
             language=language,
             parent=parent,
         )
@@ -91,7 +89,6 @@ def build_dns_feature() -> DnsFeature:
 
         return DnsIspWarningWorker(
             request_id,
-            dns_feature=feature,
             adapters=adapters,
             dns_info=dns_info,
             force_dns_active=force_dns_active,
@@ -115,7 +112,6 @@ def build_dns_feature() -> DnsFeature:
 
         return DnsApplyWorker(
             request_id,
-            dns_feature=feature,
             action=action,
             adapters=adapters,
             name=name,
