@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from importlib import import_module
+import time
 
 from PyQt6.QtWidgets import QWidget
 
 from ui.navigation.schema import get_page_route_key
 from app.page_names import PageName
 from ui.page_composition import build_page_deps, validate_page_deps_builder_coverage
+from ui.page_performance import log_page_metric
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,12 +42,20 @@ class UiPageFactory:
 
         module_name, class_name = spec
 
-        import time as _time
+        started_at = time.perf_counter()
 
-        started_at = _time.perf_counter()
+        step_started_at = time.perf_counter()
         module = import_module(module_name)
         page_cls = getattr(module, class_name)
-        page = page_cls(parent=self._window, **build_page_deps(self._page_deps_sources, page_name))
+        log_page_metric(page_name, "factory.import", (time.perf_counter() - step_started_at) * 1000)
+
+        step_started_at = time.perf_counter()
+        page_deps = build_page_deps(self._page_deps_sources, page_name)
+        log_page_metric(page_name, "factory.deps", (time.perf_counter() - step_started_at) * 1000)
+
+        step_started_at = time.perf_counter()
+        page = page_cls(parent=self._window, **page_deps)
+        log_page_metric(page_name, "factory.constructor", (time.perf_counter() - step_started_at) * 1000)
 
         route_key = get_page_route_key(page_name)
         if route_key:
@@ -59,7 +69,7 @@ class UiPageFactory:
         else:
             setattr(page, "_page_registry_name", page_name)
 
-        elapsed_ms = int((_time.perf_counter() - started_at) * 1000)
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
         return CreatedPage(
             page_name=page_name,
             page=page,
