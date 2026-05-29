@@ -275,6 +275,18 @@ class ProfileListModel(QAbstractListModel):
             return True
 
         next_items = tuple(replacement if existing.key == source_key else existing for existing in self._all_items)
+        next_group_expanded = dict(self._group_expanded)
+        next_group_expanded.setdefault(str(replacement.group or "common"), True)
+        next_rows = self._build_rows_from(next_items, next_group_expanded)
+        if [_stable_row_identity(row) for row in self._rows] == [_stable_row_identity(row) for row in next_rows]:
+            changed_rows = tuple(index for index, row in enumerate(next_rows) if self._rows[index] != row)
+            self._all_items = next_items
+            self._profile_items = {entry.key: entry for entry in self._all_items}
+            self._group_expanded = next_group_expanded
+            self._rows = next_rows
+            self._emit_data_changed_for_rows(changed_rows)
+            return True
+
         can_update_row = (
             str(current.group or "") == str(replacement.group or "")
             and self._matches_filter(current)
@@ -292,8 +304,8 @@ class ProfileListModel(QAbstractListModel):
                 return True
 
         self.beginResetModel()
-        self._group_expanded.setdefault(str(replacement.group or "common"), True)
-        self._rows = self._build_rows()
+        self._group_expanded = next_group_expanded
+        self._rows = next_rows
         self.endResetModel()
         return True
 

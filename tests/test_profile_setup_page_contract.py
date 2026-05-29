@@ -1094,6 +1094,73 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertTrue(model.replace_profile("profile:0", youtube))
         self.assertEqual(model.rowCount(), 2)
 
+    def test_profile_model_updates_hidden_profile_without_reset(self) -> None:
+        from profile.ui.profile_list_model import ProfileListModel
+
+        discord = SimpleNamespace(
+            key="profile:0",
+            persistent_key="p0",
+            profile_index=0,
+            display_name="Discord",
+            enabled=True,
+            in_preset=True,
+            strategy_id="fake",
+            strategy_name="Fake",
+            match_lines=("--filter-udp=443-65535", "--hostlist=lists/discord.txt"),
+            list_type="hostlist",
+            rating="",
+            favorite=False,
+            group="voice",
+            group_name="Voice",
+            order=0,
+            order_is_manual=False,
+            group_collapsed=False,
+        )
+        youtube = SimpleNamespace(
+            key="profile:1",
+            persistent_key="p1",
+            profile_index=1,
+            display_name="YouTube",
+            enabled=True,
+            in_preset=True,
+            strategy_id="none",
+            strategy_name="Стратегия не выбрана",
+            match_lines=("--filter-tcp=443", "--hostlist=lists/youtube.txt"),
+            list_type="hostlist",
+            rating="",
+            favorite=False,
+            group="video",
+            group_name="Video",
+            order=1,
+            order_is_manual=False,
+            group_collapsed=False,
+        )
+        updated_discord = SimpleNamespace(
+            **{
+                **discord.__dict__,
+                "strategy_id": "updated",
+                "strategy_name": "Updated",
+            }
+        )
+
+        model = ProfileListModel()
+        model.set_profiles((discord, youtube))
+        model.set_search_query("youtube")
+        model.beginResetModel = Mock(side_effect=AssertionError("hidden profile update must not reset visible rows"))
+
+        self.assertTrue(model.replace_profile("profile:0", updated_discord))
+
+        rows = [
+            (
+                model.index(row, 0).data(ProfileListModel.KindRole),
+                model.index(row, 0).data(ProfileListModel.ProfileKeyRole),
+            )
+            for row in range(model.rowCount())
+        ]
+        self.assertIn(("profile", "profile:1"), rows)
+        self.assertNotIn(("profile", "profile:0"), rows)
+        self.assertEqual(model.profile_item_for_key("profile:0").strategy_id, "updated")
+
     def test_profile_model_removes_single_profile_row_without_reset(self) -> None:
         from profile.ui.profile_list_model import ProfileListModel
 
