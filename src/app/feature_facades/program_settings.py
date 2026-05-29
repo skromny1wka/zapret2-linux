@@ -72,6 +72,36 @@ class ProgramSettingsFeature:
     def set_hide_to_tray_on_minimize_close(self, enabled: bool) -> bool:
         return bool(self._commands().set_hide_to_tray_on_minimize_close(enabled))
 
+    def _program_settings_save_action(self, action: str):
+        normalized_action = str(action or "").strip()
+
+        def save_auto_dpi(enabled: bool, *, status_callback=None):
+            return self.set_auto_dpi_enabled(enabled)
+
+        def save_hide_to_tray(enabled: bool, *, status_callback=None):
+            return self.set_hide_to_tray_on_minimize_close(enabled)
+
+        def save_defender_disabled(enabled: bool, *, status_callback=None):
+            return self.set_defender_disabled(enabled, status_callback=status_callback)
+
+        def save_max_block(enabled: bool, *, status_callback=None):
+            return self.set_max_block_enabled(enabled, status_callback=status_callback)
+
+        actions = {
+            "auto_dpi": save_auto_dpi,
+            "hide_to_tray": save_hide_to_tray,
+            "defender_disabled": save_defender_disabled,
+            "max_block": save_max_block,
+        }
+        save_action = actions.get(normalized_action)
+        if save_action is not None:
+            return save_action
+
+        def unknown_action(enabled: bool, *, status_callback=None):
+            raise ValueError(f"Неизвестная настройка программы: {normalized_action}")
+
+        return unknown_action
+
     def create_program_settings_save_worker(self, request_id: int, *, action: str, enabled: bool, parent=None):
         from program_settings.workers import ProgramSettingsSaveWorker
 
@@ -79,6 +109,7 @@ class ProgramSettingsFeature:
             request_id,
             action=action,
             enabled=bool(enabled),
+            save_action=self._program_settings_save_action(action),
             parent=parent,
         )
 
@@ -87,7 +118,7 @@ class ProgramSettingsFeature:
 
         return ProgramSettingsLoadWorker(
             request_id,
-            runtime_service=self.runtime_service,
+            load_program_settings_snapshot=self.load_program_settings_snapshot,
             parent=parent,
         )
 
@@ -96,6 +127,7 @@ class ProgramSettingsFeature:
 
         return ProgramSettingsAdminCheckWorker(
             request_id,
+            is_user_admin=self.is_user_admin,
             parent=parent,
         )
 

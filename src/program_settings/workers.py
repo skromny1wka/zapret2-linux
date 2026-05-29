@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from log.log import log
@@ -13,18 +16,16 @@ class ProgramSettingsLoadWorker(QThread):
         self,
         request_id: int,
         *,
-        runtime_service,
+        load_program_settings_snapshot: Callable[[], Any],
         parent=None,
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._runtime_service = runtime_service
+        self._load_program_settings_snapshot = load_program_settings_snapshot
 
     def run(self) -> None:
-        import program_settings.public as program_settings_commands
-
         try:
-            snapshot = program_settings_commands.load_program_settings_snapshot(self._runtime_service)
+            snapshot = self._load_program_settings_snapshot()
         except Exception as exc:
             log(f"ProgramSettingsLoadWorker: не удалось загрузить настройки программы: {exc}", "WARNING")
             self.failed.emit(self._request_id, str(exc))
@@ -40,16 +41,16 @@ class ProgramSettingsAdminCheckWorker(QThread):
         self,
         request_id: int,
         *,
+        is_user_admin: Callable[[], bool],
         parent=None,
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
+        self._is_user_admin = is_user_admin
 
     def run(self) -> None:
-        import program_settings.public as program_settings_commands
-
         try:
-            is_admin = bool(program_settings_commands.is_user_admin())
+            is_admin = bool(self._is_user_admin())
         except Exception as exc:
             log(f"ProgramSettingsAdminCheckWorker: не удалось проверить права администратора: {exc}", "WARNING")
             self.failed.emit(self._request_id, str(exc))
@@ -68,36 +69,24 @@ class ProgramSettingsSaveWorker(QThread):
         *,
         action: str,
         enabled: bool,
+        save_action: Callable[..., Any],
         parent=None,
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
         self._action = str(action or "").strip()
         self._enabled = bool(enabled)
+        self._save_action = save_action
 
     def run(self) -> None:
-        import program_settings.commands as program_settings_commands
-
         def emit_status(message: str) -> None:
             self.status.emit(self._request_id, self._action, str(message or ""))
 
         try:
-            if self._action == "auto_dpi":
-                result = program_settings_commands.set_auto_dpi_enabled(self._enabled)
-            elif self._action == "hide_to_tray":
-                result = program_settings_commands.set_hide_to_tray_on_minimize_close(self._enabled)
-            elif self._action == "defender_disabled":
-                result = program_settings_commands.set_defender_disabled(
-                    self._enabled,
-                    status_callback=emit_status,
-                )
-            elif self._action == "max_block":
-                result = program_settings_commands.set_max_block_enabled(
-                    self._enabled,
-                    status_callback=emit_status,
-                )
-            else:
-                raise ValueError(f"Неизвестная настройка программы: {self._action}")
+            result = self._save_action(
+                self._enabled,
+                status_callback=emit_status,
+            )
         except Exception as exc:
             log(f"ProgramSettingsSaveWorker: не удалось сохранить {self._action}: {exc}", "WARNING")
             self.failed.emit(self._request_id, self._action, str(exc))

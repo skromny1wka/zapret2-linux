@@ -2899,6 +2899,10 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
         self.assertTrue(hasattr(program_settings_workers, "ProgramSettingsSaveWorker"))
         worker_source = inspect.getsource(program_settings_workers.ProgramSettingsSaveWorker.run)
+        feature_source = inspect.getsource(
+            __import__("app.feature_facades.program_settings", fromlist=["ProgramSettingsFeature"])
+            .ProgramSettingsFeature.create_program_settings_save_worker
+        )
         shared_source = inspect.getsource(control_page_shared.ControlPageActionMixin)
 
         for source in (
@@ -2913,14 +2917,15 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
         self.assertIn("create_program_settings_save_worker", shared_source)
         self.assertIn("program_settings_save_pending", shared_source)
-        self.assertIn("set_auto_dpi_enabled", worker_source)
-        self.assertIn("set_hide_to_tray_on_minimize_close", worker_source)
+        self.assertIn("save_action=self._program_settings_save_action(action)", feature_source)
+        self.assertIn("_save_action", worker_source)
+        self.assertNotIn("program_settings_commands", worker_source)
         self.assertIn('_request_program_settings_save("defender_disabled"', defender_source)
         self.assertIn('_request_program_settings_save("max_block"', max_source)
         self.assertNotIn("self._program_settings.set_defender_disabled", defender_source)
         self.assertNotIn("self._program_settings.set_max_block_enabled", max_source)
-        self.assertIn("set_defender_disabled", worker_source)
-        self.assertIn("set_max_block_enabled", worker_source)
+        self.assertNotIn("set_defender_disabled", worker_source)
+        self.assertNotIn("set_max_block_enabled", worker_source)
 
     def test_defender_admin_check_runs_through_worker(self) -> None:
         defender_source = "\n".join(
