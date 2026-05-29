@@ -164,7 +164,6 @@ class StrategyScanResumeSaveWorker(QThread):
         self,
         request_id: int,
         *,
-        blockcheck_feature,
         scan_target: str,
         scan_protocol: str,
         next_index: int,
@@ -173,7 +172,6 @@ class StrategyScanResumeSaveWorker(QThread):
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._blockcheck = blockcheck_feature
         self._scan_target = str(scan_target or "")
         self._scan_protocol = str(scan_protocol or "")
         self._next_index = int(next_index)
@@ -181,7 +179,9 @@ class StrategyScanResumeSaveWorker(QThread):
 
     def run(self) -> None:
         try:
-            self._blockcheck.save_resume_state(
+            import blockcheck.public as blockcheck_public
+
+            blockcheck_public.save_resume_state(
                 self._scan_target,
                 self._scan_protocol,
                 self._next_index,
@@ -202,7 +202,6 @@ class StrategyScanFinalizeWorker(QThread):
         self,
         request_id: int,
         *,
-        blockcheck_feature,
         report,
         scan_target: str,
         scan_protocol: str,
@@ -214,7 +213,6 @@ class StrategyScanFinalizeWorker(QThread):
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._blockcheck = blockcheck_feature
         self._report = report
         self._scan_target = str(scan_target or "")
         self._scan_protocol = str(scan_protocol or "")
@@ -225,7 +223,9 @@ class StrategyScanFinalizeWorker(QThread):
 
     def run(self) -> None:
         try:
-            finish_plan = self._blockcheck.finalize_scan_report(
+            import blockcheck.public as blockcheck_public
+
+            finish_plan = blockcheck_public.finalize_scan_report(
                 self._report,
                 scan_target=self._scan_target,
                 scan_protocol=self._scan_protocol,

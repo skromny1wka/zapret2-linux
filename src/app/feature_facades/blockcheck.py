@@ -60,12 +60,12 @@ class BlockcheckFeature:
     def create_strategy_scan_resume_save_worker(self, request_id: int, **kwargs):
         from blockcheck.workers import StrategyScanResumeSaveWorker
 
-        return StrategyScanResumeSaveWorker(request_id, blockcheck_feature=self, **kwargs)
+        return StrategyScanResumeSaveWorker(request_id, **kwargs)
 
     def create_strategy_scan_finalize_worker(self, request_id: int, **kwargs):
         from blockcheck.workers import StrategyScanFinalizeWorker
 
-        return StrategyScanFinalizeWorker(request_id, blockcheck_feature=self, **kwargs)
+        return StrategyScanFinalizeWorker(request_id, **kwargs)
 
     def append_run_log(self, *args, **kwargs) -> None:
         return self._commands().append_run_log(*args, **kwargs)
