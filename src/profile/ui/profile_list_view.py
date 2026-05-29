@@ -13,6 +13,16 @@ from .profile_list_model import ProfileListModel
 PROFILE_DROP_MARKER_PROPERTY = "profileDropMarker"
 
 
+def set_current_index_if_changed(view, index) -> bool:
+    try:
+        if view.currentIndex() == index:
+            return False
+    except Exception:
+        pass
+    view.setCurrentIndex(index)
+    return True
+
+
 def profile_drop_marker_for_target(row: int, destination_kind: str) -> dict[str, object]:
     kind = str(destination_kind or "").strip()
     try:
@@ -219,14 +229,14 @@ class ProfileListView(ListView):
             if index.isValid() and str(index.data(ProfileListModel.KindRole) or "") == "folder":
                 group_key = str(index.data(ProfileListModel.GroupRole) or "")
                 if group_key:
-                    self.setCurrentIndex(index)
+                    set_current_index_if_changed(self, index)
                     self.folder_context_requested.emit(group_key, self.viewport().mapToGlobal(pos))
                     event.accept()
                     return
             if index.isValid() and str(index.data(ProfileListModel.KindRole) or "") == "profile":
                 profile_key = str(index.data(ProfileListModel.ProfileKeyRole) or "")
                 if profile_key:
-                    self.setCurrentIndex(index)
+                    set_current_index_if_changed(self, index)
                     self.profile_context_requested.emit(profile_key, self.viewport().mapToGlobal(pos))
                     event.accept()
                     return

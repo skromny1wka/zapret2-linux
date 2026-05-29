@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import unittest
+from unittest.mock import Mock
 
 from profile.ui import profile_list_delegate, profile_list_view
 
@@ -64,6 +65,22 @@ class ProfileDragIndicatorTests(unittest.TestCase):
         self.assertIn("_update_drop_marker_rows", payload_source)
         self.assertNotIn("viewport().update()", payload_source)
         self.assertIn("viewport().update(rect", update_source)
+
+    def test_profile_current_index_helper_skips_already_selected_index(self) -> None:
+        class _Index:
+            def __init__(self, row: int) -> None:
+                self.row = row
+
+            def __eq__(self, other) -> bool:
+                return isinstance(other, _Index) and self.row == other.row
+
+        index = _Index(3)
+        view = Mock()
+        view.currentIndex.return_value = index
+
+        self.assertFalse(profile_list_view.set_current_index_if_changed(view, index))
+
+        view.setCurrentIndex.assert_not_called()
 
     def test_view_sends_destination_group_with_row_drop(self) -> None:
         view_source = inspect.getsource(profile_list_view.ProfileListView)
