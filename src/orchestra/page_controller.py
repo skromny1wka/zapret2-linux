@@ -33,9 +33,9 @@ class OrchestraPageController:
     def create_clear_learned_worker(self, request_id: int, parent=None):
         from orchestra.page_workers import OrchestraClearLearnedWorker
 
-        return OrchestraClearLearnedWorker(request_id, self, parent)
+        return OrchestraClearLearnedWorker(request_id, self.clear_learned_data, parent)
 
     def create_log_history_load_worker(self, request_id: int, parent=None):
         from orchestra.page_workers import OrchestraLogHistoryLoadWorker
 
-        return OrchestraLogHistoryLoadWorker(request_id, self, parent)
+        return OrchestraLogHistoryLoadWorker(request_id, self.load_log_history, parent)

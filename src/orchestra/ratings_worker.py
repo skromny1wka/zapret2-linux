@@ -9,14 +9,14 @@ class OrchestraRatingsStateLoadWorker(QThread):
     loaded = pyqtSignal(int, object)
     failed = pyqtSignal(int, str)
 
-    def __init__(self, request_id: int, controller, parent=None):
+    def __init__(self, request_id: int, load_state, parent=None):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._controller = controller
+        self._load_state = load_state
 
     def run(self) -> None:
         try:
-            state = self._controller.load_state()
+            state = self._load_state()
         except Exception as exc:
             log(f"Orchestra ratings worker: ошибка загрузки: {exc}", "ERROR")
             self.failed.emit(self._request_id, str(exc))

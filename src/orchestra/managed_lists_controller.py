@@ -49,14 +49,18 @@ class BlockedStrategiesController:
     def create_snapshot_load_worker(self, request_id: int, parent=None):
         from orchestra.managed_lists_workers import OrchestraManagedSnapshotLoadWorker
 
-        return OrchestraManagedSnapshotLoadWorker(request_id, self, parent)
+        return OrchestraManagedSnapshotLoadWorker(request_id, self.reload_snapshot, parent)
 
     def create_action_worker(self, request_id: int, *, action: str, parent=None, **kwargs):
         from orchestra.managed_lists_workers import OrchestraManagedActionWorker
 
         return OrchestraManagedActionWorker(
             request_id,
-            self,
+            self.reload_snapshot,
+            change_strategy=self.change_strategy,
+            remove_strategy=self.remove_strategy,
+            add_strategy=self.add_strategy,
+            clear_user_strategies=self.clear_user_strategies,
             action=action,
             parent=parent,
             **kwargs,
@@ -142,14 +146,20 @@ class LockedStrategiesController:
     def create_snapshot_load_worker(self, request_id: int, parent=None):
         from orchestra.managed_lists_workers import OrchestraManagedSnapshotLoadWorker
 
-        return OrchestraManagedSnapshotLoadWorker(request_id, self, parent)
+        return OrchestraManagedSnapshotLoadWorker(request_id, self.reload_snapshot, parent)
 
     def create_action_worker(self, request_id: int, *, action: str, parent=None, **kwargs):
         from orchestra.managed_lists_workers import OrchestraManagedActionWorker
 
         return OrchestraManagedActionWorker(
             request_id,
-            self,
+            self.reload_snapshot,
+            change_strategy=self.change_strategy,
+            remove_strategy=self.remove_strategy,
+            add_strategy=self.add_strategy,
+            is_blocked_strategy=self.is_blocked_strategy,
+            current_strategy=self.current_strategy,
+            clear_strategies=self.clear_strategies,
             action=action,
             parent=parent,
             **kwargs,
@@ -260,7 +270,7 @@ class WhitelistController:
 
         return OrchestraWhitelistSnapshotLoadWorker(
             request_id,
-            self,
+            self.snapshot,
             refresh=refresh,
             parent=parent,
         )
@@ -278,7 +288,10 @@ class WhitelistController:
 
         return OrchestraWhitelistActionWorker(
             request_id,
-            self,
+            self.add_domain,
+            self.remove_domain,
+            self.clear_user_domains,
+            self.snapshot,
             action=action,
             domain=domain,
             user_domains=user_domains,
