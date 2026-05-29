@@ -117,7 +117,8 @@ class ProfileSettingsSaveWorker(QThread):
     def __init__(
         self,
         request_id: int,
-        controller,
+        save_settings,
+        load_profile,
         *,
         profile_key: str,
         filter_kind: str,
@@ -128,7 +129,8 @@ class ProfileSettingsSaveWorker(QThread):
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._controller = controller
+        self._save_settings = save_settings
+        self._load_profile = load_profile
         self._profile_key = str(profile_key or "").strip()
         self._filter_kind = str(filter_kind or "").strip()
         self._filter_value = str(filter_value or "").strip()
@@ -137,14 +139,14 @@ class ProfileSettingsSaveWorker(QThread):
 
     def run(self) -> None:
         try:
-            profile_key = self._controller.save_winws2_settings(
+            profile_key = self._save_settings(
                 profile_key=self._profile_key,
                 filter_kind=self._filter_kind,
                 filter_value=self._filter_value,
                 in_range=self._in_range,
                 out_range=self._out_range,
             )
-            payload = self._controller.load(str(profile_key or self._profile_key))
+            payload = self._load_profile(str(profile_key or self._profile_key))
         except Exception as exc:
             log(f"ProfileSettingsSaveWorker: не удалось сохранить настройки profile: {exc}", "ERROR")
             self.failed.emit(self._request_id, str(exc))
@@ -156,20 +158,21 @@ class ProfileRawTextSaveWorker(QThread):
     saved = pyqtSignal(int, str, object)
     failed = pyqtSignal(int, str)
 
-    def __init__(self, request_id: int, controller, profile_key: str, raw_text: str, parent=None):
+    def __init__(self, request_id: int, save_raw_text, load_profile, profile_key: str, raw_text: str, parent=None):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._controller = controller
+        self._save_raw_text = save_raw_text
+        self._load_profile = load_profile
         self._profile_key = str(profile_key or "").strip()
         self._raw_text = str(raw_text or "")
 
     def run(self) -> None:
         try:
-            profile_key = self._controller.save_raw_profile_text(
+            profile_key = self._save_raw_text(
                 profile_key=self._profile_key,
                 raw_text=self._raw_text,
             )
-            payload = self._controller.load(str(profile_key or self._profile_key))
+            payload = self._load_profile(str(profile_key or self._profile_key))
         except Exception as exc:
             log(f"ProfileRawTextSaveWorker: не удалось сохранить сырой текст profile: {exc}", "ERROR")
             self.failed.emit(self._request_id, str(exc))
@@ -184,7 +187,8 @@ class ProfileEnabledSaveWorker(QThread):
     def __init__(
         self,
         request_id: int,
-        controller,
+        set_enabled,
+        load_profile,
         *,
         profile_key: str,
         enabled: bool,
@@ -194,7 +198,8 @@ class ProfileEnabledSaveWorker(QThread):
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._controller = controller
+        self._set_enabled = set_enabled
+        self._load_profile = load_profile
         self._profile_key = str(profile_key or "").strip()
         self._enabled = bool(enabled)
         self._filter_kind = str(filter_kind or "").strip()
@@ -202,7 +207,7 @@ class ProfileEnabledSaveWorker(QThread):
 
     def run(self) -> None:
         try:
-            profile_key = self._controller.set_enabled(
+            profile_key = self._set_enabled(
                 profile_key=self._profile_key,
                 enabled=self._enabled,
                 filter_kind=self._filter_kind,
@@ -216,7 +221,7 @@ class ProfileEnabledSaveWorker(QThread):
         clean_profile_key = str(profile_key or "").strip()
         if clean_profile_key:
             try:
-                payload = self._controller.load(clean_profile_key)
+                payload = self._load_profile(clean_profile_key)
             except Exception as exc:
                 log(f"ProfileEnabledSaveWorker: не удалось обновить payload profile: {exc}", "DEBUG")
         self.saved.emit(self._request_id, clean_profile_key, self._enabled, payload)
@@ -542,16 +547,17 @@ class ProfileStrategyApplyWorker(QThread):
     applied = pyqtSignal(int, str, str, str, object)
     failed = pyqtSignal(int, str)
 
-    def __init__(self, request_id: int, controller, profile_key: str, strategy_id: str, parent=None):
+    def __init__(self, request_id: int, apply_strategy, load_profile, profile_key: str, strategy_id: str, parent=None):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._controller = controller
+        self._apply_strategy = apply_strategy
+        self._load_profile = load_profile
         self._profile_key = str(profile_key or "").strip()
         self._strategy_id = str(strategy_id or "").strip()
 
     def run(self) -> None:
         try:
-            profile_key = self._controller.apply_strategy(
+            profile_key = self._apply_strategy(
                 profile_key=self._profile_key,
                 strategy_id=self._strategy_id,
             )
@@ -564,7 +570,7 @@ class ProfileStrategyApplyWorker(QThread):
             return
         payload = None
         try:
-            payload = self._controller.load(str(profile_key))
+            payload = self._load_profile(str(profile_key))
         except Exception as exc:
             log(f"ProfileStrategyApplyWorker: не удалось загрузить обновлённый profile payload: {exc}", "DEBUG")
         self.applied.emit(self._request_id, self._profile_key, str(profile_key), self._strategy_id, payload)
@@ -577,7 +583,7 @@ class ProfileStrategyFeedbackSaveWorker(QThread):
     def __init__(
         self,
         request_id: int,
-        controller,
+        save_feedback,
         *,
         profile_key: str,
         strategy_id: str,
@@ -587,7 +593,7 @@ class ProfileStrategyFeedbackSaveWorker(QThread):
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._controller = controller
+        self._save_feedback = save_feedback
         self._profile_key = str(profile_key or "").strip()
         self._strategy_id = str(strategy_id or "").strip()
         self._rating = rating
@@ -595,7 +601,7 @@ class ProfileStrategyFeedbackSaveWorker(QThread):
 
     def run(self) -> None:
         try:
-            state = self._controller.set_strategy_feedback(
+            state = self._save_feedback(
                 profile_key=self._profile_key,
                 rating=self._rating,
                 favorite=self._favorite,

@@ -101,7 +101,8 @@ class ProfileSetupController:
 
         return ProfileSettingsSaveWorker(
             request_id,
-            self,
+            self.save_winws2_settings,
+            self.load,
             profile_key=profile_key,
             filter_kind=filter_kind,
             filter_value=filter_value,
@@ -113,7 +114,14 @@ class ProfileSetupController:
     def create_raw_profile_save_worker(self, request_id: int, profile_key: str, raw_text: str, parent=None):
         from profile.profile_setup_loader import ProfileRawTextSaveWorker
 
-        return ProfileRawTextSaveWorker(request_id, self, profile_key, raw_text, parent)
+        return ProfileRawTextSaveWorker(
+            request_id,
+            self.save_raw_profile_text,
+            self.load,
+            profile_key,
+            raw_text,
+            parent,
+        )
 
     def create_enabled_save_worker(
         self,
@@ -129,7 +137,8 @@ class ProfileSetupController:
 
         return ProfileEnabledSaveWorker(
             request_id,
-            self,
+            self.set_enabled,
+            self.load,
             profile_key=profile_key,
             enabled=enabled,
             filter_kind=filter_kind,
@@ -168,7 +177,14 @@ class ProfileSetupController:
     def create_strategy_apply_worker(self, request_id: int, *, profile_key: str, strategy_id: str, parent=None):
         from profile.profile_setup_loader import ProfileStrategyApplyWorker
 
-        return ProfileStrategyApplyWorker(request_id, self, profile_key, strategy_id, parent)
+        return ProfileStrategyApplyWorker(
+            request_id,
+            self.apply_strategy,
+            self.load,
+            profile_key,
+            strategy_id,
+            parent,
+        )
 
     def create_strategy_feedback_save_worker(
         self,
@@ -184,7 +200,7 @@ class ProfileSetupController:
 
         return ProfileStrategyFeedbackSaveWorker(
             request_id,
-            self,
+            self.set_strategy_feedback,
             profile_key=profile_key,
             strategy_id=strategy_id,
             rating=rating,

@@ -2542,11 +2542,12 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         worker.start.assert_called_once()
 
     def test_raw_profile_save_worker_emits_new_profile_key_and_payload(self) -> None:
-        controller = Mock()
+        save_raw_text = Mock()
+        load_profile = Mock()
         payload = SimpleNamespace(item=SimpleNamespace(key="profile-2"))
-        controller.save_raw_profile_text.return_value = "profile-2"
-        controller.load.return_value = payload
-        worker = ProfileRawTextSaveWorker(7, controller, "profile-1", "--new\n")
+        save_raw_text.return_value = "profile-2"
+        load_profile.return_value = payload
+        worker = ProfileRawTextSaveWorker(7, save_raw_text, load_profile, "profile-1", "--new\n")
         saved = []
 
         worker.saved.connect(lambda request_id, profile_key, emitted_payload: saved.append(
@@ -2555,11 +2556,11 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         worker.run()
 
-        controller.save_raw_profile_text.assert_called_once_with(
+        save_raw_text.assert_called_once_with(
             profile_key="profile-1",
             raw_text="--new\n",
         )
-        controller.load.assert_called_once_with("profile-2")
+        load_profile.assert_called_once_with("profile-2")
         self.assertEqual(saved, [(7, "profile-2", payload)])
 
     def test_raw_profile_save_finish_passes_updated_item_to_preset_page(self) -> None:
@@ -2627,13 +2628,14 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         worker.start.assert_called_once()
 
     def test_enabled_save_worker_emits_new_profile_key_and_payload(self) -> None:
-        controller = Mock()
-        controller.set_enabled.return_value = "profile-2"
+        set_enabled = Mock(return_value="profile-2")
+        load_profile = Mock()
         payload = SimpleNamespace(item=SimpleNamespace(key="profile-2"))
-        controller.load.return_value = payload
+        load_profile.return_value = payload
         worker = ProfileEnabledSaveWorker(
             8,
-            controller,
+            set_enabled,
+            load_profile,
             profile_key="profile-1",
             enabled=False,
             filter_kind="hostlist",
@@ -2649,13 +2651,13 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         worker.run()
 
-        controller.set_enabled.assert_called_once_with(
+        set_enabled.assert_called_once_with(
             profile_key="profile-1",
             enabled=False,
             filter_kind="hostlist",
             filter_value="lists/youtube.txt",
         )
-        controller.load.assert_called_once_with("profile-2")
+        load_profile.assert_called_once_with("profile-2")
         self.assertEqual(saved, [(8, "profile-2", False, payload)])
 
     def test_enabled_save_finish_updates_detail_without_reload(self) -> None:
@@ -3085,13 +3087,15 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         worker.start.assert_called_once()
 
     def test_settings_save_worker_emits_new_profile_key_and_payload(self) -> None:
-        controller = Mock()
+        save_settings = Mock()
+        load_profile = Mock()
         payload = SimpleNamespace(item=SimpleNamespace(key="profile-2"))
-        controller.save_winws2_settings.return_value = "profile-2"
-        controller.load.return_value = payload
+        save_settings.return_value = "profile-2"
+        load_profile.return_value = payload
         worker = ProfileSettingsSaveWorker(
             4,
-            controller,
+            save_settings,
+            load_profile,
             profile_key="profile-1",
             filter_kind="hostlist",
             filter_value="lists/youtube.txt",
@@ -3106,14 +3110,14 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         worker.run()
 
-        controller.save_winws2_settings.assert_called_once_with(
+        save_settings.assert_called_once_with(
             profile_key="profile-1",
             filter_kind="hostlist",
             filter_value="lists/youtube.txt",
             in_range="x",
             out_range="a",
         )
-        controller.load.assert_called_once_with("profile-2")
+        load_profile.assert_called_once_with("profile-2")
         self.assertEqual(saved, [(4, "profile-2", payload)])
 
     def test_settings_save_finish_passes_updated_item_to_preset_page(self) -> None:
@@ -3381,11 +3385,11 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._on_profile_changed_callback.assert_called_once_with("profile-1", "strategy", updated_item)
 
     def test_strategy_apply_worker_emits_new_profile_key(self) -> None:
-        controller = Mock()
-        controller.apply_strategy.return_value = "profile-1"
+        apply_strategy = Mock(return_value="profile-1")
+        load_profile = Mock()
         payload = SimpleNamespace(item=SimpleNamespace(key="profile-1"))
-        controller.load.return_value = payload
-        worker = ProfileStrategyApplyWorker(9, controller, "template:profile-1", "tls_fake")
+        load_profile.return_value = payload
+        worker = ProfileStrategyApplyWorker(9, apply_strategy, load_profile, "template:profile-1", "tls_fake")
         applied = []
 
         worker.applied.connect(
@@ -3400,11 +3404,11 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         worker.run()
 
-        controller.apply_strategy.assert_called_once_with(
+        apply_strategy.assert_called_once_with(
             profile_key="template:profile-1",
             strategy_id="tls_fake",
         )
-        controller.load.assert_called_once_with("profile-1")
+        load_profile.assert_called_once_with("profile-1")
         self.assertEqual(applied, [(9, "template:profile-1", "profile-1", "tls_fake", payload)])
 
     def test_strategy_feedback_updates_payload_without_reloading_profile(self) -> None:
@@ -3525,12 +3529,11 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page.reload_current_profile.assert_not_called()
 
     def test_strategy_feedback_worker_emits_state(self) -> None:
-        controller = Mock()
         state = ProfileStrategyState(rating="work", favorite=True)
-        controller.set_strategy_feedback.return_value = state
+        save_feedback = Mock(return_value=state)
         worker = ProfileStrategyFeedbackSaveWorker(
             10,
-            controller,
+            save_feedback,
             profile_key="profile-1",
             strategy_id="tls_fake",
             rating="work",
@@ -3549,7 +3552,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         worker.run()
 
-        controller.set_strategy_feedback.assert_called_once_with(
+        save_feedback.assert_called_once_with(
             profile_key="profile-1",
             rating="work",
             favorite=True,
