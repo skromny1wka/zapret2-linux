@@ -57,6 +57,50 @@ from ui.widgets.fluent_scrollbar import install_fluent_scrollbars
 from ui.widgets.hover_row import paint_profile_hover_row, profile_hover_row_rect
 
 
+def set_widget_text_if_changed(widget, text: str) -> bool:
+    value = str(text or "")
+    try:
+        if str(widget.text()) == value:
+            return False
+    except Exception:
+        pass
+    widget.setText(value)
+    return True
+
+
+def set_widget_checked_if_changed(widget, checked: bool) -> bool:
+    value = bool(checked)
+    try:
+        if bool(widget.isChecked()) == value:
+            return False
+    except Exception:
+        pass
+    widget.setChecked(value)
+    return True
+
+
+def set_widget_enabled_if_changed(widget, enabled: bool) -> bool:
+    value = bool(enabled)
+    try:
+        if bool(widget.isEnabled()) == value:
+            return False
+    except Exception:
+        pass
+    widget.setEnabled(value)
+    return True
+
+
+def set_widget_visible_if_changed(widget, visible: bool) -> bool:
+    value = bool(visible)
+    try:
+        if bool(widget.isVisible()) == value:
+            return False
+    except Exception:
+        pass
+    widget.setVisible(value)
+    return True
+
+
 class ProfileStrategyListDelegate(QStyledItemDelegate):
     """Рисует готовые стратегии как единый текстовый список."""
 
@@ -1375,13 +1419,14 @@ class ProfileSetupPageBase(BasePage):
         self._loading = True
         try:
             item = payload.item
-            self._summary.setText(payload.match_summary)
-            self._enabled_checkbox.setChecked(bool(item.enabled))
-            self._enabled_checkbox.setEnabled(True)
+            set_widget_text_if_changed(self._summary, payload.match_summary)
+            set_widget_checked_if_changed(self._enabled_checkbox, bool(item.enabled))
+            set_widget_enabled_if_changed(self._enabled_checkbox, True)
+            user_profile_visible = bool(_user_profile_id_from_payload(self._profile_key, payload))
             if self._update_user_profile_button is not None:
-                self._update_user_profile_button.setVisible(bool(_user_profile_id_from_payload(self._profile_key, payload)))
+                set_widget_visible_if_changed(self._update_user_profile_button, user_profile_visible)
             if self._delete_user_profile_button is not None:
-                self._delete_user_profile_button.setVisible(bool(_user_profile_id_from_payload(self._profile_key, payload)))
+                set_widget_visible_if_changed(self._delete_user_profile_button, user_profile_visible)
             self._apply_editable_settings(payload)
             self._set_list_file_editor_available(_profile_has_list_file_editor(payload))
             self._sync_editor_tab_label(payload)
@@ -1391,7 +1436,7 @@ class ProfileSetupPageBase(BasePage):
                 states=payload.strategy_states,
                 current_strategy_id=item.strategy_id or "none",
             )
-            self._strategy_list.setEnabled(not (item.in_preset and not item.enabled))
+            set_widget_enabled_if_changed(self._strategy_list, not (item.in_preset and not item.enabled))
             self._list_file_dirty = True
             if self._editor_tab_built and self._strategy_stack.currentIndex() == 1:
                 self._request_list_file_editor_state()
