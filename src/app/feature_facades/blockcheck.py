@@ -30,7 +30,7 @@ class BlockcheckFeature:
     def create_strategy_apply_worker(self, request_id: int, **kwargs):
         from blockcheck.strategy_apply_worker import StrategyApplyWorker
 
-        return StrategyApplyWorker(request_id, blockcheck_feature=self, **kwargs)
+        return StrategyApplyWorker(request_id, apply_strategy=self.apply_strategy, **kwargs)
 
     def create_page_initial_state_worker(self, request_id: int, *, parent=None):
         from blockcheck.workers import BlockcheckInitialStateWorker

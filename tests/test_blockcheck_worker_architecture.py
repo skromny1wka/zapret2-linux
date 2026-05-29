@@ -4,6 +4,7 @@ import inspect
 import unittest
 
 from app.feature_facades.blockcheck import BlockcheckFeature
+import blockcheck.strategy_apply_worker as strategy_apply_worker
 import blockcheck.workers as blockcheck_workers
 
 
@@ -26,6 +27,18 @@ class BlockcheckWorkerArchitectureTests(unittest.TestCase):
         self.assertNotIn("self._blockcheck", worker_source)
         self.assertIn("blockcheck_public.save_resume_state", worker_source)
         self.assertIn("blockcheck_public.finalize_scan_report", worker_source)
+
+    def test_strategy_apply_worker_uses_apply_callable_not_feature_object(self) -> None:
+        feature_source = inspect.getsource(BlockcheckFeature.create_strategy_apply_worker)
+        worker_init_source = inspect.getsource(strategy_apply_worker.StrategyApplyWorker.__init__)
+        worker_run_source = inspect.getsource(strategy_apply_worker.StrategyApplyWorker.run)
+
+        self.assertNotIn("blockcheck_feature=self", feature_source)
+        self.assertIn("apply_strategy", worker_init_source)
+        self.assertIn("self._apply_strategy", worker_init_source)
+        self.assertNotIn("self._blockcheck", worker_init_source)
+        self.assertIn("self._apply_strategy(", worker_run_source)
+        self.assertNotIn("self._blockcheck.apply_strategy", worker_run_source)
 
 
 if __name__ == "__main__":

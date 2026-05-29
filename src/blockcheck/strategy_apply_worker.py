@@ -13,7 +13,7 @@ class StrategyApplyWorker(QThread):
         self,
         request_id: int,
         *,
-        blockcheck_feature,
+        apply_strategy,
         strategy_args: str,
         strategy_name: str,
         scan_target: str,
@@ -23,7 +23,7 @@ class StrategyApplyWorker(QThread):
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._blockcheck = blockcheck_feature
+        self._apply_strategy = apply_strategy
         self._strategy_args = str(strategy_args or "")
         self._strategy_name = str(strategy_name or "")
         self._scan_target = str(scan_target or "")
@@ -32,7 +32,7 @@ class StrategyApplyWorker(QThread):
 
     def run(self) -> None:
         try:
-            result = self._blockcheck.apply_strategy(
+            result = self._apply_strategy(
                 strategy_args=self._strategy_args,
                 strategy_name=self._strategy_name,
                 scan_target=self._scan_target,
