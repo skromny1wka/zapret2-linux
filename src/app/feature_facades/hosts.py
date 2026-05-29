@@ -7,6 +7,7 @@ from typing import Callable
 @dataclass(frozen=True, slots=True)
 class HostsFeature:
     load_user_selection: Callable
+    warm_page_data_cache: Callable
     create_hosts_runtime: Callable
     get_hosts_state: Callable
     get_hosts_path_str: Callable
@@ -25,8 +26,15 @@ def build_hosts_feature() -> HostsFeature:
 
         return hosts_public
 
+    def _warm_page_data_cache() -> bool:
+        public = _public()
+        public.load_user_selection()
+        public.get_catalog_signature()
+        return True
+
     return HostsFeature(
         load_user_selection=lambda *args, **kwargs: _public().load_user_selection(*args, **kwargs),
+        warm_page_data_cache=_warm_page_data_cache,
         create_hosts_runtime=lambda *args, **kwargs: _public().create_hosts_runtime(*args, **kwargs),
         get_hosts_state=lambda *args, **kwargs: _public().get_hosts_state(*args, **kwargs),
         get_hosts_path_str=lambda *args, **kwargs: _public().get_hosts_path_str(*args, **kwargs),

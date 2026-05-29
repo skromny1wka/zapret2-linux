@@ -10,6 +10,8 @@ from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE, is_preset_launch_method, n
 
 
 DEFAULT_USER_PRESETS_WARMUP_METHODS: tuple[str, ...] = (ZAPRET2_MODE, ZAPRET1_MODE)
+USER_PRESETS_WARMUP_DELAY_MS = 8_000
+USER_PRESETS_SECONDARY_WARMUP_DELAY_MS = 15_000
 
 
 def user_presets_warmup_methods(current_method: str) -> tuple[str, ...]:
@@ -24,8 +26,8 @@ def install_user_presets_warmup(
     *,
     presets_feature,
     log_startup_metric,
-    delay_ms: int = 3_500,
-    secondary_delay_ms: int = 15_000,
+    delay_ms: int = USER_PRESETS_WARMUP_DELAY_MS,
+    secondary_delay_ms: int = USER_PRESETS_SECONDARY_WARMUP_DELAY_MS,
 ) -> None:
     def _run_user_presets_warmup_method(method: str) -> None:
         if not is_startup_host_alive(startup_host):
@@ -79,6 +81,8 @@ def install_user_presets_warmup(
 
 __all__ = [
     "DEFAULT_USER_PRESETS_WARMUP_METHODS",
+    "USER_PRESETS_SECONDARY_WARMUP_DELAY_MS",
+    "USER_PRESETS_WARMUP_DELAY_MS",
     "install_user_presets_warmup",
     "user_presets_warmup_methods",
 ]

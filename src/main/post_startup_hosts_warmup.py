@@ -2,36 +2,41 @@ from __future__ import annotations
 
 import time
 
-from app.page_names import PageName
 from log.log import log
 from main.post_startup_gate import bind_startup_gate, is_startup_host_alive
-from main.post_startup_threading import schedule_after
+from main.post_startup_threading import schedule_after, start_daemon_thread
+
+
+HOSTS_PAGE_WARMUP_DELAY_MS = 5_000
 
 
 def install_hosts_page_warmup(
     startup_host,
     *,
+    hosts_feature=None,
     log_startup_metric,
-    delay_ms: int = 0,
+    delay_ms: int = HOSTS_PAGE_WARMUP_DELAY_MS,
 ) -> None:
-    def _start_hosts_page_warmup() -> None:
+    def _run_hosts_page_data_warmup() -> None:
         if not is_startup_host_alive(startup_host):
             return
         started_at = time.perf_counter()
-        log_startup_metric("StartupHostsPageWarmupStarted", "ensure_page")
+        log_startup_metric("StartupHostsPageWarmupStarted", "backend_cache")
         try:
-            page = startup_host.ensure_page(PageName.HOSTS)
-            if page is None:
+            if hosts_feature is None:
                 return
-            warmup = getattr(page, "warmup_initial_load", None)
-            if callable(warmup):
-                warmup()
-                log_startup_metric("StartupHostsPageWarmupFinished", "warmup_initial_load")
+            hosts_feature.warm_page_data_cache()
+            log_startup_metric("StartupHostsPageWarmupFinished", "backend_cache")
         except Exception as exc:
             log(f"Фоновая подготовка страницы hosts не выполнена: {exc}", "DEBUG")
             return
         elapsed_ms = (time.perf_counter() - started_at) * 1000.0
         log(f"Фоновая подготовка страницы hosts: {elapsed_ms:.1f}ms", "DEBUG")
+
+    def _start_hosts_page_warmup() -> None:
+        if not is_startup_host_alive(startup_host):
+            return
+        start_daemon_thread("HostsPageDataWarmup", _run_hosts_page_data_warmup)
 
     def _schedule_hosts_page_warmup() -> None:
         if not is_startup_host_alive(startup_host):
@@ -50,4 +55,4 @@ def install_hosts_page_warmup(
     )
 
 
-__all__ = ["install_hosts_page_warmup"]
+__all__ = ["HOSTS_PAGE_WARMUP_DELAY_MS", "install_hosts_page_warmup"]

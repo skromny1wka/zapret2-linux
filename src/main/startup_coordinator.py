@@ -27,6 +27,12 @@ REQUIRED_STARTUP_COMPONENTS = (
 )
 
 
+def _startup_step_metric_marker(task_name: str) -> str:
+    words = str(task_name or "step").replace("-", "_").split("_")
+    suffix = "".join(word[:1].upper() + word[1:] for word in words if word)
+    return f"StartupStep{suffix or 'Step'}"
+
+
 @dataclass(frozen=True, slots=True)
 class StartupWindowShell:
     """Минимальный UI-интерфейс, который нужен startup-координатору."""
@@ -216,12 +222,21 @@ class StartupCoordinator:
     # ───────────────────────── инициализация подсистем ───────────────────────
 
     def _run_step(self, task_name: str, label: str, func, *, error_status=None) -> bool:
+        started_at = _time.perf_counter()
+        metric_marker = _startup_step_metric_marker(task_name)
         try:
             func()
+            elapsed_ms = (_time.perf_counter() - started_at) * 1000.0
+            self._log_startup_step(metric_marker, f"{label} {elapsed_ms:.0f}ms")
             self.startup_tasks_completed.add(task_name)
             self._check_and_complete_initialization()
             return True
         except Exception as exc:
+            elapsed_ms = (_time.perf_counter() - started_at) * 1000.0
+            self._log_startup_step(
+                metric_marker,
+                f"{label} error:{type(exc).__name__} {elapsed_ms:.0f}ms",
+            )
             log(f"Ошибка startup-шага {label}: {exc}", "❌ ERROR")
             if error_status is not None:
                 try:

@@ -107,6 +107,7 @@ class PostStartupDeps:
     apply_dns_on_startup_async: Any
     install_tray_post_startup: Any
     updater_feature: Any
+    hosts_feature: Any = None
     premium_feature: Any = None
     logs_feature: Any = None
     presets_feature: Any = None
@@ -157,6 +158,7 @@ def install_post_startup_tasks(deps: PostStartupDeps) -> None:
     )
     install_hosts_page_warmup(
         startup_host,
+        hosts_feature=deps.hosts_feature,
         log_startup_metric=deps.log_startup_metric,
     )
     if deps.premium_feature is not None and deps.logs_feature is not None:

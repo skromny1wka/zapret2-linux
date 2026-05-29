@@ -11,6 +11,7 @@ def build_application_post_startup_deps(*, window, app_runtime) -> PostStartupDe
     notifications = window.window_notification_center
     return PostStartupDeps(
         startup_host=build_post_startup_host(window),
+        hosts_feature=features.hosts,
         profile_feature=features.profile,
         presets_feature=features.presets,
         ui_state_store=app_runtime.state.ui,

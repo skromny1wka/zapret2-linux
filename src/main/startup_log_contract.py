@@ -83,6 +83,8 @@ def _first_metric(metrics: tuple[StartupMetric, ...], marker: str) -> StartupMet
 
 
 def _must_start_after_interactive(marker: str) -> bool:
+    if marker.startswith("StartupStep"):
+        return True
     if marker in _AFTER_INTERACTIVE_MARKERS:
         return True
     return False

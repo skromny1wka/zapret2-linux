@@ -86,6 +86,15 @@ class StartupRuntimeSetupTests(unittest.TestCase):
 
         self.assertTrue(coordinator._post_init_scheduled)
         self.assertEqual(runtime.autostart_calls, ["zapret2_mode"])
+        metric_names = [call.args[0] for call in coordinator.log_startup_metric.call_args_list]
+        for metric_name in (
+            "StartupStepLaunchRuntimeApi",
+            "StartupStepLaunchRuntime",
+            "StartupStepProcessMonitor",
+            "StartupStepCoreStartup",
+            "StartupStepStartupCoreReady",
+        ):
+            self.assertIn(metric_name, metric_names)
         window_shell.mark_startup_interactive.assert_not_called()
         window_shell.mark_startup_post_init_done.assert_called_once()
         self.assertIn(startup_coordinator.STARTUP_STEP_GAP_MS, timer_delays)
@@ -356,6 +365,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
 
         deps = SimpleNamespace(
             startup_host=object(),
+            hosts_feature=object(),
             profile_feature=object(),
             dns_feature=object(),
             notify=Mock(),
@@ -1929,10 +1939,12 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         from main.post_startup import PostStartupDeps, install_post_startup_tasks
 
         startup_host = object()
+        hosts_feature = object()
         profile_feature = object()
         log_startup_metric = Mock()
         deps = PostStartupDeps(
             startup_host=startup_host,
+            hosts_feature=hosts_feature,
             profile_feature=profile_feature,
             dns_feature=object(),
             notify=Mock(),
@@ -1964,6 +1976,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
 
         install_hosts_page_warmup.assert_called_once_with(
             startup_host,
+            hosts_feature=hosts_feature,
             log_startup_metric=log_startup_metric,
         )
         self.assertFalse(hasattr(post_startup, "install_page_warmup"))
@@ -2346,7 +2359,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             )
             signal.emit("interactive")
 
-        self.assertEqual(delays, [1800, 9000])
+        self.assertEqual(delays, [6500, 12000])
         self.assertEqual(thread_names, ["ProfileWarmup-zapret1_mode", "ProfileWarmup-zapret2_mode"])
         self.assertEqual(ready_methods, ["zapret1_mode", "zapret2_mode"])
         self.assertEqual(
@@ -2355,7 +2368,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         )
         metric.assert_any_call(
             "StartupProfileWarmupQueued",
-            "1800ms current after interactive; 9000ms secondary after interactive",
+            "6500ms current after interactive; 12000ms secondary after interactive",
         )
         metric.assert_any_call("StartupProfileWarmupStarted", "zapret1_mode")
         metric.assert_any_call("StartupProfileWarmupStarted", "zapret2_mode")
@@ -2409,7 +2422,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             )
             signal.emit("interactive")
 
-        self.assertEqual(delays, [3500, 15000])
+        self.assertEqual(delays, [8000, 15000])
         self.assertEqual(thread_names, ["UserPresetsWarmup-zapret1_mode", "UserPresetsWarmup-zapret2_mode"])
         self.assertEqual(
             [recorded_call.args[0] for recorded_call in presets_feature.warm_preset_list_metadata_cache.call_args_list],
@@ -2417,7 +2430,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         )
         metric.assert_any_call(
             "StartupUserPresetsWarmupQueued",
-            "3500ms current after interactive; 15000ms secondary after interactive",
+            "8000ms current after interactive; 15000ms secondary after interactive",
         )
         metric.assert_any_call("StartupUserPresetsWarmupStarted", "zapret1_mode")
         metric.assert_any_call("StartupUserPresetsWarmupStarted", "zapret2_mode")

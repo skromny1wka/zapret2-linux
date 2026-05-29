@@ -73,8 +73,7 @@ class BackendPageDataWarmupTests(unittest.TestCase):
         metric.assert_any_call("StartupBackendPageDataWarmupStarted", "appearance, logs")
         metric.assert_any_call("StartupBackendPageDataWarmupStarted", "premium")
 
-    def test_hosts_page_is_prepared_immediately_after_interactive(self) -> None:
-        from app.page_names import PageName
+    def test_hosts_page_data_is_warmed_in_background_without_page_host(self) -> None:
         from main import post_startup_hosts_warmup
         from main.post_startup_hosts_warmup import install_hosts_page_warmup
 
@@ -89,33 +88,42 @@ class BackendPageDataWarmupTests(unittest.TestCase):
                 self._callback(value)
 
         signal = Signal()
-        page = SimpleNamespace(warmup_initial_load=Mock(return_value=True))
         startup_host = SimpleNamespace(
             startup_interactive_ready=signal,
             startup_state=SimpleNamespace(interactive_logged=False),
             is_alive=Mock(return_value=True),
-            ensure_page=Mock(return_value=page),
         )
+        hosts_feature = SimpleNamespace(warm_page_data_cache=Mock(return_value=True))
         metric = Mock()
         delays: list[int] = []
+        thread_names: list[str] = []
 
-        with patch.object(
-            post_startup_hosts_warmup,
-            "schedule_after",
-            side_effect=lambda delay_ms, callback: delays.append(delay_ms) or callback(),
+        with (
+            patch.object(
+                post_startup_hosts_warmup,
+                "schedule_after",
+                side_effect=lambda delay_ms, callback: delays.append(delay_ms) or callback(),
+            ),
+            patch.object(
+                post_startup_hosts_warmup,
+                "start_daemon_thread",
+                side_effect=lambda name, target: thread_names.append(name) or target(),
+            ),
         ):
             install_hosts_page_warmup(
                 startup_host,
+                hosts_feature=hosts_feature,
                 log_startup_metric=metric,
             )
             signal.emit("interactive")
 
-        self.assertEqual(delays, [0])
-        startup_host.ensure_page.assert_called_once_with(PageName.HOSTS)
-        page.warmup_initial_load.assert_called_once_with()
-        metric.assert_any_call("StartupHostsPageWarmupQueued", "0ms after interactive")
-        metric.assert_any_call("StartupHostsPageWarmupStarted", "ensure_page")
-        metric.assert_any_call("StartupHostsPageWarmupFinished", "warmup_initial_load")
+        self.assertEqual(delays, [5000])
+        self.assertEqual(thread_names, ["HostsPageDataWarmup"])
+        hosts_feature.warm_page_data_cache.assert_called_once_with()
+        self.assertFalse(hasattr(startup_host, "ensure_page"))
+        metric.assert_any_call("StartupHostsPageWarmupQueued", "5000ms after interactive")
+        metric.assert_any_call("StartupHostsPageWarmupStarted", "backend_cache")
+        metric.assert_any_call("StartupHostsPageWarmupFinished", "backend_cache")
 
     def test_premium_page_uses_warmed_device_snapshot_before_worker(self) -> None:
         from app.feature_facades.premium import PremiumPageData

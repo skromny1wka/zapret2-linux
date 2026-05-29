@@ -13,6 +13,8 @@ from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE, is_preset_launch_method, n
 
 
 DEFAULT_PROFILE_WARMUP_METHODS: tuple[str, ...] = (ZAPRET2_MODE, ZAPRET1_MODE)
+PROFILE_WARMUP_DELAY_MS = 6_500
+PROFILE_SECONDARY_WARMUP_DELAY_MS = 12_000
 
 
 class _ProfileWarmupBridge(QObject):
@@ -31,8 +33,8 @@ def install_profile_warmup(
     *,
     profile_feature,
     log_startup_metric,
-    delay_ms: int = 1_800,
-    secondary_delay_ms: int = 9_000,
+    delay_ms: int = PROFILE_WARMUP_DELAY_MS,
+    secondary_delay_ms: int = PROFILE_SECONDARY_WARMUP_DELAY_MS,
     on_profile_warmup_ready: Callable[[str], None] | None = None,
 ) -> None:
     warmup_bridge = _ProfileWarmupBridge()
@@ -98,6 +100,8 @@ def install_profile_warmup(
 
 __all__ = [
     "DEFAULT_PROFILE_WARMUP_METHODS",
+    "PROFILE_SECONDARY_WARMUP_DELAY_MS",
+    "PROFILE_WARMUP_DELAY_MS",
     "install_profile_warmup",
     "profile_warmup_methods",
 ]
