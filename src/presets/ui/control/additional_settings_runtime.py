@@ -111,38 +111,21 @@ class AdditionalSettingsSaveWorker(QThread):
     def __init__(
         self,
         request_id: int,
-        profile_feature,
+        save_setting,
         *,
-        launch_method: str,
         setting: str,
         enabled: bool,
         parent=None,
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._profile_feature = profile_feature
-        self._launch_method = str(launch_method or "").strip()
+        self._save_setting = save_setting
         self._setting = str(setting or "").strip()
         self._enabled = bool(enabled)
 
     def run(self) -> None:
         try:
-            if self._setting == "discord_restart":
-                from discord.discord_restart import set_discord_restart_setting
-
-                set_discord_restart_setting(self._enabled)
-            elif self._setting == "wssize":
-                self._profile_feature.set_wssize_enabled(
-                    self._enabled,
-                    launch_method=self._launch_method,
-                )
-            elif self._setting == "debug_log":
-                self._profile_feature.set_debug_log_enabled(
-                    self._enabled,
-                    launch_method=self._launch_method,
-                )
-            else:
-                raise ValueError(f"Неизвестная дополнительная настройка: {self._setting}")
+            self._save_setting(self._setting, self._enabled)
         except Exception as exc:
             log(f"AdditionalSettingsSaveWorker: не удалось сохранить настройку {self._setting}: {exc}", "ERROR")
             self.failed.emit(self._request_id, self._setting, str(exc))
@@ -159,10 +142,29 @@ def create_additional_settings_save_worker(
     enabled: bool,
     parent=None,
 ):
+    clean_launch_method = str(launch_method or "").strip()
+
+    def _save_setting(setting: str, enabled: bool) -> None:
+        if setting == "discord_restart":
+            from discord.discord_restart import set_discord_restart_setting
+
+            set_discord_restart_setting(bool(enabled))
+        elif setting == "wssize":
+            profile_feature.set_wssize_enabled(
+                bool(enabled),
+                launch_method=clean_launch_method,
+            )
+        elif setting == "debug_log":
+            profile_feature.set_debug_log_enabled(
+                bool(enabled),
+                launch_method=clean_launch_method,
+            )
+        else:
+            raise ValueError(f"Неизвестная дополнительная настройка: {setting}")
+
     return AdditionalSettingsSaveWorker(
         request_id,
-        profile_feature,
-        launch_method=launch_method,
+        _save_setting,
         setting=setting,
         enabled=enabled,
         parent=parent,

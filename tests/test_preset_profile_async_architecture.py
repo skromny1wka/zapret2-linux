@@ -2845,10 +2845,20 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
             self.assertNotIn("save_discord_restart_setting(", source)
             self.assertNotIn("set_discord_restart_setting(", source)
         self.assertIn("create_additional_settings_save_worker", inspect.getsource(control_additional_settings_runtime))
-        self.assertIn("set_discord_restart_setting", worker_source)
-        self.assertIn("set_wssize_enabled", worker_source)
-        self.assertIn("set_debug_log_enabled", worker_source)
-        self.assertIn("launch_method=self._launch_method", worker_source)
+        worker_init_source = inspect.getsource(control_additional_settings_runtime.AdditionalSettingsSaveWorker.__init__)
+        factory_source = inspect.getsource(control_additional_settings_runtime.create_additional_settings_save_worker)
+
+        self.assertIn("save_setting", worker_init_source)
+        self.assertIn("self._save_setting", worker_init_source)
+        self.assertNotIn("_profile_feature", worker_init_source)
+        self.assertNotIn("launch_method", worker_init_source)
+        self.assertIn("self._save_setting(self._setting, self._enabled)", worker_source)
+        self.assertNotIn("set_discord_restart_setting", worker_source)
+        self.assertNotIn("set_wssize_enabled", worker_source)
+        self.assertNotIn("set_debug_log_enabled", worker_source)
+        self.assertIn("set_discord_restart_setting", factory_source)
+        self.assertIn("set_wssize_enabled", factory_source)
+        self.assertIn("set_debug_log_enabled", factory_source)
 
     def test_control_additional_settings_has_no_legacy_sync_save_helpers(self) -> None:
         for module in (zapret1_runtime_helpers, zapret2_page_runtime):
