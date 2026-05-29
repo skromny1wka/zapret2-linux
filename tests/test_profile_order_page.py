@@ -270,25 +270,24 @@ class ProfileOrderPageTests(unittest.TestCase):
         self.assertEqual(page._order_move_request_id, 6)
         self.assertFalse(page._order_load_dirty)
 
-    def test_order_workers_call_profile_feature(self) -> None:
+    def test_order_workers_call_profile_service(self) -> None:
         from profile.profile_order_loader import ProfileOrderListLoadWorker, ProfilePresetOrderMoveWorker
 
-        profile = Mock()
-        profile.list_preset_order_profiles.return_value = SimpleNamespace(items=())
-        load_worker = ProfileOrderListLoadWorker(2, profile, "zapret2_mode")
+        service = Mock()
+        service.list_preset_order_profiles.return_value = SimpleNamespace(items=())
+        load_worker = ProfileOrderListLoadWorker(2, service)
         loaded = []
         load_worker.loaded.connect(lambda request_id, payload: loaded.append((request_id, payload)))
 
         load_worker.run()
 
-        profile.list_preset_order_profiles.assert_called_once_with("zapret2_mode")
-        self.assertEqual(loaded, [(2, profile.list_preset_order_profiles.return_value)])
+        service.list_preset_order_profiles.assert_called_once_with()
+        self.assertEqual(loaded, [(2, service.list_preset_order_profiles.return_value)])
 
-        profile.move_preset_profile_before.return_value = "profile-1"
+        service.move_preset_profile_before.return_value = "profile-1"
         move_worker = ProfilePresetOrderMoveWorker(
             3,
-            profile,
-            "zapret2_mode",
+            service,
             action="before",
             source_profile_key="profile-1",
             destination_profile_key="profile-2",
@@ -306,7 +305,7 @@ class ProfileOrderPageTests(unittest.TestCase):
 
         move_worker.run()
 
-        profile.move_preset_profile_before.assert_called_once_with("zapret2_mode", "profile-1", "profile-2")
+        service.move_preset_profile_before.assert_called_once_with("profile-1", "profile-2")
         self.assertEqual(moved, [(3, "before", "profile-1", "profile-2", "profile-1")])
 
     def test_order_page_has_breadcrumbs_back_to_profiles_and_control(self) -> None:
