@@ -144,9 +144,25 @@ class ProfileListModel(QAbstractListModel):
         normalized = _normalized_search_query(query)
         if self._search_query == normalized:
             return
+        previous_query = self._search_query
+        self._search_query = normalized
+        try:
+            next_rows = self._build_rows()
+        finally:
+            self._search_query = previous_query
+
+        old_ids = [_stable_row_identity(row) for row in self._rows]
+        next_ids = [_stable_row_identity(row) for row in next_rows]
+        if old_ids == next_ids:
+            changed_rows = tuple(index for index, row in enumerate(next_rows) if self._rows[index] != row)
+            self._search_query = normalized
+            self._rows = next_rows
+            self._emit_data_changed_for_rows(changed_rows)
+            return
+
         self.beginResetModel()
         self._search_query = normalized
-        self._rows = self._build_rows()
+        self._rows = next_rows
         self.endResetModel()
 
     def set_group_expanded(self, group_key: str, expanded: bool) -> None:
