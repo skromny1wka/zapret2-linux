@@ -12,7 +12,6 @@ class LogsSupportPrepareWorker(QThread):
     def __init__(
         self,
         request_id: int,
-        logs_feature,
         *,
         current_log_file: str,
         orchestra_runner,
@@ -20,13 +19,14 @@ class LogsSupportPrepareWorker(QThread):
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._logs = logs_feature
         self._current_log_file = str(current_log_file or "")
         self._orchestra_runner = orchestra_runner
 
     def run(self) -> None:
+        import log.commands as log_commands
+
         try:
-            result = self._logs.prepare_support_bundle(
+            result = log_commands.prepare_support_bundle(
                 current_log_file=self._current_log_file,
                 orchestra_runner=self._orchestra_runner,
             )

@@ -11,14 +11,15 @@ class LogsOpenFolderWorker(QThread):
     loaded = pyqtSignal(int, bool)
     failed = pyqtSignal(int, str)
 
-    def __init__(self, request_id: int, *, logs_feature, parent=None):
+    def __init__(self, request_id: int, *, parent=None):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._logs = logs_feature
 
     def run(self) -> None:
+        import log.commands as log_commands
+
         try:
-            self._logs.open_logs_folder()
+            log_commands.open_logs_folder()
         except Exception as exc:
             log(f"LogsOpenFolderWorker: не удалось открыть папку логов: {exc}", "ERROR")
             self.failed.emit(self._request_id, str(exc))

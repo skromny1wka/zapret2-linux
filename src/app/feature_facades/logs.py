@@ -53,7 +53,7 @@ class LogsFeature:
     def create_open_folder_worker(self, request_id: int, *, parent=None):
         from log.open_folder_worker import LogsOpenFolderWorker
 
-        return LogsOpenFolderWorker(request_id, logs_feature=self, parent=parent)
+        return LogsOpenFolderWorker(request_id, parent=parent)
 
     def create_support_prepare_worker(
         self,
@@ -67,7 +67,6 @@ class LogsFeature:
 
         return LogsSupportPrepareWorker(
             request_id,
-            logs_feature=self,
             current_log_file=current_log_file,
             orchestra_runner=orchestra_runner,
             parent=parent,
