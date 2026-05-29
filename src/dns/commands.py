@@ -71,6 +71,12 @@ def create_dns_quick_check_worker(request_id: int, *, parent=None):
     return DNSQuickCheckWorker(request_id, parent=parent)
 
 
+def save_dns_check_results(*, file_path: str, plain_text: str):
+    from dns.dns_check_plans import save_results_text
+
+    return save_results_text(file_path=file_path, plain_text=plain_text)
+
+
 def run_quick_dns_check():
     import socket
 

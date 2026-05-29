@@ -47,9 +47,9 @@ class DNSCheckSaveWorker(QThread):
         self._plain_text = str(plain_text or "")
 
     def run(self) -> None:
-        from dns.dns_check_plans import save_results_text
+        from dns import commands as dns_commands
 
-        plan = save_results_text(
+        plan = dns_commands.save_dns_check_results(
             file_path=self._file_path,
             plain_text=self._plain_text,
         )

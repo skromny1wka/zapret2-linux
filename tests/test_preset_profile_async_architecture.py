@@ -79,6 +79,7 @@ import dns.page_diagnostics_warning_workflow as dns_diag_workflow
 import dns.page_load_workflow as dns_load_workflow
 import dns.ui.page as dns_page
 import dns.ui.dns_check_page as dns_check_page
+import dns.commands as dns_commands
 import dns.dns_check_plans as dns_check_page_plans
 import dns.dns_check_worker as dns_check_worker
 from dns.page_workers import DnsPageLoadWorker
@@ -2069,12 +2070,16 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         save_source = inspect.getsource(dns_check_page.DNSCheckPage.save_results)
 
         self.assertTrue(hasattr(dns_check_worker, "DNSCheckSaveWorker"))
+        self.assertTrue(hasattr(dns_commands, "save_dns_check_results"))
         worker_source = inspect.getsource(dns_check_worker.DNSCheckSaveWorker.run)
+        commands_source = inspect.getsource(dns_commands.save_dns_check_results)
 
         self.assertIn("create_dns_check_save_worker", page_source)
         self.assertIn("_start_save_results_worker", save_source)
         self.assertNotIn("save_results_text(", save_source)
-        self.assertIn("save_results_text", worker_source)
+        self.assertIn("dns_commands.save_dns_check_results", worker_source)
+        self.assertNotIn("dns.dns_check_plans", worker_source)
+        self.assertIn("save_results_text", commands_source)
 
     def test_dns_quick_check_runs_through_worker(self) -> None:
         page_source = inspect.getsource(dns_check_page.DNSCheckPage)
