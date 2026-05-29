@@ -63,26 +63,6 @@ def apply_profile_ui_mode_change(*, wanted_mode: str, reload_host) -> None:
 
     save_current_profile_ui_mode(PROFILE_UI_MODE_DEFAULT)
 
-def save_wssize_enabled(enabled: bool, *, profile_feature, runtime_feature) -> None:
-    _ = runtime_feature
-    try:
-        profile_feature.set_wssize_enabled(
-            bool(enabled),
-            launch_method=ZAPRET2_MODE,
-        )
-    except Exception:
-        pass
-
-def save_debug_log_enabled(enabled: bool, *, profile_feature, runtime_feature) -> None:
-    _ = runtime_feature
-    try:
-        profile_feature.set_debug_log_enabled(
-            bool(enabled),
-            launch_method=ZAPRET2_MODE,
-        )
-    except Exception:
-        pass
-
 def build_stop_button_plan(*, language: str) -> ControlStopButtonPlan:
     try:
         from settings.mode import exe_name_for_launch_method

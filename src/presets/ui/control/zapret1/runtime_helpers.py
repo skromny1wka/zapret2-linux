@@ -162,19 +162,3 @@ def show_simple_infobar_result(*, ok: bool, message: str, window, info_bar_cls) 
     if ok:
         return
     info_bar_cls.warning(title="Ошибка", content=f"Не удалось очистить кэш: {message}", parent=window)
-
-
-def save_wssize_enabled(enabled: bool, *, profile_feature, runtime_feature) -> None:
-    _ = runtime_feature
-    profile_feature.set_wssize_enabled(
-        bool(enabled),
-        launch_method=ZAPRET1_MODE,
-    )
-
-
-def save_debug_log_enabled(enabled: bool, *, profile_feature, runtime_feature) -> None:
-    _ = runtime_feature
-    profile_feature.set_debug_log_enabled(
-        bool(enabled),
-        launch_method=ZAPRET1_MODE,
-    )

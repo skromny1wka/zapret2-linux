@@ -2729,6 +2729,11 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("set_debug_log_enabled", worker_source)
         self.assertIn("launch_method=self._launch_method", worker_source)
 
+    def test_control_additional_settings_has_no_legacy_sync_save_helpers(self) -> None:
+        for module in (zapret1_runtime_helpers, zapret2_page_runtime):
+            self.assertFalse(hasattr(module, "save_wssize_enabled"))
+            self.assertFalse(hasattr(module, "save_debug_log_enabled"))
+
     def test_control_program_settings_save_runs_through_worker(self) -> None:
         zapret1_auto_source = inspect.getsource(Zapret1ModeControlPage._on_auto_dpi_toggled)
         zapret1_tray_source = inspect.getsource(Zapret1ModeControlPage._on_hide_to_tray_toggled)
