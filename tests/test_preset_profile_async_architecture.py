@@ -460,7 +460,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("apply_active_preset_marker_for_file", handler_source)
         self.assertIn("_request_preset_activation", handler_source)
         self.assertIn("create_preset_activate_worker", request_source)
-        self.assertIn("actions_api.activate_preset", worker_source)
+        self.assertIn("self._activate_preset", worker_source)
+        self.assertNotIn("actions_api.activate_preset", worker_source)
 
     def test_user_presets_activation_error_restores_marker_without_list_reload(self) -> None:
         page = UserPresetsPageBase.__new__(UserPresetsPageBase)

@@ -1298,9 +1298,10 @@ class UserPresetsPageBase(BasePage):
         return True
 
     def create_preset_activate_worker(self, request_id: int, *, file_name: str, display_name: str):
+        actions_api = self._actions_api()
         return UserPresetActivateWorker(
             request_id,
-            self._actions_api(),
+            actions_api.activate_preset,
             file_name=file_name,
             display_name=display_name,
             parent=self,
