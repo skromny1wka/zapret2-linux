@@ -4,10 +4,13 @@ import inspect
 import importlib
 import importlib.util
 import unittest
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from main import window_notifications_setup
 from ui.window_notification_actions import WindowNotificationActionHandler
 from ui.window_notification_center import WindowNotificationCenter
+from winws_runtime.runtime import conflict_flow
 
 
 class WindowNotificationActionsContractTests(unittest.TestCase):
@@ -49,6 +52,49 @@ class WindowNotificationActionsContractTests(unittest.TestCase):
         self.assertIn("_notification_action_runtime", center_source)
         self.assertIn("create_notification_action_worker", center_source)
         self.assertIn("_run_notification_action_worker", center_source)
+
+    def test_launch_conflict_notification_action_runs_heavy_part_through_worker(self) -> None:
+        handler_source = inspect.getsource(WindowNotificationActionHandler)
+        center_source = inspect.getsource(WindowNotificationCenter)
+
+        self.assertIn("_request_launch_conflict_action", handler_source)
+        self.assertNotIn("resume_start_after_conflict_resolution(", handler_source)
+        self.assertIn("prepare_launch_conflict_resolution", center_source)
+        self.assertIn("continue_start_after_conflict_resolution", center_source)
+        self.assertIn("launch_conflict_resume", center_source)
+        self.assertIn("_notification_action_runtime", center_source)
+
+    def test_launch_conflict_prepare_does_not_start_dpi_from_worker_step(self) -> None:
+        runtime_owner = SimpleNamespace(
+            _pending_conflict_request_id=7,
+            _pending_conflict_selected_mode="mode",
+            _pending_conflict_launch_method="zapret2_mode",
+            start_dpi_async=Mock(),
+        )
+
+        with (
+            patch.object(conflict_flow, "try_kill_conflicting_processes", return_value=True) as kill_conflicts,
+            patch.object(conflict_flow.time, "sleep") as sleep,
+        ):
+            ok, reason = conflict_flow.prepare_launch_conflict_resolution(
+                runtime_owner,
+                7,
+                close_conflicts=True,
+            )
+
+        self.assertTrue(ok)
+        self.assertEqual(reason, "")
+        kill_conflicts.assert_called_once_with(auto_kill=True)
+        sleep.assert_called_once_with(1)
+        runtime_owner.start_dpi_async.assert_not_called()
+
+        conflict_flow.continue_start_after_conflict_resolution(runtime_owner, 7)
+
+        runtime_owner.start_dpi_async.assert_called_once_with(
+            selected_mode="mode",
+            launch_method="zapret2_mode",
+            _skip_conflict_prompt=True,
+        )
 
 
 if __name__ == "__main__":

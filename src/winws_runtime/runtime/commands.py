@@ -271,6 +271,40 @@ def resume_start_after_conflict_resolution(
     return True
 
 
+def prepare_launch_conflict_resolution(
+    request_id: int,
+    *,
+    runtime_feature: Any,
+    close_conflicts: bool,
+) -> tuple[bool, str]:
+    runtime_owner = runtime_feature.objects.launch_runtime
+    if runtime_owner is None:
+        return False, "runtime_unavailable"
+
+    from winws_runtime.runtime.conflict_flow import prepare_launch_conflict_resolution
+
+    return prepare_launch_conflict_resolution(
+        runtime_owner,
+        int(request_id or 0),
+        close_conflicts=bool(close_conflicts),
+    )
+
+
+def continue_start_after_conflict_resolution(
+    request_id: int,
+    *,
+    runtime_feature: Any,
+) -> bool:
+    runtime_owner = runtime_feature.objects.launch_runtime
+    if runtime_owner is None:
+        return False
+
+    from winws_runtime.runtime.conflict_flow import continue_start_after_conflict_resolution
+
+    continue_start_after_conflict_resolution(runtime_owner, int(request_id or 0))
+    return True
+
+
 def cancel_start_after_conflict_prompt(request_id: int, *, runtime_feature: Any) -> bool:
     runtime_owner = runtime_feature.objects.launch_runtime
     if runtime_owner is None:

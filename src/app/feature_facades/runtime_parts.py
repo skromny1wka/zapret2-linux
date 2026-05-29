@@ -466,6 +466,23 @@ class RuntimeCommandPort:
             )
         )
 
+    def prepare_launch_conflict_resolution(self, request_id: int, *, close_conflicts: bool) -> tuple[bool, str]:
+        runtime_commands = self._runtime_commands()
+        return runtime_commands.prepare_launch_conflict_resolution(
+            request_id,
+            runtime_feature=self.owner,
+            close_conflicts=close_conflicts,
+        )
+
+    def continue_start_after_conflict_resolution(self, request_id: int) -> bool:
+        runtime_commands = self._runtime_commands()
+        return bool(
+            runtime_commands.continue_start_after_conflict_resolution(
+                request_id,
+                runtime_feature=self.owner,
+            )
+        )
+
     def cancel_start_after_conflict_prompt(self, request_id: int) -> bool:
         runtime_commands = self._runtime_commands()
         return bool(

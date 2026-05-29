@@ -22,6 +22,7 @@ class WindowNotificationActionHandler:
         request_disable_kaspersky_warning: Callable[[object | None], None],
         request_disable_telega_warning: Callable[[object | None], None],
         request_windivert_autofix: Callable[[str, object | None], None],
+        request_launch_conflict_action: Callable[[int, bool, object | None], None],
     ) -> None:
         self._notify = notify
         self._runtime = runtime_feature
@@ -31,6 +32,7 @@ class WindowNotificationActionHandler:
         self._request_disable_kaspersky_warning = request_disable_kaspersky_warning
         self._request_disable_telega_warning = request_disable_telega_warning
         self._request_windivert_autofix = request_windivert_autofix
+        self._request_launch_conflict_action = request_launch_conflict_action
 
     def build_action_callback(self, action: dict, bar):
         kind = str(action.get("kind") or "").strip().lower()
@@ -133,27 +135,7 @@ class WindowNotificationActionHandler:
             )
             return
 
-        self._close_bar(bar)
-
-        try:
-            runtime.resume_start_after_conflict_resolution(
-                int(request_id or 0),
-                close_conflicts=bool(close_conflicts),
-            )
-        except Exception as e:
-            log(f"Не удалось обработать действие по конфликтующим процессам: {e}", "DEBUG")
-            self._notify(
-                advisory_notification(
-                    level="warning",
-                    title="Не удалось продолжить запуск",
-                    content="Во время обработки конфликтующих процессов произошла ошибка.",
-                    source="launch.conflicting_processes.action",
-                    presentation="infobar",
-                    queue="immediate",
-                    duration=7000,
-                    dedupe_key="launch.conflicting_processes.action",
-                )
-            )
+        self._request_launch_conflict_action(int(request_id or 0), bool(close_conflicts), bar)
 
     def _cancel_launch_conflict_action(self, *, request_id: int, bar=None) -> None:
         runtime = self._runtime

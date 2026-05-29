@@ -4,7 +4,7 @@ import time
 
 from PyQt6.QtCore import Q_ARG, QMetaObject, QObject, Qt, QTimer, pyqtSlot
 
-from app_notifications import advisory_notification, normalize_notification_payload
+from app_notifications import advisory_notification, normalize_notification_payload, notification_action
 from log.log import global_logger, log
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.window_notification_actions import WindowNotificationActionHandler
@@ -56,6 +56,7 @@ class WindowNotificationCenter(QObject):
             request_disable_kaspersky_warning=self._request_disable_kaspersky_warning,
             request_disable_telega_warning=self._request_disable_telega_warning,
             request_windivert_autofix=self._request_windivert_autofix,
+            request_launch_conflict_action=self._request_launch_conflict_action,
         )
 
     def register_global_error_notifier(self) -> None:
@@ -203,6 +204,20 @@ class WindowNotificationCenter(QObject):
             context={"action": value},
         )
 
+    def _request_launch_conflict_action(self, request_id: int, close_conflicts: bool, bar=None) -> None:
+        self._request_notification_action(
+            "launch_conflict_resume",
+            lambda: self._runtime.prepare_launch_conflict_resolution(
+                int(request_id or 0),
+                close_conflicts=bool(close_conflicts),
+            ),
+            bar=bar,
+            context={
+                "request_id": int(request_id or 0),
+                "close_conflicts": bool(close_conflicts),
+            },
+        )
+
     def _request_notification_action(self, action_name: str, action_fn, *, bar=None, context=None) -> None:
         request = (str(action_name or "").strip(), action_fn, bar, dict(context or {}))
         if self._notification_action_runtime.is_running():
@@ -284,6 +299,8 @@ class WindowNotificationCenter(QObject):
                 bar=bar,
                 action=str(context.get("action") or ""),
             )
+        elif action == "launch_conflict_resume":
+            self._finish_launch_conflict_action(result, context=context, bar=bar)
 
     def _on_notification_action_failed(self, request_id: int, action_name: str, error: str) -> None:
         context = self._notification_action_context.pop(int(request_id), {})
@@ -319,6 +336,8 @@ class WindowNotificationCenter(QObject):
                 bar=bar,
                 action=str(context.get("action") or ""),
             )
+        elif action == "launch_conflict_resume":
+            self._finish_launch_conflict_action((False, error), context=context, bar=bar)
 
     def _on_notification_action_worker_finished(self, _worker) -> None:
         pending = self._notification_action_pending
@@ -386,6 +405,61 @@ class WindowNotificationCenter(QObject):
                 queue="immediate",
                 duration=5000 if ok else 8000,
                 dedupe_key=f"launch.autofix:{action}",
+            )
+        )
+
+    def _finish_launch_conflict_action(self, result, *, context: dict[str, object], bar=None) -> None:
+        ok, reason = self._coerce_bool_message_result(result)
+        request_id = int(context.get("request_id") or 0)
+        if ok:
+            self._close_bar(bar)
+            try:
+                self._runtime.continue_start_after_conflict_resolution(request_id)
+            except Exception as exc:
+                log(f"Не удалось продолжить запуск после конфликта: {exc}", "DEBUG")
+                self._notify_launch_conflict_action_error()
+            return
+
+        self._close_bar(bar)
+        if str(reason or "") == "kill_failed":
+            self._notify_launch_conflict_kill_failed(request_id)
+            return
+        if str(reason or "") != "stale":
+            self._notify_launch_conflict_action_error()
+
+    def _notify_launch_conflict_kill_failed(self, request_id: int) -> None:
+        self.notify(
+            advisory_notification(
+                level="warning",
+                title="Не удалось закрыть процессы",
+                content=(
+                    "Некоторые конфликтующие процессы не удалось закрыть.\n"
+                    "Запуск DPI может завершиться ошибкой."
+                ),
+                source="launch.conflicting_processes.kill_failed",
+                presentation="infobar",
+                queue="immediate",
+                duration=-1,
+                dedupe_key=f"launch.conflicting_processes.kill_failed:{int(request_id or 0)}",
+                dedupe_window_ms=0,
+                buttons=[
+                    notification_action("launch_conflict_ignore_start", "Продолжить запуск", value=request_id),
+                    notification_action("launch_conflict_cancel", "Отмена", value=request_id),
+                ],
+            )
+        )
+
+    def _notify_launch_conflict_action_error(self) -> None:
+        self.notify(
+            advisory_notification(
+                level="warning",
+                title="Не удалось продолжить запуск",
+                content="Во время обработки конфликтующих процессов произошла ошибка.",
+                source="launch.conflicting_processes.action",
+                presentation="infobar",
+                queue="immediate",
+                duration=7000,
+                dedupe_key="launch.conflicting_processes.action",
             )
         )
 

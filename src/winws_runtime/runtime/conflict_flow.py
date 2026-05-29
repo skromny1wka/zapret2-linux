@@ -57,22 +57,48 @@ def resume_start_after_conflict_resolution(runtime_owner, request_id: int, *, cl
         log(f"Пропуск устаревшего действия по конфликтующим процессам: {request_id}", "DEBUG")
         return
 
-    selected_mode = runtime_owner._pending_conflict_selected_mode
-    launch_method = runtime_owner._pending_conflict_launch_method
-
     if close_conflicts:
-        log("Пользователь выбрал закрыть конфликтующие процессы", "INFO")
-        killed = try_kill_conflicting_processes(auto_kill=True)
-        if killed:
-            log("Конфликтующие процессы закрыты, ожидание 1с...", "INFO")
-            time.sleep(1)
-        else:
-            log("Не удалось закрыть все конфликтующие процессы", "WARNING")
-            show_conflict_kill_failed_infobar(runtime_owner, request_id)
+        ok, reason = prepare_launch_conflict_resolution(
+            runtime_owner,
+            request_id,
+            close_conflicts=True,
+        )
+        if not ok:
+            if reason == "kill_failed":
+                show_conflict_kill_failed_infobar(runtime_owner, request_id)
             return
     else:
         log("Пользователь продолжил запуск несмотря на конфликтующие процессы", "WARNING")
 
+    continue_start_after_conflict_resolution(runtime_owner, request_id)
+
+
+def prepare_launch_conflict_resolution(runtime_owner, request_id: int, *, close_conflicts: bool) -> tuple[bool, str]:
+    if not has_pending_conflict_request(runtime_owner, request_id):
+        log(f"Пропуск устаревшей подготовки запуска после конфликта: {request_id}", "DEBUG")
+        return False, "stale"
+
+    if not close_conflicts:
+        return True, ""
+
+    log("Пользователь выбрал закрыть конфликтующие процессы", "INFO")
+    killed = try_kill_conflicting_processes(auto_kill=True)
+    if killed:
+        log("Конфликтующие процессы закрыты, ожидание 1с...", "INFO")
+        time.sleep(1)
+        return True, ""
+
+    log("Не удалось закрыть все конфликтующие процессы", "WARNING")
+    return False, "kill_failed"
+
+
+def continue_start_after_conflict_resolution(runtime_owner, request_id: int) -> None:
+    if not has_pending_conflict_request(runtime_owner, request_id):
+        log(f"Пропуск устаревшего продолжения запуска после конфликта: {request_id}", "DEBUG")
+        return
+
+    selected_mode = runtime_owner._pending_conflict_selected_mode
+    launch_method = runtime_owner._pending_conflict_launch_method
     clear_pending_conflict_request(runtime_owner, request_id)
     runtime_owner.start_dpi_async(
         selected_mode=selected_mode,

@@ -205,6 +205,15 @@ class RuntimeFeature:
             close_conflicts=close_conflicts,
         )
 
+    def prepare_launch_conflict_resolution(self, request_id: int, *, close_conflicts: bool) -> tuple[bool, str]:
+        return self.commands.prepare_launch_conflict_resolution(
+            request_id,
+            close_conflicts=close_conflicts,
+        )
+
+    def continue_start_after_conflict_resolution(self, request_id: int) -> bool:
+        return self.commands.continue_start_after_conflict_resolution(request_id)
+
     def cancel_start_after_conflict_prompt(self, request_id: int) -> bool:
         return self.commands.cancel_start_after_conflict_prompt(request_id)
 
