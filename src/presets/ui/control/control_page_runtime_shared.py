@@ -3,7 +3,13 @@ from __future__ import annotations
 
 def set_toggle_checked(toggle, checked: bool) -> None:
     """Устанавливает состояние toggle по каноническому контракту Win11ToggleRow."""
-    toggle.setChecked(bool(checked), block_signals=True)
+    next_checked = bool(checked)
+    try:
+        if bool(toggle.isChecked()) == next_checked:
+            return
+    except Exception:
+        pass
+    toggle.setChecked(next_checked, block_signals=True)
 
 
 def apply_program_settings_toggles(

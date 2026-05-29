@@ -37,6 +37,19 @@ class _StatusDot:
         self.stopped += 1
 
 
+class _ToggleTarget:
+    def __init__(self, checked: bool) -> None:
+        self.checked = bool(checked)
+        self.calls: list[tuple[bool, bool]] = []
+
+    def isChecked(self) -> bool:  # noqa: N802
+        return self.checked
+
+    def setChecked(self, checked: bool, block_signals: bool = False) -> None:  # noqa: N802
+        self.calls.append((bool(checked), bool(block_signals)))
+        self.checked = bool(checked)
+
+
 class ControlStatusDotPulseTests(unittest.TestCase):
     def _apply_plan(self, *, pulsing: bool) -> _StatusDot:
         from presets.ui.control.control_page_runtime_shared import apply_status_plan
@@ -162,6 +175,25 @@ class ControlStatusDotPulseTests(unittest.TestCase):
         message_label.setText.assert_not_called()
         message_dot.set_color.assert_not_called()
         message_dot.stop_pulse.assert_not_called()
+
+    def test_set_toggle_checked_skips_duplicate_state(self) -> None:
+        from presets.ui.control.control_page_runtime_shared import set_toggle_checked
+
+        toggle = _ToggleTarget(True)
+
+        set_toggle_checked(toggle, True)
+
+        self.assertEqual(toggle.calls, [])
+
+    def test_set_toggle_checked_applies_changed_state_with_blocked_signals(self) -> None:
+        from presets.ui.control.control_page_runtime_shared import set_toggle_checked
+
+        toggle = _ToggleTarget(False)
+
+        set_toggle_checked(toggle, True)
+
+        self.assertEqual(toggle.calls, [(True, True)])
+        self.assertTrue(toggle.checked)
 
     def test_running_status_pulses_for_both_control_modes(self) -> None:
         from presets.ui.control import control_runtime
