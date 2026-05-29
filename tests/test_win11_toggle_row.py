@@ -52,6 +52,34 @@ class _SpinBox:
         self.block_calls.append(bool(blocked))
 
 
+class _ComboBox:
+    def __init__(self, index: int = 0, data_by_index: dict[int, object] | None = None) -> None:
+        self._index = int(index)
+        self._data_by_index = dict(data_by_index or {})
+        self.set_calls: list[int] = []
+        self.block_calls: list[bool] = []
+
+    def currentIndex(self) -> int:  # noqa: N802
+        return self._index
+
+    def currentData(self):
+        return self._data_by_index.get(self._index)
+
+    def findData(self, data) -> int:  # noqa: N802
+        for index, value in self._data_by_index.items():
+            if value == data:
+                return index
+        return -1
+
+    def setCurrentIndex(self, index: int) -> None:  # noqa: N802
+        next_index = int(index)
+        self.set_calls.append(next_index)
+        self._index = next_index
+
+    def blockSignals(self, blocked: bool) -> None:  # noqa: N802
+        self.block_calls.append(bool(blocked))
+
+
 class Win11ToggleRowTests(unittest.TestCase):
     def test_set_checked_skips_duplicate_state(self) -> None:
         from ui.widgets.win11_controls import Win11ToggleRow
@@ -228,6 +256,102 @@ class Win11ToggleRowTests(unittest.TestCase):
 
         self.assertEqual(title_calls, ["Attempts"])
         self.assertEqual(content_calls, ["Retry count"])
+
+    def test_combo_row_set_current_index_skips_duplicate_index(self) -> None:
+        from ui.widgets.win11_controls import Win11ComboRow
+
+        row = Win11ComboRow.__new__(Win11ComboRow)
+        combo = _ComboBox(index=2)
+        row.combo = combo
+
+        Win11ComboRow.setCurrentIndex(row, 2, block_signals=True)
+
+        self.assertEqual(combo.set_calls, [])
+        self.assertEqual(combo.block_calls, [])
+
+    def test_combo_row_set_current_index_applies_changed_index_with_blocked_signals(self) -> None:
+        from ui.widgets.win11_controls import Win11ComboRow
+
+        row = Win11ComboRow.__new__(Win11ComboRow)
+        combo = _ComboBox(index=1)
+        row.combo = combo
+
+        Win11ComboRow.setCurrentIndex(row, 2, block_signals=True)
+
+        self.assertEqual(combo.set_calls, [2])
+        self.assertEqual(combo.block_calls, [True, False])
+        self.assertEqual(combo.currentIndex(), 2)
+
+    def test_combo_row_set_current_data_skips_duplicate_data(self) -> None:
+        from ui.widgets.win11_controls import Win11ComboRow
+
+        row = Win11ComboRow.__new__(Win11ComboRow)
+        combo = _ComboBox(index=1, data_by_index={0: "off", 1: "on"})
+        row.combo = combo
+
+        Win11ComboRow.setCurrentData(row, "on", block_signals=True)
+
+        self.assertEqual(combo.set_calls, [])
+        self.assertEqual(combo.block_calls, [])
+
+    def test_combo_row_set_current_data_applies_changed_data_with_blocked_signals(self) -> None:
+        from ui.widgets.win11_controls import Win11ComboRow
+
+        row = Win11ComboRow.__new__(Win11ComboRow)
+        combo = _ComboBox(index=0, data_by_index={0: "off", 1: "on"})
+        row.combo = combo
+
+        Win11ComboRow.setCurrentData(row, "on", block_signals=True)
+
+        self.assertEqual(combo.set_calls, [1])
+        self.assertEqual(combo.block_calls, [True, False])
+        self.assertEqual(combo.currentData(), "on")
+
+    def test_combo_row_set_texts_skips_duplicate_title_and_description(self) -> None:
+        from ui.widgets.win11_controls import Win11ComboRow
+
+        row = Win11ComboRow.__new__(Win11ComboRow)
+        row._title_label = _TextLabel("Preset")
+        row._desc_label = _TextLabel("Select mode")
+        title_calls: list[str] = []
+        content_calls: list[str] = []
+
+        def set_title(text: str) -> None:
+            title_calls.append(str(text))
+
+        def set_content(text: str) -> None:
+            content_calls.append(str(text))
+
+        row.setTitle = set_title
+        row.setContent = set_content
+
+        Win11ComboRow.set_texts(row, "Preset", "Select mode")
+
+        self.assertEqual(title_calls, [])
+        self.assertEqual(content_calls, [])
+
+    def test_combo_row_set_texts_applies_changed_title_and_description(self) -> None:
+        from ui.widgets.win11_controls import Win11ComboRow
+
+        row = Win11ComboRow.__new__(Win11ComboRow)
+        row._title_label = _TextLabel("Old")
+        row._desc_label = _TextLabel("Old description")
+        title_calls: list[str] = []
+        content_calls: list[str] = []
+
+        def set_title(text: str) -> None:
+            title_calls.append(str(text))
+
+        def set_content(text: str) -> None:
+            content_calls.append(str(text))
+
+        row.setTitle = set_title
+        row.setContent = set_content
+
+        Win11ComboRow.set_texts(row, "Preset", "Select mode")
+
+        self.assertEqual(title_calls, ["Preset"])
+        self.assertEqual(content_calls, ["Select mode"])
 
 
 if __name__ == "__main__":

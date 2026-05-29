@@ -647,11 +647,17 @@ class Win11ComboRow(FluentSettingCard):
             self._applying_theme_styles = False
 
     def setCurrentData(self, data, block_signals: bool = False):
+        index = self.combo.findData(data)
+        if index < 0:
+            return
+        try:
+            if self.combo.currentIndex() == index:
+                return
+        except Exception:
+            pass
         if block_signals:
             self.combo.blockSignals(True)
-        index = self.combo.findData(data)
-        if index >= 0:
-            self.combo.setCurrentIndex(index)
+        self.combo.setCurrentIndex(index)
         if block_signals:
             self.combo.blockSignals(False)
 
@@ -659,9 +665,15 @@ class Win11ComboRow(FluentSettingCard):
         return self.combo.currentData()
 
     def setCurrentIndex(self, index: int, block_signals: bool = False):
+        next_index = int(index)
+        try:
+            if self.combo.currentIndex() == next_index:
+                return
+        except Exception:
+            pass
         if block_signals:
             self.combo.blockSignals(True)
-        self.combo.setCurrentIndex(index)
+        self.combo.setCurrentIndex(next_index)
         if block_signals:
             self.combo.blockSignals(False)
 
@@ -669,9 +681,24 @@ class Win11ComboRow(FluentSettingCard):
         return self.combo.currentIndex()
 
     def set_texts(self, title: str, description: str = "") -> None:
+        next_title = str(title or "")
+        next_description = str(description or "")
+        text_key = (next_title, next_description)
         try:
-            self.setTitle(title)
-            self.setContent(description)
+            title_label = getattr(self, "_title_label", None)
+            desc_label = getattr(self, "_desc_label", None)
+            current_title = str(title_label.text() if title_label is not None else "")
+            current_description = str(desc_label.text() if desc_label is not None else "")
+            if (current_title, current_description) == text_key:
+                self._last_win11_combo_texts_key = text_key
+                return
+        except Exception:
+            if getattr(self, "_last_win11_combo_texts_key", None) == text_key:
+                return
+        try:
+            self.setTitle(next_title)
+            self.setContent(next_description)
+            self._last_win11_combo_texts_key = text_key
         except Exception:
             pass
 
