@@ -53,24 +53,56 @@ class ApplicationController:
             "StartupWindowBootstrapWindow",
             f"{(_time.perf_counter() - t_window) * 1000:.0f}ms",
         )
+        t_register = _time.perf_counter()
         register_app_window(window)
+        emit_startup_metric(
+            "StartupWindowRegisterAppWindow",
+            f"{(_time.perf_counter() - t_register) * 1000:.0f}ms",
+        )
+        t_tray_port = _time.perf_counter()
         tray_window_port = build_tray_window_port(window)
+        emit_startup_metric(
+            "StartupWindowTrayPort",
+            f"{(_time.perf_counter() - t_tray_port) * 1000:.0f}ms",
+        )
+        t_feature_window_deps = _time.perf_counter()
         feature_window_deps = build_feature_window_deps(
             window,
             tray_window_port=tray_window_port,
         )
+        emit_startup_metric(
+            "StartupWindowFeatureDeps",
+            f"{(_time.perf_counter() - t_feature_window_deps) * 1000:.0f}ms",
+        )
 
         def _build_feature_deps(state):
+            t_state_actions = _time.perf_counter()
             appearance_actions = WindowStateActions(window=window, ui_state_store=state.ui)
             self._window_state_actions = appearance_actions
-            return build_window_feature_deps(
+            emit_startup_metric(
+                "StartupWindowStateActions",
+                f"{(_time.perf_counter() - t_state_actions) * 1000:.0f}ms",
+            )
+            t_feature_deps = _time.perf_counter()
+            feature_deps = build_window_feature_deps(
                 feature_window_deps,
                 appearance_actions=appearance_actions,
             )
+            emit_startup_metric(
+                "StartupWindowFeatureDepsFactory",
+                f"{(_time.perf_counter() - t_feature_deps) * 1000:.0f}ms",
+            )
+            return feature_deps
 
         t_runtime = _time.perf_counter()
+        t_initial_state = _time.perf_counter()
+        initial_ui_state = window._build_initial_ui_state()
+        emit_startup_metric(
+            "StartupWindowInitialUiState",
+            f"{(_time.perf_counter() - t_initial_state) * 1000:.0f}ms",
+        )
         app_runtime = build_app_runtime(
-            initial_ui_state=window._build_initial_ui_state(),
+            initial_ui_state=initial_ui_state,
             feature_deps_factory=_build_feature_deps,
         )
         emit_startup_metric(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import atexit
 import sys
+import time as _time
 
 from PyQt6.QtCore import QTimer
 
@@ -10,7 +11,10 @@ from log.log import log
 from config.build_info import APP_VERSION
 
 from main.qt_runtime import application_bootstrap
-from main.runtime_state import is_qt_event_diagnostic_enabled
+from main.runtime_state import (
+    is_qt_event_diagnostic_enabled,
+    log_startup_metric as emit_startup_metric,
+)
 from main.shell import shell_bootstrap
 
 
@@ -111,14 +115,29 @@ def main() -> None:
     log(APP_VERSION, "🔹 main")
 
     try:
+        t_settings = _time.perf_counter()
         from settings.store import materialize_settings_file
 
         materialize_settings_file()
+        emit_startup_metric(
+            "StartupSettingsMaterialize",
+            f"{(_time.perf_counter() - t_settings) * 1000:.0f}ms",
+        )
     except Exception as exc:
         log(f"Не удалось подготовить settings.json: {exc}", "WARNING")
 
+    t_shell = _time.perf_counter()
     start_in_tray = shell_bootstrap()
+    emit_startup_metric(
+        "StartupShellBootstrap",
+        f"{(_time.perf_counter() - t_shell) * 1000:.0f}ms",
+    )
+    t_app = _time.perf_counter()
     app = application_bootstrap()
+    emit_startup_metric(
+        "StartupApplicationBootstrap",
+        f"{(_time.perf_counter() - t_app) * 1000:.0f}ms",
+    )
     if is_qt_event_diagnostic_enabled():
         try:
             from main.qt_event_diagnostics import install_qt_event_diagnostic
@@ -127,12 +146,27 @@ def main() -> None:
         except Exception as exc:
             log(f"Не удалось включить Qt event diagnostic: {exc}", "WARNING")
 
+    t_controller_import = _time.perf_counter()
     from main.application_controller import ApplicationController
+    emit_startup_metric(
+        "StartupApplicationControllerImport",
+        f"{(_time.perf_counter() - t_controller_import) * 1000:.0f}ms",
+    )
+    t_window_import = _time.perf_counter()
     from main.window import LupiDPIApp
+    emit_startup_metric(
+        "StartupWindowClassImport",
+        f"{(_time.perf_counter() - t_window_import) * 1000:.0f}ms",
+    )
 
+    t_controller_init = _time.perf_counter()
     application_controller = ApplicationController(
         window_cls=LupiDPIApp,
         start_in_tray=start_in_tray,
+    )
+    emit_startup_metric(
+        "StartupApplicationControllerInit",
+        f"{(_time.perf_counter() - t_controller_init) * 1000:.0f}ms",
     )
     window = application_controller.create_window()
     QTimer.singleShot(

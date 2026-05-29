@@ -21,6 +21,18 @@ class StartupBootstrapMetricsTests(unittest.TestCase):
         self.assertIn("StartupQtThemeMode", source)
         self.assertIn("StartupQtAccent", source)
 
+    def test_entry_logs_pre_window_bootstrap_substeps(self) -> None:
+        from main import entry
+
+        source = inspect.getsource(entry.main)
+
+        self.assertIn("StartupSettingsMaterialize", source)
+        self.assertIn("StartupShellBootstrap", source)
+        self.assertIn("StartupApplicationBootstrap", source)
+        self.assertIn("StartupApplicationControllerImport", source)
+        self.assertIn("StartupWindowClassImport", source)
+        self.assertIn("StartupApplicationControllerInit", source)
+
     def test_window_constructor_logs_bootstrap_substeps(self) -> None:
         from main.window_startup import WindowStartupMixin
         from ui.fluent_app_window import ZapretFluentWindow
@@ -44,6 +56,42 @@ class StartupBootstrapMetricsTests(unittest.TestCase):
 
         self.assertIn("StartupAppRuntimeBuild", source)
         self.assertIn("StartupWindowAttachRuntime", source)
+        self.assertIn("StartupWindowRegisterAppWindow", source)
+        self.assertIn("StartupWindowTrayPort", source)
+        self.assertIn("StartupWindowFeatureDeps", source)
+        self.assertIn("StartupWindowStateActions", source)
+        self.assertIn("StartupWindowFeatureDepsFactory", source)
+        self.assertIn("StartupWindowInitialUiState", source)
+
+    def test_app_runtime_logs_build_substeps(self) -> None:
+        from app import runtime
+
+        source = inspect.getsource(runtime.build_app_runtime)
+
+        self.assertIn("StartupAppRuntimePaths", source)
+        self.assertIn("StartupAppRuntimeStateAccess", source)
+        self.assertIn("StartupAppRuntimeFeatureDeps", source)
+        self.assertIn("StartupAppRuntimeFeatures", source)
+
+    def test_feature_assembly_logs_feature_build_substeps(self) -> None:
+        from app import feature_assembly
+
+        source = "\n".join(
+            (
+                inspect.getsource(feature_assembly.build_preset_profile_features),
+                inspect.getsource(feature_assembly.build_app_features),
+            )
+        )
+
+        self.assertIn("StartupFeatureAssemblyImports", source)
+        self.assertIn("StartupFeatureAssemblyOrchestra", source)
+        self.assertIn("StartupFeatureAssemblyPresetProfileImport", source)
+        self.assertIn("StartupFeatureAssemblyPresets", source)
+        self.assertIn("StartupFeatureAssemblyProfile", source)
+        self.assertIn("StartupFeatureAssemblyRuntime", source)
+        self.assertIn("StartupFeatureAssemblyTelegramProxy", source)
+        self.assertIn("StartupFeatureAssemblyTray", source)
+        self.assertIn("StartupFeatureAssemblySecondary", source)
 
 
 if __name__ == "__main__":
