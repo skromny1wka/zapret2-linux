@@ -1,28 +1,30 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from app.feature_facades import (
-    AutostartFeature,
-    BlockcheckFeature,
-    BlobsFeature,
-    DiagnosticsFeature,
-    DnsFeature,
-    DpiSettingsFeature,
-    ExternalActionsFeature,
-    HostsFeature,
-    ListsFeature,
-    LogsFeature,
-    OrchestraFeature,
-    PremiumFeature,
-    PresetsFeature,
-    ProfileFeature,
-    ProgramSettingsFeature,
-    RuntimeFeature,
-    TelegramProxyFeature,
-    TrayFeature,
-    UpdaterFeature,
-)
+if TYPE_CHECKING:
+    from app.feature_facades import (
+        AutostartFeature,
+        BlockcheckFeature,
+        BlobsFeature,
+        DiagnosticsFeature,
+        DnsFeature,
+        DpiSettingsFeature,
+        ExternalActionsFeature,
+        HostsFeature,
+        ListsFeature,
+        LogsFeature,
+        OrchestraFeature,
+        PremiumFeature,
+        PresetsFeature,
+        ProfileFeature,
+        ProgramSettingsFeature,
+        RuntimeFeature,
+        TelegramProxyFeature,
+        TrayFeature,
+        UpdaterFeature,
+    )
 
 
 @dataclass(frozen=True, slots=True)

@@ -725,6 +725,23 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             inspect.getsource(application_lifecycle.ApplicationLifecycle._cleanup_before_close),
         )
 
+    def test_application_lifecycle_port_defers_close_cleanup_helpers(self) -> None:
+        import inspect
+        import main.application_lifecycle_port as application_lifecycle_port
+
+        source = inspect.getsource(application_lifecycle_port)
+        top_level = source.split("@dataclass", 1)[0]
+
+        self.assertNotIn("from main.window_lifecycle_cleanup import", top_level)
+        self.assertIn(
+            "from main.window_lifecycle_cleanup import persist_window_geometry",
+            inspect.getsource(application_lifecycle_port.ApplicationLifecycleWindowPort.persist_geometry),
+        )
+        self.assertIn(
+            "from main.window_lifecycle_cleanup import cleanup_threaded_pages_for_close",
+            inspect.getsource(application_lifecycle_port.ApplicationLifecycleWindowPort.cleanup_threaded_pages),
+        )
+
     def test_window_notifications_defers_page_adapter(self) -> None:
         import inspect
         import main.window_notifications_setup as window_notifications_setup
@@ -750,6 +767,80 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         self.assertIn(
             "from ui.window_adapter import route_window_search_result, show_page",
             inspect.getsource(window_actions.WindowActionsMixin.open_connection_test),
+        )
+
+    def test_window_feature_deps_defers_appearance_bindings(self) -> None:
+        import inspect
+        import main.window_feature_deps as window_feature_deps
+
+        source = inspect.getsource(window_feature_deps)
+        top_level = source.split("def initialize_window_holiday_effects", 1)[0]
+
+        self.assertNotIn("from ui.window_appearance_bindings import", top_level)
+        self.assertIn(
+            "from ui.window_appearance_bindings import initialize_window_holiday_effects",
+            inspect.getsource(window_feature_deps.initialize_window_holiday_effects),
+        )
+
+    def test_feature_assembly_defers_feature_facades_import(self) -> None:
+        import inspect
+        import app.feature_assembly as feature_assembly
+
+        source = inspect.getsource(feature_assembly)
+        top_level = source.split("@dataclass", 1)[0]
+
+        self.assertNotIn("from app.feature_facades import", top_level)
+        self.assertIn(
+            "from app.feature_facades import PresetsFeature, ProfileFeature",
+            inspect.getsource(feature_assembly.build_preset_profile_features),
+        )
+        self.assertIn(
+            "from app.feature_facades import (",
+            inspect.getsource(feature_assembly.build_app_features),
+        )
+
+    def test_app_features_defers_feature_facades_imports_to_type_checking(self) -> None:
+        import inspect
+        import app.features as app_features
+
+        source = inspect.getsource(app_features)
+        before_type_checking = source.split("if TYPE_CHECKING:", 1)[0]
+
+        self.assertNotIn("from app.feature_facades import", before_type_checking)
+        self.assertIn("if TYPE_CHECKING:", source)
+        self.assertIn("from app.feature_facades import", source)
+
+    def test_window_state_actions_defers_appearance_state_helpers(self) -> None:
+        import inspect
+        import main.window_state_actions as window_state_actions
+
+        source = inspect.getsource(window_state_actions)
+        top_level = source.split("@dataclass", 1)[0]
+
+        self.assertNotIn("from ui.window_appearance_state import", top_level)
+        self.assertNotIn("from log.log import", top_level)
+        self.assertIn(
+            "from ui.window_appearance_state import apply_window_opacity_value",
+            inspect.getsource(window_state_actions.WindowStateActions.set_window_opacity),
+        )
+
+    def test_window_page_deps_setup_defers_ui_root_imports(self) -> None:
+        import inspect
+        import main.window_page_deps_setup as window_page_deps_setup
+
+        source = inspect.getsource(window_page_deps_setup)
+        top_level = source.split("def build_window_page_deps_sources", 1)[0]
+
+        self.assertNotIn("from ui.page_deps.common import", top_level)
+        self.assertNotIn("from ui.ui_root import", top_level)
+        self.assertNotIn("from ui.window_bootstrap_runtime import", top_level)
+        self.assertIn(
+            "from ui.page_deps.common import PageDepsSources",
+            inspect.getsource(window_page_deps_setup.build_window_page_deps_sources),
+        )
+        self.assertIn(
+            "from ui.ui_root import WindowUiRoot",
+            inspect.getsource(window_page_deps_setup.attach_window_ui_root),
         )
 
     def test_post_startup_host_defers_window_adapter(self) -> None:

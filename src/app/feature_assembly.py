@@ -3,27 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from app.feature_facades import (
-    BlockcheckFeature,
-    PresetsFeature,
-    ProfileFeature,
-    build_autostart_feature,
-    build_blobs_feature,
-    build_diagnostics_feature,
-    build_dns_feature,
-    build_dpi_settings_feature,
-    build_external_actions_feature,
-    build_hosts_feature,
-    build_lists_feature,
-    build_logs_feature,
-    build_orchestra_feature,
-    build_premium_feature,
-    build_program_settings_feature,
-    build_runtime_feature,
-    build_telegram_proxy_feature,
-    build_tray_feature,
-    build_updater_feature,
-)
 from app.features import AppFeatures
 
 
@@ -67,6 +46,8 @@ class AppFeatureAssemblyDeps:
 
 
 def build_preset_profile_features(paths: Any) -> PresetProfileFeatures:
+    from app.feature_facades import PresetsFeature, ProfileFeature
+
     presets_feature = PresetsFeature.create(paths)
     profile_feature = ProfileFeature(
         _presets_feature=presets_feature,
@@ -81,6 +62,26 @@ def build_preset_profile_features(paths: Any) -> PresetProfileFeatures:
 
 def build_app_features(*, deps: AppFeatureAssemblyDeps, paths: Any, state: Any) -> AppFeatures:
     """Собирает feature-входы без превращения AppFeatures в общий контейнер."""
+    from app.feature_facades import (
+        BlockcheckFeature,
+        build_autostart_feature,
+        build_blobs_feature,
+        build_diagnostics_feature,
+        build_dns_feature,
+        build_dpi_settings_feature,
+        build_external_actions_feature,
+        build_hosts_feature,
+        build_lists_feature,
+        build_logs_feature,
+        build_orchestra_feature,
+        build_premium_feature,
+        build_program_settings_feature,
+        build_runtime_feature,
+        build_telegram_proxy_feature,
+        build_tray_feature,
+        build_updater_feature,
+    )
+
     orchestra_feature = build_orchestra_feature()
     preset_profile = build_preset_profile_features(paths)
 

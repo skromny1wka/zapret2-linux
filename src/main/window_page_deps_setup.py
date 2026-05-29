@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from ui.page_deps.common import PageDepsSources
-from ui.ui_root import WindowUiRoot
-from ui.window_bootstrap_runtime import WindowRuntimeBootstrapDeps
-
 
 def build_window_page_deps_sources(*, features, state, page_actions) -> PageDepsSources:
+    from ui.page_deps.common import PageDepsSources
+
     return PageDepsSources(
         feature_deps={
             "autostart": features.autostart,
@@ -54,6 +52,9 @@ def build_window_page_deps_sources(*, features, state, page_actions) -> PageDeps
 
 
 def attach_window_ui_root(window, *, features, state, page_actions) -> None:
+    from ui.ui_root import WindowUiRoot
+    from ui.window_bootstrap_runtime import WindowRuntimeBootstrapDeps
+
     runtime_bootstrap_deps = WindowRuntimeBootstrapDeps(
         runtime_feature=features.runtime,
         presets_feature=features.presets,

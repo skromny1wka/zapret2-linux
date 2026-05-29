@@ -7,7 +7,12 @@ from app.feature_assembly import (
     TrayFeatureDeps,
 )
 from main.window_feature_ports import FeatureWindowDeps
-from ui.window_appearance_bindings import initialize_window_holiday_effects
+
+
+def initialize_window_holiday_effects(*args, **kwargs):
+    from ui.window_appearance_bindings import initialize_window_holiday_effects as _initialize_window_holiday_effects
+
+    return _initialize_window_holiday_effects(*args, **kwargs)
 
 
 def build_window_feature_deps(window_deps: FeatureWindowDeps, *, appearance_actions) -> AppFeatureAssemblyDeps:
