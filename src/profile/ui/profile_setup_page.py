@@ -1320,7 +1320,10 @@ class ProfileSetupPageBase(BasePage):
         worker.deleteLater()
 
     def show_profile(self, profile_key: str) -> None:
-        self._profile_key = str(profile_key or "").strip()
+        next_key = str(profile_key or "").strip()
+        if next_key and next_key == str(self._profile_key or "").strip() and self._payload is not None:
+            return
+        self._profile_key = next_key
         self.reload_current_profile()
 
     def handle_page_command(self, command: str, payload: dict) -> bool:

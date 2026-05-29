@@ -3133,6 +3133,16 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page.reload_current_profile.assert_not_called()
         page._on_profile_changed_callback.assert_not_called()
 
+    def test_show_profile_skips_reload_when_profile_is_already_loaded(self) -> None:
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._profile_key = "profile-1"
+        page._payload = SimpleNamespace(item=SimpleNamespace(key="profile-1"))
+        page.reload_current_profile = Mock(side_effect=AssertionError("same loaded profile must not reload"))
+
+        ProfileSetupPageBase.show_profile(page, "profile-1")
+
+        page.reload_current_profile.assert_not_called()
+
     def test_strategy_feedback_worker_emits_state(self) -> None:
         controller = Mock()
         state = ProfileStrategyState(rating="work", favorite=True)
