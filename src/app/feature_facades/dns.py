@@ -59,6 +59,10 @@ def build_dns_feature() -> DnsFeature:
             enabled=enabled,
             adapters=adapters,
             language=language,
+            get_force_dns_status=feature.get_force_dns_status,
+            enable_force_dns=feature.enable_force_dns,
+            disable_force_dns=feature.disable_force_dns,
+            refresh_dns_info=feature.refresh_dns_info,
             parent=parent,
         )
 
@@ -73,6 +77,7 @@ def build_dns_feature() -> DnsFeature:
         return DnsFlushCacheWorker(
             request_id,
             language=language,
+            flush_dns_cache=feature.flush_dns_cache,
             parent=parent,
         )
 
@@ -93,6 +98,9 @@ def build_dns_feature() -> DnsFeature:
             dns_info=dns_info,
             force_dns_active=force_dns_active,
             language=language,
+            is_isp_dns_warning_shown=feature.is_isp_dns_warning_shown,
+            mark_isp_dns_warning_shown=feature.mark_isp_dns_warning_shown,
+            normalize_adapter_alias=feature.normalize_adapter_alias,
             parent=parent,
         )
 
@@ -119,6 +127,10 @@ def build_dns_feature() -> DnsFeature:
             primary=primary,
             secondary=secondary,
             ipv6_available=ipv6_available,
+            apply_auto_dns=feature.apply_auto_dns,
+            apply_provider_dns=feature.apply_provider_dns,
+            apply_custom_dns=feature.apply_custom_dns,
+            refresh_dns_info=feature.refresh_dns_info,
             parent=parent,
         )
 

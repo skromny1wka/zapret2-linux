@@ -3740,7 +3740,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("create_dns_flush_cache_worker", feature_source)
         self.assertIn("create_dns_flush_cache_worker", page_source)
         self.assertIn("_dns_flush_cache_pending", page_source)
-        self.assertIn("flush_dns_cache", worker_source)
+        self.assertIn("_flush_dns_cache", worker_source)
+        self.assertNotIn("dns_public.flush_dns_cache", worker_source)
         self.assertIn("build_flush_dns_cache_result_plan", worker_source)
 
     def test_dns_apply_actions_run_through_worker(self) -> None:

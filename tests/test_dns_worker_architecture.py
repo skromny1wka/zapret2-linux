@@ -5,11 +5,10 @@ import unittest
 
 from app.feature_facades.dns import build_dns_feature
 from dns import page_workers
-import dns.public as dns_public
 
 
 class DnsWorkerArchitectureTests(unittest.TestCase):
-    def test_network_action_workers_use_public_commands_not_feature_object(self) -> None:
+    def test_network_action_workers_receive_feature_action_callables(self) -> None:
         feature_source = inspect.getsource(build_dns_feature)
         worker_source = "\n".join(
             (
@@ -23,19 +22,38 @@ class DnsWorkerArchitectureTests(unittest.TestCase):
         self.assertNotIn("dns_feature=feature", feature_source)
         self.assertNotIn("self._dns =", worker_source)
         self.assertNotIn("self._dns.", worker_source)
-        self.assertIn("dns_public.get_force_dns_status", worker_source)
-        self.assertIn("dns_public.enable_force_dns", worker_source)
-        self.assertIn("dns_public.disable_force_dns", worker_source)
-        self.assertIn("dns_public.flush_dns_cache", worker_source)
-        self.assertIn("dns_public.apply_auto_dns", worker_source)
-        self.assertIn("dns_public.apply_provider_dns", worker_source)
-        self.assertIn("dns_public.apply_custom_dns", worker_source)
-        self.assertIn("dns_public.refresh_dns_info", worker_source)
-        self.assertIn("dns_public.is_isp_dns_warning_shown", worker_source)
-        self.assertIn("dns_public.mark_isp_dns_warning_shown", worker_source)
-        self.assertIn("dns_public.normalize_adapter_alias", worker_source)
-        self.assertIn("enable_force_dns", inspect.getsource(dns_public.enable_force_dns))
-        self.assertIn("apply_custom_dns", inspect.getsource(dns_public.apply_custom_dns))
+        self.assertNotIn("import dns.public", worker_source)
+        self.assertNotIn("dns_public.", worker_source)
+
+        for expected in (
+            "get_force_dns_status=feature.get_force_dns_status",
+            "enable_force_dns=feature.enable_force_dns",
+            "disable_force_dns=feature.disable_force_dns",
+            "flush_dns_cache=feature.flush_dns_cache",
+            "apply_auto_dns=feature.apply_auto_dns",
+            "apply_provider_dns=feature.apply_provider_dns",
+            "apply_custom_dns=feature.apply_custom_dns",
+            "refresh_dns_info=feature.refresh_dns_info",
+            "is_isp_dns_warning_shown=feature.is_isp_dns_warning_shown",
+            "mark_isp_dns_warning_shown=feature.mark_isp_dns_warning_shown",
+            "normalize_adapter_alias=feature.normalize_adapter_alias",
+        ):
+            self.assertIn(expected, feature_source)
+
+        for expected in (
+            "_get_force_dns_status",
+            "_enable_force_dns",
+            "_disable_force_dns",
+            "_flush_dns_cache",
+            "_apply_auto_dns",
+            "_apply_provider_dns",
+            "_apply_custom_dns",
+            "_refresh_dns_info",
+            "_is_isp_dns_warning_shown",
+            "_mark_isp_dns_warning_shown",
+            "_normalize_adapter_alias",
+        ):
+            self.assertIn(expected, worker_source)
 
 
 if __name__ == "__main__":

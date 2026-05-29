@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from log.log import log
@@ -51,6 +54,10 @@ class DnsForceDnsActionWorker(QThread):
         enabled: bool | None = None,
         adapters=None,
         language: str = "ru",
+        get_force_dns_status: Callable[[], bool],
+        enable_force_dns: Callable[..., Any],
+        disable_force_dns: Callable[..., Any],
+        refresh_dns_info: Callable[[list], Any],
         parent=None,
     ):
         super().__init__(parent)
@@ -59,6 +66,10 @@ class DnsForceDnsActionWorker(QThread):
         self._enabled = None if enabled is None else bool(enabled)
         self._adapters = list(adapters or [])
         self._language = str(language or "ru")
+        self._get_force_dns_status = get_force_dns_status
+        self._enable_force_dns = enable_force_dns
+        self._disable_force_dns = disable_force_dns
+        self._refresh_dns_info_action = refresh_dns_info
 
     def run(self) -> None:
         context = {
@@ -79,11 +90,10 @@ class DnsForceDnsActionWorker(QThread):
         self.completed.emit(self._request_id, self._action, result, context)
 
     def _run_toggle(self) -> dict[str, object]:
-        import dns.public as dns_public
         from dns.ui import page_plans as dns_page_plans
 
         requested_enabled = bool(self._enabled)
-        current_state = bool(dns_public.get_force_dns_status())
+        current_state = bool(self._get_force_dns_status())
         if requested_enabled == current_state:
             plan = dns_page_plans.NetworkForceDnsTogglePlan(
                 final_checked=current_state,
@@ -95,7 +105,7 @@ class DnsForceDnsActionWorker(QThread):
             return {"plan": plan, "message": "", "changed": False}
 
         if requested_enabled:
-            command_result = dns_public.enable_force_dns(include_disconnected=False)
+            command_result = self._enable_force_dns(include_disconnected=False)
             plan = dns_page_plans.build_force_dns_toggle_plan(
                 requested_enabled=True,
                 success=bool(command_result.success),
@@ -103,7 +113,7 @@ class DnsForceDnsActionWorker(QThread):
                 total=int(command_result.total_count or 0),
             )
         else:
-            command_result = dns_public.disable_force_dns(reset_to_auto=False)
+            command_result = self._disable_force_dns(reset_to_auto=False)
             plan = dns_page_plans.build_force_dns_toggle_plan(
                 requested_enabled=False,
                 success=bool(command_result.success),
@@ -112,15 +122,14 @@ class DnsForceDnsActionWorker(QThread):
             "plan": plan,
             "message": str(command_result.message or ""),
             "changed": True,
-            "dns_info": self._refresh_dns_info(),
+            "dns_info": self._load_dns_info(),
         }
 
     def _run_reset_dhcp(self) -> dict[str, object]:
-        import dns.public as dns_public
         from dns.ui import page_plans as dns_page_plans
 
-        command_result = dns_public.disable_force_dns(reset_to_auto=True)
-        force_dns_active = bool(dns_public.get_force_dns_status())
+        command_result = self._disable_force_dns(reset_to_auto=True)
+        force_dns_active = bool(self._get_force_dns_status())
         plan = dns_page_plans.build_reset_dhcp_result_plan(
             success=bool(command_result.success),
             message=str(command_result.message or ""),
@@ -130,15 +139,13 @@ class DnsForceDnsActionWorker(QThread):
         return {
             "plan": plan,
             "message": str(command_result.message or ""),
-            "dns_info": self._refresh_dns_info(),
+            "dns_info": self._load_dns_info(),
         }
 
-    def _refresh_dns_info(self):
-        import dns.public as dns_public
-
+    def _load_dns_info(self):
         if not self._adapters:
             return None
-        return dns_public.refresh_dns_info(self._adapters)
+        return self._refresh_dns_info_action(self._adapters)
 
 
 class DnsFlushCacheWorker(QThread):
@@ -150,18 +157,19 @@ class DnsFlushCacheWorker(QThread):
         request_id: int,
         *,
         language: str = "ru",
+        flush_dns_cache: Callable[[], Any],
         parent=None,
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
         self._language = str(language or "ru")
+        self._flush_dns_cache = flush_dns_cache
 
     def run(self) -> None:
-        import dns.public as dns_public
         from dns.ui import page_plans as dns_page_plans
 
         try:
-            result = dns_public.flush_dns_cache()
+            result = self._flush_dns_cache()
             plan = dns_page_plans.build_flush_dns_cache_result_plan(
                 success=bool(result.success),
                 message=str(result.message or ""),
@@ -186,6 +194,9 @@ class DnsIspWarningWorker(QThread):
         dns_info: dict,
         force_dns_active: bool,
         language: str = "ru",
+        is_isp_dns_warning_shown: Callable[[], bool],
+        mark_isp_dns_warning_shown: Callable[[], Any],
+        normalize_adapter_alias: Callable[[str], str],
         parent=None,
     ):
         super().__init__(parent)
@@ -194,9 +205,11 @@ class DnsIspWarningWorker(QThread):
         self._dns_info = dict(dns_info or {})
         self._force_dns_active = bool(force_dns_active)
         self._language = str(language or "ru")
+        self._is_isp_dns_warning_shown = is_isp_dns_warning_shown
+        self._mark_isp_dns_warning_shown = mark_isp_dns_warning_shown
+        self._normalize_adapter_alias = normalize_adapter_alias
 
     def run(self) -> None:
-        import dns.public as dns_public
         from dns.ui import page_plans as dns_page_plans
 
         try:
@@ -204,12 +217,12 @@ class DnsIspWarningWorker(QThread):
                 self._adapters,
                 self._dns_info,
                 force_dns_active=self._force_dns_active,
-                warning_already_shown=dns_public.is_isp_dns_warning_shown(),
-                normalize_alias_fn=dns_public.normalize_adapter_alias,
+                warning_already_shown=self._is_isp_dns_warning_shown(),
+                normalize_alias_fn=self._normalize_adapter_alias,
                 language=self._language,
             )
             if plan.should_show:
-                dns_public.mark_isp_dns_warning_shown()
+                self._mark_isp_dns_warning_shown()
         except Exception as exc:
             log(f"DnsIspWarningWorker: ошибка подготовки предупреждения ISP DNS: {exc}", "ERROR")
             self.failed.emit(self._request_id, str(exc))
@@ -232,6 +245,10 @@ class DnsApplyWorker(QThread):
         primary: str = "",
         secondary: str | None = None,
         ipv6_available: bool = False,
+        apply_auto_dns: Callable[[list], Any],
+        apply_provider_dns: Callable[..., Any],
+        apply_custom_dns: Callable[..., Any],
+        refresh_dns_info: Callable[[list], Any],
         parent=None,
     ):
         super().__init__(parent)
@@ -243,6 +260,10 @@ class DnsApplyWorker(QThread):
         self._primary = str(primary or "").strip()
         self._secondary = None if secondary is None else str(secondary or "").strip()
         self._ipv6_available = bool(ipv6_available)
+        self._apply_auto_dns = apply_auto_dns
+        self._apply_provider_dns = apply_provider_dns
+        self._apply_custom_dns = apply_custom_dns
+        self._refresh_dns_info = refresh_dns_info
 
     def run(self) -> None:
         try:
@@ -254,14 +275,13 @@ class DnsApplyWorker(QThread):
         self.completed.emit(self._request_id, result)
 
     def _run_apply(self) -> dict[str, object]:
-        import dns.public as dns_public
         from dns.ui import page_plans as dns_page_plans
 
         if not self._adapters:
             return {"plan": None, "dns_info": None}
 
         if self._action == "auto":
-            command_result = dns_public.apply_auto_dns(self._adapters)
+            command_result = self._apply_auto_dns(self._adapters)
             plan = dns_page_plans.build_auto_dns_apply_result_plan(
                 adapter_count=len(self._adapters),
                 success_count=int(command_result.affected_count or 0),
@@ -277,7 +297,7 @@ class DnsApplyWorker(QThread):
                     "plan": provider_plan,
                     "dns_info": None,
                 }
-            command_result = dns_public.apply_provider_dns(
+            command_result = self._apply_provider_dns(
                 self._adapters,
                 provider_plan.ipv4,
                 provider_plan.ipv6,
@@ -293,7 +313,7 @@ class DnsApplyWorker(QThread):
         elif self._action == "custom":
             if not self._primary:
                 return {"plan": None, "dns_info": None}
-            command_result = dns_public.apply_custom_dns(
+            command_result = self._apply_custom_dns(
                 self._adapters,
                 self._primary,
                 self._secondary,
@@ -306,7 +326,7 @@ class DnsApplyWorker(QThread):
         else:
             raise ValueError(f"Неизвестное DNS действие: {self._action}")
 
-        dns_info = dns_public.refresh_dns_info(self._adapters) if getattr(plan, "should_refresh", False) else None
+        dns_info = self._refresh_dns_info(self._adapters) if getattr(plan, "should_refresh", False) else None
         return {
             "plan": plan,
             "dns_info": dns_info,
