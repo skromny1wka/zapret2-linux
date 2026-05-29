@@ -72,7 +72,13 @@ class RawPresetActionWorker(QThread):
     def __init__(
         self,
         request_id: int,
-        run_action,
+        open_source_file,
+        rename_preset,
+        duplicate_preset,
+        export_preset,
+        reset_to_builtin,
+        delete_preset,
+        source_path,
         *,
         action: str,
         payload: dict | None = None,
@@ -80,7 +86,13 @@ class RawPresetActionWorker(QThread):
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._run_action = run_action
+        self._open_source_file = open_source_file
+        self._rename_preset = rename_preset
+        self._duplicate_preset = duplicate_preset
+        self._export_preset = export_preset
+        self._reset_to_builtin = reset_to_builtin
+        self._delete_preset = delete_preset
+        self._source_path = source_path
         self._action = str(action or "").strip()
         self._payload = dict(payload or {})
 
@@ -88,7 +100,38 @@ class RawPresetActionWorker(QThread):
         action = self._action
         payload = self._payload
         try:
-            result = self._run_action(action, payload)
+            if action == "open":
+                result = self._open_source_file(payload.get("path"))
+            elif action == "rename":
+                updated = self._rename_preset(
+                    file_name=str(payload.get("file_name") or ""),
+                    new_name=str(payload.get("new_name") or ""),
+                )
+                result = (updated, self._source_path(updated.file_name))
+            elif action == "duplicate":
+                updated = self._duplicate_preset(
+                    file_name=str(payload.get("file_name") or ""),
+                    new_name=str(payload.get("new_name") or ""),
+                )
+                result = (updated, self._source_path(updated.file_name))
+            elif action == "export":
+                target_path = str(payload.get("target_path") or "")
+                self._export_preset(
+                    file_name=str(payload.get("file_name") or ""),
+                    target_path=target_path,
+                )
+                result = target_path
+            elif action == "reset":
+                updated = self._reset_to_builtin(
+                    file_name=str(payload.get("file_name") or ""),
+                )
+                result = (updated, self._source_path(updated.file_name))
+            elif action == "delete":
+                result = self._delete_preset(
+                    file_name=str(payload.get("file_name") or ""),
+                )
+            else:
+                raise ValueError(f"Неизвестное действие preset: {action}")
         except Exception as exc:
             log(f"RawPresetActionWorker: действие {action} не выполнено: {exc}", "ERROR")
             self.failed.emit(self._request_id, action, str(exc), payload)
