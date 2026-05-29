@@ -7,11 +7,19 @@ from log.log import log
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
+
+IPC_COMMAND_SHOW_WINDOW = "SHOW_WINDOW"
+IPC_COMMAND_EXIT_KEEP_DPI = "EXIT_KEEP_DPI"
+IPC_COMMAND_EXIT_STOP_DPI = "EXIT_STOP_DPI"
+
+
 class IPCManager(QObject):
     """Менеджер межпроцессного взаимодействия для показа окна из трея"""
     
     # Сигнал для показа окна (будет вызван в главном потоке Qt)
     show_window_signal = pyqtSignal()
+    exit_keep_dpi_signal = pyqtSignal()
+    exit_stop_dpi_signal = pyqtSignal()
     
     def __init__(self, port=47289):
         super().__init__()
@@ -27,6 +35,8 @@ class IPCManager(QObject):
         
         # Подключаем сигнал к методу показа окна
         self.show_window_signal.connect(self._handle_show_window)
+        self.exit_keep_dpi_signal.connect(lambda: self._handle_exit_request(stop_dpi=False))
+        self.exit_stop_dpi_signal.connect(lambda: self._handle_exit_request(stop_dpi=True))
         
         def server_thread():
             try:
@@ -43,9 +53,7 @@ class IPCManager(QObject):
                         conn, addr = self.server_socket.accept()
                         data = conn.recv(1024).decode('utf-8')
                         
-                        if data == "SHOW_WINDOW":
-                            # Вызываем сигнал (он выполнится в главном потоке)
-                            self.show_window_signal.emit()
+                        self._dispatch_command(data)
                             
                         conn.close()
                     except socket.timeout:
@@ -74,18 +82,55 @@ class IPCManager(QObject):
                 self.window.activateWindow()
                 self.window.raise_()
             log("Окно показано по запросу от другого экземпляра", "INFO")
-    
-    def send_show_command(self):
-        """Отправляет команду показать окно уже запущенному экземпляру"""
+
+    def _handle_exit_request(self, *, stop_dpi: bool):
+        """Обработчик запроса закрыть GUI (выполняется в главном потоке)."""
+        if not self.window:
+            return
+        request_exit = getattr(self.window, "request_exit", None)
+        if callable(request_exit):
+            request_exit(stop_dpi=bool(stop_dpi))
+            log(
+                "Закрытие GUI запрошено через IPC"
+                + (" с остановкой DPI" if stop_dpi else " без остановки DPI"),
+                "INFO",
+            )
+
+    def _dispatch_command(self, data: str) -> bool:
+        command = str(data or "").strip()
+        if command == IPC_COMMAND_SHOW_WINDOW:
+            # Вызываем сигнал (он выполнится в главном потоке)
+            self.show_window_signal.emit()
+            return True
+        if command == IPC_COMMAND_EXIT_KEEP_DPI:
+            self.exit_keep_dpi_signal.emit()
+            return True
+        if command == IPC_COMMAND_EXIT_STOP_DPI:
+            self.exit_stop_dpi_signal.emit()
+            return True
+        return False
+
+    def send_command(self, command: str) -> bool:
+        """Отправляет команду уже запущенному экземпляру."""
         try:
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client.settimeout(1.0)
             client.connect(('127.0.0.1', self.port))
-            client.send(b"SHOW_WINDOW")
+            client.send(str(command or "").encode("utf-8"))
             client.close()
             return True
         except:
             return False
+    
+    def send_show_command(self):
+        """Отправляет команду показать окно уже запущенному экземпляру"""
+        return self.send_command(IPC_COMMAND_SHOW_WINDOW)
+
+    def send_exit_command(self, *, stop_dpi: bool = False):
+        """Отправляет команду закрыть уже запущенный GUI."""
+        return self.send_command(
+            IPC_COMMAND_EXIT_STOP_DPI if stop_dpi else IPC_COMMAND_EXIT_KEEP_DPI
+        )
             
     def stop(self):
         """Останавливает IPC сервер"""
