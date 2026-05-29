@@ -249,6 +249,32 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn(".list_profiles(", source)
         self.assertIn("get_profile_strategy_display_state", source)
 
+    def test_preset_switch_summary_refresh_runs_through_worker_runtime(self) -> None:
+        import ui.window_bootstrap_runtime as bootstrap_runtime
+
+        source = inspect.getsource(bootstrap_runtime.create_preset_runtime_coordinator)
+
+        self.assertIn("PresetProfileStrategySummaryRefreshRuntime", source)
+        self.assertIn("summary_refresh_runtime.request_refresh", source)
+        self.assertNotIn(
+            "refresh_after_switch=lambda: runtime_deps.presets_feature.refresh_profile_strategy_summary_in_store",
+            source,
+        )
+
+    def test_preset_switch_summary_worker_does_not_touch_ui_state_store(self) -> None:
+        import presets.display_state_refresh as display_state_refresh
+
+        worker_source = inspect.getsource(display_state_refresh.PresetProfileStrategySummaryWorker.run)
+        runtime_source = inspect.getsource(
+            display_state_refresh.PresetProfileStrategySummaryRefreshRuntime._on_summary_loaded,
+        )
+        publish_source = inspect.getsource(display_state.publish_profile_strategy_summary_in_store)
+
+        self.assertIn("resolve_profile_strategy_display_state", worker_source)
+        self.assertNotIn("ui_state_store", worker_source)
+        self.assertIn("publish_profile_strategy_summary_in_store", runtime_source)
+        self.assertIn("set_current_strategy_summary", publish_source)
+
     def test_user_presets_full_metadata_loading_is_worker_only(self) -> None:
         load_source = inspect.getsource(UserPresetsRuntimeService.load_presets)
         watcher_source = inspect.getsource(UserPresetsRuntimeService.reload_presets_from_watcher)

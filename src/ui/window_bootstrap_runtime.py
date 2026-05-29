@@ -68,17 +68,25 @@ def initialize_build_ui_state(
 
 
 def create_preset_runtime_coordinator(window, runtime_deps: WindowRuntimeBootstrapDeps):
+    from presets.display_state_refresh import PresetProfileStrategySummaryRefreshRuntime
+
+    summary_refresh_runtime = PresetProfileStrategySummaryRefreshRuntime(
+        profile_feature=runtime_deps.profile_feature,
+        state_store=runtime_deps.ui_state_store,
+        get_launch_method=get_current_launch_method_for_preset_runtime,
+        parent=window,
+    )
+    session = get_window_ui_session(window)
+    if session is not None:
+        session.preset_summary_refresh_runtime = summary_refresh_runtime
+
     return runtime_deps.runtime_feature.create_preset_runtime_coordinator(
         ui_state_store=runtime_deps.ui_state_store,
         get_launch_method=get_current_launch_method_for_preset_runtime,
         get_active_preset_path=lambda: resolve_active_preset_watch_path(
             presets_feature=runtime_deps.presets_feature,
         ),
-        refresh_after_switch=lambda: runtime_deps.presets_feature.refresh_profile_strategy_summary_in_store(
-            method=get_current_launch_method_for_preset_runtime(),
-            profile_feature=runtime_deps.profile_feature,
-            ui_state_store=runtime_deps.ui_state_store,
-        ),
+        refresh_after_switch=summary_refresh_runtime.request_refresh,
     )
 
 

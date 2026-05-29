@@ -57,6 +57,19 @@ def refresh_profile_strategy_summary_in_store(
         log(f"Ошибка обновления display стратегии после смены пресета: {e}", "DEBUG")
 
 
+def publish_profile_strategy_summary_in_store(
+    *,
+    state: ProfileStrategyDisplayState,
+    ui_state_store,
+) -> None:
+    """Записывает уже готовый summary profile в общий UI state."""
+    try:
+        if ui_state_store is not None and state.summary:
+            ui_state_store.set_current_strategy_summary(state.summary)
+    except Exception as e:
+        log(f"Ошибка записи display стратегии после смены пресета: {e}", "DEBUG")
+
+
 def refresh_launch_summary_in_store(
     *,
     method: str,
@@ -83,6 +96,7 @@ def refresh_launch_summary_in_store(
 
 __all__ = [
     "ProfileStrategyDisplayState",
+    "publish_profile_strategy_summary_in_store",
     "refresh_launch_summary_in_store",
     "refresh_profile_strategy_summary_in_store",
     "resolve_profile_strategy_display_state",

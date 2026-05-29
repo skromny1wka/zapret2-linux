@@ -40,6 +40,7 @@ class WindowUiSession:
     startup_page_init_metrics: list[tuple[str, int]] = field(default_factory=list)
 
     preset_runtime_coordinator: Any | None = None
+    preset_summary_refresh_runtime: Any | None = None
     runtime_ui_bridge: Any | None = None
     page_stack_bootstrap_complete: bool = False
     ui_bootstrap_bindings_connected: bool = False
