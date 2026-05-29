@@ -30,7 +30,6 @@ from presets.user_presets_action_workers import (
     UserPresetFolderActionWorker,
     UserPresetItemActionWorker,
     UserPresetLinkActionWorker,
-    UserPresetOpenFolderWorker,
     UserPresetStorageActionWorker,
 )
 from presets.ui.common.user_presets_page_runtime import (
@@ -555,9 +554,8 @@ class UserPresetsPageBase(BasePage):
         self._request_preset_open_folder_action()
 
     def create_preset_open_folder_worker(self, request_id: int):
-        return UserPresetOpenFolderWorker(
+        return self._presets_feature.create_user_presets_open_folder_worker(
             request_id,
-            self._presets_feature,
             launch_method=self._config.launch_method,
             parent=self,
         )

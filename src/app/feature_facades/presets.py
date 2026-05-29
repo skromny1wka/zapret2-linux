@@ -204,6 +204,16 @@ class PresetsFeature:
     def open_user_presets_folder(self, launch_method: str) -> None:
         return self._commands().open_user_presets_folder(launch_method, preset_services=self._preset_services())
 
+    def create_user_presets_open_folder_worker(self, request_id: int, *, launch_method: str, parent=None):
+        from presets.user_presets_action_workers import UserPresetOpenFolderWorker
+
+        return UserPresetOpenFolderWorker(
+            request_id,
+            launch_method=launch_method,
+            preset_services=self._preset_services(),
+            parent=parent,
+        )
+
     def open_preset_source_file(self, path) -> None:
         return self._commands().open_preset_source_file(path)
 

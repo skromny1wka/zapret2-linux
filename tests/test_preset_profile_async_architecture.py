@@ -356,8 +356,13 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("self._presets.", open_folder_source)
 
         self.assertTrue(hasattr(user_presets_action_workers, "UserPresetOpenFolderWorker"))
+        create_worker_source = inspect.getsource(UserPresetsPageBase.create_preset_open_folder_worker)
         worker_source = inspect.getsource(user_presets_action_workers.UserPresetOpenFolderWorker.run)
-        self.assertIn("open_user_presets_folder", worker_source)
+        worker_init_source = inspect.getsource(user_presets_action_workers.UserPresetOpenFolderWorker.__init__)
+        self.assertIn("create_user_presets_open_folder_worker", create_worker_source)
+        self.assertNotIn("UserPresetOpenFolderWorker(", create_worker_source)
+        self.assertNotIn("_presets_feature", worker_init_source)
+        self.assertIn("preset_commands.open_user_presets_folder", worker_source)
 
     def test_preset_list_active_marker_updates_indexed_rows_only(self) -> None:
         class CountingRow(dict):

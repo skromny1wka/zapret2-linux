@@ -180,15 +180,20 @@ class UserPresetOpenFolderWorker(QThread):
     completed = pyqtSignal(int)
     failed = pyqtSignal(int, str)
 
-    def __init__(self, request_id: int, presets_feature, *, launch_method: str, parent=None):
+    def __init__(self, request_id: int, *, launch_method: str, preset_services, parent=None):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._presets_feature = presets_feature
         self._launch_method = str(launch_method or "").strip()
+        self._preset_services = preset_services
 
     def run(self) -> None:
+        import presets.commands as preset_commands
+
         try:
-            self._presets_feature.open_user_presets_folder(self._launch_method)
+            preset_commands.open_user_presets_folder(
+                self._launch_method,
+                preset_services=self._preset_services,
+            )
         except Exception as exc:
             log(f"UserPresetOpenFolderWorker: не удалось открыть папку preset: {exc}", "ERROR")
             self.failed.emit(self._request_id, str(exc))
