@@ -4,6 +4,7 @@ import os
 import sys
 
 from config.config import MAIN_DIRECTORY
+from main.pyinstaller_archive_import_lock import install_pyinstaller_archive_import_lock
 from main.runtime_state import is_startup_debug_enabled
 
 
@@ -90,5 +91,6 @@ def prepare_prelaunch() -> None:
     _set_workdir_to_app()
     _require_frozen()
     _install_crash_handler()
+    install_pyinstaller_archive_import_lock()
     _preload_slow_modules()
     _PRELAUNCH_DONE = True
