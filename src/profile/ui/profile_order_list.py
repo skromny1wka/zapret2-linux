@@ -25,8 +25,11 @@ class ProfileOrderListModel(QAbstractListModel):
     def set_profiles(self, items: tuple[Any, ...]) -> None:
         rows = [item for item in tuple(items or ()) if bool(getattr(item, "in_preset", False))]
         rows.sort(key=lambda item: int(getattr(item, "profile_index", 0) or 0))
+        next_items = tuple(rows)
+        if self._items == next_items:
+            return
         self.beginResetModel()
-        self._items = tuple(rows)
+        self._items = next_items
         self.endResetModel()
 
     def move_profile(self, source_profile_key: str, action: str, destination_profile_key: str = "") -> bool:

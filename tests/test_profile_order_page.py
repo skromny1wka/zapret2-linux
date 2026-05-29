@@ -90,6 +90,29 @@ class ProfileOrderPageTests(unittest.TestCase):
             ["profile:b", "profile:c", "profile:a"],
         )
 
+    def test_order_model_skips_reset_when_profiles_are_unchanged(self) -> None:
+        from profile.ui.profile_order_list import ProfileOrderListModel
+        from profile.ui.profile_list_model import ProfileListModel
+
+        model = ProfileOrderListModel()
+        model.set_profiles((
+            _item("A", key="profile:a", profile_index=0),
+            _item("B", key="profile:b", profile_index=1),
+        ))
+        model.beginResetModel = Mock(side_effect=AssertionError("unchanged profile order payload must not reset the whole model"))
+        model.endResetModel = Mock(side_effect=AssertionError("unchanged profile order payload must not reset the whole model"))
+
+        model.set_profiles((
+            _item("A", key="profile:a", profile_index=0),
+            _item("B", key="profile:b", profile_index=1),
+        ))
+
+        self.assertEqual(model.rowCount(), 2)
+        self.assertEqual(
+            [model.index(row, 0).data(ProfileListModel.ProfileKeyRole) for row in range(model.rowCount())],
+            ["profile:a", "profile:b"],
+        )
+
     def test_order_page_explains_priority_and_uses_order_workers(self) -> None:
         from profile.ui.profile_order_page import ProfileOrderPageBase
 
