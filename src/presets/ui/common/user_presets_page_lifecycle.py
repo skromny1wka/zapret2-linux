@@ -9,6 +9,28 @@ from qfluentwidgets import FluentIcon
 from ui.fluent_widgets import set_tooltip
 
 
+def set_widget_text_if_changed(widget, text: str) -> bool:
+    value = str(text or "")
+    try:
+        if str(widget.text()) == value:
+            return False
+    except Exception:
+        pass
+    widget.setText(value)
+    return True
+
+
+def set_placeholder_if_changed(widget, text: str) -> bool:
+    value = str(text or "")
+    try:
+        if str(widget.placeholderText()) == value:
+            return False
+    except Exception:
+        pass
+    widget.setPlaceholderText(value)
+    return True
+
+
 def handle_user_presets_ui_state_changed(
     *,
     cleanup_in_progress: bool,
@@ -239,24 +261,25 @@ def apply_user_presets_language(
     apply_mode_labels_fn()
 
     if configs_title_label is not None:
-        configs_title_label.setText(
+        set_widget_text_if_changed(
+            configs_title_label,
             tr_fn(
                 f"{tr_prefix}.configs.title",
                 "Обменивайтесь пресетами и профилями в разделе GitHub Discussions",
-            )
+            ),
         )
     if get_configs_btn is not None:
-        get_configs_btn.setText(tr_fn(f"{tr_prefix}.configs.button", "Получить конфиги"))
+        set_widget_text_if_changed(get_configs_btn, tr_fn(f"{tr_prefix}.configs.button", "Получить конфиги"))
 
     if create_btn is not None:
         set_tooltip(create_btn, tr_fn(f"{tr_prefix}.tooltip.create", "Создать новый пресет"))
 
     if import_btn is not None:
-        import_btn.setText(tr_fn(f"{tr_prefix}.button.import", "Импорт"))
+        set_widget_text_if_changed(import_btn, tr_fn(f"{tr_prefix}.button.import", "Импорт"))
         set_tooltip(import_btn, tr_fn(f"{tr_prefix}.tooltip.import", "Импорт пресета из файла"))
 
     if open_folder_btn is not None:
-        open_folder_btn.setText(tr_fn(f"{tr_prefix}.button.open_folder", "Открыть папку"))
+        set_widget_text_if_changed(open_folder_btn, tr_fn(f"{tr_prefix}.button.open_folder", "Открыть папку"))
         set_tooltip(
             open_folder_btn,
             tr_fn(f"{tr_prefix}.tooltip.open_folder", "Открыть папку, где лежат ваши пресеты"),
@@ -265,7 +288,7 @@ def apply_user_presets_language(
     if reset_all_btn is not None:
         current_text = reset_all_btn.text() or ""
         if "/" not in current_text:
-            reset_all_btn.setText(tr_fn(f"{tr_prefix}.button.reset_all", "Вернуть встроенные"))
+            set_widget_text_if_changed(reset_all_btn, tr_fn(f"{tr_prefix}.button.reset_all", "Вернуть встроенные"))
         set_tooltip(
             reset_all_btn,
             tr_fn(
@@ -275,12 +298,13 @@ def apply_user_presets_language(
         )
 
     if presets_info_btn is not None:
-        presets_info_btn.setText(tr_fn(f"{tr_prefix}.button.wiki", "Вики по пресетам"))
+        set_widget_text_if_changed(presets_info_btn, tr_fn(f"{tr_prefix}.button.wiki", "Вики по пресетам"))
     if info_btn is not None:
-        info_btn.setText(tr_fn(f"{tr_prefix}.button.what_is_this", "Что это такое?"))
+        set_widget_text_if_changed(info_btn, tr_fn(f"{tr_prefix}.button.what_is_this", "Что это такое?"))
 
     if preset_search_input is not None:
-        preset_search_input.setPlaceholderText(
+        set_placeholder_if_changed(
+            preset_search_input,
             tr_fn(f"{tr_prefix}.search.placeholder", "Поиск пресетов по имени...")
         )
 
