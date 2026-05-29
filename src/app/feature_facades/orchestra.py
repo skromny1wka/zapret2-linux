@@ -78,9 +78,9 @@ class OrchestraFeature:
 
         return OrchestraSettingSaveWorker(
             request_id,
-            self,
             key=key,
             value=value,
+            runner=self.runner,
             parent=parent,
         )
 

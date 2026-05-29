@@ -42,3 +42,9 @@ def remove_whitelist_domain(orchestra_runner, domain: str, *, whitelist_service)
 
 def clear_whitelist_user_domains(orchestra_runner, domains: list[str], *, whitelist_service) -> int:
     return int(whitelist_service.clear_user_domains(orchestra_runner, domains))
+
+
+def set_setting(key: str, value, *, runner=None) -> None:
+    from settings.dpi.public import set_orchestra_setting
+
+    set_orchestra_setting(key, value, runner=runner)

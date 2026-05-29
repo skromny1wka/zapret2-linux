@@ -12,21 +12,23 @@ class OrchestraSettingSaveWorker(QThread):
     def __init__(
         self,
         request_id: int,
-        orchestra_feature,
         *,
         key: str,
         value,
+        runner=None,
         parent=None,
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
-        self._orchestra = orchestra_feature
         self._key = str(key or "").strip()
         self._value = value
+        self._runner = runner
 
     def run(self) -> None:
+        import orchestra.commands as orchestra_commands
+
         try:
-            self._orchestra.set_setting(self._key, self._value)
+            orchestra_commands.set_setting(self._key, self._value, runner=self._runner)
         except Exception as exc:
             log(f"OrchestraSettingSaveWorker: не удалось сохранить {self._key}: {exc}", "ERROR")
             self.failed.emit(self._request_id, self._key, str(exc))
