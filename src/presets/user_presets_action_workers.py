@@ -336,6 +336,13 @@ class UserPresetFolderActionWorker(QThread):
     def __init__(
         self,
         request_id: int,
+        load_preset_folder_state,
+        create_preset_folder,
+        rename_preset_folder,
+        delete_preset_folder,
+        move_preset_folder_by_step,
+        set_preset_folder_collapsed,
+        reset_preset_folders,
         *,
         scope_key: str,
         action: str,
@@ -348,6 +355,13 @@ class UserPresetFolderActionWorker(QThread):
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
+        self._load_preset_folder_state = load_preset_folder_state
+        self._create_preset_folder = create_preset_folder
+        self._rename_preset_folder = rename_preset_folder
+        self._delete_preset_folder = delete_preset_folder
+        self._move_preset_folder_by_step = move_preset_folder_by_step
+        self._set_preset_folder_collapsed = set_preset_folder_collapsed
+        self._reset_preset_folders = reset_preset_folders
         self._scope_key = str(scope_key or "").strip()
         self._action = str(action or "").strip()
         self._folder_key = str(folder_key or "").strip()
@@ -357,16 +371,6 @@ class UserPresetFolderActionWorker(QThread):
         self._context_extra = dict(context_extra or {})
 
     def run(self) -> None:
-        from presets.folders import (
-            create_preset_folder,
-            delete_preset_folder,
-            load_preset_folder_state,
-            move_preset_folder_by_step,
-            rename_preset_folder,
-            reset_preset_folders,
-            set_preset_folder_collapsed,
-        )
-
         context = {
             "scope_key": self._scope_key,
             "folder_key": self._folder_key,
@@ -377,28 +381,28 @@ class UserPresetFolderActionWorker(QThread):
         context.update(self._context_extra)
         try:
             if self._action == "load_state":
-                result = load_preset_folder_state(self._scope_key)
+                result = self._load_preset_folder_state(self._scope_key)
             elif self._action == "create":
-                result = create_preset_folder(self._scope_key, self._name)
+                result = self._create_preset_folder(self._scope_key, self._name)
             elif self._action == "rename":
-                result = rename_preset_folder(self._scope_key, self._folder_key, self._name)
+                result = self._rename_preset_folder(self._scope_key, self._folder_key, self._name)
             elif self._action == "delete":
-                result = delete_preset_folder(self._scope_key, self._folder_key)
+                result = self._delete_preset_folder(self._scope_key, self._folder_key)
             elif self._action in {"move", "move_step"}:
-                result = move_preset_folder_by_step(self._scope_key, self._folder_key, self._direction)
+                result = self._move_preset_folder_by_step(self._scope_key, self._folder_key, self._direction)
             elif self._action == "set_collapsed":
-                result = set_preset_folder_collapsed(self._scope_key, self._folder_key, self._collapsed)
+                result = self._set_preset_folder_collapsed(self._scope_key, self._folder_key, self._collapsed)
             elif self._action == "toggle_collapsed":
-                state = load_preset_folder_state(self._scope_key)
+                state = self._load_preset_folder_state(self._scope_key)
                 folder = state.get("folders", {}).get(self._folder_key) if isinstance(state, dict) else None
                 if not isinstance(folder, dict) and self._folder_key != "pinned":
                     result = False
                 else:
                     collapsed = not bool(folder.get("collapsed", False)) if isinstance(folder, dict) else True
                     context["collapsed"] = collapsed
-                    result = set_preset_folder_collapsed(self._scope_key, self._folder_key, collapsed)
+                    result = self._set_preset_folder_collapsed(self._scope_key, self._folder_key, collapsed)
             elif self._action == "reset":
-                result = reset_preset_folders(self._scope_key)
+                result = self._reset_preset_folders(self._scope_key)
             else:
                 raise ValueError(f"Неизвестное действие папки preset: {self._action}")
         except Exception as exc:
@@ -407,7 +411,7 @@ class UserPresetFolderActionWorker(QThread):
             return
         if self._action != "load_state" and bool(result):
             try:
-                context["folder_state"] = load_preset_folder_state(self._scope_key)
+                context["folder_state"] = self._load_preset_folder_state(self._scope_key)
             except Exception as exc:
                 log(f"UserPresetFolderActionWorker: не удалось обновить состояние папок preset: {exc}", "DEBUG")
         self.completed.emit(self._request_id, self._action, result, context)

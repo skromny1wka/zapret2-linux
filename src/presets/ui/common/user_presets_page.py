@@ -18,7 +18,16 @@ from PyQt6.QtWidgets import (
 from ui.pages.base_page import BasePage
 from presets.ui.common.preset_actions_menu import show_preset_actions_menu
 from presets.ui.common.preset_rating_menu import show_preset_rating_menu
-from presets.folders import delete_preset_item_meta
+from presets.folders import (
+    create_preset_folder,
+    delete_preset_folder,
+    delete_preset_item_meta,
+    load_preset_folder_state,
+    move_preset_folder_by_step,
+    rename_preset_folder,
+    reset_preset_folders,
+    set_preset_folder_collapsed,
+)
 from presets.user_presets_runtime_service import (
     UserPresetsRuntimeAdapter,
     UserPresetsRuntimeService,
@@ -345,8 +354,6 @@ class UserPresetsPageBase(BasePage):
         return self._config.folder_scope
 
     def _load_preset_folder_state_light(self) -> dict[str, object]:
-        from presets.folders import load_preset_folder_state
-
         return load_preset_folder_state(self._folder_scope_key())
 
     def on_page_activated(self) -> None:
@@ -1034,6 +1041,13 @@ class UserPresetsPageBase(BasePage):
     ):
         return UserPresetFolderActionWorker(
             request_id,
+            load_preset_folder_state,
+            create_preset_folder,
+            rename_preset_folder,
+            delete_preset_folder,
+            move_preset_folder_by_step,
+            set_preset_folder_collapsed,
+            reset_preset_folders,
             scope_key=self._folder_scope_key(),
             action=action,
             folder_key=folder_key,
