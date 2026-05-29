@@ -44,7 +44,7 @@ def restart_proxy_if_running(
     restarting: bool,
     set_restarting,
     status_label,
-    telegram_proxy_feature,
+    create_stop_runtime_worker,
 ) -> None:
     plan = telegram_proxy_page_runtime.build_restart_plan(
         running=bool(manager.is_running),
@@ -56,7 +56,7 @@ def restart_proxy_if_running(
     set_restarting(True)
     status_label.setText(plan.status_text)
 
-    worker = telegram_proxy_feature.create_stop_runtime_worker(manager=manager, parent=page)
+    worker = create_stop_runtime_worker(manager=manager, parent=page)
     setattr(page, "_restart_stop_worker", worker)
     worker.stopped.connect(lambda: QMetaObject.invokeMethod(page, "_finish_restart", QtNS.ConnectionType.QueuedConnection))
     worker.finished.connect(lambda: setattr(page, "_restart_stop_worker", None))
@@ -76,7 +76,7 @@ def start_proxy_runtime(
     btn_toggle,
     status_label,
     append_log_line,
-    telegram_proxy_feature,
+    create_start_worker,
 ) -> None:
     plan = telegram_proxy_page_runtime.build_start_plan(
         starting=bool(starting),
@@ -94,7 +94,7 @@ def start_proxy_runtime(
     if plan.upstream_log_line:
         append_log_line(plan.upstream_log_line)
 
-    worker = telegram_proxy_feature.create_start_worker(
+    worker = create_start_worker(
         manager=manager,
         port=port,
         mode="socks5",
@@ -140,7 +140,7 @@ def start_relay_check(
     set_relay_diag,
     get_zapret_running,
     log_warning,
-    telegram_proxy_feature,
+    create_relay_check_worker,
 ) -> None:
     start_plan = telegram_proxy_page_runtime.build_relay_start_plan(
         current_generation=current_generation,
@@ -153,7 +153,7 @@ def start_relay_check(
     if manager.is_running:
         status_label.setText(start_plan.status_text)
 
-    worker = telegram_proxy_feature.create_relay_check_worker(
+    worker = create_relay_check_worker(
         generation=gen,
         get_zapret_running=get_zapret_running,
         parent=page,
@@ -211,7 +211,7 @@ def apply_relay_result(
         )
 
 
-def stop_proxy_runtime(*, page, manager, telegram_proxy_feature) -> None:
+def stop_proxy_runtime(*, page, manager, create_stop_runtime_worker) -> None:
     worker = getattr(page, "_proxy_stop_worker", None)
     if worker is not None:
         try:
@@ -220,7 +220,7 @@ def stop_proxy_runtime(*, page, manager, telegram_proxy_feature) -> None:
         except RuntimeError:
             setattr(page, "_proxy_stop_worker", None)
 
-    worker = telegram_proxy_feature.create_stop_runtime_worker(
+    worker = create_stop_runtime_worker(
         manager=manager,
         emit_status=True,
         parent=page,

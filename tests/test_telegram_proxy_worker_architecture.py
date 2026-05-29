@@ -7,6 +7,35 @@ from telegram_proxy import workers as telegram_proxy_workers
 
 
 class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
+    def test_runtime_workflow_receives_worker_factories_not_full_feature(self) -> None:
+        from telegram_proxy.ui import proxy_runtime_workflow
+
+        for function_name in (
+            "restart_proxy_if_running",
+            "start_proxy_runtime",
+            "start_relay_check",
+            "stop_proxy_runtime",
+        ):
+            signature = inspect.signature(getattr(proxy_runtime_workflow, function_name))
+            self.assertNotIn("telegram_proxy_feature", signature.parameters)
+
+        self.assertIn(
+            "create_stop_runtime_worker",
+            inspect.signature(proxy_runtime_workflow.restart_proxy_if_running).parameters,
+        )
+        self.assertIn(
+            "create_start_worker",
+            inspect.signature(proxy_runtime_workflow.start_proxy_runtime).parameters,
+        )
+        self.assertIn(
+            "create_relay_check_worker",
+            inspect.signature(proxy_runtime_workflow.start_relay_check).parameters,
+        )
+        self.assertIn(
+            "create_stop_runtime_worker",
+            inspect.signature(proxy_runtime_workflow.stop_proxy_runtime).parameters,
+        )
+
     def test_relay_reachability_probe_is_owned_by_commands(self) -> None:
         worker_source = inspect.getsource(telegram_proxy_workers.TelegramProxyRelayCheckWorker.run)
 

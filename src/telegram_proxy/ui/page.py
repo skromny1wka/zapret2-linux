@@ -806,7 +806,7 @@ class TelegramProxyPage(BasePage):
             restarting=bool(getattr(self, "_restarting", False)),
             set_restarting=lambda value: setattr(self, "_restarting", value),
             status_label=self._status_label,
-            telegram_proxy_feature=self._telegram_proxy,
+            create_stop_runtime_worker=self._telegram_proxy.create_stop_runtime_worker,
         )
 
     @pyqtSlot()
@@ -938,7 +938,7 @@ class TelegramProxyPage(BasePage):
             btn_toggle=self._btn_toggle,
             status_label=self._status_label,
             append_log_line=self._append_log_line,
-            telegram_proxy_feature=self._telegram_proxy,
+            create_start_worker=self._telegram_proxy.create_start_worker,
         )
 
     @pyqtSlot()
@@ -968,7 +968,7 @@ class TelegramProxyPage(BasePage):
             set_relay_diag=lambda value: setattr(self, "_relay_diag", value),
             get_zapret_running=lambda: telegram_proxy_page_runtime.is_zapret_runtime_running(self._runtime_feature),
             log_warning=lambda text: log(text, "WARNING"),
-            telegram_proxy_feature=self._telegram_proxy,
+            create_relay_check_worker=self._telegram_proxy.create_relay_check_worker,
         )
 
     @pyqtSlot()
@@ -990,7 +990,7 @@ class TelegramProxyPage(BasePage):
         stop_proxy_runtime(
             page=self,
             manager=mgr,
-            telegram_proxy_feature=self._telegram_proxy,
+            create_stop_runtime_worker=self._telegram_proxy.create_stop_runtime_worker,
         )
 
     @pyqtSlot()
