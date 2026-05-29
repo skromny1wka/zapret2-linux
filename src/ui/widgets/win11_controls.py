@@ -146,9 +146,24 @@ class Win11ToggleRow(FluentSettingCard):
         return bool(toggle.isChecked())
 
     def set_texts(self, title: str, description: str = "") -> None:
+        next_title = str(title or "")
+        next_description = str(description or "")
+        text_key = (next_title, next_description)
         try:
-            self.setTitle(title)
-            self.setContent(description)
+            title_label = getattr(self, "_title_label", None)
+            desc_label = getattr(self, "_desc_label", None)
+            current_title = str(title_label.text() if title_label is not None else "")
+            current_description = str(desc_label.text() if desc_label is not None else "")
+            if (current_title, current_description) == text_key:
+                self._last_win11_toggle_texts_key = text_key
+                return
+        except Exception:
+            if getattr(self, "_last_win11_toggle_texts_key", None) == text_key:
+                return
+        try:
+            self.setTitle(next_title)
+            self.setContent(next_description)
+            self._last_win11_toggle_texts_key = text_key
         except Exception:
             pass
 

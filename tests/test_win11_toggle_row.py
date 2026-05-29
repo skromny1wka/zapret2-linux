@@ -3,6 +3,14 @@ from __future__ import annotations
 import unittest
 
 
+class _TextLabel:
+    def __init__(self, text: str) -> None:
+        self._text = str(text)
+
+    def text(self) -> str:
+        return self._text
+
+
 class _SwitchButton:
     def __init__(self, checked: bool) -> None:
         self.checked = bool(checked)
@@ -45,6 +53,52 @@ class Win11ToggleRowTests(unittest.TestCase):
         self.assertEqual(switch.set_calls, [True])
         self.assertEqual(switch.block_calls, [True, False])
         self.assertTrue(switch.checked)
+
+    def test_set_texts_skips_duplicate_title_and_description(self) -> None:
+        from ui.widgets.win11_controls import Win11ToggleRow
+
+        row = Win11ToggleRow.__new__(Win11ToggleRow)
+        row._title_label = _TextLabel("Title")
+        row._desc_label = _TextLabel("Description")
+        title_calls: list[str] = []
+        content_calls: list[str] = []
+
+        def set_title(text: str) -> None:
+            title_calls.append(str(text))
+
+        def set_content(text: str) -> None:
+            content_calls.append(str(text))
+
+        row.setTitle = set_title
+        row.setContent = set_content
+
+        Win11ToggleRow.set_texts(row, "Title", "Description")
+
+        self.assertEqual(title_calls, [])
+        self.assertEqual(content_calls, [])
+
+    def test_set_texts_applies_changed_title_and_description(self) -> None:
+        from ui.widgets.win11_controls import Win11ToggleRow
+
+        row = Win11ToggleRow.__new__(Win11ToggleRow)
+        row._title_label = _TextLabel("Old title")
+        row._desc_label = _TextLabel("Old description")
+        title_calls: list[str] = []
+        content_calls: list[str] = []
+
+        def set_title(text: str) -> None:
+            title_calls.append(str(text))
+
+        def set_content(text: str) -> None:
+            content_calls.append(str(text))
+
+        row.setTitle = set_title
+        row.setContent = set_content
+
+        Win11ToggleRow.set_texts(row, "Title", "Description")
+
+        self.assertEqual(title_calls, ["Title"])
+        self.assertEqual(content_calls, ["Description"])
 
 
 if __name__ == "__main__":
