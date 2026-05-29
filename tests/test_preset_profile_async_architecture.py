@@ -3376,6 +3376,18 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("self._load_data_fn()", worker_source)
         self.assertNotIn("load_data_fn=self._load_data", page_source)
 
+    def test_network_force_dns_status_is_applied_from_page_load_worker(self) -> None:
+        build_force_source = inspect.getsource(dns_page.NetworkPage._build_force_dns_card)
+        loaded_source = inspect.getsource(dns_page.NetworkPage._on_page_state_loaded)
+        apply_source = inspect.getsource(dns_page.NetworkPage._apply_loaded_force_dns_state)
+
+        self.assertNotIn("get_force_dns_status_fn=dns_feature.get_force_dns_status", build_force_source)
+        self.assertIn("get_force_dns_status_fn=lambda: self._force_dns_active", build_force_source)
+        self.assertIn("_apply_loaded_force_dns_state()", loaded_source)
+        self.assertIn("_set_force_dns_toggle", apply_source)
+        self.assertIn("_update_force_dns_status", apply_source)
+        self.assertIn("_update_dns_selection_state", apply_source)
+
     def test_dns_force_dns_actions_run_through_worker(self) -> None:
         page_workers = importlib.import_module("dns.page_workers")
         feature_source = inspect.getsource(__import__("app.feature_facades.dns", fromlist=["DnsFeature"]).DnsFeature)

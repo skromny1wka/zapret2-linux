@@ -481,6 +481,7 @@ class NetworkPage(BasePage):
                 emit_adapters_loaded_fn=lambda adapters: (not self._cleanup_in_progress) and self.adapters_loaded.emit(adapters),
                 emit_dns_info_loaded_fn=lambda dns_info: (not self._cleanup_in_progress) and self.dns_info_loaded.emit(dns_info),
             )
+            self._apply_loaded_force_dns_state()
         except Exception as exc:
             log(f"Ошибка загрузки DNS данных: {exc}", "ERROR")
     
@@ -748,7 +749,6 @@ class NetworkPage(BasePage):
     
     def _build_force_dns_card(self):
         """Строит виджет принудительного DNS в стиле DPI страницы"""
-        dns_feature = self._dns_feature()
         self._force_dns_active, force_dns_widgets = build_force_dns_card_ui(
             parent=self,
             content_parent=self.content,
@@ -756,7 +756,7 @@ class NetworkPage(BasePage):
             tr_fn=self._tr,
             add_widget_fn=self.add_widget,
             get_theme_tokens_fn=get_theme_tokens,
-            get_force_dns_status_fn=dns_feature.get_force_dns_status,
+            get_force_dns_status_fn=lambda: self._force_dns_active,
             setting_card_group_cls=SettingCardGroup,
             caption_label_cls=CaptionLabel,
             action_button_cls=PushButton,
@@ -777,6 +777,15 @@ class NetworkPage(BasePage):
         self._force_dns_reset_row = force_dns_widgets.reset_row
 
         self._update_force_dns_status(self._force_dns_active)
+        self._update_dns_selection_state()
+
+    def _apply_loaded_force_dns_state(self) -> None:
+        if self._cleanup_in_progress:
+            return
+        if not hasattr(self, "force_dns_toggle"):
+            return
+        self._set_force_dns_toggle(bool(self._force_dns_active))
+        self._update_force_dns_status(bool(self._force_dns_active))
         self._update_dns_selection_state()
 
     def _apply_inline_theme_styles(self, tokens=None) -> None:
