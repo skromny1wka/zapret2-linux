@@ -316,7 +316,9 @@ class UserPresetsRuntimeService:
         try:
             scrollbar = page.presets_list.verticalScrollBar()
             if scrollbar is not None:
-                scrollbar.setValue(int((state or {}).get("scroll_value") or 0))
+                scroll_value = int((state or {}).get("scroll_value") or 0)
+                if int(scrollbar.value()) != scroll_value:
+                    scrollbar.setValue(scroll_value)
         except Exception:
             pass
 

@@ -394,6 +394,22 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
         presets_list.setCurrentIndex.assert_not_called()
 
+    def test_user_presets_restore_view_state_skips_same_scroll_value(self) -> None:
+        scrollbar = Mock()
+        scrollbar.value.return_value = 42
+        presets_list = Mock()
+        presets_list.verticalScrollBar.return_value = scrollbar
+        page = SimpleNamespace(presets_list=presets_list)
+        service = UserPresetsRuntimeService.__new__(UserPresetsRuntimeService)
+        service._resolve_page = Mock(return_value=page)
+
+        UserPresetsRuntimeService.restore_presets_view_state(
+            service,
+            {"current_file_name": "", "scroll_value": 42},
+        )
+
+        scrollbar.setValue.assert_not_called()
+
     def test_user_presets_activation_runs_through_worker(self) -> None:
         handler_source = inspect.getsource(UserPresetsPageBase._on_activate_preset)
         request_source = inspect.getsource(UserPresetsPageBase._request_preset_activation)
