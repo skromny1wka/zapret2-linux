@@ -3,12 +3,6 @@ from __future__ import annotations
 from PyQt6.QtWidgets import QApplication
 
 from log.log import log
-from main.window_lifecycle_cleanup import (
-    cleanup_process_monitor_for_close,
-    cleanup_runtime_threads_for_close,
-    cleanup_subscription_for_close,
-    detach_global_error_notifier,
-)
 
 
 class ApplicationLifecycle:
@@ -77,6 +71,8 @@ class ApplicationLifecycle:
         return False
 
     def run_final_close_cleanup(self) -> None:
+        from main.window_lifecycle_cleanup import detach_global_error_notifier
+
         detach_global_error_notifier()
         self._window_port.persist_geometry(context="закрытии", level="❌ ERROR")
 
@@ -121,6 +117,12 @@ class ApplicationLifecycle:
         QApplication.quit()
 
     def _cleanup_before_close(self) -> None:
+        from main.window_lifecycle_cleanup import (
+            cleanup_process_monitor_for_close,
+            cleanup_runtime_threads_for_close,
+            cleanup_subscription_for_close,
+        )
+
         cleanup_process_monitor_for_close(self._runtime_feature)
         cleanup_subscription_for_close(self._premium_feature)
         self._window_port.cleanup_theme()

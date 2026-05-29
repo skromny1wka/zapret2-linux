@@ -2,9 +2,6 @@ from __future__ import annotations
 
 from log.log import log
 
-from ui.page_actions import request_blockcheck_diagnostics_focus
-from ui.window_adapter import route_window_search_result, show_page
-
 
 class WindowActionsMixin:
     def bind_status_message_sink(self, sink) -> None:
@@ -78,6 +75,10 @@ class WindowActionsMixin:
     def open_connection_test(self) -> None:
         """Переключает на вкладку диагностики соединений."""
         try:
+            from app.page_names import PageName
+            from ui.page_actions import request_blockcheck_diagnostics_focus
+            from ui.window_adapter import route_window_search_result, show_page
+
             if show_page(self, PageName.BLOCKCHECK):
                 route_window_search_result(self, PageName.BLOCKCHECK, "diagnostics")
                 request_blockcheck_diagnostics_focus(self)

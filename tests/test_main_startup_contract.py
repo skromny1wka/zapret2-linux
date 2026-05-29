@@ -687,6 +687,88 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             inspect.getsource(window_page_actions.on_mica_changed),
         )
 
+    def test_window_lifecycle_defers_close_cleanup_and_adapter_helpers(self) -> None:
+        import inspect
+        import main.window_lifecycle as window_lifecycle
+
+        source = inspect.getsource(window_lifecycle)
+        top_level = source.split("class WindowLifecycleMixin", 1)[0]
+
+        self.assertNotIn("from main.window_lifecycle_cleanup import", top_level)
+        self.assertNotIn("from ui.window_adapter import", top_level)
+        self.assertIn("self.unsetCursor()", inspect.getsource(window_lifecycle.WindowLifecycleMixin.release_input_interaction_states))
+        self.assertIn(
+            "sync_titlebar_search_width(self)",
+            inspect.getsource(window_lifecycle.WindowLifecycleMixin.resizeEvent),
+        )
+        self.assertIn(
+            "refresh_titlebar_layout(self)",
+            inspect.getsource(window_lifecycle.WindowLifecycleMixin._refresh_titlebar_layout_after_show),
+        )
+        self.assertIn("from ui.window_adapter import sync_titlebar_search_width", inspect.getsource(window_lifecycle.sync_titlebar_search_width))
+        self.assertIn("from ui.window_adapter import refresh_titlebar_layout", inspect.getsource(window_lifecycle.refresh_titlebar_layout))
+
+    def test_application_lifecycle_defers_close_cleanup_helpers(self) -> None:
+        import inspect
+        import main.application_lifecycle as application_lifecycle
+
+        source = inspect.getsource(application_lifecycle)
+        top_level = source.split("class ApplicationLifecycle", 1)[0]
+
+        self.assertNotIn("from main.window_lifecycle_cleanup import", top_level)
+        self.assertIn(
+            "from main.window_lifecycle_cleanup import detach_global_error_notifier",
+            inspect.getsource(application_lifecycle.ApplicationLifecycle.run_final_close_cleanup),
+        )
+        self.assertIn(
+            "from main.window_lifecycle_cleanup import",
+            inspect.getsource(application_lifecycle.ApplicationLifecycle._cleanup_before_close),
+        )
+
+    def test_window_notifications_defers_page_adapter(self) -> None:
+        import inspect
+        import main.window_notifications_setup as window_notifications_setup
+
+        source = inspect.getsource(window_notifications_setup)
+        top_level = source.split("def show_page", 1)[0]
+
+        self.assertNotIn("from ui.window_adapter import", top_level)
+        self.assertIn(
+            "from ui.window_adapter import show_page",
+            inspect.getsource(window_notifications_setup.show_page),
+        )
+
+    def test_window_actions_defers_window_adapter(self) -> None:
+        import inspect
+        import main.window_actions as window_actions
+
+        source = inspect.getsource(window_actions)
+        top_level = source.split("class WindowActionsMixin", 1)[0]
+
+        self.assertNotIn("from ui.window_adapter import", top_level)
+        self.assertNotIn("from ui.page_actions import", top_level)
+        self.assertIn(
+            "from ui.window_adapter import route_window_search_result, show_page",
+            inspect.getsource(window_actions.WindowActionsMixin.open_connection_test),
+        )
+
+    def test_post_startup_host_defers_window_adapter(self) -> None:
+        import inspect
+        import main.post_startup_host as post_startup_host
+
+        source = inspect.getsource(post_startup_host)
+        top_level = source.split("@dataclass", 1)[0]
+
+        self.assertNotIn("from ui.window_adapter import", top_level)
+        self.assertIn(
+            "from ui.window_adapter import show_page",
+            inspect.getsource(post_startup_host.PostStartupHost.show_page),
+        )
+        self.assertIn(
+            "from ui.window_adapter import get_loaded_page",
+            inspect.getsource(post_startup_host.PostStartupHost.get_loaded_page),
+        )
+
     def test_lazy_feature_facades_still_call_loaded_command_modules(self) -> None:
         from app.feature_facades.blockcheck import BlockcheckFeature
         from app.feature_facades.external import ExternalActionsFeature

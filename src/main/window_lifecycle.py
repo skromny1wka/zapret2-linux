@@ -5,9 +5,6 @@ from PyQt6.QtWidgets import QWidget
 
 from log.log import log
 
-from main.window_lifecycle_cleanup import (
-    release_input_interaction_states,
-)
 from main.window_native_commands import (
     handle_minimize_request,
     handle_native_minimize_command,
@@ -16,7 +13,6 @@ from main.runtime_state import (
     log_startup_metric as emit_startup_metric,
     startup_elapsed_ms,
 )
-from ui.window_adapter import refresh_titlebar_layout, sync_titlebar_search_width
 
 
 class WindowLifecycleMixin:
@@ -54,7 +50,10 @@ class WindowLifecycleMixin:
         super().closeEvent(event)
 
     def release_input_interaction_states(self) -> None:
-        release_input_interaction_states(self)
+        try:
+            self.unsetCursor()
+        except Exception:
+            pass
 
     def request_exit(self, stop_dpi: bool) -> None:
         """Общий вход для tray и adapter-слоя."""
@@ -204,3 +203,15 @@ class WindowLifecycleMixin:
             log("🎨 Принудительное обновление стилей выполнено после показа окна", "DEBUG")
         except Exception as e:
             log(f"Ошибка обновления стилей: {e}", "DEBUG")
+
+
+def sync_titlebar_search_width(window) -> None:
+    from ui.window_adapter import sync_titlebar_search_width as _sync_titlebar_search_width
+
+    _sync_titlebar_search_width(window)
+
+
+def refresh_titlebar_layout(window) -> None:
+    from ui.window_adapter import refresh_titlebar_layout as _refresh_titlebar_layout
+
+    _refresh_titlebar_layout(window)

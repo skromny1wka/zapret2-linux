@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ui.window_adapter import get_loaded_page, show_page
-
 
 @dataclass(frozen=True, slots=True)
 class PostStartupHost:
@@ -43,9 +41,13 @@ class PostStartupHost:
         return bool(box.exec())
 
     def show_page(self, page_name) -> None:
+        from ui.window_adapter import show_page
+
         show_page(self._window, page_name)
 
     def get_loaded_page(self, page_name):
+        from ui.window_adapter import get_loaded_page
+
         return get_loaded_page(self._window, page_name)
 
 

@@ -3,8 +3,13 @@ from __future__ import annotations
 import time as _time
 
 from main.runtime_state import log_startup_metric as emit_startup_metric
-from ui.window_adapter import show_page
 from ui.window_notification_center import WindowNotificationCenter
+
+
+def show_page(window, page_name, *, allow_internal: bool = False) -> bool:
+    from ui.window_adapter import show_page
+
+    return bool(show_page(window, page_name, allow_internal=allow_internal))
 
 
 def attach_window_notifications(window, features) -> None:
