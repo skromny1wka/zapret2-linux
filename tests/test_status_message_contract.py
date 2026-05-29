@@ -42,6 +42,24 @@ class StatusMessageContractTests(unittest.TestCase):
 
         self.assertEqual(messages, ["Блокировка MAX включена"])
 
+    def test_window_open_folder_runs_through_worker(self) -> None:
+        import inspect
+
+        from main.window_actions import WindowActionsMixin
+        from main import window_action_workers
+
+        open_source = "\n".join(
+            (
+                inspect.getsource(WindowActionsMixin.open_folder),
+                inspect.getsource(WindowActionsMixin._start_open_folder_worker),
+            )
+        )
+        worker_source = inspect.getsource(window_action_workers.WindowOpenFolderWorker.run)
+
+        self.assertIn("create_open_folder_worker", open_source)
+        self.assertNotIn("run_hidden(", open_source)
+        self.assertIn("run_hidden", worker_source)
+
 
 if __name__ == "__main__":
     unittest.main()
