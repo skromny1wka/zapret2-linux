@@ -102,6 +102,8 @@ class OrchestraPage(BasePage):
         self._clear_learned_pending = False
         self._cleanup_in_progress = False
         self._clear_learned_runtime = OneShotWorkerRuntime()
+        self._log_history_runtime = OneShotWorkerRuntime()
+        self._log_history_pending = False
         self._clear_learned_reset_timer = QTimer(self)
         self._clear_learned_reset_timer.setSingleShot(True)
         self._clear_learned_reset_timer.timeout.connect(self._reset_clear_learned_button)
@@ -611,17 +613,51 @@ class OrchestraPage(BasePage):
         """Обновляет список истории логов"""
         if self._cleanup_in_progress:
             return
-        try:
-            runner = self._get_runner()
-            if runner is not None:
-                update_log_history_view(
-                    runner=runner,
-                    tr_fn=self._tr,
-                    log_history_list=self.log_history_list,
-                )
+        self._request_log_history_load()
 
-        except Exception as e:
-            log(f"Ошибка обновления истории логов: {e}", "DEBUG")
+    def create_log_history_load_worker(self, request_id: int):
+        return self._controller.create_log_history_load_worker(request_id, self)
+
+    def _request_log_history_load(self) -> None:
+        if self._log_history_runtime.is_running():
+            self._log_history_pending = True
+            return
+        self._log_history_pending = False
+        self._start_log_history_load_worker()
+
+    def _start_log_history_load_worker(self) -> None:
+        self._log_history_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: self.create_log_history_load_worker(request_id),
+            on_loaded=self._on_log_history_loaded,
+            on_failed=self._on_log_history_failed,
+            on_finished=self._on_log_history_worker_finished,
+        )
+
+    def _on_log_history_loaded(self, request_id: int, logs) -> None:
+        if not self._log_history_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
+            return
+        update_log_history_view(
+            logs=logs,
+            tr_fn=self._tr,
+            log_history_list=self.log_history_list,
+        )
+
+    def _on_log_history_failed(self, request_id: int, error: str) -> None:
+        if not self._log_history_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
+            return
+        log(f"Ошибка обновления истории логов: {error}", "DEBUG")
+
+    def _on_log_history_worker_finished(self, _worker) -> None:
+        pending = bool(self._log_history_pending)
+        self._log_history_pending = False
+        if pending and not self._cleanup_in_progress:
+            self._start_log_history_load_worker()
 
     def _view_log_history(self):
         """Просматривает выбранный лог из истории"""
@@ -672,6 +708,12 @@ class OrchestraPage(BasePage):
             blocking=False,
             log_fn=log,
             warning_prefix="Orchestra clear learned worker",
+        )
+        self._log_history_pending = False
+        self._log_history_runtime.stop(
+            blocking=False,
+            log_fn=log,
+            warning_prefix="Orchestra log history worker",
         )
 
         try:

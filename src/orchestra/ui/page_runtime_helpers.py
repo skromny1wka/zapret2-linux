@@ -199,12 +199,11 @@ def apply_log_filter_to_view(*, lines: list[str], domain_filter: str, protocol_f
     log_text.setTextCursor(cursor)
 
 
-def update_log_history_view(*, runner, tr_fn, log_history_list) -> None:
+def update_log_history_view(*, logs, tr_fn, log_history_list) -> None:
     log_history_list.clear()
 
-    logs = runner.get_log_history()
     plan = orchestra_page_runtime.build_log_history_plan(
-        logs=logs,
+        logs=list(logs or []),
         current_suffix_text=tr_fn("page.orchestra.log_history.current_suffix", " (текущий)"),
         none_text=tr_fn("page.orchestra.log_history.none", "  Нет сохранённых логов"),
     )

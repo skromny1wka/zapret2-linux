@@ -24,7 +24,18 @@ class OrchestraPageController:
         self._orchestra.clear_learned_data()
         return True
 
+    def load_log_history(self) -> list[dict]:
+        runner = self.runner()
+        if runner is None:
+            return []
+        return list(runner.get_log_history() or [])
+
     def create_clear_learned_worker(self, request_id: int, parent=None):
         from orchestra.page_workers import OrchestraClearLearnedWorker
 
         return OrchestraClearLearnedWorker(request_id, self, parent)
+
+    def create_log_history_load_worker(self, request_id: int, parent=None):
+        from orchestra.page_workers import OrchestraLogHistoryLoadWorker
+
+        return OrchestraLogHistoryLoadWorker(request_id, self, parent)

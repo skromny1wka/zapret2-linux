@@ -2965,6 +2965,29 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("create_clear_learned_worker", controller_source)
         self.assertIn("clear_learned_data", worker_source)
 
+    def test_orchestra_log_history_loads_through_worker(self) -> None:
+        spec = importlib.util.find_spec("orchestra.page_workers")
+        self.assertIsNotNone(spec)
+        orchestra_page_workers = importlib.import_module("orchestra.page_workers")
+        orchestra_page_runtime_helpers = importlib.import_module("orchestra.ui.page_runtime_helpers")
+
+        update_source = inspect.getsource(OrchestraPage._update_log_history)
+        helper_source = inspect.getsource(orchestra_page_runtime_helpers.update_log_history_view)
+        page_source = inspect.getsource(OrchestraPage)
+        controller_source = inspect.getsource(orchestra_page_controller.OrchestraPageController)
+
+        self.assertTrue(hasattr(orchestra_page_workers, "OrchestraLogHistoryLoadWorker"))
+        worker_source = inspect.getsource(orchestra_page_workers.OrchestraLogHistoryLoadWorker.run)
+
+        self.assertIn("_request_log_history_load", update_source)
+        self.assertNotIn("runner.get_log_history", update_source)
+        self.assertNotIn("runner.get_log_history", helper_source)
+        self.assertIn("logs=", helper_source)
+        self.assertIn("_log_history_runtime", page_source)
+        self.assertIn("create_log_history_load_worker", page_source)
+        self.assertIn("create_log_history_load_worker", controller_source)
+        self.assertIn("load_log_history", worker_source)
+
     def test_orchestra_whitelist_actions_run_through_worker(self) -> None:
         whitelist_workers = importlib.import_module("orchestra.managed_lists_workers")
 
