@@ -71,6 +71,17 @@ def create_dns_quick_check_worker(request_id: int, *, parent=None):
     return DNSQuickCheckWorker(request_id, parent=parent)
 
 
+def run_dns_poisoning_check(*, log_callback=None, should_stop=None) -> dict:
+    from dns_checker import DNSChecker
+
+    checker = DNSChecker()
+    results = checker.check_dns_poisoning(
+        log_callback=log_callback,
+        should_stop=should_stop,
+    )
+    return dict(results or {})
+
+
 def save_dns_check_results(*, file_path: str, plain_text: str):
     from dns.dns_check_plans import save_results_text
 

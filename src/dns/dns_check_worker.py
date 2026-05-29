@@ -21,10 +21,9 @@ class DNSCheckWorker(QObject):
 
     def run(self):
         try:
-            from dns_checker import DNSChecker
+            from dns import commands as dns_commands
 
-            checker = DNSChecker()
-            results = checker.check_dns_poisoning(
+            results = dns_commands.run_dns_poisoning_check(
                 log_callback=self.update_signal.emit,
                 should_stop=self.is_stop_requested,
             )
