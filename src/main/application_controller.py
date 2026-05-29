@@ -68,10 +68,16 @@ class ApplicationController:
                 appearance_actions=appearance_actions,
             )
 
+        t_runtime = _time.perf_counter()
         app_runtime = build_app_runtime(
             initial_ui_state=window._build_initial_ui_state(),
             feature_deps_factory=_build_feature_deps,
         )
+        emit_startup_metric(
+            "StartupAppRuntimeBuild",
+            f"{(_time.perf_counter() - t_runtime) * 1000:.0f}ms",
+        )
+        t_attach = _time.perf_counter()
         attach_app_runtime_to_window(
             window,
             app_runtime,
@@ -79,6 +85,10 @@ class ApplicationController:
                 window=target_window,
                 appearance_actions=self.window_state_actions,
             ),
+        )
+        emit_startup_metric(
+            "StartupWindowAttachRuntime",
+            f"{(_time.perf_counter() - t_attach) * 1000:.0f}ms",
         )
         self._window = window
         self._app_runtime = app_runtime

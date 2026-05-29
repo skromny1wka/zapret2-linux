@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import os
 import sys
+import time as _time
 
 from PyQt6.QtCore import QCoreApplication, Qt
 from PyQt6.QtWidgets import QApplication
+
+from main.runtime_state import log_startup_metric as emit_startup_metric
 
 
 _QT_RUNTIME_READY = False
@@ -78,11 +81,17 @@ def ensure_qt_runtime() -> QApplication:
     _set_attr_if_exists("AA_EnableHighDpiScaling")
     _set_attr_if_exists("AA_UseHighDpiPixmaps")
 
+    t_qapp = _time.perf_counter()
     app = QApplication.instance() or QApplication(sys.argv)
+    emit_startup_metric(
+        "StartupQtRuntimeQApplication",
+        f"{(_time.perf_counter() - t_qapp) * 1000:.0f}ms",
+    )
 
     if _QT_RUNTIME_READY:
         return app
 
+    t_hooks = _time.perf_counter()
     from ui.combo_popup_guard import install_global_combo_popup_closer
 
     install_global_combo_popup_closer(app)
@@ -91,6 +100,10 @@ def ensure_qt_runtime() -> QApplication:
     from ui.theme import connect_qfluent_accent_signal
 
     connect_qfluent_accent_signal()
+    emit_startup_metric(
+        "StartupQtRuntimeReadyHooks",
+        f"{(_time.perf_counter() - t_hooks) * 1000:.0f}ms",
+    )
 
     _QT_RUNTIME_READY = True
     return app
@@ -111,10 +124,20 @@ def _install_non_transient_scrollbars_style(app: QApplication) -> None:
 def application_bootstrap() -> QApplication:
     import ctypes
 
+    t_runtime = _time.perf_counter()
     app = ensure_qt_runtime()
+    emit_startup_metric(
+        "StartupQtRuntimeEnsure",
+        f"{(_time.perf_counter() - t_runtime) * 1000:.0f}ms",
+    )
     try:
         try:
+            t_style = _time.perf_counter()
             _install_non_transient_scrollbars_style(app)
+            emit_startup_metric(
+                "StartupQtScrollStyle",
+                f"{(_time.perf_counter() - t_style) * 1000:.0f}ms",
+            )
         except Exception:
             pass
 
@@ -122,10 +145,16 @@ def application_bootstrap() -> QApplication:
 
         from log.crash_handler import install_qt_crash_handler
 
+        t_crash = _time.perf_counter()
         install_qt_crash_handler(app)
+        emit_startup_metric(
+            "StartupQtCrashHandler",
+            f"{(_time.perf_counter() - t_crash) * 1000:.0f}ms",
+        )
     except Exception as exc:
         ctypes.windll.user32.MessageBoxW(None, f"Ошибка инициализации Qt: {exc}", "Zapret", 0x10)
 
+    t_theme = _time.perf_counter()
     from qfluentwidgets import Theme, setTheme
     from qfluentwidgets.common.config import qconfig
     from PyQt6.QtGui import QColor
@@ -143,7 +172,12 @@ def application_bootstrap() -> QApplication:
         setTheme(Theme.AUTO)
     else:
         setTheme(Theme.DARK)
+    emit_startup_metric(
+        "StartupQtThemeMode",
+        f"{(_time.perf_counter() - t_theme) * 1000:.0f}ms",
+    )
 
+    t_accent = _time.perf_counter()
     try:
         from settings.appearance import (
             load_accent_color,
@@ -165,5 +199,9 @@ def application_bootstrap() -> QApplication:
                     save_accent_color(accent_hex)
     except Exception:
         pass
+    emit_startup_metric(
+        "StartupQtAccent",
+        f"{(_time.perf_counter() - t_accent) * 1000:.0f}ms",
+    )
 
     return app

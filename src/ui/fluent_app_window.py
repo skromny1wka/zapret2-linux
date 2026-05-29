@@ -4,6 +4,7 @@ Main app window using qfluentwidgets FluentWindow (WinUI 3 style).
 Replaces the old QWidget + FramelessWindowMixin + CustomTitleBar stack.
 """
 import os
+import time as _time
 from qfluentwidgets import (
     FluentWindow, NavigationItemPosition, FluentIcon,
     setTheme, Theme, setThemeColor, NavigationAvatarWidget,
@@ -17,6 +18,7 @@ from config.build_info import APP_VERSION
 from config.config import ICON_PATH, ICON_DEV_PATH, is_dev_build_channel
 
 from log.log import log
+from main.runtime_state import log_startup_metric as emit_startup_metric
 
 
 
@@ -28,10 +30,16 @@ class ZapretFluentWindow(FluentWindow):
         # QColor(0,0,0,0) = pure Mica (no tint), alpha 1-200 = visible tint.
         self._mica_tint_color = QColor(0, 0, 0, 0)
 
+        t_super = _time.perf_counter()
         super().__init__(parent)
+        emit_startup_metric(
+            "StartupFluentWindowSuper",
+            f"{(_time.perf_counter() - t_super) * 1000:.0f}ms",
+        )
         self.setWindowTitle(f"Zapret2 v{APP_VERSION}")
 
         # Set app icon
+        t_icon = _time.perf_counter()
         icon_path = ICON_DEV_PATH if is_dev_build_channel() else ICON_PATH
         self._app_icon = None
         if os.path.exists(icon_path):
@@ -40,6 +48,10 @@ class ZapretFluentWindow(FluentWindow):
             app = QApplication.instance()
             if app:
                 app.setWindowIcon(self._app_icon)
+        emit_startup_metric(
+            "StartupFluentWindowIcon",
+            f"{(_time.perf_counter() - t_icon) * 1000:.0f}ms",
+        )
 
         # Theme mode (DARK/LIGHT) is set in main.py via _sync_theme_mode_to_qfluent()
         # before the window is created, so no hardcoded setTheme(DARK) here.

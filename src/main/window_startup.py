@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import traceback
+import time as _time
 from config.window_metrics import HEIGHT, WIDTH
 from PyQt6.QtCore import QTimer
 
@@ -27,11 +28,21 @@ class WindowStartupMixin:
         )
         self.visual_state = WindowVisualState()
 
+        t_super = _time.perf_counter()
         super().__init__()
+        emit_startup_metric(
+            "StartupWindowCtorSuper",
+            f"{(_time.perf_counter() - t_super) * 1000:.0f}ms",
+        )
 
         from settings.dpi.strategy_settings import get_strategy_launch_method
 
+        t_method = _time.perf_counter()
         current_method = get_strategy_launch_method()
+        emit_startup_metric(
+            "StartupWindowLaunchMethod",
+            f"{(_time.perf_counter() - t_method) * 1000:.0f}ms",
+        )
         log(f"Метод запуска стратегий: {current_method}", "INFO")
 
     @staticmethod
