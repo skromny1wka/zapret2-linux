@@ -187,12 +187,11 @@ class TelegramProxyRelayCheckWorker(QThread):
     def run(self) -> None:
         try:
             import telegram_proxy.commands as telegram_proxy_commands
-            from telegram_proxy.wss_proxy import check_relay_reachable
 
             time.sleep(2)
             best_result = None
             for attempt in range(3):
-                result = check_relay_reachable(timeout=5.0)
+                result = telegram_proxy_commands.check_relay_reachable(timeout=5.0)
                 if result["reachable"]:
                     best_result = result
                     break

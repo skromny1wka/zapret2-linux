@@ -105,6 +105,12 @@ def run_diagnostics(*, proxy_port: int, progress_callback=None) -> str:
     return str(run_all(proxy_port=proxy_port, progress_callback=progress_callback))
 
 
+def check_relay_reachable(*, timeout: float = 5.0) -> dict:
+    from telegram_proxy.wss_proxy import check_relay_reachable as _check_relay_reachable
+
+    return dict(_check_relay_reachable(timeout=timeout))
+
+
 def check_relay_http(relay_ip: str = "149.154.167.220", timeout: float = 5.0) -> bool:
     import socket
 
