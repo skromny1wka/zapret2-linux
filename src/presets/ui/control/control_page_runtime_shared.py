@@ -50,6 +50,19 @@ def apply_status_plan(
     stop_and_exit_btn,
     update_stop_button_text,
 ) -> bool:
+    plan_key = (
+        str(getattr(plan, "phase", "") or ""),
+        str(getattr(plan, "title", "") or ""),
+        str(getattr(plan, "description", "") or ""),
+        str(getattr(plan, "dot_color", "") or ""),
+        bool(getattr(plan, "pulsing", False)),
+        bool(getattr(plan, "show_start", False)),
+        bool(getattr(plan, "show_stop_only", False)),
+        bool(getattr(plan, "show_stop_and_exit", False)),
+    )
+    if getattr(status_dot, "_last_control_status_plan_key", None) == plan_key:
+        return plan.phase == "running"
+    setattr(status_dot, "_last_control_status_plan_key", plan_key)
     status_title.setText(plan.title)
     status_desc.setText(plan.description)
     status_dot.set_color(plan.dot_color)
