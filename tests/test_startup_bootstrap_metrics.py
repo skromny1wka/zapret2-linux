@@ -54,6 +54,7 @@ class StartupBootstrapMetricsTests(unittest.TestCase):
             (
                 inspect.getsource(WindowStartupMixin.__init__),
                 inspect.getsource(ZapretFluentWindow.__init__),
+                inspect.getsource(ZapretFluentWindow._schedule_app_icon_after_interactive),
                 inspect.getsource(ZapretFluentWindow._apply_app_icon_deferred),
             )
         )
@@ -62,7 +63,8 @@ class StartupBootstrapMetricsTests(unittest.TestCase):
         self.assertIn("StartupWindowLaunchMethod", source)
         self.assertIn("StartupFluentWindowSuper", source)
         self.assertIn("StartupFluentWindowIconDeferred", source)
-        self.assertIn("QTimer.singleShot(0, self._apply_app_icon_deferred)", source)
+        self.assertIn("startup_interactive_ready.connect", source)
+        self.assertIn("self._app_icon_deferred_started", source)
 
     def test_application_controller_logs_runtime_and_attach_substeps(self) -> None:
         from main.application_controller import ApplicationController

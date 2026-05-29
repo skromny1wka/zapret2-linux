@@ -39,13 +39,24 @@ class ZapretFluentWindow(FluentWindow):
         self.setWindowTitle(f"Zapret2 v{APP_VERSION}")
 
         self._app_icon = None
-        QTimer.singleShot(0, self._apply_app_icon_deferred)
+        self._app_icon_deferred_started = False
+        self._schedule_app_icon_after_interactive()
 
         # Theme mode (DARK/LIGHT) is set in main.py via _sync_theme_mode_to_qfluent()
         # before the window is created, so no hardcoded setTheme(DARK) here.
 
+    def _schedule_app_icon_after_interactive(self) -> None:
+        try:
+            self.startup_interactive_ready.connect(lambda *_args: QTimer.singleShot(0, self._apply_app_icon_deferred))
+        except Exception:
+            QTimer.singleShot(1500, self._apply_app_icon_deferred)
+
     def _apply_app_icon_deferred(self) -> None:
         """Ставит иконку после первого показа окна, чтобы не задерживать старт."""
+        if self._app_icon_deferred_started:
+            return
+        self._app_icon_deferred_started = True
+
         t_icon = _time.perf_counter()
         icon_path = ICON_DEV_PATH if is_dev_build_channel() else ICON_PATH
         if os.path.exists(icon_path):
