@@ -89,6 +89,7 @@ class UpdaterFeature:
             skip_rate_limit=True,
             is_any_running=is_any_running,
             shutdown_sync=shutdown_sync,
+            stop_dpi_for_download=self.stop_dpi_for_download,
         )
 
     def run_startup_update_check(self) -> dict:
@@ -106,6 +107,14 @@ class UpdaterFeature:
         return self._commands().retry_server_check_without_dpi(
             is_any_running=is_any_running,
             shutdown_sync=shutdown_sync,
+        )
+
+    def stop_dpi_for_download(self, *, is_any_running, shutdown_sync) -> bool:
+        return bool(
+            self._commands().stop_dpi_for_download(
+                is_any_running=is_any_running,
+                shutdown_sync=shutdown_sync,
+            )
         )
 
     def restart_dpi_after_update(self, *, is_available, restart) -> bool:

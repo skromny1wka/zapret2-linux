@@ -340,6 +340,7 @@ class UpdateWorker(QObject):
         *,
         is_any_running,
         shutdown_sync,
+        stop_dpi_for_download,
     ):
         super().__init__()
         self._parent = parent
@@ -348,6 +349,7 @@ class UpdateWorker(QObject):
         self._stop_requested = False
         self._is_any_running = is_any_running
         self._shutdown_sync = shutdown_sync
+        self._stop_dpi_for_download_fn = stop_dpi_for_download
 
     def stop(self) -> None:
         self._stop_requested = True
@@ -422,9 +424,7 @@ class UpdateWorker(QObject):
 
     def _stop_dpi_for_download(self) -> bool:
         """Останавливает winws/winws2 если запущены. Возвращает True если что-то остановили."""
-        import updater.commands as updater_commands
-
-        stopped = updater_commands.stop_dpi_for_download(
+        stopped = self._stop_dpi_for_download_fn(
             is_any_running=self._is_any_running,
             shutdown_sync=self._shutdown_sync,
         )

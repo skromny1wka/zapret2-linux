@@ -38,17 +38,23 @@ class UpdaterDownloadContractTests(unittest.TestCase):
 
     def test_update_worker_uses_narrow_runtime_actions_for_download_dpi_stop(self) -> None:
         import updater.commands as updater_commands
+        import app.feature_facades.updater as updater_feature
         from updater.update import UpdateWorker
 
         init_signature = inspect.signature(UpdateWorker.__init__)
         worker_source = inspect.getsource(UpdateWorker)
         stop_source = inspect.getsource(UpdateWorker._stop_dpi_for_download)
+        feature_source = inspect.getsource(updater_feature.UpdaterFeature)
         self.assertTrue(hasattr(updater_commands, "stop_dpi_for_download"))
         command_source = inspect.getsource(updater_commands.stop_dpi_for_download)
 
         self.assertNotIn("runtime_feature", init_signature.parameters)
         self.assertNotIn("_runtime_feature", worker_source)
-        self.assertIn("updater_commands.stop_dpi_for_download", stop_source)
+        self.assertIn("stop_dpi_for_download", init_signature.parameters)
+        self.assertIn("stop_dpi_for_download=self.stop_dpi_for_download", feature_source)
+        self.assertIn("def stop_dpi_for_download", feature_source)
+        self.assertIn("_stop_dpi_for_download", stop_source)
+        self.assertNotIn("updater_commands", stop_source)
         self.assertNotIn("self._shutdown_sync(", stop_source)
         self.assertNotIn("self._is_any_running(", stop_source)
         self.assertIn("shutdown_sync", command_source)
@@ -63,6 +69,7 @@ class UpdaterDownloadContractTests(unittest.TestCase):
             skip_rate_limit=True,
             is_any_running=runtime_feature.is_any_running,
             shutdown_sync=runtime_feature.shutdown_sync,
+            stop_dpi_for_download=updater_commands.stop_dpi_for_download,
         )
         progress = []
         worker.progress.connect(progress.append)

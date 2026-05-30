@@ -7,6 +7,7 @@ from updater.commands import (
     retry_server_check_without_dpi,
     run_startup_update_check,
     set_auto_update_enabled,
+    stop_dpi_for_download,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "retry_server_check_without_dpi",
     "run_startup_update_check",
     "set_auto_update_enabled",
+    "stop_dpi_for_download",
 ]
