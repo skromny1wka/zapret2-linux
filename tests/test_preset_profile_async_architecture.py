@@ -705,16 +705,14 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("candidate =", helper_source)
         self.assertIn("current_positions", helper_source)
 
-    def test_preset_rows_rebuild_skips_layout_when_rows_do_not_change(self) -> None:
-        from presets.ui.common.user_presets_page_runtime import rebuild_presets_rows
+    def test_preset_rows_plan_apply_skips_layout_when_rows_do_not_change(self) -> None:
+        from presets.ui.common.user_presets_page_runtime import apply_presets_rows_plan
 
         runtime_service = Mock()
         runtime_service.capture_presets_view_state.return_value = {}
-        runtime_service.current_search_query.return_value = ""
         presets_model = Mock()
         presets_model.set_rows.return_value = False
-        listing_api = Mock()
-        listing_api.build_preset_rows_plan.return_value = SimpleNamespace(
+        plan = SimpleNamespace(
             rows=[
                 {
                     "kind": "preset",
@@ -729,31 +727,26 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         schedule_resync = Mock(side_effect=AssertionError("unchanged rows must not resync layout"))
         presets_delegate = Mock()
 
-        rebuild_presets_rows(
+        apply_presets_rows_plan(
             runtime_service=runtime_service,
-            listing_api=listing_api,
             presets_delegate=presets_delegate,
             presets_model=presets_model,
             presets_list=object(),
-            get_selected_source_preset_file_name_light_fn=Mock(return_value="first.txt"),
-            ui_language="ru",
             schedule_layout_resync_fn=schedule_resync,
             update_presets_view_height_fn=update_height,
             log_fn=Mock(),
-            all_presets={"first.txt": {"display_name": "First"}},
-            folder_state={},
+            plan=plan,
         )
 
         presets_delegate.reset_interaction_state.assert_not_called()
         runtime_service.ensure_preset_list_current_index.assert_not_called()
         runtime_service.restore_presets_view_state.assert_not_called()
 
-    def test_preset_rows_rebuild_skips_layout_when_row_count_is_unchanged(self) -> None:
-        from presets.ui.common.user_presets_page_runtime import rebuild_presets_rows
+    def test_preset_rows_plan_apply_skips_layout_when_row_count_is_unchanged(self) -> None:
+        from presets.ui.common.user_presets_page_runtime import apply_presets_rows_plan
 
         runtime_service = Mock()
         runtime_service.capture_presets_view_state.return_value = {}
-        runtime_service.current_search_query.return_value = ""
         presets_model = PresetListModel()
         presets_model.set_rows([
             {
@@ -776,8 +769,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
                 "folder_key": "common",
             },
         ])
-        listing_api = Mock()
-        listing_api.build_preset_rows_plan.return_value = SimpleNamespace(
+        plan = SimpleNamespace(
             rows=[
                 {
                     "kind": "folder",
@@ -805,19 +797,15 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         update_height = Mock()
         schedule_resync = Mock()
 
-        rebuild_presets_rows(
+        apply_presets_rows_plan(
             runtime_service=runtime_service,
-            listing_api=listing_api,
             presets_delegate=Mock(),
             presets_model=presets_model,
             presets_list=object(),
-            get_selected_source_preset_file_name_light_fn=Mock(return_value="first.txt"),
-            ui_language="ru",
             schedule_layout_resync_fn=schedule_resync,
             update_presets_view_height_fn=update_height,
             log_fn=Mock(),
-            all_presets={"first.txt": {"display_name": "First"}, "second.txt": {"display_name": "Second"}},
-            folder_state={},
+            plan=plan,
         )
 
         update_height.assert_not_called()

@@ -75,6 +75,12 @@ class UserPresetsRowsWorkerArchitectureTests(unittest.TestCase):
         self.assertFalse(hasattr(UserPresetsPageBase, "_rebuild_presets_rows"))
         self.assertFalse(hasattr(page_module, "rebuild_presets_rows"))
 
+    def test_user_presets_runtime_keeps_only_worker_plan_apply_path(self) -> None:
+        import presets.ui.common.user_presets_page_runtime as runtime_module
+
+        self.assertTrue(hasattr(runtime_module, "apply_presets_rows_plan"))
+        self.assertFalse(hasattr(runtime_module, "rebuild_presets_rows"))
+
 
 if __name__ == "__main__":
     unittest.main()
