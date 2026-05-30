@@ -22,13 +22,6 @@ from presets.user_presets_runtime_service import (
     UserPresetsRuntimeAdapter,
     UserPresetsRuntimeService,
 )
-from presets.user_presets_action_workers import (
-    UserPresetActivateWorker,
-    UserPresetBulkActionWorker,
-    UserPresetEditActionWorker,
-    UserPresetItemActionWorker,
-    UserPresetLinkActionWorker,
-)
 from presets.ui.common.user_presets_page_runtime import (
     UserPresetsPageRuntime,
     UserPresetsPageRuntimeConfig,
@@ -114,6 +107,11 @@ class UserPresetsPageBase(BasePage):
         preset_runtime_actions: UserPresetsRuntimeActions,
         connect_preset_signals,
         create_user_presets_open_folder_worker,
+        create_preset_edit_action_worker,
+        create_preset_bulk_action_worker,
+        create_preset_activate_worker,
+        create_preset_item_action_worker,
+        create_preset_link_action_worker,
         create_preset_folder_action_worker,
         create_preset_storage_action_worker,
         load_preset_folder_state,
@@ -132,6 +130,11 @@ class UserPresetsPageBase(BasePage):
         self._preset_runtime_actions = preset_runtime_actions
         self._connect_preset_signals = connect_preset_signals
         self._create_user_presets_open_folder_worker = create_user_presets_open_folder_worker
+        self._create_preset_edit_action_worker_fn = create_preset_edit_action_worker
+        self._create_preset_bulk_action_worker_fn = create_preset_bulk_action_worker
+        self._create_preset_activate_worker_fn = create_preset_activate_worker
+        self._create_preset_item_action_worker_fn = create_preset_item_action_worker
+        self._create_preset_link_action_worker_fn = create_preset_link_action_worker
         self._create_preset_folder_action_worker_fn = create_preset_folder_action_worker
         self._create_preset_storage_action_worker_fn = create_preset_storage_action_worker
         self._load_preset_folder_state_fn = load_preset_folder_state
@@ -207,7 +210,6 @@ class UserPresetsPageBase(BasePage):
                 activate_error_level=self._config.activate_error_level,
                 activate_error_mode=self._config.activate_error_mode,
                 preset_runtime_actions=self._preset_runtime_actions,
-                open_url=self._open_url,
             )
         )
 
@@ -244,12 +246,6 @@ class UserPresetsPageBase(BasePage):
 
     def _listing_api(self):
         return self._page_runtime_api().listing
-
-    def _actions_api(self):
-        return self._page_runtime_api().actions
-
-    def _storage_api(self):
-        return self._page_runtime_api().storage
 
     def _get_selected_source_preset_file_name_light(self) -> str:
         return self._listing_api().get_selected_source_preset_file_name_light()
@@ -701,11 +697,9 @@ class UserPresetsPageBase(BasePage):
         new_name: str = "",
         from_current: bool = False,
     ):
-        actions_api = self._actions_api()
-        return UserPresetEditActionWorker(
+        return self._create_preset_edit_action_worker_fn(
             request_id,
-            actions_api.create_preset,
-            actions_api.rename_preset,
+            launch_method=self._config.launch_method,
             action=action,
             name=name,
             current_name=current_name,
@@ -810,11 +804,9 @@ class UserPresetsPageBase(BasePage):
             self._bulk_reset_running = False
 
     def create_preset_bulk_action_worker(self, request_id: int, *, action: str, file_path: str = ""):
-        actions_api = self._actions_api()
-        return UserPresetBulkActionWorker(
+        return self._create_preset_bulk_action_worker_fn(
             request_id,
-            actions_api.import_preset_from_file,
-            actions_api.reset_all_presets,
+            launch_method=self._config.launch_method,
             action=action,
             file_path=file_path,
             parent=self,
@@ -1307,10 +1299,11 @@ class UserPresetsPageBase(BasePage):
         return True
 
     def create_preset_activate_worker(self, request_id: int, *, file_name: str, display_name: str):
-        actions_api = self._actions_api()
-        return UserPresetActivateWorker(
+        return self._create_preset_activate_worker_fn(
             request_id,
-            actions_api.activate_preset,
+            launch_method=self._config.launch_method,
+            activate_error_level=self._config.activate_error_level,
+            activate_error_mode=self._config.activate_error_mode,
             file_name=file_name,
             display_name=display_name,
             parent=self,
@@ -1533,13 +1526,9 @@ class UserPresetsPageBase(BasePage):
         display_name: str,
         file_path: str = "",
     ):
-        actions_api = self._actions_api()
-        return UserPresetItemActionWorker(
+        return self._create_preset_item_action_worker_fn(
             request_id,
-            actions_api.duplicate_preset,
-            actions_api.reset_preset_to_builtin,
-            actions_api.delete_preset,
-            actions_api.export_preset,
+            launch_method=self._config.launch_method,
             action=action,
             file_name=file_name,
             display_name=display_name,
@@ -1624,11 +1613,9 @@ class UserPresetsPageBase(BasePage):
         worker.deleteLater()
 
     def create_preset_link_action_worker(self, request_id: int, *, action: str):
-        actions_api = self._actions_api()
-        return UserPresetLinkActionWorker(
+        return self._create_preset_link_action_worker_fn(
             request_id,
-            actions_api.open_presets_info,
-            actions_api.open_new_configs_post,
+            open_url=self._open_url,
             action=action,
             parent=self,
         )

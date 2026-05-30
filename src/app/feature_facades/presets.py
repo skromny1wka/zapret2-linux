@@ -216,6 +216,370 @@ class PresetsFeature:
             parent=parent,
         )
 
+    def create_preset_edit_action_worker(
+        self,
+        request_id: int,
+        *,
+        launch_method: str,
+        action: str,
+        name: str = "",
+        current_name: str = "",
+        new_name: str = "",
+        from_current: bool = False,
+        parent=None,
+    ):
+        from presets.ui.common.user_presets_page_runtime import UserPresetActionResult
+        from presets.user_presets_action_workers import UserPresetEditActionWorker
+
+        def _create_preset(*, name: str, from_current: bool) -> UserPresetActionResult:
+            created = self.create_preset(launch_method, name, from_current=from_current)
+            return UserPresetActionResult(
+                ok=True,
+                log_level="INFO",
+                log_message=f"Создан пресет '{name}'",
+                infobar_level=None,
+                infobar_title="",
+                infobar_content="",
+                structure_changed=True,
+                preset_file_name=created.file_name,
+                preset_display_name=created.name,
+            )
+
+        def _rename_preset(*, current_name: str, new_name: str) -> UserPresetActionResult:
+            updated = self.rename_preset_by_file_name(launch_method, current_name, new_name)
+            switched_file_name = (
+                updated.file_name
+                if self.is_selected_source_preset_file(launch_method, updated.file_name)
+                else None
+            )
+            return UserPresetActionResult(
+                ok=True,
+                log_level="INFO",
+                log_message=f"Пресет '{current_name}' переименован в '{new_name}'",
+                infobar_level=None,
+                infobar_title="",
+                infobar_content="",
+                structure_changed=True,
+                switched_file_name=switched_file_name,
+                preset_file_name=updated.file_name,
+                preset_display_name=updated.name,
+            )
+
+        return UserPresetEditActionWorker(
+            request_id,
+            _create_preset,
+            _rename_preset,
+            action=action,
+            name=name,
+            current_name=current_name,
+            new_name=new_name,
+            from_current=from_current,
+            parent=parent,
+        )
+
+    def create_preset_bulk_action_worker(
+        self,
+        request_id: int,
+        *,
+        launch_method: str,
+        action: str,
+        file_path: str = "",
+        parent=None,
+    ):
+        from pathlib import Path
+
+        from presets.ui.common.user_presets_page_runtime import UserPresetImportResult, UserPresetResetAllResult
+        from presets.user_presets_action_workers import UserPresetBulkActionWorker
+
+        def _import_preset_from_file(*, file_path: str) -> UserPresetImportResult:
+            requested_name = str(Path(file_path).stem or "").strip() or "Imported"
+            imported = self.import_preset_from_file(launch_method, file_path, requested_name)
+            actual_name = imported.name
+            actual_file_name = imported.file_name
+            expected_file_name = f"{requested_name}.txt" if requested_name else ""
+            file_name_changed = bool(
+                actual_file_name and expected_file_name and actual_file_name.casefold() != expected_file_name.casefold()
+            )
+            content = (
+                "Пресет импортирован.\n"
+                f"Отображаемое имя: {actual_name}\n"
+                f"Имя файла: {actual_file_name}"
+            )
+            return UserPresetImportResult(
+                ok=True,
+                actual_name=actual_name,
+                actual_file_name=actual_file_name,
+                requested_name=requested_name,
+                log_level="INFO",
+                log_message=f"Импортирован пресет '{actual_name}'",
+                infobar_level="warning" if file_name_changed else "success",
+                infobar_title="Импортирован с новым именем файла" if file_name_changed else "Пресет импортирован",
+                infobar_content=content,
+                structure_changed=True,
+            )
+
+        def _reset_all_presets() -> UserPresetResetAllResult:
+            success_count, total, failed = self.reset_all_presets_to_builtin(launch_method)
+            selected_file_name = self.get_selected_source_preset_file_name(launch_method)
+            failed_count = len(failed or [])
+            if failed_count:
+                log_message = (
+                    "Сброс встроенных пресетов завершён с ошибками: "
+                    f"сброшено={success_count}, ошибки={failed_count}, всего встроенных={total}"
+                )
+                level = "WARNING"
+            elif int(success_count or 0) > 0:
+                log_message = f"Сброшено встроенных пресетов: {success_count}"
+                level = "INFO"
+            else:
+                log_message = "Сброс встроенных пресетов: нечего менять"
+                level = "INFO"
+            return UserPresetResetAllResult(
+                ok=True,
+                success_count=int(success_count or 0),
+                total_count=int(total or 0),
+                failed_count=failed_count,
+                log_level=level,
+                log_message=log_message,
+                structure_changed=True,
+                switched_file_name=selected_file_name,
+            )
+
+        return UserPresetBulkActionWorker(
+            request_id,
+            _import_preset_from_file,
+            _reset_all_presets,
+            action=action,
+            file_path=file_path,
+            parent=parent,
+        )
+
+    def create_preset_activate_worker(
+        self,
+        request_id: int,
+        *,
+        launch_method: str,
+        file_name: str,
+        display_name: str,
+        activate_error_level: str,
+        activate_error_mode: str,
+        parent=None,
+    ):
+        from presets.ui.common.user_presets_page_runtime import UserPresetActivationResult
+        from presets.user_presets_action_workers import UserPresetActivateWorker
+
+        def _activate_preset(*, file_name: str, display_name: str) -> UserPresetActivationResult:
+            preset_file_name = str(file_name or "").strip()
+            preset_display_name = str(display_name or preset_file_name).strip() or preset_file_name
+            try:
+                try:
+                    selected_file_name = str(self.get_selected_source_preset_file_name(launch_method) or "").strip()
+                except Exception:
+                    selected_file_name = ""
+                if selected_file_name and selected_file_name.casefold() == preset_file_name.casefold():
+                    return UserPresetActivationResult(
+                        ok=True,
+                        log_level="DEBUG",
+                        log_message=f"Пресет '{preset_display_name}' уже выбран",
+                        infobar_level=None,
+                        infobar_title="",
+                        infobar_content="",
+                        activated_file_name=selected_file_name,
+                    )
+                self.activate_preset_file(launch_method, preset_file_name)
+                return UserPresetActivationResult(
+                    ok=True,
+                    log_level="INFO",
+                    log_message=f"Активирован пресет '{preset_display_name}'",
+                    infobar_level=None,
+                    infobar_title="",
+                    infobar_content="",
+                    activated_file_name=preset_file_name,
+                )
+            except Exception as exc:
+                content = (
+                    f"Не удалось активировать пресет '{preset_display_name}'"
+                    if str(activate_error_mode or "") == "friendly"
+                    else f"Ошибка: {exc}"
+                )
+                return UserPresetActivationResult(
+                    ok=False,
+                    log_level="ERROR",
+                    log_message=f"Ошибка активации пресета: {exc}",
+                    infobar_level=activate_error_level,
+                    infobar_title="Ошибка",
+                    infobar_content=content,
+                    activated_file_name=None,
+                )
+
+        return UserPresetActivateWorker(
+            request_id,
+            _activate_preset,
+            file_name=file_name,
+            display_name=display_name,
+            parent=parent,
+        )
+
+    def create_preset_item_action_worker(
+        self,
+        request_id: int,
+        *,
+        launch_method: str,
+        action: str,
+        file_name: str,
+        display_name: str,
+        file_path: str = "",
+        parent=None,
+    ):
+        from presets.ui.common.user_presets_page_runtime import UserPresetActionResult
+        from presets.user_presets_action_workers import UserPresetItemActionWorker
+
+        def _duplicate_preset(*, file_name: str, display_name: str) -> UserPresetActionResult:
+            new_name = f"{display_name} (копия)"
+            duplicated = self.duplicate_preset_by_file_name(launch_method, file_name, new_name)
+            return UserPresetActionResult(
+                ok=True,
+                log_level="INFO",
+                log_message=f"Пресет '{display_name}' дублирован как '{new_name}'",
+                infobar_level=None,
+                infobar_title="",
+                infobar_content="",
+                structure_changed=True,
+                preset_file_name=duplicated.file_name,
+                preset_display_name=duplicated.name,
+            )
+
+        def _reset_preset_to_builtin(*, file_name: str, display_name: str) -> UserPresetActionResult:
+            self.reset_preset_to_builtin_by_file_name(launch_method, file_name)
+            return UserPresetActionResult(
+                ok=True,
+                log_level="INFO",
+                log_message=f"Восстановлен встроенный пресет для '{display_name}'",
+                infobar_level=None,
+                infobar_title="",
+                infobar_content="",
+                structure_changed=False,
+            )
+
+        def _delete_preset(*, file_name: str, display_name: str) -> UserPresetActionResult:
+            if self._is_builtin_preset_file(launch_method, file_name):
+                return UserPresetActionResult(
+                    ok=False,
+                    log_level="WARNING",
+                    log_message="Встроенные пресеты удалять нельзя",
+                    infobar_level="warning",
+                    infobar_title="Ошибка",
+                    infobar_content="Встроенные пресеты удалять нельзя. Можно удалить только пользовательские пресеты.",
+                    structure_changed=False,
+                )
+            try:
+                self.delete_preset_by_file_name(launch_method, file_name)
+            except Exception as exc:
+                if "Preset not found" in str(exc):
+                    return UserPresetActionResult(
+                        ok=False,
+                        log_level="ERROR",
+                        log_message=f"Ошибка удаления пресета: {exc}",
+                        infobar_level=None,
+                        infobar_title="",
+                        infobar_content="",
+                        structure_changed=False,
+                        error_code="not_found",
+                    )
+                raise
+            return UserPresetActionResult(
+                ok=True,
+                log_level="INFO",
+                log_message=f"Удалён пресет '{display_name}'",
+                infobar_level=None,
+                infobar_title="",
+                infobar_content="",
+                structure_changed=True,
+            )
+
+        def _export_preset(*, file_name: str, file_path: str, display_name: str) -> UserPresetActionResult:
+            self.export_preset_plain_text(launch_method, file_name, file_path)
+            return UserPresetActionResult(
+                ok=True,
+                log_level="INFO",
+                log_message=f"Экспортирован пресет '{display_name}' в {file_path}",
+                infobar_level="success",
+                infobar_title="Успех",
+                infobar_content=f"Пресет экспортирован: {file_path}",
+                structure_changed=False,
+            )
+
+        return UserPresetItemActionWorker(
+            request_id,
+            _duplicate_preset,
+            _reset_preset_to_builtin,
+            _delete_preset,
+            _export_preset,
+            action=action,
+            file_name=file_name,
+            display_name=display_name,
+            file_path=file_path,
+            parent=parent,
+        )
+
+    def create_preset_link_action_worker(self, request_id: int, *, open_url, action: str, parent=None):
+        from config.urls import PRESET_INFO_URL, SUPPORT_DISCUSSIONS_URL
+        from presets.ui.common.user_presets_page_runtime import UserPresetActionResult
+        from presets.user_presets_action_workers import UserPresetLinkActionWorker
+
+        def _open_url_action(url: str, *, success_message: str, error_message: str) -> UserPresetActionResult:
+            try:
+                result = open_url(url)
+                if not getattr(result, "ok", False):
+                    raise RuntimeError(getattr(result, "error", "Не удалось открыть ссылку"))
+                return UserPresetActionResult(
+                    ok=True,
+                    log_level="INFO",
+                    log_message=success_message,
+                    infobar_level=None,
+                    infobar_title="",
+                    infobar_content="",
+                    structure_changed=False,
+                )
+            except Exception as exc:
+                return UserPresetActionResult(
+                    ok=False,
+                    log_level="ERROR",
+                    log_message=f"{error_message}: {exc}",
+                    infobar_level="warning",
+                    infobar_title="Ошибка",
+                    infobar_content=f"{error_message}: {exc}",
+                    structure_changed=False,
+                )
+
+        return UserPresetLinkActionWorker(
+            request_id,
+            lambda: _open_url_action(
+                PRESET_INFO_URL,
+                success_message=f"Открыта страница о пресетах: {PRESET_INFO_URL}",
+                error_message="Не удалось открыть страницу о пресетах",
+            ),
+            lambda: _open_url_action(
+                SUPPORT_DISCUSSIONS_URL,
+                success_message=f"Открыта страница пресетов: {SUPPORT_DISCUSSIONS_URL}",
+                error_message="Не удалось открыть страницу пресетов",
+            ),
+            action=action,
+            parent=parent,
+        )
+
+    def _is_builtin_preset_file(self, launch_method: str, file_name: str) -> bool:
+        candidate = str(file_name or "").strip()
+        if not candidate or not candidate.lower().endswith(".txt"):
+            return False
+        try:
+            manifest = self.get_preset_manifest_by_file_name(launch_method, candidate)
+            if manifest is not None:
+                return str(getattr(manifest, "kind", "") or "").strip().lower() == "builtin"
+        except Exception:
+            pass
+        return False
+
     def load_preset_folder_state(self, scope_key: str):
         from presets.folders import load_preset_folder_state
 

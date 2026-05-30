@@ -1,56 +1,11 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
+from app.feature_facades.presets import PresetsFeature
 from presets.ui.common.user_presets_page import UserPresetsPageBase
 from presets.ui.common.preset_subpage_base import PresetRawEditorPage
-from presets.ui.common.user_presets_page_runtime import (
-    UserPresetsPageRuntime,
-    UserPresetsPageRuntimeConfig,
-    UserPresetsRuntimeActions,
-)
-
-
-def _make_runtime(actions: UserPresetsRuntimeActions) -> UserPresetsPageRuntime:
-    return UserPresetsPageRuntime(
-        UserPresetsPageRuntimeConfig(
-            launch_method="zapret2_mode",
-            folder_scope="zapret2",
-            empty_not_found_key="",
-            empty_none_key="",
-            list_log_prefix="",
-            activate_error_level="error",
-            activate_error_mode="friendly",
-            preset_runtime_actions=actions,
-            open_url=Mock(),
-        )
-    )
-
-
-def _make_runtime_actions(**overrides) -> UserPresetsRuntimeActions:
-    values = {
-        "create_preset": Mock(),
-        "rename_preset_by_file_name": Mock(),
-        "is_selected_preset_file_name": Mock(),
-        "import_preset_from_file": Mock(),
-        "reset_all_presets_to_builtin": Mock(),
-        "get_selected_source_preset_file_name": Mock(),
-        "duplicate_preset_by_file_name": Mock(),
-        "reset_preset_to_builtin_by_file_name": Mock(),
-        "delete_preset_by_file_name": Mock(),
-        "export_preset_plain_text": Mock(),
-        "get_preset_manifest_by_file_name": Mock(),
-        "list_preset_manifests": Mock(),
-        "get_selected_source_preset_manifest": Mock(),
-        "get_user_presets_dir": Mock(),
-        "get_cached_preset_list_metadata": Mock(),
-        "warm_preset_list_metadata_cache": Mock(),
-        "get_preset_source_path_by_file_name": Mock(),
-        "activate_preset_file": Mock(),
-    }
-    values.update(overrides)
-    return UserPresetsRuntimeActions(**values)
 
 
 class UserPresetActivationGuardTests(unittest.TestCase):
@@ -84,27 +39,45 @@ class UserPresetActivationGuardTests(unittest.TestCase):
         page._request_preset_activation.assert_not_called()
         page._show_error.assert_not_called()
 
-    def test_runtime_skips_duplicate_selected_preset_activation(self) -> None:
-        actions = _make_runtime_actions(
-            get_selected_source_preset_file_name=Mock(return_value="Default.txt"),
-        )
-        runtime = _make_runtime(actions)
+    def test_feature_worker_skips_duplicate_selected_preset_activation(self) -> None:
+        feature = PresetsFeature()
 
-        result = runtime.activate_preset(file_name="default.TXT", display_name="Default")
+        with (
+            patch.object(PresetsFeature, "get_selected_source_preset_file_name", return_value="Default.txt"),
+            patch.object(PresetsFeature, "activate_preset_file") as activate_preset_file,
+        ):
+            worker = feature.create_preset_activate_worker(
+                1,
+                launch_method="zapret2_mode",
+                file_name="default.TXT",
+                display_name="Default",
+                activate_error_level="error",
+                activate_error_mode="friendly",
+            )
+            result = worker._activate_preset(file_name="default.TXT", display_name="Default")
 
-        actions.activate_preset_file.assert_not_called()
+        activate_preset_file.assert_not_called()
         self.assertTrue(result.ok)
         self.assertEqual(result.activated_file_name, "Default.txt")
 
-    def test_runtime_still_activates_when_duplicate_guard_cannot_read_selection(self) -> None:
-        actions = _make_runtime_actions(
-            get_selected_source_preset_file_name=Mock(side_effect=RuntimeError("settings busy")),
-        )
-        runtime = _make_runtime(actions)
+    def test_feature_worker_still_activates_when_duplicate_guard_cannot_read_selection(self) -> None:
+        feature = PresetsFeature()
 
-        result = runtime.activate_preset(file_name="Other.txt", display_name="Other")
+        with (
+            patch.object(PresetsFeature, "get_selected_source_preset_file_name", side_effect=RuntimeError("settings busy")),
+            patch.object(PresetsFeature, "activate_preset_file") as activate_preset_file,
+        ):
+            worker = feature.create_preset_activate_worker(
+                1,
+                launch_method="zapret2_mode",
+                file_name="Other.txt",
+                display_name="Other",
+                activate_error_level="error",
+                activate_error_mode="friendly",
+            )
+            result = worker._activate_preset(file_name="Other.txt", display_name="Other")
 
-        actions.activate_preset_file.assert_called_once_with("zapret2_mode", "Other.txt")
+        activate_preset_file.assert_called_once_with("zapret2_mode", "Other.txt")
         self.assertTrue(result.ok)
 
 

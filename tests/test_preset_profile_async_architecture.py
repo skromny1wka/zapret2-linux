@@ -1158,6 +1158,27 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("active_preset_file_name", source)
         self.assertNotIn("_get_selected_source_preset_file_name_light", source)
 
+    def test_user_preset_activation_worker_is_created_through_feature(self) -> None:
+        request_source = inspect.getsource(UserPresetsPageBase._request_preset_activation)
+        create_worker_source = inspect.getsource(UserPresetsPageBase.create_preset_activate_worker)
+
+        self.assertIn("create_preset_activate_worker", request_source)
+        self.assertNotIn("UserPresetActivateWorker", create_worker_source)
+        self.assertIn("_create_preset_activate_worker_fn", create_worker_source)
+
+    def test_user_presets_runtime_does_not_keep_file_action_fallbacks(self) -> None:
+        page_source = inspect.getsource(UserPresetsPageBase)
+        runtime_source = inspect.getsource(user_presets_page_runtime)
+
+        self.assertNotIn("def _actions_api", page_source)
+        self.assertNotIn("class UserPresetsActionsApi", runtime_source)
+        self.assertNotIn("class _UserPresetsActionsApiImpl", runtime_source)
+        self.assertNotIn("def create_preset(self, *, name", runtime_source)
+        self.assertNotIn("def import_preset_from_file(self, *, file_path", runtime_source)
+        self.assertNotIn("def activate_preset(self, *, file_name", runtime_source)
+        self.assertNotIn("def duplicate_preset(self, *, file_name", runtime_source)
+        self.assertNotIn("def open_presets_info(self)", runtime_source)
+
     def test_user_presets_item_file_actions_run_through_worker(self) -> None:
         worker_source = inspect.getsource(UserPresetItemActionWorker.run)
         request_source = inspect.getsource(UserPresetsPageBase._request_preset_item_action)
