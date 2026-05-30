@@ -2823,7 +2823,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         self.assertIn('addItem("editor", "Редактор"', build)
         self.assertIn("_sync_editor_tab_label(payload)", apply_payload)
-        self.assertIn('setItemText("editor", editor_title)', sync_label)
+        self.assertIn('set_tab_item_text_if_changed(self._strategy_tabs, "editor", editor_title)', sync_label)
         self.assertNotIn("self._list_file_text = PlainTextEdit()", build)
         self.assertIn("_ensure_editor_tab_built", switch_tab)
         self.assertIn("_request_list_file_editor_state", switch_tab)

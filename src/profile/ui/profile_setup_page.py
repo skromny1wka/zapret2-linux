@@ -167,6 +167,18 @@ def set_current_index_if_changed(widget, index: int) -> bool:
     return True
 
 
+def set_tab_item_text_if_changed(widget, item_key: str, text: str) -> bool:
+    route_key = str(item_key or "")
+    value = str(text or "")
+    try:
+        if str(widget.itemText(route_key)) == value:
+            return False
+    except Exception:
+        pass
+    widget.setItemText(route_key, value)
+    return True
+
+
 class ProfileStrategyListDelegate(QStyledItemDelegate):
     """Рисует готовые стратегии как единый текстовый список."""
 
@@ -1585,7 +1597,7 @@ class ProfileSetupPageBase(BasePage):
     def _sync_editor_tab_label(self, payload) -> None:
         editor_title = _profile_editor_tab_title(payload)
         if self._strategy_tabs is not None and self._editor_tab_available:
-            self._strategy_tabs.setItemText("editor", editor_title)
+            set_tab_item_text_if_changed(self._strategy_tabs, "editor", editor_title)
             set_tooltip(
                 self._strategy_tabs,
                 f"Готовые стратегии меняют строки --lua-desync. «{editor_title}» меняет файл hostlist/ipset. «Когда применяется» показывает условия profile и итоговый текст.",

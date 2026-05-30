@@ -178,6 +178,21 @@ class _IndexWidget:
         self._index = value
 
 
+class _TabTextWidget:
+    def __init__(self, texts: dict[str, str] | None = None) -> None:
+        self._texts = dict(texts or {})
+        self.calls: list[tuple[str, str]] = []
+
+    def itemText(self, key: str):  # noqa: N802
+        return self._texts.get(str(key), "")
+
+    def setItemText(self, key: str, text: str) -> None:  # noqa: N802
+        route_key = str(key)
+        value = str(text)
+        self.calls.append((route_key, value))
+        self._texts[route_key] = value
+
+
 class _ListWidget:
     def __init__(self) -> None:
         self.clear_calls = 0
@@ -305,6 +320,17 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
 
         self.assertTrue(set_current_index_if_changed(widget, 0))
         self.assertEqual(widget.calls, [0])
+
+    def test_tab_item_text_update_skips_duplicate_value(self) -> None:
+        from profile.ui.profile_setup_page import set_tab_item_text_if_changed
+
+        widget = _TabTextWidget({"editor": "Редактор"})
+
+        self.assertFalse(set_tab_item_text_if_changed(widget, "editor", "Редактор"))
+        self.assertEqual(widget.calls, [])
+
+        self.assertTrue(set_tab_item_text_if_changed(widget, "editor", "Hostlist"))
+        self.assertEqual(widget.calls, [("editor", "Hostlist")])
 
     def test_property_update_skips_duplicate_value(self) -> None:
         from profile.ui.profile_setup_page import set_widget_property_if_changed
