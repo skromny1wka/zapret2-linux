@@ -17,6 +17,7 @@ from settings.mode import (
 from ui.fluent_widgets import (
     SettingsCard,
 )
+from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from app.ui_texts import tr as tr_catalog
 from ui.theme import get_theme_tokens
 from ui.widgets.win11_controls import (
@@ -99,11 +100,9 @@ class DpiSettingsPage(BasePage):
         self.lock_successes_spin = None
         self.unlock_fails_spin = None
         self._settings_loaded = False
-        self._dpi_settings_worker = None
-        self._dpi_settings_request_id = 0
+        self._dpi_settings_runtime = OneShotWorkerRuntime()
         self._dpi_settings_pending: list[tuple[str, str]] = []
-        self._orchestra_settings_save_worker = None
-        self._orchestra_settings_save_request_id = 0
+        self._orchestra_settings_save_runtime = OneShotWorkerRuntime()
         self._orchestra_settings_save_pending: list[tuple[str, object]] = []
         self._build_ui()
 
@@ -317,17 +316,10 @@ class DpiSettingsPage(BasePage):
 
     def _request_dpi_settings_action(self, action: str, method: str = "") -> None:
         payload = (str(action or "").strip(), str(method or "").strip())
-        worker = self.__dict__.get("_dpi_settings_worker")
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    self._dpi_settings_pending.append(payload)
-                    self._coalesce_dpi_settings_pending()
-                    return
-            except Exception:
-                self._dpi_settings_pending.append(payload)
-                self._coalesce_dpi_settings_pending()
-                return
+        if self._dpi_settings_runtime.is_running():
+            self._dpi_settings_pending.append(payload)
+            self._coalesce_dpi_settings_pending()
+            return
         self._start_dpi_settings_worker(payload)
 
     def _coalesce_dpi_settings_pending(self) -> None:
@@ -343,21 +335,23 @@ class DpiSettingsPage(BasePage):
         ]
 
     def _start_dpi_settings_worker(self, payload: tuple[str, str]) -> None:
-        self._dpi_settings_request_id += 1
-        request_id = self._dpi_settings_request_id
-        worker = self.create_dpi_settings_worker(
-            request_id,
-            action=payload[0],
-            method=payload[1],
+        self._dpi_settings_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: self.create_dpi_settings_worker(
+                request_id,
+                action=payload[0],
+                method=payload[1],
+            ),
+            on_loaded=self._on_dpi_settings_worker_completed,
+            on_failed=self._on_dpi_settings_worker_failed,
+            on_finished=self._on_dpi_settings_worker_finished,
+            loaded_signal_name="completed",
         )
-        self._dpi_settings_worker = worker
-        worker.completed.connect(self._on_dpi_settings_worker_completed)
-        worker.failed.connect(self._on_dpi_settings_worker_failed)
-        worker.finished.connect(lambda w=worker: self._on_dpi_settings_worker_finished(w))
-        worker.start()
 
     def _on_dpi_settings_worker_completed(self, request_id: int, action: str, result) -> None:
-        if request_id != self._dpi_settings_request_id:
+        if not self._dpi_settings_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
             return
         if not isinstance(result, dict):
             return
@@ -380,16 +374,16 @@ class DpiSettingsPage(BasePage):
             self._after_launch_method_changed(next_method)
 
     def _on_dpi_settings_worker_failed(self, request_id: int, action: str, error: str) -> None:
-        if request_id != self._dpi_settings_request_id:
+        if not self._dpi_settings_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
             return
         if action == "load_initial_state":
             self._settings_loaded = False
         log(f"Ошибка DPI-настроек ({action}): {error}", "ERROR")
 
-    def _on_dpi_settings_worker_finished(self, worker) -> None:
-        if self.__dict__.get("_dpi_settings_worker") is worker:
-            self._dpi_settings_worker = None
-        worker.deleteLater()
+    def _on_dpi_settings_worker_finished(self, _worker) -> None:
         if self._dpi_settings_pending and not self._cleanup_in_progress:
             pending = self._dpi_settings_pending.pop(0)
             self._start_dpi_settings_worker(pending)
@@ -490,17 +484,10 @@ class DpiSettingsPage(BasePage):
 
     def _request_orchestra_setting_save(self, key: str, value) -> None:
         payload = (str(key or "").strip(), value)
-        worker = self.__dict__.get("_orchestra_settings_save_worker")
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    self._orchestra_settings_save_pending.append(payload)
-                    self._coalesce_orchestra_settings_save_pending()
-                    return
-            except Exception:
-                self._orchestra_settings_save_pending.append(payload)
-                self._coalesce_orchestra_settings_save_pending()
-                return
+        if self._orchestra_settings_save_runtime.is_running():
+            self._orchestra_settings_save_pending.append(payload)
+            self._coalesce_orchestra_settings_save_pending()
+            return
         self._start_orchestra_setting_save_worker(payload)
 
     def _coalesce_orchestra_settings_save_pending(self) -> None:
@@ -514,32 +501,34 @@ class DpiSettingsPage(BasePage):
         self._orchestra_settings_save_pending = [latest_by_key[key] for key in order]
 
     def _start_orchestra_setting_save_worker(self, payload: tuple[str, object]) -> None:
-        self._orchestra_settings_save_request_id += 1
-        request_id = self._orchestra_settings_save_request_id
-        worker = self.create_orchestra_setting_save_worker(
-            request_id,
-            key=str(payload[0]),
-            value=payload[1],
+        self._orchestra_settings_save_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: self.create_orchestra_setting_save_worker(
+                request_id,
+                key=str(payload[0]),
+                value=payload[1],
+            ),
+            on_loaded=self._on_orchestra_setting_save_finished,
+            on_failed=self._on_orchestra_setting_save_failed,
+            on_finished=self._on_orchestra_setting_save_worker_finished,
+            loaded_signal_name="saved",
         )
-        self._orchestra_settings_save_worker = worker
-        worker.saved.connect(self._on_orchestra_setting_save_finished)
-        worker.failed.connect(self._on_orchestra_setting_save_failed)
-        worker.finished.connect(lambda w=worker: self._on_orchestra_setting_save_worker_finished(w))
-        worker.start()
 
     def _on_orchestra_setting_save_finished(self, request_id: int, _key: str, _value) -> None:
-        if request_id != self._orchestra_settings_save_request_id:
+        if not self._orchestra_settings_save_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
             return
 
     def _on_orchestra_setting_save_failed(self, request_id: int, key: str, error: str) -> None:
-        if request_id != self._orchestra_settings_save_request_id:
+        if not self._orchestra_settings_save_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
             return
         log(f"Ошибка сохранения настройки оркестратора {key}: {error}", "ERROR")
 
-    def _on_orchestra_setting_save_worker_finished(self, worker) -> None:
-        if self.__dict__.get("_orchestra_settings_save_worker") is worker:
-            self._orchestra_settings_save_worker = None
-        worker.deleteLater()
+    def _on_orchestra_setting_save_worker_finished(self, _worker) -> None:
         if self._orchestra_settings_save_pending and not self._cleanup_in_progress:
             pending = self._orchestra_settings_save_pending.pop(0)
             self._start_orchestra_setting_save_worker(pending)
@@ -653,19 +642,9 @@ class DpiSettingsPage(BasePage):
 
     def cleanup(self) -> None:
         self._dpi_settings_pending.clear()
-        worker = self.__dict__.get("_dpi_settings_worker")
-        if worker is not None:
-            try:
-                worker.quit()
-            except Exception:
-                pass
-            self._dpi_settings_worker = None
+        self._dpi_settings_runtime.stop(log_fn=log, warning_prefix="DPI-настройки")
+        self._dpi_settings_runtime.cancel()
         self._orchestra_settings_save_pending.clear()
-        worker = self.__dict__.get("_orchestra_settings_save_worker")
-        if worker is not None:
-            try:
-                worker.quit()
-            except Exception:
-                pass
-            self._orchestra_settings_save_worker = None
+        self._orchestra_settings_save_runtime.stop(log_fn=log, warning_prefix="настройки оркестратора")
+        self._orchestra_settings_save_runtime.cancel()
         super().cleanup()

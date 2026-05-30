@@ -3910,6 +3910,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         feature_factory_source = inspect.getsource(dpi_feature_module._create_dpi_settings_worker)
         worker_init_source = inspect.getsource(dpi_workers.DpiSettingsWorker.__init__)
         worker_source = inspect.getsource(dpi_workers.DpiSettingsWorker.run)
+        start_source = inspect.getsource(DpiSettingsPage._start_dpi_settings_worker)
 
         self.assertIn("_request_dpi_initial_state_load", load_source)
         self.assertNotIn("self._dpi_settings.load_initial_state", load_source)
@@ -3929,6 +3930,9 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("apply_launch_method", worker_source)
         self.assertIn("load_orchestra_settings", worker_source)
         self.assertNotIn("settings.dpi.commands", worker_source)
+        self.assertIn("OneShotWorkerRuntime", page_source)
+        self.assertIn("_dpi_settings_runtime", page_source)
+        self.assertNotIn("worker.start()", start_source)
 
     def test_dpi_orchestra_settings_save_runs_through_worker(self) -> None:
         spec = importlib.util.find_spec("orchestra.settings_worker")
@@ -3937,6 +3941,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
         page_source = inspect.getsource(DpiSettingsPage)
         request_source = inspect.getsource(DpiSettingsPage._request_orchestra_setting_save)
+        start_source = inspect.getsource(DpiSettingsPage._start_orchestra_setting_save_worker)
         finished_source = inspect.getsource(DpiSettingsPage._on_orchestra_setting_save_worker_finished)
         worker_source = inspect.getsource(orchestra_settings_worker.OrchestraSettingSaveWorker.run)
         feature_source = inspect.getsource(__import__("app.feature_facades.orchestra", fromlist=["OrchestraFeature"]).OrchestraFeature)
@@ -3954,8 +3959,10 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
             self.assertNotIn("self._orchestra.set_setting", source)
 
         self.assertIn("create_orchestra_setting_save_worker", page_source)
+        self.assertIn("_orchestra_settings_save_runtime", page_source)
         self.assertIn("_orchestra_settings_save_pending", request_source)
         self.assertIn("_orchestra_settings_save_pending.pop(0)", finished_source)
+        self.assertNotIn("worker.start()", start_source)
         self.assertIn("set_setting=self.set_setting", feature_source)
         self.assertIn("_set_setting", worker_source)
         self.assertNotIn("orchestra_commands", worker_source)

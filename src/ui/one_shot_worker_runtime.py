@@ -78,20 +78,24 @@ class OneShotWorkerRuntime:
         on_finished: Callable | None = None,
         bind_worker: Callable[[object], None] | None = None,
         signal_includes_request_id: bool = True,
+        loaded_signal_name: str = "loaded",
+        failed_signal_name: str = "failed",
     ) -> tuple[int, object]:
         request_id = self.next_request_id()
         worker = worker_factory(request_id)
 
-        if on_loaded is not None and hasattr(worker, "loaded"):
+        loaded_signal = getattr(worker, loaded_signal_name, None)
+        if on_loaded is not None and loaded_signal is not None:
             if signal_includes_request_id:
-                worker.loaded.connect(on_loaded)
+                loaded_signal.connect(on_loaded)
             else:
-                worker.loaded.connect(lambda *args, req=request_id: on_loaded(req, *args))
-        if on_failed is not None and hasattr(worker, "failed"):
+                loaded_signal.connect(lambda *args, req=request_id: on_loaded(req, *args))
+        failed_signal = getattr(worker, failed_signal_name, None)
+        if on_failed is not None and failed_signal is not None:
             if signal_includes_request_id:
-                worker.failed.connect(on_failed)
+                failed_signal.connect(on_failed)
             else:
-                worker.failed.connect(lambda *args, req=request_id: on_failed(req, *args))
+                failed_signal.connect(lambda *args, req=request_id: on_failed(req, *args))
         worker.finished.connect(lambda w=worker: self._finish_qthread_worker(w, on_finished))
         worker.finished.connect(worker.deleteLater)
         if bind_worker is not None:
