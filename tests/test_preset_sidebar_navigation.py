@@ -1060,7 +1060,7 @@ class PresetSidebarNavigationTests(unittest.TestCase):
             signal.emit()
 
             self.assertEqual(len(scheduled), 1)
-            self.assertGreaterEqual(scheduled[0][0], 500)
+            self.assertEqual(scheduled[0][0], sidebar_builder.SIDEBAR_SEARCH_AFTER_INTERACTIVE_MS)
             self.assertEqual(installed, [])
 
             scheduled[0][1]()
@@ -1304,7 +1304,7 @@ class PresetSidebarNavigationTests(unittest.TestCase):
             signal.emit()
 
             self.assertEqual(len(scheduled), 1)
-            self.assertGreaterEqual(scheduled[0][0], 1000)
+            self.assertEqual(scheduled[0][0], sidebar_builder.SIDEBAR_HIDDEN_MODE_ITEMS_AFTER_INTERACTIVE_MS)
             self.assertEqual(installed, [])
 
             scheduled[0][1]()
