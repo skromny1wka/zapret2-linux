@@ -511,19 +511,21 @@ class Winws2LaunchPresetValidationTests(unittest.TestCase):
 
         with (
             patch("winws_runtime.runners.zapret2_runner.subprocess.Popen", return_value=fake_process) as popen_mock,
-            patch("winws_runtime.runners.zapret2_runner.wait_for_process_stable_start", return_value=True),
+            patch("winws_runtime.runners.zapret2_runner.wait_for_process_stable_start", return_value=True) as stable_start,
         ):
             self.assertTrue(
                 runner._spawn_process_locked(
                     artifact,
                     "Preset",
                     preset_switch=False,
+                    stable_start_window_seconds=0.35,
                 )
             )
 
         kwargs = popen_mock.call_args.kwargs
         self.assertIs(kwargs["stdout"], subprocess.DEVNULL)
         self.assertIs(kwargs["stderr"], subprocess.DEVNULL)
+        self.assertEqual(stable_start.call_args.kwargs["stable_window"], 0.35)
 
     def test_winws2_dry_run_artifact_stays_inside_at_config(self) -> None:
         from winws_runtime.runners.preset_runner_support import PreparedPresetArtifact

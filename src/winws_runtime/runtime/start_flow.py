@@ -120,6 +120,7 @@ def start_dpi_async(
             request.launch_method,
             runtime_feature=runtime_owner._runtime_feature,
             runtime_api=runtime_owner._runtime_api(),
+            startup_autostart=bool(startup_autostart),
         ),
         finished_slot=runtime_owner._on_dpi_start_finished,
         progress_slot=runtime_owner_status_callback(runtime_owner),

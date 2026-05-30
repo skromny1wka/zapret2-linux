@@ -768,6 +768,7 @@ class Winws2StrategyRunner(StrategyRunnerBase):
         *,
         preset_switch: bool,
         notify_failure: bool = True,
+        stable_start_window_seconds: float = 1.0,
     ) -> bool:
         if not artifact.launch_args:
             message = "Не удалось подготовить аргументы запуска из preset файла"
@@ -819,6 +820,7 @@ class Winws2StrategyRunner(StrategyRunnerBase):
             stable_ok = wait_for_process_stable_start(
                 self.running_process,
                 readiness_check=lambda: self._spawn_readiness_check_locked(self.running_process),
+                stable_window=stable_start_window_seconds,
             )
 
             if stable_ok:
@@ -1044,6 +1046,7 @@ class Winws2StrategyRunner(StrategyRunnerBase):
         strategy_name: str = "Preset",
         _force_cleanup: bool = False,
         _retry_count: int = 0,
+        _stable_start_window_seconds: float = 1.0,
     ) -> bool:
         """
         Запускает движок Zapret 2 из выбранного preset-файла.
@@ -1074,6 +1077,7 @@ class Winws2StrategyRunner(StrategyRunnerBase):
                 strategy_name,
                 force_cleanup=bool(_force_cleanup),
                 retry_count=int(_retry_count),
+                stable_start_window_seconds=float(_stable_start_window_seconds),
             )
 
     def _resolve_cleanup_required_before_spawn(
@@ -1158,6 +1162,7 @@ class Winws2StrategyRunner(StrategyRunnerBase):
         *,
         force_cleanup: bool,
         retry_count: int,
+        stable_start_window_seconds: float = 1.0,
     ) -> bool:
         artifact = self._compile_preset_artifact(preset_path)
         if not artifact.validation_ok:
@@ -1194,6 +1199,7 @@ class Winws2StrategyRunner(StrategyRunnerBase):
             artifact,
             strategy_name,
             preset_switch=False,
+            stable_start_window_seconds=stable_start_window_seconds,
         )
         if success:
             return True

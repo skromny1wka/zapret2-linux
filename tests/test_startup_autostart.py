@@ -155,6 +155,41 @@ class StartupAutostartTests(unittest.TestCase):
         self.assertIs(result, request)
         self.assertTrue(prepare.call_args.kwargs["skip_preset_prevalidation"])
 
+    def test_start_flow_marks_start_worker_as_startup_autostart(self) -> None:
+        from winws_runtime.runtime import start_flow
+        from winws_runtime.runtime.start_workers import PreparedDpiStartRequest
+
+        request = PreparedDpiStartRequest(
+            launch_method="zapret2_mode",
+            selected_mode={"is_preset_file": True},
+            mode_name="Пресет",
+            method_name="прямой winws2",
+        )
+        runtime_owner = SimpleNamespace(
+            _runtime_feature=SimpleNamespace(),
+            _runtime_api=Mock(return_value=object()),
+            _runtime_service=Mock(return_value=SimpleNamespace(set_busy=Mock())),
+            _begin_runtime_start=Mock(),
+            _on_dpi_start_finished=Mock(),
+        )
+
+        with (
+            patch.object(start_flow, "prepare_start_preflight", return_value=True),
+            patch.object(start_flow, "build_start_request", return_value=request),
+            patch.object(start_flow, "set_runtime_owner_status"),
+            patch.object(start_flow, "runtime_owner_status_callback", return_value=Mock()),
+            patch.object(start_flow, "start_worker_thread") as start_worker_thread,
+        ):
+            start_flow.start_dpi_async(
+                runtime_owner,
+                selected_mode=request.selected_mode,
+                launch_method="zapret2_mode",
+                startup_autostart=True,
+            )
+
+        worker = start_worker_thread.call_args.kwargs["worker"]
+        self.assertTrue(worker._startup_autostart)
+
     def test_startup_manifest_cache_signature_does_not_read_preset_body(self) -> None:
         import inspect
         from presets.mode_coordinator import PresetModeCoordinator
@@ -188,6 +223,28 @@ class StartupAutostartTests(unittest.TestCase):
 
         self.assertFalse(ok)
         self.assertIn("нет включённых profile", worker._last_error_message)
+
+    def test_startup_worker_uses_short_stable_window_for_autostart(self) -> None:
+        from winws_runtime.runtime.start_workers import PresetLaunchStartWorker
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            preset_path = Path(tmp_dir) / "ready.txt"
+            preset_path.write_text("--new\n--filter-tcp=80\n", encoding="utf-8")
+
+            worker = PresetLaunchStartWorker(
+                {"is_preset_file": True, "preset_path": str(preset_path), "name": "Пресет"},
+                "zapret2_mode",
+                runtime_feature=SimpleNamespace(),
+                runtime_api=SimpleNamespace(),
+                startup_autostart=True,
+            )
+            runner = SimpleNamespace(start_from_preset_file=Mock(return_value=True))
+
+            with patch("winws_runtime.runners.runner_factory.get_strategy_runner", return_value=runner):
+                self.assertTrue(worker._start_presets_with_runner(str(preset_path), "Пресет"))
+
+        kwargs = runner.start_from_preset_file.call_args.kwargs
+        self.assertLess(kwargs["_stable_start_window_seconds"], 1.0)
 
 
 if __name__ == "__main__":

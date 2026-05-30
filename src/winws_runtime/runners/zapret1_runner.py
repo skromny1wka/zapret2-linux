@@ -220,6 +220,7 @@ class Winws1StrategyRunner(StrategyRunnerBase):
         strategy_name: str,
         *,
         notify_failure: bool = True,
+        stable_start_window_seconds: float = 1.0,
     ) -> bool:
         if not artifact.launch_args:
             self._set_last_error(
@@ -254,6 +255,7 @@ class Winws1StrategyRunner(StrategyRunnerBase):
             if wait_for_process_stable_start(
                 self.running_process,
                 readiness_check=lambda: self._spawn_readiness_check_locked(self.running_process),
+                stable_window=stable_start_window_seconds,
             ):
                 self._set_runner_state_locked(
                     PresetRunnerState.RUNNING,
@@ -410,7 +412,13 @@ class Winws1StrategyRunner(StrategyRunnerBase):
 
         return bool(self._spawn_process_locked(artifact, strategy_name, notify_failure=False))
 
-    def start_from_preset_file(self, preset_path: str, strategy_name: str = "Preset", _retry_count: int = 0) -> bool:
+    def start_from_preset_file(
+        self,
+        preset_path: str,
+        strategy_name: str = "Preset",
+        _retry_count: int = 0,
+        _stable_start_window_seconds: float = 1.0,
+    ) -> bool:
         """
         Запускает движок Zapret 1 из выбранного preset-файла.
 
@@ -431,6 +439,7 @@ class Winws1StrategyRunner(StrategyRunnerBase):
                 strategy_name,
                 retry_count=int(_retry_count),
                 max_retries=int(max_retries),
+                stable_start_window_seconds=float(_stable_start_window_seconds),
             )
 
     def _prepare_cleanup_before_spawn_locked(self, *, retry_count: int) -> None:
@@ -489,7 +498,15 @@ class Winws1StrategyRunner(StrategyRunnerBase):
 
         return False
 
-    def _start_from_preset_file_locked(self, preset_path: str, strategy_name: str, *, retry_count: int, max_retries: int) -> bool:
+    def _start_from_preset_file_locked(
+        self,
+        preset_path: str,
+        strategy_name: str,
+        *,
+        retry_count: int,
+        max_retries: int,
+        stable_start_window_seconds: float = 1.0,
+    ) -> bool:
         artifact = self._compile_preset_artifact(preset_path)
         if not artifact.validation_ok:
             self._set_runner_state_locked(
@@ -519,7 +536,11 @@ class Winws1StrategyRunner(StrategyRunnerBase):
             return False
 
         self._preset_file_path = preset_path
-        success = self._spawn_process_locked(artifact, strategy_name)
+        success = self._spawn_process_locked(
+            artifact,
+            strategy_name,
+            stable_start_window_seconds=stable_start_window_seconds,
+        )
         if success:
             return True
 

@@ -14,6 +14,9 @@ from winws_runtime.runtime.sync_shutdown import shutdown_runtime_sync
 from winws_runtime.runtime.system_ops import force_kill_all_winws_processes
 
 
+STARTUP_AUTOSTART_STABLE_WINDOW_SECONDS = 0.35
+
+
 @dataclass(frozen=True)
 class PreparedDpiStartRequest:
     launch_method: str
@@ -28,13 +31,22 @@ class PresetLaunchStartWorker(QObject):
     finished = pyqtSignal(bool, str)  # success, error_message
     progress = pyqtSignal(str)        # status_message
 
-    def __init__(self, selected_mode, launch_method, *, runtime_feature, runtime_api):
+    def __init__(
+        self,
+        selected_mode,
+        launch_method,
+        *,
+        runtime_feature,
+        runtime_api,
+        startup_autostart: bool = False,
+    ):
         super().__init__()
         self.selected_mode = selected_mode
         self.launch_method = launch_method
         self._runtime_feature = runtime_feature
         self.launch_runtime_api = runtime_api
         self._last_error_message: str = ""
+        self._startup_autostart = bool(startup_autostart)
 
     def _get_winws_exe(self) -> str:
         from settings.mode import exe_path_for_launch_method
@@ -208,7 +220,10 @@ class PresetLaunchStartWorker(QObject):
 
         runner = get_strategy_runner(self._get_winws_exe())
         self._configure_runner_runtime_callbacks(runner)
-        success = runner.start_from_preset_file(preset_path, strategy_name)
+        start_kwargs = {}
+        if self._startup_autostart:
+            start_kwargs["_stable_start_window_seconds"] = STARTUP_AUTOSTART_STABLE_WINDOW_SECONDS
+        success = runner.start_from_preset_file(preset_path, strategy_name, **start_kwargs)
 
         if success:
             log(f"Пресет '{strategy_name}' успешно запущен", "✅ SUCCESS")

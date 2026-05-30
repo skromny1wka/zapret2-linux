@@ -200,9 +200,11 @@ def wait_for_process_exit(process: subprocess.Popen, timeout: float = 3.0, probe
 def wait_for_process_stable_start(
     process: subprocess.Popen,
     readiness_check: Callable[[], bool] | None = None,
+    *,
+    stable_window: float = 1.0,
 ) -> bool:
     startup_timeout = 2.5
-    stable_window = 1.0
+    stable_window = max(0.05, float(stable_window))
     probe_interval = 0.05
 
     start_time = time.perf_counter()
