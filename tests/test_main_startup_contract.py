@@ -523,6 +523,11 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertTrue(any("Во время запуска можно греть только данные" in error for error in result.errors))
 
+    def test_startup_runtime_step_gap_stays_short_after_interactive(self) -> None:
+        from main import startup_coordinator
+
+        self.assertLessEqual(startup_coordinator.STARTUP_STEP_GAP_MS, 8)
+
     def test_dns_feature_exposes_startup_dns_entrypoint(self) -> None:
         from app.feature_facades.dns import build_dns_feature
 
