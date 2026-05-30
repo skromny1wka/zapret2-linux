@@ -9,6 +9,27 @@ def _tr_key(tr_prefix: str, suffix: str) -> str:
     return f"{tr_prefix}.{suffix}"
 
 
+def _set_button_text_if_changed(button, text: str) -> bool:
+    value = str(text or "")
+    try:
+        current = getattr(button, "text", None)
+        current_value = str(current()) if callable(current) else str(current)
+        if current_value == value:
+            return False
+    except Exception:
+        pass
+    button.setText(value)
+    return True
+
+
+def _set_button_icon_if_changed(button, icon) -> bool:
+    if getattr(button, "_last_user_preset_action_icon", None) == icon:
+        return False
+    setattr(button, "_last_user_preset_action_icon", icon)
+    button.setIcon(icon)
+    return True
+
+
 def show_reset_all_result(
     *,
     cleanup_in_progress: bool,
@@ -26,15 +47,16 @@ def show_reset_all_result(
     failed = int(failed_count or 0)
     try:
         if failed > 0:
-            reset_all_btn.setText(f"Ошибки: {failed}")
+            text = f"Ошибки: {failed}"
             icon = FluentIcon.INFO
         elif ok > 0:
-            reset_all_btn.setText(f"Сброшено: {ok}")
+            text = f"Сброшено: {ok}"
             icon = FluentIcon.ACCEPT
         else:
-            reset_all_btn.setText("Нечего менять")
+            text = "Нечего менять"
             icon = FluentIcon.ACCEPT
-        reset_all_btn.setIcon(icon)
+        _set_button_text_if_changed(reset_all_btn, text)
+        _set_button_icon_if_changed(reset_all_btn, icon)
     except Exception:
         pass
     single_shot_fn(3000, restore_label_fn)
@@ -50,9 +72,10 @@ def restore_reset_all_button_label(
     if cleanup_in_progress:
         return
     try:
-        reset_all_btn.setText(
-            tr_fn(_tr_key(tr_prefix, "button.reset_all"), "Вернуть встроенные")
+        _set_button_text_if_changed(
+            reset_all_btn,
+            tr_fn(_tr_key(tr_prefix, "button.reset_all"), "Вернуть встроенные"),
         )
-        reset_all_btn.setIcon(FluentIcon.RETURN)
+        _set_button_icon_if_changed(reset_all_btn, FluentIcon.RETURN)
     except Exception:
         pass

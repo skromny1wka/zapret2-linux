@@ -11,11 +11,15 @@ class _Button:
     def __init__(self) -> None:
         self.text = ""
         self.icon = None
+        self.text_calls: list[str] = []
+        self.icon_calls: list[object] = []
 
     def setText(self, value: str) -> None:
+        self.text_calls.append(str(value))
         self.text = value
 
     def setIcon(self, value) -> None:
+        self.icon_calls.append(value)
         self.icon = value
 
 
@@ -51,6 +55,33 @@ class UserPresetsResetResultTests(unittest.TestCase):
 
         self.assertEqual(button.text, "Ошибки: 2")
         self.assertEqual(button.icon, FluentIcon.INFO)
+
+    def test_reset_result_skips_duplicate_button_render(self) -> None:
+        button = _Button()
+
+        show_reset_all_result(
+            cleanup_in_progress=False,
+            success_count=3,
+            total_count=83,
+            failed_count=0,
+            reset_all_btn=button,
+            single_shot_fn=lambda _delay, callback: None,
+            restore_label_fn=lambda: None,
+        )
+        button.text_calls.clear()
+        button.icon_calls.clear()
+        show_reset_all_result(
+            cleanup_in_progress=False,
+            success_count=3,
+            total_count=83,
+            failed_count=0,
+            reset_all_btn=button,
+            single_shot_fn=lambda _delay, callback: None,
+            restore_label_fn=lambda: None,
+        )
+
+        self.assertEqual(button.text_calls, [])
+        self.assertEqual(button.icon_calls, [])
 
 
 if __name__ == "__main__":
