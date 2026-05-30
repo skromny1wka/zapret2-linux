@@ -6,6 +6,7 @@ from PyQt6.QtCore import QObject, QThread, pyqtSignal
 
 from log.log import log
 from settings.mode import is_preset_launch_method, normalize_launch_method
+from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 
 
 class PresetProfileStrategySummaryWorker(QThread):
@@ -58,8 +59,7 @@ class PresetProfileStrategySummaryRefreshRuntime(QObject):
         self._profile_feature = profile_feature
         self._state_store = state_store
         self._get_launch_method = get_launch_method
-        self._request_id = 0
-        self._worker: PresetProfileStrategySummaryWorker | None = None
+        self._summary_runtime = OneShotWorkerRuntime()
         self._pending = False
 
     def request_refresh(self) -> None:
@@ -67,35 +67,28 @@ class PresetProfileStrategySummaryRefreshRuntime(QObject):
         if not method or not is_preset_launch_method(method):
             return
 
-        worker = self._worker
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    self._pending = True
-                    return
-            except Exception:
-                self._worker = None
+        if self._summary_runtime.is_running():
+            self._pending = True
+            return
 
         self._start_worker(method)
 
     def _start_worker(self, method: str) -> None:
         self._pending = False
-        self._request_id += 1
-        request_id = self._request_id
-        worker = PresetProfileStrategySummaryWorker(
-            request_id,
-            method=method,
-            profile_feature=self._profile_feature,
-            parent=self,
+        self._summary_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: PresetProfileStrategySummaryWorker(
+                request_id,
+                method=method,
+                profile_feature=self._profile_feature,
+                parent=self,
+            ),
+            on_loaded=self._on_summary_loaded,
+            on_failed=self._on_summary_failed,
+            on_finished=self._on_worker_finished,
         )
-        self._worker = worker
-        worker.loaded.connect(self._on_summary_loaded)
-        worker.failed.connect(self._on_summary_failed)
-        worker.finished.connect(lambda w=worker: self._on_worker_finished(w))
-        worker.start()
 
     def _on_summary_loaded(self, request_id: int, state) -> None:
-        if request_id != self._request_id:
+        if not self._summary_runtime.is_current(request_id):
             return
         from presets.display_state import publish_profile_strategy_summary_in_store
 
@@ -105,15 +98,21 @@ class PresetProfileStrategySummaryRefreshRuntime(QObject):
         )
 
     def _on_summary_failed(self, request_id: int, error: str) -> None:
-        if request_id == self._request_id:
+        if self._summary_runtime.is_current(request_id):
             log(f"Preset summary refresh skipped: {error}", "DEBUG")
 
-    def _on_worker_finished(self, worker: PresetProfileStrategySummaryWorker) -> None:
-        if self._worker is worker:
-            self._worker = None
-        worker.deleteLater()
+    def _on_worker_finished(self, _worker) -> None:
         if self._pending:
             self.request_refresh()
+
+    def cleanup(self) -> None:
+        self._pending = False
+        self._summary_runtime.stop(
+            blocking=True,
+            log_fn=log,
+            warning_prefix="preset summary refresh worker",
+        )
+        self._summary_runtime.cancel()
 
 
 __all__ = [

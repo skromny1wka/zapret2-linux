@@ -19,9 +19,13 @@ class ApplicationLifecycleWindowPort:
         cleanup_theme_for_close(self._window)
 
     def cleanup_threaded_pages(self) -> None:
-        from main.window_lifecycle_cleanup import cleanup_threaded_pages_for_close
+        from main.window_lifecycle_cleanup import (
+            cleanup_session_runtimes_for_close,
+            cleanup_threaded_pages_for_close,
+        )
 
         cleanup_threaded_pages_for_close(self._window)
+        cleanup_session_runtimes_for_close(self._window)
 
     def cleanup_visual_and_proxy_resources(self, *, telegram_proxy_feature) -> None:
         from main.window_lifecycle_cleanup import cleanup_visual_and_proxy_resources_for_close

@@ -65,6 +65,21 @@ def cleanup_threaded_pages_for_close(window) -> None:
         log(f"Ошибка при очистке страниц: {e}", "DEBUG")
 
 
+def cleanup_session_runtimes_for_close(window) -> None:
+    session = get_window_ui_session(window)
+    runtime = None if session is None else getattr(session, "preset_summary_refresh_runtime", None)
+    if runtime is None or not hasattr(runtime, "cleanup"):
+        return
+    try:
+        runtime.cleanup()
+    except Exception as e:
+        log(f"Ошибка очистки preset summary refresh runtime: {e}", "DEBUG")
+    try:
+        session.preset_summary_refresh_runtime = None
+    except Exception:
+        pass
+
+
 def cleanup_process_monitor_for_close(runtime_feature) -> None:
     try:
         # Эти сервисы создаются после первого показа окна, поэтому при очень
