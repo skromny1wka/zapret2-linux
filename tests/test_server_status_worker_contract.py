@@ -136,7 +136,8 @@ class UpdatePageRuntimeServerRecoveryTests(unittest.TestCase):
         command_signature = inspect.signature(updater_commands.retry_server_check_without_dpi)
         command_source = inspect.getsource(updater_commands.retry_server_check_without_dpi)
 
-        self.assertIn("updater_commands.retry_server_check_without_dpi", worker_source)
+        self.assertIn("_retry_server_check_without_dpi", worker_source)
+        self.assertNotIn("updater_commands.retry_server_check_without_dpi", worker_source)
         self.assertNotIn("runtime_feature", init_signature.parameters)
         self.assertNotIn("runtime_feature", command_signature.parameters)
         self.assertNotIn("_runtime_feature", inspect.getsource(UpdaterServerRetryWithoutDpiWorker))
@@ -153,6 +154,7 @@ class UpdatePageRuntimeServerRecoveryTests(unittest.TestCase):
             7,
             is_any_running=runtime_feature.is_any_running,
             shutdown_sync=runtime_feature.shutdown_sync,
+            retry_server_check_without_dpi=updater_commands.retry_server_check_without_dpi,
         )
         results = []
         worker.loaded.connect(lambda *args: results.append(args))
@@ -175,7 +177,8 @@ class UpdatePageRuntimeServerRecoveryTests(unittest.TestCase):
         command_signature = inspect.signature(updater_commands.restart_dpi_after_update)
         command_source = inspect.getsource(updater_commands.restart_dpi_after_update)
 
-        self.assertIn("updater_commands.restart_dpi_after_update", worker_source)
+        self.assertIn("_restart_dpi_after_update", worker_source)
+        self.assertNotIn("updater_commands.restart_dpi_after_update", worker_source)
         self.assertNotIn("runtime_feature", init_signature.parameters)
         self.assertNotIn("runtime_feature", command_signature.parameters)
         self.assertNotIn("_runtime_feature", inspect.getsource(UpdaterDpiRestartWorker))
@@ -192,6 +195,7 @@ class UpdatePageRuntimeServerRecoveryTests(unittest.TestCase):
             9,
             is_available=runtime_feature.is_available,
             restart=runtime_feature.restart,
+            restart_dpi_after_update=updater_commands.restart_dpi_after_update,
             context="test",
         )
         results = []

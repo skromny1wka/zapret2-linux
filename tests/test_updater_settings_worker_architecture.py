@@ -4,6 +4,7 @@ import inspect
 import unittest
 
 from app.feature_facades.updater import UpdaterFeature
+import updater.retry_workers as retry_workers
 import updater.settings_workers as settings_workers
 
 
@@ -38,6 +39,20 @@ class UpdaterSettingsWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("open_update_channel", worker_signature.parameters)
         self.assertNotIn("updater_commands.open_update_channel", worker_source)
         self.assertNotIn("import updater.commands", worker_source)
+
+    def test_retry_workers_receive_feature_action_callables(self) -> None:
+        feature_source = inspect.getsource(UpdaterFeature)
+        retry_source = inspect.getsource(retry_workers.UpdaterServerRetryWithoutDpiWorker)
+        restart_source = inspect.getsource(retry_workers.UpdaterDpiRestartWorker)
+
+        self.assertIn("create_server_retry_without_dpi_worker", feature_source)
+        self.assertIn("retry_server_check_without_dpi=self.retry_server_check_without_dpi", feature_source)
+        self.assertIn("create_dpi_restart_worker", feature_source)
+        self.assertIn("restart_dpi_after_update=self.restart_dpi_after_update", feature_source)
+        self.assertIn("_retry_server_check_without_dpi", retry_source)
+        self.assertIn("_restart_dpi_after_update", restart_source)
+        self.assertNotIn("import updater.commands", retry_source)
+        self.assertNotIn("import updater.commands", restart_source)
 
 
 if __name__ == "__main__":

@@ -637,9 +637,7 @@ class UpdatePageRuntime:
         )
 
     def create_server_retry_without_dpi_worker(self, request_id: int):
-        from updater.retry_workers import UpdaterServerRetryWithoutDpiWorker
-
-        return UpdaterServerRetryWithoutDpiWorker(
+        return self._updater_feature.create_server_retry_without_dpi_worker(
             request_id,
             is_any_running=self._runtime_feature.is_any_running,
             shutdown_sync=self._runtime_feature.shutdown_sync,
@@ -647,9 +645,7 @@ class UpdatePageRuntime:
         )
 
     def create_dpi_restart_worker(self, request_id: int, *, context: str):
-        from updater.retry_workers import UpdaterDpiRestartWorker
-
-        return UpdaterDpiRestartWorker(
+        return self._updater_feature.create_dpi_restart_worker(
             request_id,
             is_available=self._runtime_feature.is_available,
             restart=self._runtime_feature.restart,

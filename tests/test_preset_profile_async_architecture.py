@@ -2704,6 +2704,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
     def test_updater_server_retry_without_dpi_runs_through_worker(self) -> None:
         retry_workers = importlib.import_module("updater.retry_workers")
         update_runtime_cls = __import__("updater.update_page_runtime", fromlist=["UpdatePageRuntime"]).UpdatePageRuntime
+        updater_feature_cls = __import__("app.feature_facades.updater", fromlist=["UpdaterFeature"]).UpdaterFeature
 
         retry_source = inspect.getsource(update_runtime_cls._maybe_retry_server_check_without_dpi)
         runtime_source = inspect.getsource(update_runtime_cls)
@@ -2711,6 +2712,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertTrue(hasattr(retry_workers, "UpdaterServerRetryWithoutDpiWorker"))
         worker_source = inspect.getsource(retry_workers.UpdaterServerRetryWithoutDpiWorker.run)
         command_source = inspect.getsource(importlib.import_module("updater.commands").retry_server_check_without_dpi)
+        feature_source = inspect.getsource(updater_feature_cls)
 
         self.assertIn("_request_server_retry_without_dpi", retry_source)
         self.assertNotIn("shutdown_sync", retry_source)
@@ -2718,7 +2720,10 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_server_retry_without_dpi_runtime", runtime_source)
         self.assertIn("create_server_retry_without_dpi_worker", runtime_source)
         self.assertIn("_teardown_server_retry_without_dpi_worker", runtime_source)
-        self.assertIn("updater.commands", worker_source)
+        self.assertIn("create_server_retry_without_dpi_worker", feature_source)
+        self.assertIn("retry_server_check_without_dpi=self.retry_server_check_without_dpi", feature_source)
+        self.assertIn("_retry_server_check_without_dpi", worker_source)
+        self.assertNotIn("updater.commands", worker_source)
         self.assertIn("retry_server_check_without_dpi", worker_source)
         self.assertNotIn("self._is_any_running(", worker_source)
         self.assertNotIn("self._shutdown_sync(", worker_source)
@@ -2735,6 +2740,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertTrue(hasattr(retry_workers, "UpdaterDpiRestartWorker"))
         worker_source = inspect.getsource(retry_workers.UpdaterDpiRestartWorker.run)
         command_source = inspect.getsource(importlib.import_module("updater.commands").restart_dpi_after_update)
+        feature_source = inspect.getsource(__import__("app.feature_facades.updater", fromlist=["UpdaterFeature"]).UpdaterFeature)
 
         self.assertIn("_request_dpi_restart", restart_source)
         self.assertNotIn(".restart(", restart_source)
@@ -2742,7 +2748,10 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_dpi_restart_runtime", runtime_source)
         self.assertIn("create_dpi_restart_worker", runtime_source)
         self.assertIn("_teardown_dpi_restart_worker", runtime_source)
-        self.assertIn("updater.commands", worker_source)
+        self.assertIn("create_dpi_restart_worker", feature_source)
+        self.assertIn("restart_dpi_after_update=self.restart_dpi_after_update", feature_source)
+        self.assertIn("_restart_dpi_after_update", worker_source)
+        self.assertNotIn("updater.commands", worker_source)
         self.assertIn("restart_dpi_after_update", worker_source)
         self.assertNotIn(".is_available(", worker_source)
         self.assertNotIn(".restart(", worker_source)
