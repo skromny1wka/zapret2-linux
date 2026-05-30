@@ -56,6 +56,20 @@ class ProfileTypeSelectorTests(unittest.TestCase):
         self.assertEqual(tcp_button.calls, [])
         self.assertEqual(udp_button.calls, [])
 
+    def test_profile_types_signal_skips_duplicate_state(self) -> None:
+        from profile.ui.widgets.profile_type_selector import ProfileTypeSelector
+
+        emitted: list[set[str]] = []
+        selector = SimpleNamespace(
+            get_active_profile_types=lambda: {"all"},
+            profile_types_changed=SimpleNamespace(emit=emitted.append),
+        )
+
+        changed = ProfileTypeSelector._emit_profile_types_changed_if_needed(selector, {"all"})
+
+        self.assertFalse(changed)
+        self.assertEqual(emitted, [])
+
 
 if __name__ == "__main__":
     unittest.main()

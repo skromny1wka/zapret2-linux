@@ -84,6 +84,7 @@ class ProfileTypeSelector(QWidget):
         if not isinstance(sender, _ProfileTypeButton):
             return
 
+        previous_types = self.get_active_profile_types()
         clicked_key = sender.profile_type
         is_checked = sender.isChecked()
 
@@ -102,7 +103,7 @@ class ProfileTypeSelector(QWidget):
                 if not self._has_other_selected():
                     set_button_checked_if_changed(self._buttons["all"], True)
 
-        self.profile_types_changed.emit(self.get_active_profile_types())
+        self._emit_profile_types_changed_if_needed(previous_types)
 
     def _has_other_selected(self) -> bool:
         for key, btn in self._buttons.items():
@@ -112,6 +113,13 @@ class ProfileTypeSelector(QWidget):
 
     def get_active_profile_types(self) -> set:
         return {key for key, btn in self._buttons.items() if btn.isChecked()}
+
+    def _emit_profile_types_changed_if_needed(self, previous_types: set) -> bool:
+        active_types = self.get_active_profile_types()
+        if active_types == set(previous_types or set()):
+            return False
+        self.profile_types_changed.emit(active_types)
+        return True
 
     def set_active_profile_types(self, profile_types: set):
         self.blockSignals(True)
@@ -125,5 +133,6 @@ class ProfileTypeSelector(QWidget):
         self.blockSignals(False)
 
     def reset(self):
+        previous_types = self.get_active_profile_types()
         self.set_active_profile_types({"all"})
-        self.profile_types_changed.emit({"all"})
+        self._emit_profile_types_changed_if_needed(previous_types)
