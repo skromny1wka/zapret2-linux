@@ -265,6 +265,35 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         page._controller.create_load_worker.assert_called_once_with(1, "profile-1", page)
         self.assertEqual(worker.start_calls, 1)
 
+    def test_list_file_request_skips_duplicate_loading_status(self) -> None:
+        from unittest.mock import Mock
+
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        worker = _LoadWorker()
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._editor_tab_built = True
+        page._profile_key = "profile-1"
+        page._list_file_load_worker = None
+        page._list_file_load_request_id = 0
+        page._list_file_status_label = _TextWidget("Загрузка файла списка...")
+        page._current_filter_kind = lambda: "hostlist"
+        page._current_filter_value = lambda: "lists/youtube.txt"
+        page._controller = Mock()
+        page._controller.create_list_file_load_worker.return_value = worker
+
+        ProfileSetupPageBase._request_list_file_editor_state(page)
+
+        self.assertEqual(page._list_file_status_label.calls, [])
+        page._controller.create_list_file_load_worker.assert_called_once_with(
+            1,
+            "profile-1",
+            filter_kind="hostlist",
+            filter_value="lists/youtube.txt",
+            parent=page,
+        )
+        self.assertEqual(worker.start_calls, 1)
+
     def test_list_file_editor_state_skips_duplicate_plain_text(self) -> None:
         from types import SimpleNamespace
         from unittest.mock import Mock

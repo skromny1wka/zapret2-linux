@@ -1074,7 +1074,7 @@ class ProfileSetupPageBase(BasePage):
             except Exception:
                 return
         if self._list_file_status_label is not None:
-            self._list_file_status_label.setText("Загрузка файла списка...")
+            set_widget_text_if_changed(self._list_file_status_label, "Загрузка файла списка...")
         self._list_file_load_request_id += 1
         request_id = self._list_file_load_request_id
         worker = self._controller.create_list_file_load_worker(
@@ -1100,7 +1100,10 @@ class ProfileSetupPageBase(BasePage):
         if request_id != self._list_file_load_request_id:
             return
         if self._list_file_status_label is not None:
-            self._list_file_status_label.setText(f"Ошибка загрузки файла списка: {error}")
+            set_widget_text_if_changed(
+                self._list_file_status_label,
+                f"Ошибка загрузки файла списка: {error}",
+            )
 
     def _on_list_file_worker_finished(self, worker) -> None:
         if self._list_file_load_worker is worker:
