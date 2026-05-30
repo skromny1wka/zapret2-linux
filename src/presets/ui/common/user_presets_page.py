@@ -28,7 +28,6 @@ from presets.user_presets_action_workers import (
     UserPresetEditActionWorker,
     UserPresetItemActionWorker,
     UserPresetLinkActionWorker,
-    UserPresetStorageActionWorker,
 )
 from presets.ui.common.user_presets_page_runtime import (
     UserPresetsPageRuntime,
@@ -116,6 +115,7 @@ class UserPresetsPageBase(BasePage):
         connect_preset_signals,
         create_user_presets_open_folder_worker,
         create_preset_folder_action_worker,
+        create_preset_storage_action_worker,
         load_preset_folder_state,
         delete_preset_item_meta,
         open_preset_raw_editor,
@@ -133,6 +133,7 @@ class UserPresetsPageBase(BasePage):
         self._connect_preset_signals = connect_preset_signals
         self._create_user_presets_open_folder_worker = create_user_presets_open_folder_worker
         self._create_preset_folder_action_worker_fn = create_preset_folder_action_worker
+        self._create_preset_storage_action_worker_fn = create_preset_storage_action_worker
         self._load_preset_folder_state_fn = load_preset_folder_state
         self._delete_preset_item_meta_fn = delete_preset_item_meta
         self._open_url = open_url
@@ -1181,14 +1182,10 @@ class UserPresetsPageBase(BasePage):
         destination_id: str = "",
         destination_folder_key: str = "",
     ):
-        storage_api = self._storage_api()
-        return UserPresetStorageActionWorker(
+        return self._create_preset_storage_action_worker_fn(
             request_id,
-            storage_api.toggle_preset_pin,
-            storage_api.set_preset_rating,
-            storage_api.move_preset_by_step,
-            storage_api.move_preset_on_drop,
-            self._load_preset_folder_state_light,
+            scope_key=self._folder_scope_key(),
+            list_preset_entries=self._listing_api().list_preset_entries_light,
             action=action,
             name=name,
             display_name=display_name,

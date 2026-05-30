@@ -134,18 +134,6 @@ class UserPresetsActionsApi(Protocol):
 class UserPresetsStorageApi(Protocol):
     def is_builtin_preset_file(self, name: str) -> bool: ...
     def is_builtin_preset_file_with_cache(self, name: str, cached_metadata: dict[str, dict[str, object]] | None) -> bool: ...
-    def toggle_preset_pin(self, name: str, *, display_name: str = "") -> bool: ...
-    def set_preset_rating(self, name: str, rating: int, *, display_name: str = "") -> bool: ...
-    def move_preset_by_step(self, name: str, direction: int, *, cached_metadata: dict[str, dict[str, object]] | None = None) -> bool: ...
-    def move_preset_on_drop(
-        self,
-        *,
-        source_kind: str,
-        source_id: str,
-        destination_kind: str,
-        destination_id: str,
-        destination_folder_key: str = "",
-    ) -> bool: ...
 
 
 def schedule_preset_search(*, preset_search_timer, refresh_presets_view_from_cache_fn) -> None:
@@ -391,30 +379,6 @@ class _UserPresetsStorageApiImpl:
 
     def is_builtin_preset_file_with_cache(self, name: str, cached_metadata: dict[str, dict[str, object]] | None) -> bool:
         return self._runtime.is_builtin_preset_file_with_cache(name, cached_metadata)
-
-    def toggle_preset_pin(self, name: str, *, display_name: str = "") -> bool:
-        return self._runtime.toggle_preset_pin(name, display_name=display_name)
-
-    def move_preset_by_step(self, name: str, direction: int, *, cached_metadata: dict[str, dict[str, object]] | None = None) -> bool:
-        return self._runtime.move_preset_by_step(name, direction, cached_metadata=cached_metadata)
-
-    def move_preset_on_drop(
-        self,
-        *,
-        source_kind: str,
-        source_id: str,
-        destination_kind: str,
-        destination_id: str,
-        destination_folder_key: str = "",
-    ) -> bool:
-        return self._runtime.move_preset_on_drop(
-            source_kind=source_kind,
-            source_id=source_id,
-            destination_kind=destination_kind,
-            destination_id=destination_id,
-            destination_folder_key=destination_folder_key,
-        )
-
 
 class UserPresetsPageRuntime:
     def __init__(self, config: UserPresetsPageRuntimeConfig) -> None:
@@ -819,77 +783,6 @@ class UserPresetsPageRuntime:
                 return bool(cached_meta.get("is_builtin", False))
 
         return self.is_builtin_preset_file(candidate)
-
-    def toggle_preset_pin(self, name: str, *, display_name: str = "") -> bool:
-        from presets.folders import toggle_preset_pin
-
-        return bool(toggle_preset_pin(self._config.folder_scope, name, display_name=display_name))
-
-    def set_preset_rating(self, name: str, rating: int, *, display_name: str = "") -> bool:
-        from presets.folders import set_preset_rating
-
-        return bool(set_preset_rating(self._config.folder_scope, name, rating, display_name=display_name))
-
-    def move_preset_by_step(self, name: str, direction: int, *, cached_metadata: dict[str, dict[str, object]] | None = None) -> bool:
-        from folders.defaults import classify_preset_folder
-        from presets.folders import move_preset_by_step
-
-        live_items = []
-        metadata = cached_metadata if isinstance(cached_metadata, dict) else {}
-        for entry in self.list_preset_entries_light():
-            file_name = str(entry.get("file_name") or entry.get("key") or "").strip()
-            if not file_name:
-                continue
-            cached = metadata.get(file_name) if isinstance(metadata.get(file_name), dict) else {}
-            display_name = str(
-                (cached or {}).get("display_name")
-                or entry.get("display_name")
-                or entry.get("name")
-                or file_name
-            ).strip()
-            live_items.append(
-                {
-                    "key": file_name,
-                    "name": display_name or file_name,
-                    "folder_key": classify_preset_folder(display_name or file_name, self._config.folder_scope),
-                }
-            )
-        return bool(move_preset_by_step(self._config.folder_scope, name, direction, live_items=live_items))
-
-    def move_preset_on_drop(
-        self,
-        *,
-        source_kind: str,
-        source_id: str,
-        destination_kind: str,
-        destination_id: str,
-        destination_folder_key: str = "",
-    ) -> bool:
-        if source_kind != "preset":
-            return False
-
-        from presets.folders import move_preset_after, move_preset_before, move_preset_to_end, move_preset_to_folder
-
-        if destination_kind == "folder" and destination_id:
-            return move_preset_to_folder(self._config.folder_scope, source_id, destination_id)
-
-        if destination_kind == "preset" and destination_id:
-            return move_preset_before(
-                self._config.folder_scope,
-                source_id,
-                destination_id,
-                destination_folder_key=destination_folder_key,
-            )
-
-        if destination_kind == "preset_after" and destination_id:
-            return move_preset_after(
-                self._config.folder_scope,
-                source_id,
-                destination_id,
-                destination_folder_key=destination_folder_key,
-            )
-
-        return move_preset_to_end(self._config.folder_scope, source_id)
 
     def build_preset_rows_plan(
         self,

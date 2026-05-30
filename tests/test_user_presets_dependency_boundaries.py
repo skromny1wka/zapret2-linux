@@ -51,6 +51,7 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
         self.assertIn("connect_preset_signals", init_source)
         self.assertIn("create_user_presets_open_folder_worker", init_source)
         self.assertIn("create_preset_folder_action_worker", init_source)
+        self.assertIn("create_preset_storage_action_worker", init_source)
         self.assertIn("load_preset_folder_state", init_source)
         self.assertIn("delete_preset_item_meta", init_source)
         self.assertNotIn("from presets.folders import", page_source)
@@ -75,6 +76,10 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
         self.assertIs(
             kwargs["create_preset_folder_action_worker"],
             presets.create_preset_folder_action_worker,
+        )
+        self.assertIs(
+            kwargs["create_preset_storage_action_worker"],
+            presets.create_preset_storage_action_worker,
         )
         self.assertIs(kwargs["load_preset_folder_state"], presets.load_preset_folder_state)
         self.assertIs(kwargs["delete_preset_item_meta"], presets.delete_preset_item_meta)

@@ -25,6 +25,7 @@ from presets.user_presets_action_workers import UserPresetActivateWorker, UserPr
 from presets.user_presets_page_plans import build_preset_rows_plan
 from ui.presets_menu.model import PresetListModel
 import presets.user_presets_action_workers as user_presets_action_workers
+import presets.ui.common.user_presets_page_runtime as user_presets_page_runtime
 import app.feature_facades.presets as presets_feature_facade
 import presets.ui.control.additional_settings_runtime as control_additional_settings_runtime
 import presets.ui.control.control_page_shared as control_page_shared
@@ -1260,6 +1261,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertTrue(hasattr(user_presets_action_workers, "UserPresetStorageActionWorker"))
         worker_source = inspect.getsource(user_presets_action_workers.UserPresetStorageActionWorker.run)
         request_source = inspect.getsource(UserPresetsPageBase._request_preset_storage_action)
+        create_source = inspect.getsource(UserPresetsPageBase.create_preset_storage_action_worker)
+        runtime_source = inspect.getsource(user_presets_page_runtime.UserPresetsPageRuntime)
 
         for source in (pin_source, rating_source, move_source, drop_source):
             self.assertIn("_request_preset_storage_action", source)
@@ -1278,6 +1281,12 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("cached_presets_metadata", rating_source)
         self.assertIn("_update_cached_preset_rating", finished_source)
         self.assertIn("create_preset_storage_action_worker", request_source)
+        self.assertNotIn("UserPresetStorageActionWorker", create_source)
+        self.assertIn("_create_preset_storage_action_worker_fn", create_source)
+        self.assertNotIn("from presets.folders import toggle_preset_pin", runtime_source)
+        self.assertNotIn("from presets.folders import set_preset_rating", runtime_source)
+        self.assertNotIn("from presets.folders import move_preset_by_step", runtime_source)
+        self.assertNotIn("from presets.folders import move_preset_after", runtime_source)
         self.assertIn("self._toggle_preset_pin", worker_source)
         self.assertIn("self._set_preset_rating", worker_source)
         self.assertIn("self._move_preset_by_step", worker_source)

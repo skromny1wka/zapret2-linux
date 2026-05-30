@@ -269,6 +269,125 @@ class PresetsFeature:
             parent=parent,
         )
 
+    def create_preset_storage_action_worker(
+        self,
+        request_id: int,
+        *,
+        scope_key: str,
+        list_preset_entries,
+        action: str,
+        name: str = "",
+        display_name: str = "",
+        rating: int = 0,
+        direction: int = 0,
+        cached_metadata=None,
+        source_kind: str = "",
+        source_id: str = "",
+        destination_kind: str = "",
+        destination_id: str = "",
+        destination_folder_key: str = "",
+        parent=None,
+    ):
+        from folders.defaults import classify_preset_folder
+        from presets.folders import (
+            load_preset_folder_state,
+            move_preset_after,
+            move_preset_before,
+            move_preset_by_step,
+            move_preset_to_end,
+            move_preset_to_folder,
+            set_preset_rating,
+            toggle_preset_pin,
+        )
+        from presets.user_presets_action_workers import UserPresetStorageActionWorker
+
+        clean_scope = str(scope_key or "")
+
+        def _move_by_step(file_name: str, step: int, *, cached_metadata=None) -> bool:
+            live_items = []
+            metadata = cached_metadata if isinstance(cached_metadata, dict) else {}
+            for entry in tuple(list_preset_entries() or ()):
+                item_file_name = str(entry.get("file_name") or entry.get("key") or "").strip()
+                if not item_file_name:
+                    continue
+                cached = metadata.get(item_file_name) if isinstance(metadata.get(item_file_name), dict) else {}
+                item_display_name = str(
+                    (cached or {}).get("display_name")
+                    or entry.get("display_name")
+                    or entry.get("name")
+                    or item_file_name
+                ).strip()
+                live_items.append(
+                    {
+                        "key": item_file_name,
+                        "name": item_display_name or item_file_name,
+                        "folder_key": classify_preset_folder(item_display_name or item_file_name, clean_scope),
+                    }
+                )
+            return bool(move_preset_by_step(clean_scope, file_name, step, live_items=live_items))
+
+        def _move_on_drop(
+            *,
+            source_kind: str,
+            source_id: str,
+            destination_kind: str,
+            destination_id: str,
+            destination_folder_key: str = "",
+        ) -> bool:
+            if source_kind != "preset":
+                return False
+            if destination_kind == "folder" and destination_id:
+                return bool(move_preset_to_folder(clean_scope, source_id, destination_id))
+            if destination_kind == "preset" and destination_id:
+                return bool(
+                    move_preset_before(
+                        clean_scope,
+                        source_id,
+                        destination_id,
+                        destination_folder_key=destination_folder_key,
+                    )
+                )
+            if destination_kind == "preset_after" and destination_id:
+                return bool(
+                    move_preset_after(
+                        clean_scope,
+                        source_id,
+                        destination_id,
+                        destination_folder_key=destination_folder_key,
+                    )
+                )
+            return bool(move_preset_to_end(clean_scope, source_id))
+
+        return UserPresetStorageActionWorker(
+            request_id,
+            lambda file_name, *, display_name="": toggle_preset_pin(
+                clean_scope,
+                file_name,
+                display_name=display_name,
+            ),
+            lambda file_name, value, *, display_name="": set_preset_rating(
+                clean_scope,
+                file_name,
+                value,
+                display_name=display_name,
+            ),
+            _move_by_step,
+            _move_on_drop,
+            lambda: load_preset_folder_state(clean_scope),
+            action=action,
+            name=name,
+            display_name=display_name,
+            rating=rating,
+            direction=direction,
+            cached_metadata=cached_metadata,
+            source_kind=source_kind,
+            source_id=source_id,
+            destination_kind=destination_kind,
+            destination_id=destination_id,
+            destination_folder_key=destination_folder_key,
+            parent=parent,
+        )
+
     def open_preset_source_file(self, path) -> None:
         return self._commands().open_preset_source_file(path)
 
