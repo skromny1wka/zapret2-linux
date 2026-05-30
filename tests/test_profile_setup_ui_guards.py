@@ -592,6 +592,34 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
             "Записей всего: 3 • ваших: 2 • есть несохранённые изменения",
         )
 
+    def test_list_file_save_uses_cached_text_snapshot(self) -> None:
+        from unittest.mock import Mock
+
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        worker = _SaveWorker()
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._loading = False
+        page._profile_key = "profile-1"
+        page._list_file_text = _PlainTextWidget("user.example\nsecond.example")
+        page._list_file_text_snapshot = "user.example\nsecond.example"
+        page._list_file_save_worker = None
+        page._list_file_save_request_id = 0
+        page._list_file_status_label = _TextWidget("")
+        page._list_file_save_button = _BoolWidget(enabled=False)
+        page.create_profile_list_file_save_worker = Mock(return_value=worker)
+
+        ProfileSetupPageBase._on_list_file_save_clicked(page)
+
+        self.assertEqual(page._list_file_text.plain_text_read_calls, [])
+        page.create_profile_list_file_save_worker.assert_called_once_with(
+            1,
+            "profile-1",
+            "user.example\nsecond.example",
+            parent=page,
+        )
+        self.assertEqual(worker.start_calls, 1)
+
     def test_list_file_validation_label_skips_duplicate_error_render(self) -> None:
         from unittest.mock import Mock
 

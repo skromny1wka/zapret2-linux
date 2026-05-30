@@ -1954,7 +1954,7 @@ class ProfileSetupPageBase(BasePage):
         worker = self.create_profile_list_file_save_worker(
             request_id,
             self._profile_key,
-            self._list_file_text.toPlainText(),
+            str(self.__dict__.get("_list_file_text_snapshot", "") or ""),
             parent=self,
         )
         self._list_file_save_worker = worker
