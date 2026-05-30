@@ -57,8 +57,7 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         self,
         parent=None,
         *,
-        get_selected_source_preset_display,
-        get_enabled_profile_count_snapshot,
+        create_top_summary_worker,
         create_additional_settings_load_worker,
         set_wssize_enabled,
         set_debug_log_enabled,
@@ -88,8 +87,7 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             title_key="page.winws1_control.title",
             subtitle_key="page.winws1_control.subtitle",
         )
-        self._get_selected_source_preset_display = get_selected_source_preset_display
-        self._get_enabled_profile_count_snapshot = get_enabled_profile_count_snapshot
+        self._create_top_summary_worker = create_top_summary_worker
         self._create_additional_settings_load_worker = create_additional_settings_load_worker
         self._set_wssize_enabled = set_wssize_enabled
         self._set_debug_log_enabled = set_debug_log_enabled
@@ -403,11 +401,8 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
                 runtime.top_summary_worker = None
 
         request_id = runtime.next_top_summary_request_id()
-        worker = winws1_page_runtime.create_top_summary_worker(
+        worker = self._create_top_summary_worker(
             request_id,
-            self._get_selected_source_preset_display,
-            self._get_enabled_profile_count_snapshot,
-            launch_method=ZAPRET1_MODE,
             parent=self,
         )
         runtime.top_summary_worker = worker

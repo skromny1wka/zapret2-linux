@@ -54,12 +54,6 @@ TOP_SUMMARY_PROFILE_RETRY_MS = 750
 TOP_SUMMARY_PROFILE_RETRY_LIMIT = 10
 
 
-def create_control_top_summary_worker(*args, **kwargs):
-    from presets.ui.control.additional_settings_runtime import create_top_summary_worker
-
-    return create_top_summary_worker(*args, **kwargs)
-
-
 def _zapret2_page_runtime():
     from presets.ui.control.zapret2 import page_runtime
 
@@ -93,8 +87,7 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         self,
         parent=None,
         *,
-        get_selected_source_preset_display,
-        get_enabled_profile_count_snapshot,
+        create_top_summary_worker,
         create_additional_settings_load_worker,
         set_wssize_enabled,
         set_debug_log_enabled,
@@ -128,8 +121,7 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         )
         _log_startup_winws2_control_metric("__init__.base_page", (_time.perf_counter() - _t_base) * 1000)
 
-        self._get_selected_source_preset_display = get_selected_source_preset_display
-        self._get_enabled_profile_count_snapshot = get_enabled_profile_count_snapshot
+        self._create_top_summary_worker = create_top_summary_worker
         self._create_additional_settings_load_worker = create_additional_settings_load_worker
         self._set_wssize_enabled = set_wssize_enabled
         self._set_debug_log_enabled = set_debug_log_enabled
@@ -249,11 +241,8 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
                 runtime.top_summary_worker = None
 
         request_id = runtime.next_top_summary_request_id()
-        worker = create_control_top_summary_worker(
+        worker = self._create_top_summary_worker(
             request_id,
-            self._get_selected_source_preset_display,
-            self._get_enabled_profile_count_snapshot,
-            launch_method=ZAPRET2_MODE,
             parent=self,
         )
         runtime.top_summary_worker = worker

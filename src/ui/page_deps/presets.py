@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.page_names import PageName
 from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE
 from presets.ui.control.control_page_shared import ControlRuntimeActions
+from presets.ui.control.additional_settings_runtime import create_top_summary_worker
 from presets.ui.common.preset_subpage_base import RawPresetRuntimeActions
 from presets.ui.common.user_presets_page_runtime import UserPresetsRuntimeActions
 from ui.navigation_pages import (
@@ -31,12 +32,23 @@ def build_control_page_kwargs(
     if page_name == PageName.ZAPRET2_MODE_CONTROL:
         user_presets_page = PageName.ZAPRET2_USER_PRESETS
         preset_setup_page = PageName.ZAPRET2_PRESET_SETUP
+        method = ZAPRET2_MODE
     else:
         user_presets_page = PageName.ZAPRET1_USER_PRESETS
         preset_setup_page = PageName.ZAPRET1_PRESET_SETUP
+        method = ZAPRET1_MODE
+
+    def _create_top_summary_worker(request_id: int, *, parent=None):
+        return create_top_summary_worker(
+            request_id,
+            presets_feature.get_selected_source_preset_display,
+            profile_feature.get_enabled_profile_count_snapshot,
+            launch_method=method,
+            parent=parent,
+        )
+
     return {
-        "get_selected_source_preset_display": presets_feature.get_selected_source_preset_display,
-        "get_enabled_profile_count_snapshot": profile_feature.get_enabled_profile_count_snapshot,
+        "create_top_summary_worker": _create_top_summary_worker,
         "create_additional_settings_load_worker": profile_feature.create_additional_settings_load_worker,
         "set_wssize_enabled": profile_feature.set_wssize_enabled,
         "set_debug_log_enabled": profile_feature.set_debug_log_enabled,
