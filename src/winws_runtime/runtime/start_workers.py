@@ -17,6 +17,12 @@ from winws_runtime.runtime.system_ops import force_kill_all_winws_processes
 STARTUP_AUTOSTART_STABLE_WINDOW_SECONDS = 0.35
 
 
+def ensure_required_files_fast() -> bool:
+    from lists.file_manager import ensure_required_files_fast as _ensure_required_files_fast
+
+    return bool(_ensure_required_files_fast())
+
+
 @dataclass(frozen=True)
 class PreparedDpiStartRequest:
     launch_method: str
@@ -294,6 +300,9 @@ class PresetLaunchStartWorker(QObject):
                 skip_stop=skip_stop,
                 process_running=previous_process_running,
             )
+
+            if is_preset_file:
+                ensure_required_files_fast()
 
             self.progress.emit("Запуск DPI...")
 

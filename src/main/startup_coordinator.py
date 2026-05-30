@@ -156,12 +156,6 @@ class StartupCoordinator:
                 None,
             ),
             (
-                TASK_CORE_STARTUP,
-                "core startup",
-                self.runtime.init_core_startup,
-                None,
-            ),
-            (
                 TASK_THEME_MANAGER,
                 "theme manager",
                 self.window_shell.init_theme_manager,
@@ -186,6 +180,14 @@ class StartupCoordinator:
                 TASK_STARTUP_CORE_READY,
                 "startup core",
                 self._finalize_startup_core,
+                None,
+            )
+        )
+        phase_two_steps.append(
+            (
+                TASK_CORE_STARTUP,
+                "core startup",
+                self.runtime.init_core_startup,
                 None,
             )
         )

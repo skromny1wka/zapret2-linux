@@ -103,7 +103,8 @@ class StartupAutostartTests(unittest.TestCase):
         )
         worker._start_presets_with_runner = Mock(return_value=True)
 
-        worker.run()
+        with patch("winws_runtime.runtime.start_workers.ensure_required_files_fast", return_value=True):
+            worker.run()
 
         presets_feature.get_launch_snapshot.assert_called_once_with(
             "zapret2_mode",
@@ -383,9 +384,37 @@ class StartupAutostartTests(unittest.TestCase):
             worker._validate_preset_before_stop = Mock(return_value=True)
             worker._start_presets_with_runner = Mock(return_value=True)
 
-            worker.run()
+            with patch("winws_runtime.runtime.start_workers.ensure_required_files_fast", return_value=True):
+                worker.run()
 
         worker._validate_preset_before_stop.assert_not_called()
+        worker._start_presets_with_runner.assert_called_once_with(str(preset_path), "Пресет")
+
+    def test_startup_worker_checks_required_lists_before_preset_launch(self) -> None:
+        from winws_runtime.runtime.start_workers import PresetLaunchStartWorker
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            preset_path = Path(tmp_dir) / "ready.txt"
+            preset_path.write_text("--new\n--filter-tcp=80\n", encoding="utf-8")
+
+            worker = PresetLaunchStartWorker(
+                {"is_preset_file": True, "preset_path": str(preset_path), "name": "Пресет"},
+                "zapret2_mode",
+                runtime_feature=SimpleNamespace(),
+                runtime_api=SimpleNamespace(has_residual_processes=Mock(return_value=False)),
+                startup_autostart=True,
+            )
+            worker._start_presets_with_runner = Mock(return_value=True)
+            calls: list[str] = []
+
+            with patch(
+                "winws_runtime.runtime.start_workers.ensure_required_files_fast",
+                side_effect=lambda: calls.append("lists") or True,
+                create=True,
+            ):
+                worker.run()
+
+        self.assertEqual(calls, ["lists"])
         worker._start_presets_with_runner.assert_called_once_with(str(preset_path), "Пресет")
 
     def test_startup_worker_uses_short_stable_window_for_autostart(self) -> None:
