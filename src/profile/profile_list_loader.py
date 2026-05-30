@@ -31,6 +31,11 @@ class ProfileListLoadWorker(QThread):
             log(f"ProfileListLoadWorker: не удалось загрузить profile payload: {exc}", "ERROR")
             self.failed.emit(self._request_id, str(exc))
             return
+        if isinstance(payload, ProfileListLoadResult):
+            elapsed_ms = (time.perf_counter() - started_at) * 1000.0
+            log(f"profile_feature.worker.list_profiles.total: {elapsed_ms:.1f}ms", "DEBUG")
+            self.loaded.emit(self._request_id, payload)
+            return
         view_state = None
         if callable(self._build_view_state):
             try:

@@ -108,6 +108,7 @@ import ui.window_appearance_state as window_appearance_state
 import ui.smooth_scroll as smooth_scroll
 import ui.animation_policy as animation_policy
 import main.entry as main_entry
+from app.feature_facades.profile import ProfileFeature
 from app.page_names import PageName
 from ui.widgets.win11_controls import Win11RadioOption
 from ui.page_host import WindowPageHost
@@ -1489,6 +1490,12 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("time.perf_counter", source)
         self.assertIn("profile_feature.worker.list_profiles.total", source)
 
+    def test_profile_list_worker_accepts_warmed_load_result(self) -> None:
+        source = inspect.getsource(ProfileListLoadWorker.run)
+
+        self.assertIn("ProfileListLoadResult", source)
+        self.assertIn("isinstance(payload, ProfileListLoadResult)", source)
+
     def test_profile_list_worker_receives_loader_function(self) -> None:
         init_source = inspect.getsource(ProfileListLoadWorker.__init__)
         run_source = inspect.getsource(ProfileListLoadWorker.run)
@@ -1501,6 +1508,22 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("self._load_profiles()", run_source)
         self.assertNotIn("self._service.list_profiles", run_source)
         self.assertNotIn("self._profile.list_profiles", run_source)
+
+    def test_profile_feature_warms_profile_list_worker_result(self) -> None:
+        source = inspect.getsource(ProfileFeature.warm_profile_list)
+
+        self.assertIn("service.list_profiles", source)
+        self.assertIn("build_profile_list_view_state", source)
+        self.assertIn("ProfileListLoadResult", source)
+        self.assertIn("_profile_list_load_result_cache", source)
+
+    def test_profile_feature_profile_list_worker_uses_warm_cache_first(self) -> None:
+        source = inspect.getsource(ProfileFeature.create_profile_list_load_worker)
+        helper_source = inspect.getsource(ProfileFeature._profile_list_load_result)
+
+        self.assertIn("_profile_list_load_result", source)
+        self.assertIn("service.get_cached_profile_list", helper_source)
+        self.assertLess(source.index("_profile_list_load_result"), source.index("service.list_profiles"))
 
     def test_profile_service_logs_profile_payload_stages(self) -> None:
         source = inspect.getsource(ProfilePresetService._list_profiles_locked)

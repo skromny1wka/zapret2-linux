@@ -13,8 +13,8 @@ from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE, is_preset_launch_method, n
 
 
 DEFAULT_PROFILE_WARMUP_METHODS: tuple[str, ...] = (ZAPRET2_MODE, ZAPRET1_MODE)
-PROFILE_WARMUP_DELAY_MS = 6_500
-PROFILE_SECONDARY_WARMUP_DELAY_MS = 12_000
+PROFILE_WARMUP_DELAY_MS = 0
+PROFILE_SECONDARY_WARMUP_DELAY_MS = 1_800
 
 
 class _ProfileWarmupBridge(QObject):
@@ -46,7 +46,7 @@ def install_profile_warmup(
             return
         started_at = time.perf_counter()
         try:
-            profile_feature.list_profiles(method)
+            profile_feature.warm_profile_list(method)
         except Exception as exc:
             log(f"Фоновый прогрев профилей {method} не выполнен: {exc}", "DEBUG")
             return

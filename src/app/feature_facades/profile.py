@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -9,6 +10,13 @@ class ProfileFeature:
     _presets_feature: Any
     _app_paths: Any
     _preset_service_cache: dict[str, Any] = field(default_factory=dict, init=False, repr=False, compare=False)
+    _profile_list_load_result_cache: dict[str, Any] = field(default_factory=dict, init=False, repr=False, compare=False)
+    _profile_list_load_result_lock: threading.RLock = field(
+        default_factory=threading.RLock,
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
     @staticmethod
     def _commands():
@@ -30,6 +38,37 @@ class ProfileFeature:
 
     def peek_cached_profile_list(self, launch_method: str):
         return self._commands().peek_cached_profile_list(self, launch_method)
+
+    def warm_profile_list(self, launch_method: str):
+        from settings.mode import normalize_launch_method
+        from profile.profile_list_loader import ProfileListLoadResult
+        from profile.ui.profile_list_model import build_profile_list_view_state
+
+        method = normalize_launch_method(launch_method)
+        service = self._commands()._profile_preset_service(self, method)
+        payload = service.list_profiles()
+        result = ProfileListLoadResult(
+            payload=payload,
+            view_state=build_profile_list_view_state(tuple(getattr(payload, "items", ()) or ())),
+        )
+        with self._profile_list_load_result_lock:
+            self._profile_list_load_result_cache[method] = result
+        return result
+
+    def _profile_list_load_result(self, service, launch_method: str):
+        from settings.mode import normalize_launch_method
+
+        method = normalize_launch_method(launch_method)
+        current_payload = service.get_cached_profile_list()
+        if current_payload is None:
+            return None
+        with self._profile_list_load_result_lock:
+            result = self._profile_list_load_result_cache.get(method)
+        if result is None:
+            return None
+        if getattr(result, "payload", None) is not current_payload:
+            return None
+        return result
 
     def list_preset_order_profiles(self, launch_method: str):
         return self._commands().list_preset_order_profiles(self, launch_method)
@@ -668,11 +707,22 @@ class ProfileFeature:
         )
 
     def create_profile_list_load_worker(self, request_id: int, launch_method: str, parent=None):
-        from profile.profile_list_loader import ProfileListLoadWorker
+        from profile.profile_list_loader import ProfileListLoadResult, ProfileListLoadWorker
         from profile.ui.profile_list_model import build_profile_list_view_state
 
         service = self._commands()._profile_preset_service(self, launch_method)
-        return ProfileListLoadWorker(request_id, service.list_profiles, build_profile_list_view_state, parent)
+
+        def _load_profile_list_result():
+            warmed = self._profile_list_load_result(service, launch_method)
+            if warmed is not None:
+                return warmed
+            payload = service.list_profiles()
+            return ProfileListLoadResult(
+                payload=payload,
+                view_state=build_profile_list_view_state(tuple(getattr(payload, "items", ()) or ())),
+            )
+
+        return ProfileListLoadWorker(request_id, _load_profile_list_result, None, parent)
 
     def create_profile_order_load_worker(self, request_id: int, launch_method: str, parent=None):
         from profile.profile_order_loader import ProfileOrderListLoadWorker

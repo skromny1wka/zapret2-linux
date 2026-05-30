@@ -2591,7 +2591,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             startup_state=SimpleNamespace(interactive_logged=False),
             is_alive=Mock(return_value=True),
         )
-        profile_feature = SimpleNamespace(list_profiles=Mock(return_value=object()))
+        profile_feature = SimpleNamespace(warm_profile_list=Mock(return_value=object()))
         metric = Mock()
         delays: list[int] = []
         queued_tasks: list[tuple[str, str]] = []
@@ -2622,19 +2622,19 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             )
             signal.emit("interactive")
 
-        self.assertEqual(delays, [6500, 12000])
+        self.assertEqual(delays, [0, 1800])
         self.assertEqual(
             queued_tasks,
             [("profile", "ProfileWarmup-zapret1_mode"), ("profile", "ProfileWarmup-zapret2_mode")],
         )
         self.assertEqual(ready_methods, ["zapret1_mode", "zapret2_mode"])
         self.assertEqual(
-            [recorded_call.args[0] for recorded_call in profile_feature.list_profiles.call_args_list],
+            [recorded_call.args[0] for recorded_call in profile_feature.warm_profile_list.call_args_list],
             ["zapret1_mode", "zapret2_mode"],
         )
         metric.assert_any_call(
             "StartupProfileWarmupQueued",
-            "6500ms current after interactive; 12000ms secondary after interactive",
+            "0ms current after interactive; 1800ms secondary after interactive",
         )
         metric.assert_any_call("StartupProfileWarmupStarted", "zapret1_mode")
         metric.assert_any_call("StartupProfileWarmupStarted", "zapret2_mode")
