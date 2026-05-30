@@ -119,10 +119,10 @@ class TelegramProxyPage(BasePage):
         self._diag_poll_timer = None
         self._upstream_restart_timer = None
         self._diag_runtime = OneShotWorkerRuntime()
-        self._proxy_start_worker = None
-        self._proxy_stop_worker = None
-        self._restart_stop_worker = None
-        self._relay_check_worker = None
+        self._proxy_start_runtime = OneShotWorkerRuntime()
+        self._proxy_stop_runtime = OneShotWorkerRuntime()
+        self._restart_stop_runtime = OneShotWorkerRuntime()
+        self._relay_check_runtime = OneShotWorkerRuntime()
         self._ensure_hosts_runtime = OneShotWorkerRuntime()
         self._settings_save_runtime = OneShotWorkerRuntime()
         self._open_log_file_runtime = OneShotWorkerRuntime()
@@ -1333,6 +1333,30 @@ class TelegramProxyPage(BasePage):
             warning_prefix="telegram proxy settings save worker",
         )
         self._settings_save_runtime.cancel()
+        self._proxy_start_runtime.stop(
+            blocking=False,
+            log_fn=log,
+            warning_prefix="telegram proxy start worker",
+        )
+        self._proxy_start_runtime.cancel()
+        self._proxy_stop_runtime.stop(
+            blocking=False,
+            log_fn=log,
+            warning_prefix="telegram proxy stop worker",
+        )
+        self._proxy_stop_runtime.cancel()
+        self._restart_stop_runtime.stop(
+            blocking=False,
+            log_fn=log,
+            warning_prefix="telegram proxy restart stop worker",
+        )
+        self._restart_stop_runtime.cancel()
+        self._relay_check_runtime.stop(
+            blocking=False,
+            log_fn=log,
+            warning_prefix="telegram proxy relay check worker",
+        )
+        self._relay_check_runtime.cancel()
         if self._upstream_restart_timer is not None:
             self._upstream_restart_timer.stop()
             self._upstream_restart_timer.deleteLater()
@@ -1340,19 +1364,5 @@ class TelegramProxyPage(BasePage):
         self._log_line_pending.clear()
         self._settings_save_pending.clear()
         self._settings_save_restart_pending = ""
-        proxy_stop_worker = self.__dict__.get("_proxy_stop_worker")
-        if proxy_stop_worker is not None:
-            try:
-                proxy_stop_worker.quit()
-            except Exception:
-                pass
-            self._proxy_stop_worker = None
-        restart_stop_worker = self.__dict__.get("_restart_stop_worker")
-        if restart_stop_worker is not None:
-            try:
-                restart_stop_worker.quit()
-            except Exception:
-                pass
-            self._restart_stop_worker = None
         mgr = self._proxy_manager()
         mgr.cleanup()

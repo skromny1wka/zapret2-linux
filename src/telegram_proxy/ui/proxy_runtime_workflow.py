@@ -8,6 +8,10 @@ from qfluentwidgets import FluentIcon
 import telegram_proxy.ui.page_runtime as telegram_proxy_page_runtime
 
 
+def _page_runtime(page, attr: str):
+    return getattr(page, attr)
+
+
 def handle_toggle_proxy(
     *,
     manager,
@@ -56,12 +60,19 @@ def restart_proxy_if_running(
     set_restarting(True)
     status_label.setText(plan.status_text)
 
-    worker = create_stop_runtime_worker(manager=manager, parent=page)
-    setattr(page, "_restart_stop_worker", worker)
-    worker.stopped.connect(lambda: QMetaObject.invokeMethod(page, "_finish_restart", QtNS.ConnectionType.QueuedConnection))
-    worker.finished.connect(lambda: setattr(page, "_restart_stop_worker", None))
-    worker.finished.connect(worker.deleteLater)
-    worker.start()
+    runtime = _page_runtime(page, "_restart_stop_runtime")
+    if runtime.is_running():
+        return
+    runtime.start_qthread_worker(
+        worker_factory=lambda _request_id: create_stop_runtime_worker(manager=manager, parent=page),
+        on_loaded=lambda _request_id: QMetaObject.invokeMethod(
+            page,
+            "_finish_restart",
+            QtNS.ConnectionType.QueuedConnection,
+        ),
+        signal_includes_request_id=False,
+        loaded_signal_name="stopped",
+    )
 
 
 def start_proxy_runtime(
@@ -94,20 +105,27 @@ def start_proxy_runtime(
     if plan.upstream_log_line:
         append_log_line(plan.upstream_log_line)
 
-    worker = create_start_worker(
-        manager=manager,
-        port=port,
-        mode="socks5",
-        host=host,
-        upstream_config=None,
-        parent=page,
+    runtime = _page_runtime(page, "_proxy_start_runtime")
+    if runtime.is_running():
+        return
+    runtime.start_qthread_worker(
+        worker_factory=lambda _request_id: create_start_worker(
+            manager=manager,
+            port=port,
+            mode="socks5",
+            host=host,
+            upstream_config=None,
+            parent=page,
+        ),
+        on_loaded=lambda _request_id, ok: _finish_proxy_start_worker(page, ok),
+        signal_includes_request_id=False,
+        loaded_signal_name="completed",
     )
-    setattr(page, "_proxy_start_worker", worker)
-    worker.completed.connect(lambda ok: setattr(page, "_start_result", bool(ok)))
-    worker.completed.connect(lambda _ok: QMetaObject.invokeMethod(page, "_finish_start", QtNS.ConnectionType.QueuedConnection))
-    worker.finished.connect(lambda: setattr(page, "_proxy_start_worker", None))
-    worker.finished.connect(worker.deleteLater)
-    worker.start()
+
+
+def _finish_proxy_start_worker(page, ok: bool) -> None:
+    setattr(page, "_start_result", bool(ok))
+    QMetaObject.invokeMethod(page, "_finish_start", QtNS.ConnectionType.QueuedConnection)
 
 
 def finish_proxy_start(
@@ -142,6 +160,10 @@ def start_relay_check(
     log_warning,
     create_relay_check_worker,
 ) -> None:
+    runtime = _page_runtime(page, "_relay_check_runtime")
+    if runtime.is_running():
+        return
+
     start_plan = telegram_proxy_page_runtime.build_relay_start_plan(
         current_generation=current_generation,
         host=manager.host,
@@ -153,24 +175,24 @@ def start_relay_check(
     if manager.is_running:
         status_label.setText(start_plan.status_text)
 
-    worker = create_relay_check_worker(
-        generation=gen,
-        get_zapret_running=get_zapret_running,
-        parent=page,
-    )
-    setattr(page, "_relay_check_worker", worker)
-
     def _apply_worker_result(result_generation: int, diag: dict) -> None:
         if getattr(page, "_relay_check_gen", 0) != int(result_generation):
             return
         set_relay_diag(dict(diag or {}))
         QMetaObject.invokeMethod(page, "_apply_relay_result", QtNS.ConnectionType.QueuedConnection)
 
-    worker.completed.connect(_apply_worker_result)
-    worker.warning.connect(log_warning)
-    worker.finished.connect(lambda: setattr(page, "_relay_check_worker", None))
-    worker.finished.connect(worker.deleteLater)
-    worker.start()
+    def _bind_worker(worker) -> None:
+        worker.completed.connect(_apply_worker_result)
+        worker.warning.connect(log_warning)
+
+    runtime.start_qthread_worker(
+        worker_factory=lambda _request_id: create_relay_check_worker(
+            generation=gen,
+            get_zapret_running=get_zapret_running,
+            parent=page,
+        ),
+        bind_worker=_bind_worker,
+    )
 
 
 def apply_relay_result(
@@ -212,26 +234,24 @@ def apply_relay_result(
 
 
 def stop_proxy_runtime(*, page, manager, create_stop_runtime_worker) -> None:
-    worker = getattr(page, "_proxy_stop_worker", None)
-    if worker is not None:
-        try:
-            if worker.isRunning():
-                return
-        except RuntimeError:
-            setattr(page, "_proxy_stop_worker", None)
+    runtime = _page_runtime(page, "_proxy_stop_runtime")
+    if runtime.is_running():
+        return
 
-    worker = create_stop_runtime_worker(
-        manager=manager,
-        emit_status=True,
-        parent=page,
+    runtime.start_qthread_worker(
+        worker_factory=lambda _request_id: create_stop_runtime_worker(
+            manager=manager,
+            emit_status=True,
+            parent=page,
+        ),
+        on_loaded=lambda _request_id: QMetaObject.invokeMethod(
+            page,
+            "_finish_stop_proxy",
+            QtNS.ConnectionType.QueuedConnection,
+        ),
+        signal_includes_request_id=False,
+        loaded_signal_name="stopped",
     )
-    setattr(page, "_proxy_stop_worker", worker)
-    worker.stopped.connect(
-        lambda: QMetaObject.invokeMethod(page, "_finish_stop_proxy", QtNS.ConnectionType.QueuedConnection)
-    )
-    worker.finished.connect(lambda w=worker: setattr(page, "_proxy_stop_worker", None))
-    worker.finished.connect(worker.deleteLater)
-    worker.start()
 
 
 def apply_status_changed(
