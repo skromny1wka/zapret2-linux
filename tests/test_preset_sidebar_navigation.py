@@ -814,6 +814,52 @@ class PresetSidebarNavigationTests(unittest.TestCase):
         self.assertFalse(any(session.nav_items[page_name].visible for page_name in old_pages))
         self.assertTrue(all(session.nav_items[page_name].visible for page_name in new_pages))
 
+    def test_add_nav_item_reuses_loaded_eager_page_without_second_ensure(self) -> None:
+        from app.page_names import PageName
+        from settings.mode import ZAPRET2_MODE
+        import ui.navigation.sidebar_builder as sidebar_builder
+
+        class FakePage:
+            def __init__(self) -> None:
+                self.name = ""
+
+            def objectName(self) -> str:
+                return self.name
+
+            def setObjectName(self, name: str) -> None:
+                self.name = name
+
+        class FakeNavigationInterface:
+            def __init__(self) -> None:
+                self.added_pages = []
+
+            def addItem(self, **_kwargs):
+                raise AssertionError("eager page should use addSubInterface")
+
+        loaded_page = FakePage()
+        session = SimpleNamespace(
+            nav_items={},
+            nav_icons={},
+            nav_labels={},
+            nav_scroll_position=None,
+            default_nav_icon=None,
+            ui_language="ru",
+            pages={PageName.ZAPRET2_MODE_CONTROL: loaded_page},
+        )
+        window = SimpleNamespace(
+            ui_session=session,
+            navigationInterface=FakeNavigationInterface(),
+            get_launch_method=lambda: ZAPRET2_MODE,
+            addSubInterface=Mock(return_value=object()),
+        )
+
+        with patch.object(sidebar_builder, "_ensure_page", side_effect=AssertionError("page is already loaded")):
+            sidebar_builder.add_nav_item(window, PageName.ZAPRET2_MODE_CONTROL, None)
+
+        window.addSubInterface.assert_called_once()
+        self.assertIs(window.addSubInterface.call_args.args[0], loaded_page)
+        self.assertIn(PageName.ZAPRET2_MODE_CONTROL, session.nav_items)
+
     def test_sidebar_search_is_delayed_until_interactive_ready(self) -> None:
         import ui.navigation.sidebar_builder as sidebar_builder
 

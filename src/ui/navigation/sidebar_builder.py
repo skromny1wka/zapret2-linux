@@ -42,6 +42,13 @@ def _ensure_page(window, page_name: PageName):
     return page_host.ensure_page(page_name)
 
 
+def _get_loaded_or_ensure_page(window, page_name: PageName):
+    page = _get_loaded_pages(window).get(page_name)
+    if page is not None:
+        return page
+    return _ensure_page(window, page_name)
+
+
 def _get_loaded_pages(window) -> dict[PageName, QWidget]:
     session = get_window_ui_session(window)
     return {} if session is None else session.pages
@@ -207,7 +214,7 @@ def add_nav_item(
 
     if insert_index is not None:
         if page_name in eager_pages:
-            page = _ensure_page(window, page_name)
+            page = _get_loaded_or_ensure_page(window, page_name)
             if page is None:
                 log(f"[NAV] insert eager {page_name.name}: page is None - skip", "DEBUG")
                 return
@@ -227,7 +234,7 @@ def add_nav_item(
         )
         log(f"[NAV] insertItem {page_name.name} item={item}", "DEBUG")
     elif page_name in eager_pages:
-        page = _ensure_page(window, page_name)
+        page = _get_loaded_or_ensure_page(window, page_name)
         if page is None:
             log(f"[NAV] _add eager {page_name.name}: page is None - skip", "DEBUG")
             return
