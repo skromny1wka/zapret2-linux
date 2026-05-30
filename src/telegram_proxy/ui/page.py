@@ -124,13 +124,12 @@ class TelegramProxyPage(BasePage):
         self._restart_stop_worker = None
         self._relay_check_worker = None
         self._ensure_hosts_runtime = OneShotWorkerRuntime()
-        self._settings_save_worker = None
+        self._settings_save_runtime = OneShotWorkerRuntime()
         self._open_log_file_runtime = OneShotWorkerRuntime()
         self._external_link_runtime = OneShotWorkerRuntime()
         self._log_line_runtime = OneShotWorkerRuntime()
         self._log_line_pending: list[str] = []
         self._auto_deeplink_runtime = OneShotWorkerRuntime()
-        self._settings_save_request_id = 0
         self._settings_save_pending: list[dict[str, object]] = []
         self._settings_save_restart_pending = ""
         self._initial_state_runtime = OneShotWorkerRuntime()
@@ -839,38 +838,36 @@ class TelegramProxyPage(BasePage):
                 "update_manual": bool(update_manual),
             },
         }
-        worker = self.__dict__.get("_settings_save_worker")
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    self._settings_save_pending.append(payload)
-                    return
-            except Exception:
-                self._settings_save_pending.append(payload)
-                return
+        if self._settings_save_runtime.is_running():
+            self._settings_save_pending.append(payload)
+            return
         self._start_settings_save_worker(payload)
 
     def _start_settings_save_worker(self, payload: dict) -> None:
-        self._settings_save_request_id = int(getattr(self, "_settings_save_request_id", 0) or 0) + 1
-        request_id = self._settings_save_request_id
-        worker = self.create_settings_save_worker(
-            request_id,
-            action=str(payload.get("action") or ""),
-            host=str(payload.get("host") or ""),
-            port=int(payload.get("port") or 0),
-            user=str(payload.get("user") or ""),
-            password=str(payload.get("password") or ""),
-            enabled=bool(payload.get("enabled")),
-            context_extra=dict(payload.get("context_extra") or {}),
+        def bind_worker(worker) -> None:
+            worker.completed.connect(self._on_settings_save_finished)
+            worker.failed.connect(self._on_settings_save_failed)
+
+        self._settings_save_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: self.create_settings_save_worker(
+                request_id,
+                action=str(payload.get("action") or ""),
+                host=str(payload.get("host") or ""),
+                port=int(payload.get("port") or 0),
+                user=str(payload.get("user") or ""),
+                password=str(payload.get("password") or ""),
+                enabled=bool(payload.get("enabled")),
+                context_extra=dict(payload.get("context_extra") or {}),
+            ),
+            bind_worker=bind_worker,
+            on_finished=self._on_settings_save_worker_finished,
         )
-        self._settings_save_worker = worker
-        worker.completed.connect(self._on_settings_save_finished)
-        worker.failed.connect(self._on_settings_save_failed)
-        worker.finished.connect(lambda w=worker: self._on_settings_save_worker_finished(w))
-        worker.start()
 
     def _on_settings_save_finished(self, request_id: int, _action: str, _result, context) -> None:
-        if request_id != int(getattr(self, "_settings_save_request_id", 0) or 0):
+        if not self._settings_save_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
             return
         context = dict(context or {})
         restart = str(context.get("restart") or "")
@@ -890,15 +887,15 @@ class TelegramProxyPage(BasePage):
             self._restart_if_running()
 
     def _on_settings_save_failed(self, request_id: int, action: str, error: str, _context) -> None:
-        if request_id != int(getattr(self, "_settings_save_request_id", 0) or 0):
+        if not self._settings_save_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
             return
         self._settings_save_restart_pending = ""
         log(f"{self.__class__.__name__}: не удалось сохранить настройку Telegram Proxy ({action}): {error}", "WARNING")
 
-    def _on_settings_save_worker_finished(self, worker) -> None:
-        if self.__dict__.get("_settings_save_worker") is worker:
-            self._settings_save_worker = None
-        worker.deleteLater()
+    def _on_settings_save_worker_finished(self, _worker) -> None:
         if self._settings_save_pending and not self._cleanup_in_progress:
             pending = self._settings_save_pending.pop(0)
             self._start_settings_save_worker(dict(pending or {}))
@@ -1330,6 +1327,12 @@ class TelegramProxyPage(BasePage):
             warning_prefix="telegram proxy external link worker",
         )
         self._external_link_runtime.cancel()
+        self._settings_save_runtime.stop(
+            blocking=False,
+            log_fn=log,
+            warning_prefix="telegram proxy settings save worker",
+        )
+        self._settings_save_runtime.cancel()
         if self._upstream_restart_timer is not None:
             self._upstream_restart_timer.stop()
             self._upstream_restart_timer.deleteLater()
@@ -1337,13 +1340,6 @@ class TelegramProxyPage(BasePage):
         self._log_line_pending.clear()
         self._settings_save_pending.clear()
         self._settings_save_restart_pending = ""
-        settings_worker = self.__dict__.get("_settings_save_worker")
-        if settings_worker is not None:
-            try:
-                settings_worker.quit()
-            except Exception:
-                pass
-            self._settings_save_worker = None
         proxy_stop_worker = self.__dict__.get("_proxy_stop_worker")
         if proxy_stop_worker is not None:
             try:
