@@ -4199,6 +4199,27 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         page.reload_current_profile.assert_not_called()
 
+    def test_loaded_same_profile_payload_skips_full_repaint(self) -> None:
+        payload = SimpleNamespace(
+            item=SimpleNamespace(enabled=True),
+            match_summary="TCP 443",
+        )
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._setup_load_request_id = 7
+        page._payload = payload
+        page._summary = _TextWidget("Загрузка profile...")
+        page._enabled_checkbox = _EnabledWidget(False)
+        page._enabled_checkbox.isChecked = Mock(return_value=True)
+        page._enabled_checkbox.setChecked = Mock()
+        page._apply_payload = Mock(side_effect=AssertionError("same payload must not repaint profile page"))
+
+        ProfileSetupPageBase._on_profile_setup_payload_loaded(page, 7, payload)
+
+        page._apply_payload.assert_not_called()
+        self.assertEqual(page._summary.text(), "TCP 443")
+        self.assertEqual(page._enabled_checkbox.enabled_calls, [True])
+        page._enabled_checkbox.setChecked.assert_not_called()
+
     def test_strategy_feedback_worker_emits_state(self) -> None:
         state = ProfileStrategyState(rating="work", favorite=True)
         save_feedback = Mock(return_value=state)

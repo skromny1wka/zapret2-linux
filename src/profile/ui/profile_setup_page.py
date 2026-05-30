@@ -1707,6 +1707,9 @@ class ProfileSetupPageBase(BasePage):
             )
             set_widget_enabled_if_changed(self._enabled_checkbox, False)
             return
+        if payload == self.__dict__.get("_payload"):
+            self._restore_loaded_payload_header(payload)
+            return
         self._payload = payload
         self._apply_payload(payload)
 
@@ -1724,6 +1727,13 @@ class ProfileSetupPageBase(BasePage):
         if self._setup_load_worker is worker:
             self._setup_load_worker = None
         worker.deleteLater()
+
+    def _restore_loaded_payload_header(self, payload) -> None:
+        item = getattr(payload, "item", None)
+        set_widget_text_if_changed(self._summary, getattr(payload, "match_summary", "") or "")
+        if item is not None:
+            set_widget_checked_if_changed(self._enabled_checkbox, bool(getattr(item, "enabled", False)))
+            set_widget_enabled_if_changed(self._enabled_checkbox, True)
 
     def _apply_payload(self, payload) -> None:
         self._loading = True
