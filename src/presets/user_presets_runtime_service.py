@@ -92,7 +92,7 @@ class UserPresetsRowsPlanWorker(QThread):
         *,
         all_presets: dict[str, dict[str, object]],
         query: str,
-        active_file_name: str,
+        selected_source_file_name: Callable[[], str],
         language: str,
         folder_state: dict[str, Any] | None = None,
         started_at: float | None = None,
@@ -103,17 +103,18 @@ class UserPresetsRowsPlanWorker(QThread):
         self._build_rows_plan = build_rows_plan
         self._all_presets = dict(all_presets or {})
         self._query = str(query or "")
-        self._active_file_name = str(active_file_name or "")
+        self._selected_source_file_name = selected_source_file_name
         self._language = str(language or "")
         self._folder_state = dict(folder_state or {})
         self._started_at = started_at
 
     def run(self) -> None:
         try:
+            active_file_name = str(self._selected_source_file_name() or "").strip()
             plan = self._build_rows_plan(
                 all_presets=self._all_presets,
                 query=self._query,
-                active_file_name=self._active_file_name,
+                active_file_name=active_file_name,
                 language=self._language,
                 folder_state=self._folder_state,
             )
@@ -761,7 +762,7 @@ class UserPresetsRuntimeService:
             build_rows_plan,
             all_presets=all_presets,
             query=self.current_search_query(page),
-            active_file_name=adapter.selected_source_file_name(),
+            selected_source_file_name=adapter.selected_source_file_name,
             language=str(getattr(page, "_ui_language", "") or ""),
             folder_state=folder_state,
             started_at=started_at,

@@ -29,6 +29,18 @@ class UserPresetsRowsWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("adapter.apply_rows_plan", apply_source)
         self.assertNotIn("build_preset_rows_plan", apply_source)
 
+    def test_rows_plan_worker_resolves_active_preset_inside_worker(self) -> None:
+        import presets.user_presets_runtime_service as runtime_service
+
+        worker_init_source = inspect.getsource(runtime_service.UserPresetsRowsPlanWorker.__init__)
+        worker_run_source = inspect.getsource(runtime_service.UserPresetsRowsPlanWorker.run)
+        request_source = inspect.getsource(runtime_service.UserPresetsRuntimeService._request_rows_plan_refresh)
+
+        self.assertIn("selected_source_file_name", worker_init_source)
+        self.assertIn("self._selected_source_file_name()", worker_run_source)
+        self.assertIn("selected_source_file_name=adapter.selected_source_file_name", request_source)
+        self.assertNotIn("active_file_name=adapter.selected_source_file_name()", request_source)
+
 
 if __name__ == "__main__":
     unittest.main()
