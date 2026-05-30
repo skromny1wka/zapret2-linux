@@ -636,10 +636,7 @@ class UserPresetsRuntimeService:
             current_paths = set(watcher.files() or [])
 
             remove_paths = sorted(current_paths - desired_paths)
-            add_paths = sorted(
-                path for path in (desired_paths - current_paths)
-                if Path(path).exists()
-            )
+            add_paths = sorted(desired_paths - current_paths)
 
             if remove_paths:
                 watcher.removePaths(remove_paths)

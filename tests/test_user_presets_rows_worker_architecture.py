@@ -49,6 +49,13 @@ class UserPresetsRowsWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("active_preset_file_name", source)
         self.assertNotIn("adapter.selected_source_file_name()", source)
 
+    def test_watcher_sync_does_not_stat_every_preset_file_on_gui_thread(self) -> None:
+        import presets.user_presets_runtime_service as runtime_service
+
+        source = inspect.getsource(runtime_service.UserPresetsRuntimeService.sync_watched_preset_files)
+
+        self.assertNotIn("Path(path).exists()", source)
+
 
 if __name__ == "__main__":
     unittest.main()
