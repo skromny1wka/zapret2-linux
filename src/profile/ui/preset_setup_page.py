@@ -26,6 +26,18 @@ def preset_setup_title_for_payload(payload, default_title: str = "Настрой
     return f"{default_title}: {preset_name}"
 
 
+def profile_payload_apply_signature(payload, *, view_state=None, search_query: str = "") -> tuple[object, ...]:
+    return (
+        tuple(getattr(payload, "items", ()) or ()),
+        str(getattr(payload, "selected_preset_file_name", "") or ""),
+        str(getattr(payload, "selected_preset_name", "") or ""),
+        int(getattr(payload, "normalized_split_profiles", 0) or 0),
+        int(getattr(payload, "normalized_created_profiles", 0) or 0),
+        view_state,
+        str(search_query or ""),
+    )
+
+
 def set_widget_text_if_changed(widget, text: str) -> bool:
     value = str(text or "")
     try:
@@ -264,6 +276,18 @@ class PresetSetupPageBase(BasePage):
         if self._content_host_layout is None:
             return
         total_started_at = time.perf_counter()
+        apply_signature = profile_payload_apply_signature(
+            payload,
+            view_state=view_state,
+            search_query=self.__dict__.get("_profile_search_query", ""),
+        )
+        if (
+            self.__dict__.get("_profiles_list") is not None
+            and self.__dict__.get("_last_profile_payload_apply_signature") == apply_signature
+        ):
+            self._log_ui_timing("profile_ui.apply_payload.duplicate", total_started_at)
+            return
+        self._last_profile_payload_apply_signature = apply_signature
         self._apply_selected_preset_title(payload)
         self._show_profile_normalization_info(payload)
         if not payload.items:

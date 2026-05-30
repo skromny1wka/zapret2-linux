@@ -466,6 +466,111 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertIn("profiles_list.update_profiles", apply_source)
         self.assertIn("return", apply_source.split("profiles_list.update_profiles", 1)[1])
 
+    def test_preset_setup_skips_duplicate_loaded_payload_for_existing_list(self) -> None:
+        item = ProfileListItem(
+            key="profile:1",
+            persistent_key="profile:1",
+            profile_index=0,
+            display_name="YouTube",
+            enabled=True,
+            in_preset=True,
+            strategy_id="strategy",
+            strategy_name="Strategy",
+            match_lines=(),
+            list_type="",
+            rating="",
+            favorite=False,
+            group="common",
+            group_name="Common",
+            order=0,
+        )
+        payload = SimpleNamespace(
+            items=(item,),
+            selected_preset_name="",
+            selected_preset_file_name="custom.txt",
+            normalized_split_profiles=0,
+            normalized_created_profiles=0,
+        )
+        profiles_list = SimpleNamespace(
+            update_profiles=Mock(),
+            set_search_query=Mock(),
+            apply_view_state=Mock(),
+        )
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._content_host_layout = object()
+        page._profiles_list = profiles_list
+        page._profile_search_query = ""
+        page.title_label = _TextWidget("Настройка пресета: custom.txt")
+        page.title_key = "page.winws2_pages.title"
+        page.page_title = "Настройка пресета"
+        page._ui_language = "ru"
+        page._show_profile_normalization_info = Mock()
+        page._show_empty_state = Mock()
+        page._log_ui_timing = Mock()
+
+        PresetSetupPageBase._apply_payload(page, payload)
+        profiles_list.update_profiles.reset_mock()
+        profiles_list.set_search_query.reset_mock()
+        page._show_profile_normalization_info.reset_mock()
+
+        PresetSetupPageBase._apply_payload(page, payload)
+
+        profiles_list.update_profiles.assert_not_called()
+        profiles_list.set_search_query.assert_not_called()
+        page._show_profile_normalization_info.assert_not_called()
+
+    def test_preset_setup_skips_duplicate_loaded_view_state_for_existing_list(self) -> None:
+        item = ProfileListItem(
+            key="profile:1",
+            persistent_key="profile:1",
+            profile_index=0,
+            display_name="YouTube",
+            enabled=True,
+            in_preset=True,
+            strategy_id="strategy",
+            strategy_name="Strategy",
+            match_lines=(),
+            list_type="",
+            rating="",
+            favorite=False,
+            group="common",
+            group_name="Common",
+            order=0,
+        )
+        payload = SimpleNamespace(
+            items=(item,),
+            selected_preset_name="",
+            selected_preset_file_name="custom.txt",
+            normalized_split_profiles=0,
+            normalized_created_profiles=0,
+        )
+        view_state = SimpleNamespace(rows=[{"kind": "profile", "key": "profile:1"}])
+        profiles_list = SimpleNamespace(
+            update_profiles=Mock(),
+            set_search_query=Mock(),
+            apply_view_state=Mock(),
+        )
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._content_host_layout = object()
+        page._profiles_list = profiles_list
+        page._profile_search_query = ""
+        page.title_label = _TextWidget("Настройка пресета: custom.txt")
+        page.title_key = "page.winws2_pages.title"
+        page.page_title = "Настройка пресета"
+        page._ui_language = "ru"
+        page._show_profile_normalization_info = Mock()
+        page._show_empty_state = Mock()
+        page._log_ui_timing = Mock()
+
+        PresetSetupPageBase._apply_payload(page, payload, view_state=view_state)
+        profiles_list.apply_view_state.reset_mock()
+        page._show_profile_normalization_info.reset_mock()
+
+        PresetSetupPageBase._apply_payload(page, payload, view_state=view_state)
+
+        profiles_list.apply_view_state.assert_not_called()
+        page._show_profile_normalization_info.assert_not_called()
+
     def test_profile_list_does_not_own_page_background_color(self) -> None:
         list_source = inspect.getsource(ProfilesList._build_ui)
 
