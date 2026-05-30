@@ -166,8 +166,7 @@ def get_launch_snapshot(
 
 
 def get_selected_source_path(launch_method: str, *, preset_services) -> Path:
-    snapshot = get_launch_snapshot(launch_method, preset_services=preset_services, require_filters=False)
-    return Path(snapshot.preset_path)
+    return preset_services.preset_mode_coordinator.get_selected_source_path(launch_method)
 
 
 def get_user_presets_dir(launch_method: str, *, preset_services) -> Path:

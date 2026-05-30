@@ -149,6 +149,38 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
         self._app.processEvents()
         self.assertEqual(ui_state.active_revision, 1)
 
+    def test_preset_switch_defers_active_file_watcher_setup_after_click_event(self) -> None:
+        from core.runtime.preset_runtime_coordinator import PresetRuntimeCoordinator
+        from settings.mode import ZAPRET2_MODE
+
+        watcher_calls: list[str] = []
+        coordinator = PresetRuntimeCoordinator(
+            presets_feature=SimpleNamespace(),
+            ui_state_store=None,
+            get_launch_method=lambda: ZAPRET2_MODE,
+            get_active_preset_path=lambda: "C:/Zapret/Dev/presets/winws2/Default v5.txt",
+            refresh_after_switch=lambda: None,
+            request_selected_source_preset_apply=lambda *_args: True,
+            request_preset_content_apply=lambda *_args: True,
+        )
+        coordinator.setup_active_preset_file_watcher = lambda: watcher_calls.append("watcher")
+
+        coordinator.handle_preset_switched(ZAPRET2_MODE, "Default v5.txt")
+
+        self.assertEqual(watcher_calls, [])
+        self._app.processEvents()
+        self.assertEqual(watcher_calls, ["watcher"])
+
+    def test_get_selected_source_path_does_not_build_launch_snapshot(self) -> None:
+        import inspect
+
+        from presets import commands as preset_commands
+
+        source = inspect.getsource(preset_commands.get_selected_source_path)
+
+        self.assertNotIn("get_launch_snapshot", source)
+        self.assertIn("preset_mode_coordinator.get_selected_source_path", source)
+
     def test_preset_switch_apply_runs_next_event_loop_turn_without_visible_debounce(self) -> None:
         from core.runtime.preset_runtime_coordinator import PresetRuntimeCoordinator
         from settings.mode import ZAPRET2_MODE

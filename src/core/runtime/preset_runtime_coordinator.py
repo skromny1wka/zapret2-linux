@@ -106,7 +106,7 @@ class PresetRuntimeCoordinator(QObject):
             )
             return
         log(f"Пресет переключен: {selected_file_name}", "INFO")
-        self.setup_active_preset_file_watcher()
+        self._schedule_active_preset_file_watcher_setup()
         self._schedule_selected_source_preset_apply(
             launch_method=method,
             reason="preset_switched",
@@ -130,7 +130,7 @@ class PresetRuntimeCoordinator(QObject):
         selected_file_name = str(preset_file_name or "").strip()
         if selected_file_name:
             self._last_active_preset_key = (method, selected_file_name.lower())
-        self.setup_active_preset_file_watcher()
+        self._schedule_active_preset_file_watcher_setup()
         try:
             store = self._ui_state_store
             if store is not None:
@@ -260,6 +260,13 @@ class PresetRuntimeCoordinator(QObject):
                 store.bump_active_preset_revision()
         except Exception:
             pass
+
+    def _schedule_active_preset_file_watcher_setup(self) -> None:
+        """Перевешивает watcher после текущего GUI-события, не внутри клика."""
+        try:
+            QTimer.singleShot(0, self.setup_active_preset_file_watcher)
+        except Exception:
+            self.setup_active_preset_file_watcher()
 
     def _is_selected_source_preset(self, launch_method: str, preset_file_name: str) -> bool:
         try:
