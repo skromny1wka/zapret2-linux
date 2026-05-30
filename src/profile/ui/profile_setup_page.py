@@ -323,7 +323,7 @@ class CompactDisplayComboBox(ComboBox):
         data = str(self.itemData(index))
         compact = self._compact_text_by_data.get(data)
         if compact:
-            self.setText(compact)
+            set_widget_text_if_changed(self, compact)
 
 
 class ProfileStrategyListWidget(QWidget):
