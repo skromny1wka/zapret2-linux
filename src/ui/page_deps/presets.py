@@ -131,7 +131,7 @@ def build_user_presets_page_kwargs(
             preset_name,
             allow_internal=True,
         ),
-        "external_actions_feature": external_actions_feature,
+        "open_url": external_actions_feature.open_url,
         "ui_state_store": ui_state_store,
     }
 

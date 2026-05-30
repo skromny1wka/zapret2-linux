@@ -124,7 +124,7 @@ class UserPresetsPageBase(BasePage):
         *,
         presets_feature,
         open_preset_raw_editor,
-        external_actions_feature,
+        open_url,
         ui_state_store,
     ):
         self._config = self.page_config
@@ -135,7 +135,7 @@ class UserPresetsPageBase(BasePage):
             title_key=self._config.title_key,
         )
         self._presets_feature = presets_feature
-        self._external_actions = external_actions_feature
+        self._open_url = open_url
         self._open_preset_raw_editor_callback = open_preset_raw_editor
         self._page_api = self._build_page_runtime().build_page_api()
         self._runtime_service = self._build_runtime_service()
@@ -209,7 +209,7 @@ class UserPresetsPageBase(BasePage):
                 activate_error_level=self._config.activate_error_level,
                 activate_error_mode=self._config.activate_error_mode,
                 get_presets_feature=self._resolve_presets_feature,
-                open_url=self._external_actions.open_url,
+                open_url=self._open_url,
             )
         )
 
