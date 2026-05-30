@@ -176,6 +176,7 @@ class UserPresetsPageBase(BasePage):
         self._preset_activate_worker = None
         self._preset_activate_request_id = 0
         self._pending_preset_activation: tuple[str, str] | None = None
+        self._restore_preset_activation_marker_file_name = ""
         self._preset_item_action_worker = None
         self._preset_item_action_request_id = 0
         self._preset_bulk_action_worker = None
@@ -1325,9 +1326,20 @@ class UserPresetsPageBase(BasePage):
         if current_file_name and current_file_name.lower() == preset_file_name.lower():
             return True
         display_name = self._resolve_display_name(preset_file_name) or preset_file_name
+        if not self._preset_activation_worker_running():
+            self._restore_preset_activation_marker_file_name = current_file_name
         self._runtime_service.apply_active_preset_marker_for_file(preset_file_name)
         self._request_preset_activation(preset_file_name, display_name)
         return True
+
+    def _preset_activation_worker_running(self) -> bool:
+        worker = self.__dict__.get("_preset_activate_worker")
+        if worker is None:
+            return False
+        try:
+            return bool(worker.isRunning())
+        except Exception:
+            return False
 
     def create_preset_activate_worker(self, request_id: int, *, file_name: str, display_name: str):
         return self._create_preset_activate_worker_fn(
@@ -1366,6 +1378,8 @@ class UserPresetsPageBase(BasePage):
         if request_id != int(getattr(self, "_preset_activate_request_id", 0) or 0):
             return
         if self.__dict__.get("_pending_preset_activation"):
+            if bool(getattr(result, "ok", False)) and getattr(result, "activated_file_name", None):
+                self._restore_preset_activation_marker_file_name = str(result.activated_file_name)
             return
         log(str(getattr(result, "log_message", "") or ""), str(getattr(result, "log_level", "") or "INFO"))
         if bool(getattr(result, "ok", False)) and getattr(result, "activated_file_name", None):
@@ -1377,7 +1391,7 @@ class UserPresetsPageBase(BasePage):
                 content=str(getattr(result, "infobar_content", "") or ""),
                 parent=self.window(),
             )
-        self._runtime_service.apply_active_preset_marker()
+        self._restore_preset_activation_marker()
 
     def _on_preset_activation_failed(self, request_id: int, error: str) -> None:
         if request_id != int(getattr(self, "_preset_activate_request_id", 0) or 0):
@@ -1390,7 +1404,14 @@ class UserPresetsPageBase(BasePage):
             content=str(error),
             parent=self.window(),
         )
-        self._runtime_service.apply_active_preset_marker()
+        self._restore_preset_activation_marker()
+
+    def _restore_preset_activation_marker(self) -> None:
+        restore_file_name = str(self.__dict__.get("_restore_preset_activation_marker_file_name") or "").strip()
+        if restore_file_name:
+            self._runtime_service.apply_active_preset_marker_for_file(restore_file_name)
+            return
+        self._runtime_service.apply_active_preset_marker_for_file("")
 
     def _on_preset_activate_worker_finished(self, worker) -> None:
         if self.__dict__.get("_preset_activate_worker") is worker:
@@ -1710,6 +1731,7 @@ class UserPresetsPageBase(BasePage):
 
     def _stop_action_workers_for_cleanup(self) -> None:
         self._pending_preset_activation = None
+        self._restore_preset_activation_marker_file_name = ""
         self._preset_folder_action_pending.clear()
         self._preset_open_folder_pending = False
         self._preset_link_action_pending = ""

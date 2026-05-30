@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
@@ -22,6 +23,53 @@ class UserPresetActivationGuardTests(unittest.TestCase):
         page._runtime_service.apply_active_preset_marker_for_file.assert_not_called()
         page._resolve_display_name.assert_not_called()
         page._request_preset_activation.assert_not_called()
+
+    def test_activation_failure_restores_previous_marker_without_settings_read(self) -> None:
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_activate_request_id = 7
+        page._pending_preset_activation = None
+        page._restore_preset_activation_marker_file_name = "Before.txt"
+        page._runtime_service = Mock()
+        page._runtime_service.apply_active_preset_marker = Mock(
+            side_effect=AssertionError("failure restore must not read selected preset in GUI")
+        )
+        page._runtime_service.apply_active_preset_marker_for_file = Mock()
+        page._tr = Mock(side_effect=lambda _key, default, **_kwargs: default)
+        page.window = Mock(return_value=None)
+
+        with patch("presets.ui.common.user_presets_page.InfoBar.error"):
+            UserPresetsPageBase._on_preset_activation_failed(page, 7, "bad")
+
+        page._runtime_service.apply_active_preset_marker.assert_not_called()
+        page._runtime_service.apply_active_preset_marker_for_file.assert_called_once_with("Before.txt")
+
+    def test_activation_error_restores_previous_marker_without_settings_read(self) -> None:
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_activate_request_id = 8
+        page._pending_preset_activation = None
+        page._restore_preset_activation_marker_file_name = "Before.txt"
+        page._runtime_service = Mock()
+        page._runtime_service.apply_active_preset_marker = Mock(
+            side_effect=AssertionError("error restore must not read selected preset in GUI")
+        )
+        page._runtime_service.apply_active_preset_marker_for_file = Mock()
+        page._tr = Mock(side_effect=lambda _key, default, **_kwargs: default)
+        page.window = Mock(return_value=None)
+        result = SimpleNamespace(
+            ok=False,
+            log_message="Ошибка активации",
+            log_level="ERROR",
+            infobar_level="error",
+            infobar_title="Ошибка",
+            infobar_content="Не удалось",
+            activated_file_name=None,
+        )
+
+        with patch("presets.ui.common.user_presets_page.InfoBar.error"):
+            UserPresetsPageBase._on_preset_activation_finished(page, 8, result)
+
+        page._runtime_service.apply_active_preset_marker.assert_not_called()
+        page._runtime_service.apply_active_preset_marker_for_file.assert_called_once_with("Before.txt")
 
     def test_clicking_active_raw_preset_without_changes_does_not_start_activation_worker(self) -> None:
         page = PresetRawEditorPage.__new__(PresetRawEditorPage)
