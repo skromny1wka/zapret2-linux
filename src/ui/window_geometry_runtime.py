@@ -61,6 +61,7 @@ class WindowGeometryRuntime:
         default_width: int,
         default_height: int,
         close_state,
+        create_geometry_save_worker,
         store: SettingsWindowGeometryStore | None = None,
     ) -> None:
         self.host = host
@@ -70,6 +71,7 @@ class WindowGeometryRuntime:
         self.default_width = int(default_width)
         self.default_height = int(default_height)
         self.store = store or SettingsWindowGeometryStore()
+        self._create_geometry_save_worker = create_geometry_save_worker
 
         self._restore_in_progress = False
         self._persistence_enabled = False
@@ -634,10 +636,12 @@ class WindowGeometryRuntime:
         return (geometry, bool(requested_maximized))
 
     def _start_geometry_save_worker(self, payload) -> None:
-        from ui.window_geometry_worker import WindowGeometrySaveWorker
-
         geometry, maximized = payload
-        worker = WindowGeometrySaveWorker(geometry=geometry, maximized=bool(maximized), parent=self.host)
+        worker = self._create_geometry_save_worker(
+            geometry=geometry,
+            maximized=bool(maximized),
+            parent=self.host,
+        )
         self._geometry_save_worker = worker
         worker.saved.connect(self._on_geometry_save_finished)
         worker.failed.connect(lambda error: log(f"Ошибка сохранения геометрии окна: {error}", "DEBUG"))

@@ -99,6 +99,7 @@ def build_app_features(*, deps: AppFeatureAssemblyDeps, paths: Any, state: Any) 
         build_telegram_proxy_feature,
         build_tray_feature,
         build_updater_feature,
+        build_window_geometry_feature,
     )
     emit_startup_metric(
         "StartupFeatureAssemblyImports",
@@ -174,6 +175,7 @@ def build_app_features(*, deps: AppFeatureAssemblyDeps, paths: Any, state: Any) 
         orchestra=orchestra_feature,
         program_settings=build_program_settings_feature(),
         autostart=build_autostart_feature(runtime_state=state.runtime),
+        window_geometry=build_window_geometry_feature(),
     )
     emit_startup_metric(
         "StartupFeatureAssemblySecondary",

@@ -14,18 +14,20 @@ class WindowGeometrySaveWorker(QThread):
         *,
         geometry: tuple[int, int, int, int] | None,
         maximized: bool,
+        get_window_geometry,
+        set_window_geometry,
         parent=None,
     ):
         super().__init__(parent)
         self._geometry = None if geometry is None else tuple(int(value) for value in geometry)
         self._maximized = bool(maximized)
+        self._get_window_geometry = get_window_geometry
+        self._set_window_geometry = set_window_geometry
 
     def run(self) -> None:
         try:
-            from settings import store as settings_store
-
             if self._geometry is None:
-                current = settings_store.get_window_geometry()
+                current = self._get_window_geometry()
                 x = current.get("x")
                 y = current.get("y")
                 width = current.get("width")
@@ -33,7 +35,7 @@ class WindowGeometrySaveWorker(QThread):
             else:
                 x, y, width, height = self._geometry
 
-            settings_store.set_window_geometry(
+            self._set_window_geometry(
                 x=x,
                 y=y,
                 width=width,

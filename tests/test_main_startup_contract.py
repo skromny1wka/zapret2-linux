@@ -1719,6 +1719,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             program_settings=SimpleNamespace(
                 hide_to_tray_on_minimize_close_enabled=Mock(return_value=False),
             ),
+            window_geometry=SimpleNamespace(create_geometry_save_worker=Mock()),
         )
 
         with (

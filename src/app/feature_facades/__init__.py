@@ -20,6 +20,7 @@ from app.feature_facades.runtime import RuntimeFeature, build_runtime_feature
 from app.feature_facades.telegram_proxy import TelegramProxyFeature, build_telegram_proxy_feature
 from app.feature_facades.tray import TrayFeature, build_tray_feature
 from app.feature_facades.updater import UpdaterFeature, build_updater_feature
+from app.feature_facades.window_geometry import WindowGeometryFeature, build_window_geometry_feature
 
 
 def build_logs_feature() -> LogsFeature:
@@ -46,6 +47,7 @@ __all__ = [
     "TelegramProxyFeature",
     "TrayFeature",
     "UpdaterFeature",
+    "WindowGeometryFeature",
     "build_autostart_feature",
     "build_appearance_feature",
     "build_blobs_feature",
@@ -63,4 +65,5 @@ __all__ = [
     "build_telegram_proxy_feature",
     "build_tray_feature",
     "build_updater_feature",
+    "build_window_geometry_feature",
 ]

@@ -19,6 +19,7 @@ def attach_window_lifecycle(window, features) -> None:
         default_width=WIDTH,
         default_height=HEIGHT,
         close_state=window.close_state,
+        create_geometry_save_worker=features.window_geometry.create_geometry_save_worker,
     )
     window.application_lifecycle = ApplicationLifecycle(
         window_port=build_application_lifecycle_window_port(window),

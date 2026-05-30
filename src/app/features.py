@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         TelegramProxyFeature,
         TrayFeature,
         UpdaterFeature,
+        WindowGeometryFeature,
     )
 
 
@@ -50,3 +51,4 @@ class AppFeatures:
     orchestra: OrchestraFeature
     program_settings: ProgramSettingsFeature
     autostart: AutostartFeature
+    window_geometry: WindowGeometryFeature

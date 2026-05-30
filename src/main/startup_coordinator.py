@@ -148,14 +148,7 @@ class StartupCoordinator:
             return
         self._phase_two_started = True
 
-        phase_two_steps = [
-            (
-                TASK_THEME_MANAGER,
-                "theme manager",
-                self.window_shell.init_theme_manager,
-                None,
-            ),
-        ]
+        phase_two_steps = []
 
         if bool(self.window_shell.start_in_tray):
             phase_two_steps.append(
@@ -174,6 +167,14 @@ class StartupCoordinator:
                 TASK_STARTUP_CORE_READY,
                 "startup core",
                 self._finalize_startup_core,
+                None,
+            )
+        )
+        phase_two_steps.append(
+            (
+                TASK_THEME_MANAGER,
+                "theme manager",
+                self.window_shell.init_theme_manager,
                 None,
             )
         )
