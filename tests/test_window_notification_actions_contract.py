@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import inspect
-import importlib
-import importlib.util
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -28,16 +26,16 @@ class WindowNotificationActionsContractTests(unittest.TestCase):
         self.assertIn("features.external_actions", setup_source)
 
     def test_notification_system_actions_run_through_worker(self) -> None:
-        spec = importlib.util.find_spec("ui.window_notification_action_workers")
-        self.assertIsNotNone(spec)
-        action_workers = importlib.import_module("ui.window_notification_action_workers")
+        from app.feature_facades.external import ExternalActionsFeature
+        import app.external_workers as external_workers
 
         handler_source = inspect.getsource(WindowNotificationActionHandler)
         handler_callback_source = inspect.getsource(WindowNotificationActionHandler.build_action_callback)
         center_source = inspect.getsource(WindowNotificationCenter)
+        feature_source = inspect.getsource(ExternalActionsFeature)
 
-        self.assertTrue(hasattr(action_workers, "NotificationActionWorker"))
-        worker_source = inspect.getsource(action_workers.NotificationActionWorker.run)
+        self.assertTrue(hasattr(external_workers, "ExternalNotificationActionWorker"))
+        worker_source = inspect.getsource(external_workers.ExternalNotificationActionWorker.run)
         self.assertIn("action_fn", worker_source)
 
         self.assertIn("_request_disable_proxy", handler_callback_source)
@@ -52,6 +50,9 @@ class WindowNotificationActionsContractTests(unittest.TestCase):
         self.assertIn("_notification_action_runtime", center_source)
         self.assertIn("create_notification_action_worker", center_source)
         self.assertIn("_run_notification_action_worker", center_source)
+        self.assertIn("self._external_actions.create_notification_action_worker", center_source)
+        self.assertIn("ExternalNotificationActionWorker", feature_source)
+        self.assertNotIn("ui.window_notification_action_workers", center_source)
 
     def test_launch_conflict_notification_action_runs_heavy_part_through_worker(self) -> None:
         handler_source = inspect.getsource(WindowNotificationActionHandler)

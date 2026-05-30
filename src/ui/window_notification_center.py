@@ -163,9 +163,7 @@ class WindowNotificationCenter(QObject):
         )
 
     def create_notification_action_worker(self, request_id: int, *, action_name: str, action_fn):
-        from ui.window_notification_action_workers import NotificationActionWorker
-
-        return NotificationActionWorker(
+        return self._external_actions.create_notification_action_worker(
             request_id,
             action_name=action_name,
             action_fn=action_fn,

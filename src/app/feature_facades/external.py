@@ -29,6 +29,16 @@ class ExternalActionsFeature:
 
         return ExternalOpenUrlWorker(request_id, url=url, open_url=self.open_url, parent=parent)
 
+    def create_notification_action_worker(self, request_id: int, *, action_name: str, action_fn, parent=None):
+        from app.external_workers import ExternalNotificationActionWorker
+
+        return ExternalNotificationActionWorker(
+            request_id,
+            action_name=action_name,
+            action_fn=action_fn,
+            parent=parent,
+        )
+
 
 def build_external_actions_feature() -> ExternalActionsFeature:
     return ExternalActionsFeature()
