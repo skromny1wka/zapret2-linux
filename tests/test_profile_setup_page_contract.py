@@ -2589,6 +2589,68 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._delete_user_profile_button.setEnabled.assert_called_once_with(False)
         worker.start.assert_called_once()
 
+    def test_user_profile_update_keeps_latest_pending_request_while_worker_runs(self) -> None:
+        class _Signal:
+            def __init__(self) -> None:
+                self.callbacks = []
+
+            def connect(self, callback) -> None:
+                self.callbacks.append(callback)
+
+        class _Worker:
+            def __init__(self, *, running: bool) -> None:
+                self._running = running
+                self.updated = _Signal()
+                self.failed = _Signal()
+                self.finished = _Signal()
+                self.start = Mock()
+                self.deleteLater = Mock()
+
+            def isRunning(self) -> bool:
+                return self._running
+
+        running_worker = _Worker(running=True)
+        next_worker = _Worker(running=False)
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._user_profile_update_request_id = 1
+        page._user_profile_update_worker = running_worker
+        page._pending_user_profile_update = None
+        page._update_user_profile_button = Mock()
+        page._delete_user_profile_button = Mock()
+        page.create_profile_user_update_worker = Mock(return_value=next_worker)
+
+        ProfileSetupPageBase._request_user_profile_update(
+            page,
+            "user-1",
+            name="YouTube New",
+            protocol="TCP",
+            ports="80,443",
+        )
+
+        page.create_profile_user_update_worker.assert_not_called()
+        self.assertEqual(
+            page._pending_user_profile_update,
+            {
+                "profile_id": "user-1",
+                "name": "YouTube New",
+                "protocol": "TCP",
+                "ports": "80,443",
+            },
+        )
+
+        ProfileSetupPageBase._on_user_profile_update_worker_finished(page, running_worker)
+
+        page.create_profile_user_update_worker.assert_called_once_with(
+            2,
+            profile_id="user-1",
+            name="YouTube New",
+            protocol="TCP",
+            ports="80,443",
+            parent=page,
+        )
+        next_worker.start.assert_called_once()
+        self.assertIsNone(page._pending_user_profile_update)
+
     def test_user_profile_delete_starts_worker_without_deleting_in_gui_thread(self) -> None:
         class _Signal:
             def __init__(self) -> None:

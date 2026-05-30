@@ -842,6 +842,7 @@ class ProfileSetupPageBase(BasePage):
         self._pending_enabled_save: bool | None = None
         self._user_profile_update_request_id = 0
         self._user_profile_update_worker = None
+        self._pending_user_profile_update: dict[str, str] | None = None
         self._user_profile_delete_request_id = 0
         self._user_profile_delete_worker = None
         self._strategy_apply_request_id = 0
@@ -1393,9 +1394,23 @@ class ProfileSetupPageBase(BasePage):
         if worker is not None:
             try:
                 if worker.isRunning():
+                    self._pending_user_profile_update = {
+                        "profile_id": profile_id,
+                        "name": str(name or ""),
+                        "protocol": str(protocol or ""),
+                        "ports": str(ports or ""),
+                    }
                     return
             except Exception:
                 return
+        self._start_user_profile_update_worker(
+            profile_id,
+            name=name,
+            protocol=protocol,
+            ports=ports,
+        )
+
+    def _start_user_profile_update_worker(self, profile_id: str, *, name: str, protocol: str, ports: str) -> None:
         self._user_profile_update_request_id = int(getattr(self, "_user_profile_update_request_id", 0) or 0) + 1
         request_id = self._user_profile_update_request_id
         self._set_user_profile_buttons_enabled(False)
@@ -1446,7 +1461,8 @@ class ProfileSetupPageBase(BasePage):
     def _on_user_profile_update_failed(self, request_id: int, error: str) -> None:
         if request_id != int(getattr(self, "_user_profile_update_request_id", 0) or 0):
             return
-        self._set_user_profile_buttons_enabled(True)
+        if not self.__dict__.get("_pending_user_profile_update"):
+            self._set_user_profile_buttons_enabled(True)
         log(f"{self.__class__.__name__}: не удалось изменить пользовательский profile: {error}", "ERROR")
         InfoBar.error(
             title="Ошибка",
@@ -1457,8 +1473,18 @@ class ProfileSetupPageBase(BasePage):
     def _on_user_profile_update_worker_finished(self, worker) -> None:
         if self.__dict__.get("_user_profile_update_worker") is worker:
             self._user_profile_update_worker = None
-            self._set_user_profile_buttons_enabled(True)
         worker.deleteLater()
+        pending = self.__dict__.get("_pending_user_profile_update")
+        self._pending_user_profile_update = None
+        if pending:
+            self._start_user_profile_update_worker(
+                str(pending.get("profile_id") or ""),
+                name=str(pending.get("name") or ""),
+                protocol=str(pending.get("protocol") or ""),
+                ports=str(pending.get("ports") or ""),
+            )
+            return
+        self._set_user_profile_buttons_enabled(True)
 
     def _apply_user_profile_update_locally(self, updated_item) -> bool:
         payload = self._payload
@@ -2800,6 +2826,7 @@ class ProfileSetupPageBase(BasePage):
             "_pending_settings_save",
             "_pending_raw_profile_save",
             "_pending_enabled_save",
+            "_pending_user_profile_update",
             "_pending_strategy_apply",
             "_pending_strategy_feedback_save",
         ):
