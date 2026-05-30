@@ -35,16 +35,6 @@ class WindowStartupMixin:
             f"{(_time.perf_counter() - t_super) * 1000:.0f}ms",
         )
 
-        from settings.dpi.strategy_settings import get_strategy_launch_method
-
-        t_method = _time.perf_counter()
-        current_method = get_strategy_launch_method()
-        emit_startup_metric(
-            "StartupWindowLaunchMethod",
-            f"{(_time.perf_counter() - t_method) * 1000:.0f}ms",
-        )
-        log(f"Метод запуска стратегий: {current_method}", "INFO")
-
     @staticmethod
     def _queued_connection():
         from PyQt6.QtCore import Qt
@@ -83,6 +73,25 @@ class WindowStartupMixin:
     def _continue_startup_after_ui_ready(self) -> None:
         emit_startup_metric("StartupContinueAfterUiReadyDispatch", "continue_startup_requested")
         self.continue_startup_requested.emit()
+        QTimer.singleShot(0, self._log_launch_method_after_ui_ready)
+
+    def _log_launch_method_after_ui_ready(self) -> None:
+        t_method = _time.perf_counter()
+        try:
+            from settings.dpi.strategy_settings import get_strategy_launch_method
+
+            current_method = get_strategy_launch_method()
+            emit_startup_metric(
+                "StartupWindowLaunchMethod",
+                f"{(_time.perf_counter() - t_method) * 1000:.0f}ms",
+            )
+            log(f"Метод запуска стратегий: {current_method}", "INFO")
+        except Exception as e:
+            emit_startup_metric(
+                "StartupWindowLaunchMethod",
+                f"error:{type(e).__name__} {(_time.perf_counter() - t_method) * 1000:.0f}ms",
+            )
+            log(f"Не удалось записать метод запуска стратегий: {e}", "DEBUG")
 
     def _finalize_ui_bootstrap(self) -> None:
         """Завершает не критичную для первого кадра сборку главного окна."""
