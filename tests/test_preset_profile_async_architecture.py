@@ -3659,6 +3659,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         request_source = inspect.getsource(DpiSettingsPage._request_orchestra_setting_save)
         finished_source = inspect.getsource(DpiSettingsPage._on_orchestra_setting_save_worker_finished)
         worker_source = inspect.getsource(orchestra_settings_worker.OrchestraSettingSaveWorker.run)
+        feature_source = inspect.getsource(__import__("app.feature_facades.orchestra", fromlist=["OrchestraFeature"]).OrchestraFeature)
 
         for method_name in (
             "_on_strict_detection_changed",
@@ -3675,6 +3676,9 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("create_orchestra_setting_save_worker", page_source)
         self.assertIn("_orchestra_settings_save_pending", request_source)
         self.assertIn("_orchestra_settings_save_pending.pop(0)", finished_source)
+        self.assertIn("set_setting=self.set_setting", feature_source)
+        self.assertIn("_set_setting", worker_source)
+        self.assertNotIn("orchestra_commands", worker_source)
         self.assertIn("set_setting", worker_source)
 
     def test_autostart_page_actions_run_through_worker(self) -> None:

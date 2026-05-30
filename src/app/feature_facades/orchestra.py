@@ -68,10 +68,10 @@ class OrchestraFeature:
         if runner is not None:
             runner.clear_learned_data()
 
-    def set_setting(self, key: str, value) -> None:
+    def set_setting(self, key: str, value, *, runner=None) -> None:
         from settings.dpi.public import set_orchestra_setting
 
-        set_orchestra_setting(key, value, runner=self.runner)
+        set_orchestra_setting(key, value, runner=self.runner if runner is None else runner)
 
     def create_setting_save_worker(self, request_id: int, *, key: str, value, parent=None):
         from orchestra.settings_worker import OrchestraSettingSaveWorker
@@ -81,6 +81,7 @@ class OrchestraFeature:
             key=key,
             value=value,
             runner=self.runner,
+            set_setting=self.set_setting,
             parent=parent,
         )
 

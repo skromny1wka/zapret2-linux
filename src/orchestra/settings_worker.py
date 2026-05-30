@@ -16,6 +16,7 @@ class OrchestraSettingSaveWorker(QThread):
         key: str,
         value,
         runner=None,
+        set_setting,
         parent=None,
     ):
         super().__init__(parent)
@@ -23,12 +24,11 @@ class OrchestraSettingSaveWorker(QThread):
         self._key = str(key or "").strip()
         self._value = value
         self._runner = runner
+        self._set_setting = set_setting
 
     def run(self) -> None:
-        import orchestra.commands as orchestra_commands
-
         try:
-            orchestra_commands.set_setting(self._key, self._value, runner=self._runner)
+            self._set_setting(self._key, self._value, runner=self._runner)
         except Exception as exc:
             log(f"OrchestraSettingSaveWorker: не удалось сохранить {self._key}: {exc}", "ERROR")
             self.failed.emit(self._request_id, self._key, str(exc))
