@@ -118,8 +118,7 @@ class BlockcheckPage(BasePage):
         self._initial_state = blockcheck_page_runtime.BlockcheckPageInitialStatePlan(user_domains=())
         self._initial_state_runtime = OneShotWorkerRuntime()
         self._initial_state_load_started_at = 0.0
-        self._support_prepare_worker = None
-        self._support_prepare_request_id = 0
+        self._support_prepare_runtime = OneShotWorkerRuntime()
         self._user_domain_action_worker = None
         self._user_domain_action_request_id = 0
         self._user_domain_action_pending: list[dict[str, str]] = []
@@ -810,35 +809,37 @@ class BlockcheckPage(BasePage):
         mode_label: str,
         extra_domains: list[str],
     ) -> None:
-        worker = self.__dict__.get("_support_prepare_worker")
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    self._set_support_status("Подготовка уже идёт...")
-                    return
-            except Exception:
-                return
+        if self._support_prepare_runtime.is_running():
+            self._set_support_status("Подготовка уже идёт...")
+            return
 
-        self._support_prepare_request_id += 1
-        request_id = self._support_prepare_request_id
         self._set_support_status("Подготовка обращения...")
         if self._prepare_support_btn is not None:
             self._prepare_support_btn.setEnabled(False)
 
-        worker = self.create_support_prepare_worker(
-            request_id,
-            run_log_file=run_log_file,
-            mode_label=mode_label,
-            extra_domains=extra_domains,
+        def worker_factory(request_id: int):
+            return self.create_support_prepare_worker(
+                request_id,
+                run_log_file=run_log_file,
+                mode_label=mode_label,
+                extra_domains=extra_domains,
+            )
+
+        def bind_worker(worker) -> None:
+            worker.completed.connect(self._on_support_prepare_finished)
+            worker.failed.connect(self._on_support_prepare_failed)
+
+        self._support_prepare_runtime.start_qthread_worker(
+            worker_factory=worker_factory,
+            bind_worker=bind_worker,
+            on_finished=self._on_support_prepare_runtime_finished,
         )
-        self._support_prepare_worker = worker
-        worker.completed.connect(self._on_support_prepare_finished)
-        worker.failed.connect(self._on_support_prepare_failed)
-        worker.finished.connect(lambda w=worker: self._on_support_prepare_worker_finished(w))
-        worker.start()
 
     def _on_support_prepare_finished(self, request_id: int, feedback) -> None:
-        if request_id != self._support_prepare_request_id or self._cleanup_in_progress:
+        if not self._support_prepare_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
             return
         result = feedback.result
         if result.zip_path:
@@ -859,7 +860,10 @@ class BlockcheckPage(BasePage):
             pass
 
     def _on_support_prepare_failed(self, request_id: int, error: str) -> None:
-        if request_id != self._support_prepare_request_id or self._cleanup_in_progress:
+        if not self._support_prepare_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
             return
         logger.warning("Failed to prepare BlockCheck support bundle: %s", error)
         self._set_support_status("Ошибка подготовки")
@@ -872,13 +876,7 @@ class BlockcheckPage(BasePage):
         except Exception:
             pass
 
-    def _on_support_prepare_worker_finished(self, worker) -> None:
-        if self.__dict__.get("_support_prepare_worker") is worker:
-            self._support_prepare_worker = None
-        try:
-            worker.deleteLater()
-        except Exception:
-            pass
+    def _on_support_prepare_runtime_finished(self, _worker) -> None:
         if self._prepare_support_btn is not None and not self._cleanup_in_progress:
             self._prepare_support_btn.setEnabled(True)
 
@@ -1060,13 +1058,12 @@ class BlockcheckPage(BasePage):
             warning_prefix="blockcheck initial state worker",
         )
         self._initial_state_runtime.cancel()
-        support_worker = self.__dict__.get("_support_prepare_worker")
-        if support_worker is not None:
-            try:
-                support_worker.quit()
-            except Exception:
-                pass
-            self._support_prepare_worker = None
+        self._support_prepare_runtime.stop(
+            blocking=False,
+            log_fn=log,
+            warning_prefix="blockcheck support prepare worker",
+        )
+        self._support_prepare_runtime.cancel()
         self._user_domain_action_pending.clear()
         domain_worker = self.__dict__.get("_user_domain_action_worker")
         if domain_worker is not None:
