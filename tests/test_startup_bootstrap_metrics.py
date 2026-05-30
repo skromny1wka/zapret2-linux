@@ -44,7 +44,12 @@ class StartupBootstrapMetricsTests(unittest.TestCase):
     def test_entry_logs_pre_window_bootstrap_substeps(self) -> None:
         from main import entry
 
-        source = inspect.getsource(entry.main)
+        source = "\n".join(
+            (
+                inspect.getsource(entry.main),
+                inspect.getsource(entry._finish_event_loop_bootstrap),
+            )
+        )
 
         self.assertIn("StartupSettingsMaterialize", source)
         self.assertIn("StartupShellBootstrap", source)
@@ -52,6 +57,11 @@ class StartupBootstrapMetricsTests(unittest.TestCase):
         self.assertIn("StartupApplicationControllerImport", source)
         self.assertIn("StartupWindowClassImport", source)
         self.assertIn("StartupApplicationControllerInit", source)
+        self.assertIn("StartupLateBootstrapShutdownHook", source)
+        self.assertIn("StartupLateBootstrapAppearance", source)
+        self.assertIn("StartupLateBootstrapIpc", source)
+        self.assertIn("StartupLateBootstrapDeferredHooks", source)
+        self.assertIn("StartupLateBootstrapTotal", source)
 
     def test_window_constructor_logs_bootstrap_substeps(self) -> None:
         from main.window_startup import WindowStartupMixin

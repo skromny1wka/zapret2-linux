@@ -130,16 +130,33 @@ def _configure_window_appearance(window, appearance_actions) -> None:
 def _finish_event_loop_bootstrap(*, app, window, application_controller, start_in_tray: bool) -> None:
     from main.windows_session_shutdown import connect_windows_session_shutdown
 
+    t_total = _time.perf_counter()
+    t_shutdown = _time.perf_counter()
     connect_windows_session_shutdown(app, window)
+    emit_startup_metric(
+        "StartupLateBootstrapShutdownHook",
+        f"{(_time.perf_counter() - t_shutdown) * 1000:.0f}ms",
+    )
+    t_appearance = _time.perf_counter()
     _configure_window_appearance(window, application_controller.window_state_actions)
+    emit_startup_metric(
+        "StartupLateBootstrapAppearance",
+        f"{(_time.perf_counter() - t_appearance) * 1000:.0f}ms",
+    )
 
+    t_ipc = _time.perf_counter()
     ipc_manager = _create_ipc_manager()
     ipc_manager.start_server(window)
     atexit.register(ipc_manager.stop)
+    emit_startup_metric(
+        "StartupLateBootstrapIpc",
+        f"{(_time.perf_counter() - t_ipc) * 1000:.0f}ms",
+    )
 
     if start_in_tray:
         log("Запуск приложения скрыто в трее", "TRAY")
 
+    t_deferred = _time.perf_counter()
     _install_qt_scroll_style_after_interactive(window, app)
     _install_post_startup_tasks_after_interactive(
         window,
@@ -147,6 +164,14 @@ def _finish_event_loop_bootstrap(*, app, window, application_controller, start_i
             window=window,
             app_runtime=application_controller.app_runtime,
         ),
+    )
+    emit_startup_metric(
+        "StartupLateBootstrapDeferredHooks",
+        f"{(_time.perf_counter() - t_deferred) * 1000:.0f}ms",
+    )
+    emit_startup_metric(
+        "StartupLateBootstrapTotal",
+        f"{(_time.perf_counter() - t_total) * 1000:.0f}ms",
     )
 
 
