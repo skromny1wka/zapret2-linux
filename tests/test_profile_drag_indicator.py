@@ -66,6 +66,52 @@ class ProfileDragIndicatorTests(unittest.TestCase):
         self.assertNotIn("viewport().update()", payload_source)
         self.assertIn("viewport().update(rect", update_source)
 
+    def test_view_updates_same_drop_marker_row_once(self) -> None:
+        class _Rect:
+            def __init__(self, row: int) -> None:
+                self.row = row
+
+            def adjusted(self, *_args):
+                return self
+
+            def isValid(self) -> bool:  # noqa: N802
+                return True
+
+        class _Index:
+            def __init__(self, row: int) -> None:
+                self.row = row
+
+            def isValid(self) -> bool:  # noqa: N802
+                return True
+
+        class _Model:
+            def rowCount(self) -> int:  # noqa: N802
+                return 5
+
+            def index(self, row: int, _column: int):
+                return _Index(row)
+
+        class _Viewport:
+            def __init__(self) -> None:
+                self.updated_rows: list[int] = []
+
+            def update(self, rect) -> None:
+                self.updated_rows.append(rect.row)
+
+        view = profile_list_view.ProfileListView.__new__(profile_list_view.ProfileListView)
+        viewport = _Viewport()
+        view.model = lambda: _Model()
+        view.visualRect = lambda index: _Rect(index.row)
+        view.viewport = lambda: viewport
+
+        profile_list_view.ProfileListView._update_drop_marker_rows(
+            view,
+            {"row": 2, "mode": "before"},
+            {"row": 2, "mode": "after"},
+        )
+
+        self.assertEqual(viewport.updated_rows, [2])
+
     def test_profile_current_index_helper_skips_already_selected_index(self) -> None:
         class _Index:
             def __init__(self, row: int) -> None:

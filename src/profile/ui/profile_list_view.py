@@ -116,6 +116,7 @@ class ProfileListView(ListView):
         model = self.model()
         if model is None:
             return
+        updated_rows: set[int] = set()
         for marker in (previous_marker, next_marker):
             if not isinstance(marker, dict):
                 continue
@@ -125,6 +126,9 @@ class ProfileListView(ListView):
                 continue
             if row < 0 or row >= model.rowCount():
                 continue
+            if row in updated_rows:
+                continue
+            updated_rows.add(row)
             index = model.index(row, 0)
             if not index.isValid():
                 continue
