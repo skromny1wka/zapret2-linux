@@ -120,12 +120,14 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         activated_source = inspect.getsource(PresetSetupPageBase.on_page_activated)
         init_source = inspect.getsource(PresetSetupPageBase.__init__)
         request_source = inspect.getsource(PresetSetupPageBase._request_profiles_payload)
+        run_source = inspect.getsource(PresetSetupPageBase._run_scheduled_profiles_payload_request)
 
         self.assertNotIn(".list_profiles(", refresh_source)
         self.assertIn("_request_profiles_payload(force=True)", refresh_source)
         self.assertIn("_schedule_profiles_payload_request", activated_source)
         self.assertNotIn("QTimer.singleShot(0, self._request_profiles_payload)", init_source)
-        self.assertIn("_request_profiles_payload", inspect.getsource(PresetSetupPageBase._schedule_profiles_payload_request))
+        self.assertIn("_run_scheduled_profiles_payload_request", inspect.getsource(PresetSetupPageBase._schedule_profiles_payload_request))
+        self.assertIn("_request_profiles_payload", run_source)
         self.assertIn("_profile_payload_dirty", request_source)
         self.assertIn("_profile_payload_loaded_once", request_source)
 
@@ -140,7 +142,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("preset_content_revision", bind_source)
         self.assertIn("active_preset_revision", bind_source)
         self.assertIn("_profile_payload_dirty = True", handler_source)
-        self.assertIn("_request_profiles_payload(force=True)", handler_source)
+        self.assertIn("_schedule_profiles_payload_request(force=True)", handler_source)
+        self.assertNotIn("_request_profiles_payload(force=True)", handler_source)
         self.assertIn("_ui_state_unsubscribe", cleanup_source)
 
     def test_preset_setup_page_ignores_stale_profile_worker_after_preset_switch(self) -> None:

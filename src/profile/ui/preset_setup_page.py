@@ -230,7 +230,7 @@ class PresetSetupPageBase(BasePage):
             return
         self._profile_payload_dirty = True
         if self.isVisible():
-            self._request_profiles_payload(force=True)
+            self._schedule_profiles_payload_request(force=True)
 
     def _request_profiles_payload(self, *, force: bool = False) -> None:
         if self._cleanup_in_progress:
