@@ -29,6 +29,7 @@ from profile.profile_setup_loader import (
     ProfileUserProfileUpdateWorker,
 )
 from profile.state import ProfileListItem, ProfileSetupPayload
+from profile.strategy_catalog import StrategyEntry
 from profile.strategy_state import ProfileStrategyState
 from profile.ui.preset_setup_page import PresetSetupPageBase, preset_setup_title_for_payload
 from profile.ui.shell import build_profile_shell
@@ -3465,6 +3466,54 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._apply_strategy_locally.assert_not_called()
         page.reload_current_profile.assert_not_called()
         page._on_profile_changed_callback.assert_called_once_with("profile-1", "strategy", updated_item)
+
+    def test_apply_strategy_locally_does_not_rebuild_breadcrumb(self) -> None:
+        item = ProfileListItem(
+            key="profile-1",
+            persistent_key="profile-1",
+            profile_index=0,
+            display_name="YouTube",
+            enabled=True,
+            in_preset=True,
+            strategy_id="old",
+            strategy_name="Old",
+            match_lines=(),
+            list_type="hostlist",
+            rating="",
+            favorite=False,
+            group="video",
+            group_name="Video",
+            order=0,
+        )
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._payload = ProfileSetupPayload(
+            item=item,
+            strategy_entries={
+                "tls_fake": StrategyEntry(
+                    strategy_id="tls_fake",
+                    catalog_name="tls",
+                    name="TLS fake",
+                    args="--lua-desync=fake",
+                    visual=SimpleNamespace(label="", description=""),
+                ),
+            },
+            strategy_states={"tls_fake": ProfileStrategyState(rating="work", favorite=False)},
+            raw_profile_text="",
+            raw_strategy_text="",
+            match_summary="",
+        )
+        page._strategy_list = SimpleNamespace(set_current_strategy_id=Mock())
+        page._apply_feedback_buttons = Mock()
+        page._match_tab_built = False
+        page._apply_match_tab_payload = Mock()
+        page._rebuild_breadcrumb = Mock(side_effect=AssertionError("strategy change must not rebuild breadcrumbs"))
+
+        self.assertTrue(ProfileSetupPageBase._apply_strategy_locally(page, "tls_fake"))
+
+        page._strategy_list.set_current_strategy_id.assert_called_once_with("tls_fake")
+        page._apply_feedback_buttons.assert_called_once()
+        page._apply_match_tab_payload.assert_not_called()
+        page._rebuild_breadcrumb.assert_not_called()
 
     def test_strategy_apply_worker_emits_new_profile_key(self) -> None:
         apply_strategy = Mock(return_value="profile-1")

@@ -2548,7 +2548,6 @@ class ProfileSetupPageBase(BasePage):
         self._apply_feedback_buttons(self._payload)
         if self._match_tab_built:
             self._apply_match_tab_payload()
-        self._rebuild_breadcrumb()
         return True
 
     def _set_current_strategy_feedback(self, *, rating: str) -> None:
