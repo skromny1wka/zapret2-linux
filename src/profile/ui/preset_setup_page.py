@@ -76,13 +76,35 @@ class PresetSetupPageBase(BasePage):
     request_hint_key = "page.winws2_pages.request.hint"
     loading_key = "page.winws2_pages.loading"
 
-    def __init__(self, parent=None, *, profile_feature, open_profile_setup, open_profile_order, ui_state_store=None):
+    def __init__(
+        self,
+        parent=None,
+        *,
+        get_cached_profile_list,
+        list_profiles,
+        create_user_profile,
+        update_user_profile,
+        delete_user_profile,
+        create_profile_list_load_worker,
+        create_profile_context_action_worker,
+        create_profile_move_worker,
+        open_profile_setup,
+        open_profile_order,
+        ui_state_store=None,
+    ):
         super().__init__(
             title=self.page_title,
             parent=parent,
             title_key=self.title_key,
         )
-        self._profile = profile_feature
+        self._get_cached_profile_list = get_cached_profile_list
+        self._list_profiles_fn = list_profiles
+        self._create_user_profile_fn = create_user_profile
+        self._update_user_profile_fn = update_user_profile
+        self._delete_user_profile_fn = delete_user_profile
+        self._create_profile_list_load_worker_fn = create_profile_list_load_worker
+        self._create_profile_context_action_worker_fn = create_profile_context_action_worker
+        self._create_profile_move_worker_fn = create_profile_move_worker
         self._open_profile_setup = open_profile_setup
         self._open_profile_order_page = open_profile_order
 
@@ -208,7 +230,7 @@ class PresetSetupPageBase(BasePage):
         if not force and self._profile_payload_loaded_once and not self._profile_payload_dirty:
             return
         self._profile_payload_dirty = True
-        cached_payload = self._profile.get_cached_profile_list(self.launch_method)
+        cached_payload = self._get_cached_profile_list(self.launch_method)
         if cached_payload is not None:
             self._apply_cached_profile_payload(cached_payload)
             return
@@ -226,7 +248,7 @@ class PresetSetupPageBase(BasePage):
         request_id = self._profile_load_request_id
         if self._profiles_list is None:
             self._clear_dynamic_widgets()
-        worker = self._profile.create_profile_list_load_worker(request_id, self.launch_method, self)
+        worker = self._create_profile_list_load_worker(request_id, self.launch_method, self)
         self._profile_load_worker = worker
         worker.loaded.connect(self._on_profile_payload_loaded)
         worker.failed.connect(self._on_profile_payload_failed)
@@ -501,7 +523,7 @@ class PresetSetupPageBase(BasePage):
         enabled: bool | None = None,
         parent=None,
     ):
-        return self._profile.create_profile_context_action_worker(
+        return self._create_profile_context_action_worker_fn(
             request_id,
             launch_method,
             action=action,
@@ -509,6 +531,9 @@ class PresetSetupPageBase(BasePage):
             enabled=enabled,
             parent=parent,
         )
+
+    def _create_profile_list_load_worker(self, request_id: int, launch_method: str, parent=None):
+        return self._create_profile_list_load_worker_fn(request_id, launch_method, parent)
 
     def _sync_profile_list_locally(self) -> None:
         self._profile_payload_dirty = True
@@ -630,7 +655,7 @@ class PresetSetupPageBase(BasePage):
     def _create_user_profile_create_worker(self, request_id: int, *, name: str, protocol: str, ports: str):
         return ProfileUserProfileCreateWorker(
             request_id,
-            self._profile.create_user_profile,
+            self._create_user_profile_fn,
             self._load_user_profile_items,
             name=name,
             protocol=protocol,
@@ -649,7 +674,7 @@ class PresetSetupPageBase(BasePage):
     ):
         return ProfileUserProfileUpdateWorker(
             request_id,
-            self._profile.update_user_profile,
+            self._update_user_profile_fn,
             self._load_user_profile_items,
             profile_id=profile_id,
             name=name,
@@ -661,14 +686,14 @@ class PresetSetupPageBase(BasePage):
     def _create_user_profile_delete_worker(self, request_id: int, *, profile_id: str):
         return ProfileUserProfileDeleteWorker(
             request_id,
-            self._profile.delete_user_profile,
+            self._delete_user_profile_fn,
             profile_id=profile_id,
             parent=self,
         )
 
     def _load_user_profile_items(self, profile_id: str):
         return load_user_profile_items_from_payload(
-            lambda: self._profile.list_profiles(self.launch_method),
+            lambda: self._list_profiles_fn(self.launch_method),
             profile_id,
         )
 
@@ -967,7 +992,7 @@ class PresetSetupPageBase(BasePage):
         destination_profile_key: str = "",
         destination_group_key: str = "",
     ):
-        return self._profile.create_profile_move_worker(
+        return self._create_profile_move_worker_fn(
             request_id,
             launch_method,
             action=action,

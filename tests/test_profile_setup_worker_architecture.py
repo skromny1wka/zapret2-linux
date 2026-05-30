@@ -51,16 +51,54 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("self._move_profile_to_folder(", run_source)
         self.assertNotIn("self._service.", run_source)
 
-    def test_preset_setup_page_asks_feature_to_create_context_workers(self) -> None:
+    def test_preset_setup_page_receives_worker_factories_instead_of_profile_feature(self) -> None:
         from profile.ui.preset_setup_page import PresetSetupPageBase
+        from ui.page_deps.presets import build_preset_setup_page_kwargs
+        from ui.navigation_pages import PageName
+        from unittest.mock import Mock
 
+        init_source = inspect.getsource(PresetSetupPageBase.__init__)
+        page_source = inspect.getsource(PresetSetupPageBase)
         action_source = inspect.getsource(PresetSetupPageBase._create_profile_context_action_worker)
         move_source = inspect.getsource(PresetSetupPageBase._create_profile_move_worker)
 
-        self.assertIn("self._profile.create_profile_context_action_worker", action_source)
+        self.assertIn("get_cached_profile_list", init_source)
+        self.assertIn("list_profiles", init_source)
+        self.assertIn("create_user_profile", init_source)
+        self.assertIn("update_user_profile", init_source)
+        self.assertIn("delete_user_profile", init_source)
+        self.assertIn("create_profile_list_load_worker", init_source)
+        self.assertIn("create_profile_context_action_worker", init_source)
+        self.assertIn("create_profile_move_worker", init_source)
+        self.assertNotIn("profile_feature", init_source)
+        self.assertNotIn("self._profile =", page_source)
+        self.assertNotIn("self._profile.", page_source)
+        self.assertNotIn("self._profile.create_profile_context_action_worker", action_source)
         self.assertNotIn("ProfilePresetProfileActionWorker(", action_source)
-        self.assertIn("self._profile.create_profile_move_worker", move_source)
+        self.assertNotIn("self._profile.create_profile_move_worker", move_source)
         self.assertNotIn("ProfilePresetProfileMoveWorker(", move_source)
+
+        profile_feature = Mock()
+        kwargs = build_preset_setup_page_kwargs(
+            page_name=PageName.ZAPRET2_PRESET_SETUP,
+            profile_feature=profile_feature,
+            open_profile_setup=Mock(),
+            show_page=Mock(),
+            ui_state_store=Mock(),
+        )
+
+        self.assertIs(kwargs["get_cached_profile_list"], profile_feature.get_cached_profile_list)
+        self.assertIs(kwargs["list_profiles"], profile_feature.list_profiles)
+        self.assertIs(kwargs["create_user_profile"], profile_feature.create_user_profile)
+        self.assertIs(kwargs["update_user_profile"], profile_feature.update_user_profile)
+        self.assertIs(kwargs["delete_user_profile"], profile_feature.delete_user_profile)
+        self.assertIs(kwargs["create_profile_list_load_worker"], profile_feature.create_profile_list_load_worker)
+        self.assertIs(
+            kwargs["create_profile_context_action_worker"],
+            profile_feature.create_profile_context_action_worker,
+        )
+        self.assertIs(kwargs["create_profile_move_worker"], profile_feature.create_profile_move_worker)
+        self.assertNotIn("profile_feature", kwargs)
 
 
 if __name__ == "__main__":

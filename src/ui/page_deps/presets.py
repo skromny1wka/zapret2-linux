@@ -57,7 +57,14 @@ def build_control_page_kwargs(
 def build_preset_setup_page_kwargs(*, page_name: PageName, profile_feature, open_profile_setup, show_page, ui_state_store) -> dict:
     method = ZAPRET2_MODE if page_name == PageName.ZAPRET2_PRESET_SETUP else ZAPRET1_MODE
     return {
-        "profile_feature": profile_feature,
+        "get_cached_profile_list": profile_feature.get_cached_profile_list,
+        "list_profiles": profile_feature.list_profiles,
+        "create_user_profile": profile_feature.create_user_profile,
+        "update_user_profile": profile_feature.update_user_profile,
+        "delete_user_profile": profile_feature.delete_user_profile,
+        "create_profile_list_load_worker": profile_feature.create_profile_list_load_worker,
+        "create_profile_context_action_worker": profile_feature.create_profile_context_action_worker,
+        "create_profile_move_worker": profile_feature.create_profile_move_worker,
         "open_profile_setup": lambda profile_key, m=method: open_profile_setup(m, profile_key),
         "open_profile_order": lambda m=method: show_page(resolve_profile_order_page_for_method(m), allow_internal=True),
         "ui_state_store": ui_state_store,
