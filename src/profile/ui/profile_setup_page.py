@@ -166,6 +166,17 @@ def set_current_index_if_changed(widget, index: int) -> bool:
     return True
 
 
+def set_segmented_current_item_if_changed(widget, item_key: str) -> bool:
+    value = str(item_key or "")
+    try:
+        if str(widget.currentItem()) == value:
+            return False
+    except Exception:
+        pass
+    widget.setCurrentItem(value)
+    return True
+
+
 def set_tab_item_text_if_changed(widget, item_key: str, text: str) -> bool:
     route_key = str(item_key or "")
     value = str(text or "")
@@ -968,7 +979,7 @@ class ProfileSetupPageBase(BasePage):
         self._strategy_tabs.addItem("strategies", "Готовые стратегии", lambda: self._switch_strategy_tab(0))
         self._strategy_tabs.addItem("editor", "Редактор", lambda: self._switch_strategy_tab(1))
         self._strategy_tabs.addItem("match", "Когда применяется", lambda: self._switch_strategy_tab(2))
-        self._strategy_tabs.setCurrentItem("strategies")
+        set_segmented_current_item_if_changed(self._strategy_tabs, "strategies")
         self._sync_editor_tab_label(None)
         self.layout.addWidget(self._strategy_tabs)
 
@@ -988,7 +999,7 @@ class ProfileSetupPageBase(BasePage):
         if index == 1 and not self._editor_tab_available:
             index = 0
             if self._strategy_tabs is not None:
-                self._strategy_tabs.setCurrentItem("strategies")
+                set_segmented_current_item_if_changed(self._strategy_tabs, "strategies")
         if index == 1:
             self._ensure_editor_tab_built()
             self._request_list_file_editor_state()
@@ -1758,7 +1769,7 @@ class ProfileSetupPageBase(BasePage):
 
         if self._strategy_stack.currentIndex() == 1:
             set_current_index_if_changed(self._strategy_stack, 0)
-            self._strategy_tabs.setCurrentItem("strategies")
+            set_segmented_current_item_if_changed(self._strategy_tabs, "strategies")
         self._strategy_tabs.removeWidget("editor")
 
     def _sync_editor_tab_label(self, payload) -> None:

@@ -13,6 +13,7 @@ from profile.ui.profile_setup_page import (
     _profile_has_list_file_editor,
     _match_tab_text,
     _profile_editor_tab_title,
+    set_segmented_current_item_if_changed,
 )
 from profile.profile_setup_loader import (
     ProfileEnabledSaveWorker,
@@ -110,6 +111,16 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         PresetSetupPageBase._set_user_profile_actions_enabled(page, True)
 
         self.assertEqual(page._add_profile_btn.enabled_calls, [])
+
+    def test_segmented_current_item_skips_duplicate_selection(self) -> None:
+        widget = SimpleNamespace(
+            currentItem=Mock(return_value="strategies"),
+            setCurrentItem=Mock(),
+        )
+
+        self.assertFalse(set_segmented_current_item_if_changed(widget, "strategies"))
+
+        widget.setCurrentItem.assert_not_called()
 
     def test_preset_setup_page_shows_normalization_infobar(self) -> None:
         apply_payload = inspect.getsource(PresetSetupPageBase._apply_payload)
