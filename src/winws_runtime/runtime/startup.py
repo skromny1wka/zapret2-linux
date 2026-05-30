@@ -1,20 +1,11 @@
 from __future__ import annotations
 
-import os
-import time
-
-from log.log import log
-from settings.mode import (
-    exe_name_for_launch_method,
-    exe_path_for_launch_method,
-    is_orchestra_launch_method,
-    normalize_launch_method,
-)
-from winws_runtime.runtime.status_feedback import runtime_status_callback
-
 
 def init_launch_runtime_api(*, runtime_feature):
     from settings.dpi.strategy_settings import get_strategy_launch_method
+    from settings.mode import exe_name_for_launch_method, exe_path_for_launch_method
+    from log.log import log
+    from winws_runtime.runtime.status_feedback import runtime_status_callback
     from winws_runtime.runtime.runtime_api import PresetLaunchRuntimeApi
 
     launch_method = get_strategy_launch_method()
@@ -31,6 +22,7 @@ def init_launch_runtime_api(*, runtime_feature):
 
 
 def init_launch_runtime(*, runtime_feature, runtime_api, notify) -> None:
+    from log.log import log
     from winws_runtime.runtime.launch_runtime import PresetLaunchRuntime
 
     launch_runtime = PresetLaunchRuntime(
@@ -43,6 +35,12 @@ def init_launch_runtime(*, runtime_feature, runtime_api, notify) -> None:
 
 
 def init_process_monitor(*, process_monitor_manager=None, runtime_api=None, runtime_service=None) -> None:
+    import os
+    import time
+
+    from log.log import log
+    from settings.mode import exe_path_for_launch_method, is_orchestra_launch_method, normalize_launch_method
+
     started_at = time.perf_counter()
 
     manager = process_monitor_manager
@@ -76,6 +74,10 @@ def init_process_monitor(*, process_monitor_manager=None, runtime_api=None, runt
 
 
 def init_core_startup() -> None:
+    import time
+
+    from log.log import log
+
     started_at = time.perf_counter()
 
     from lists.file_manager import ensure_required_files_fast

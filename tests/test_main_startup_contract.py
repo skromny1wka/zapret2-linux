@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import inspect
 import sys
 import tempfile
 import types
@@ -1827,18 +1828,11 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         self.assertNotIn("_wait_for_startup_interactive_before_initial_ui_state", bind_source)
         self.assertIn("bind_control_ui_state_store", bind_source)
 
-    def test_zapret2_control_defers_top_summary_data_until_startup_interactive(self) -> None:
+    def test_zapret2_control_loads_top_summary_through_worker_without_startup_delay(self) -> None:
         from app.state_store import AppUiState
         from presets.ui.control.additional_settings_runtime import create_refresh_runtime
         from presets.ui.control.zapret2 import page as zapret2_page
         from presets.ui.control.zapret2.page import Zapret2ModeControlPage
-
-        connected: list[object] = []
-        scheduled: list[tuple[int, object]] = []
-
-        class Signal:
-            def connect(self, callback, *_args, **_kwargs) -> None:
-                connected.append(callback)
 
         class WorkerSignal:
             def __init__(self) -> None:
@@ -1886,7 +1880,6 @@ class StartupRuntimeSetupTests(unittest.TestCase):
 
         control_page = Zapret2ModeControlPage.__new__(Zapret2ModeControlPage)
         control_page._cleanup_in_progress = False
-        control_page._startup_top_summary_waiting = False
         control_page._refresh_runtime = create_refresh_runtime()
         control_page._refresh_runtime.additional_settings_dirty = False
         control_page._ui_language = "ru"
@@ -1900,43 +1893,13 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         )
         control_page._get_selected_source_preset_display = Mock(return_value=("Preset", "Preset"))
         control_page._get_enabled_profile_count_snapshot = Mock(return_value=2)
-        control_page.window = Mock(
-            return_value=SimpleNamespace(
-                startup_state=SimpleNamespace(interactive_logged=False),
-                startup_interactive_ready=Signal(),
-            )
-        )
+        control_page.window = Mock(return_value=SimpleNamespace(startup_state=SimpleNamespace(interactive_logged=False)))
         control_page.set_loading = Mock()
         control_page.update_status = Mock()
         control_page.update_strategy = Mock()
         control_page._refresh_last_status_message = Mock()
         control_page._sync_profile_ui_mode_from_settings = Mock()
 
-        Zapret2ModeControlPage._on_ui_state_changed(control_page, AppUiState(), frozenset())
-
-        control_page._get_selected_source_preset_display.assert_not_called()
-        control_page._get_enabled_profile_count_snapshot.assert_not_called()
-        self.assertEqual(len(connected), 1)
-
-        control_page.window.return_value.startup_state.interactive_logged = True
-        control_page.run_when_page_ready = Mock(side_effect=lambda callback: callback() or True)
-        with patch.object(
-            zapret2_page.QTimer,
-            "singleShot",
-            side_effect=lambda delay_ms, callback: scheduled.append((delay_ms, callback)),
-        ), patch.object(
-            zapret2_page,
-            "create_control_top_summary_worker",
-            side_effect=lambda request_id, get_preset_display, get_profile_count, **_kwargs: FakeTopSummaryWorker(
-                request_id,
-                get_preset_display,
-                get_profile_count,
-            ),
-        ):
-            connected[0]("ui_ready")
-
-        self.assertEqual(len(scheduled), 1)
-        self.assertGreaterEqual(scheduled[0][0], zapret2_page.STARTUP_TOP_SUMMARY_AFTER_INTERACTIVE_MS)
         with patch.object(
             zapret2_page,
             "create_control_top_summary_worker",
@@ -1946,7 +1909,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
                 get_profile_count,
             ),
         ):
-            scheduled[0][1]()
+            Zapret2ModeControlPage._on_ui_state_changed(control_page, AppUiState(), frozenset())
 
         control_page._get_selected_source_preset_display.assert_called_once()
         control_page._get_enabled_profile_count_snapshot.assert_called_once()
