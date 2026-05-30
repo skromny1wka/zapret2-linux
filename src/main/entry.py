@@ -18,6 +18,9 @@ from main.runtime_state import (
 from main.shell import shell_bootstrap
 
 
+QT_SCROLL_STYLE_AFTER_INTERACTIVE_MS = 2_000
+
+
 def _create_ipc_manager():
     from startup.ipc_manager import IPCManager
 
@@ -58,7 +61,7 @@ def _install_qt_scroll_style_after_interactive(window, app) -> None:
         if installed:
             return
         installed = True
-        QTimer.singleShot(0, lambda: _install_qt_scroll_style(app))
+        QTimer.singleShot(QT_SCROLL_STYLE_AFTER_INTERACTIVE_MS, lambda: _install_qt_scroll_style(app))
 
     try:
         if bool(window.startup_state.interactive_logged):

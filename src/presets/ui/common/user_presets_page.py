@@ -59,6 +59,7 @@ from presets.ui.common.user_presets_page_lifecycle import (
     handle_user_presets_ui_state_changed,
     resync_user_presets_layout_metrics,
     schedule_user_presets_layout_resync,
+    set_widget_text_if_changed,
 )
 from app.state_store import MainWindowStateStore
 
@@ -235,9 +236,9 @@ class UserPresetsPageBase(BasePage):
 
     def _apply_mode_labels(self) -> None:
         try:
-            self.title_label.setText(self._tr(self._config.title_key, "Мои пресеты"))
+            set_widget_text_if_changed(self.title_label, self._tr(self._config.title_key, "Мои пресеты"))
             if self.subtitle_label is not None:
-                self.subtitle_label.setText("")
+                set_widget_text_if_changed(self.subtitle_label, "")
         except Exception:
             pass
 

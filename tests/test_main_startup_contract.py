@@ -567,7 +567,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             window.startup_state.interactive_logged = True
             signal.emit("ui_ready")
             self.assertEqual(installed, [])
-            self.assertEqual(scheduled[0][0], 0)
+            self.assertGreaterEqual(scheduled[0][0], 1500)
 
             scheduled.pop(0)[1]()
 

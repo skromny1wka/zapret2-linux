@@ -54,6 +54,22 @@ class UserPresetsLifecycleGuardTests(unittest.TestCase):
         self.assertTrue(set_placeholder_if_changed(widget, "Поиск"))
         self.assertEqual(widget.calls, ["Поиск"])
 
+    def test_page_mode_labels_skip_duplicate_text(self) -> None:
+        from types import SimpleNamespace
+
+        from presets.ui.common.user_presets_page import UserPresetsPageBase
+
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page.title_label = _TextWidget("Мои пресеты")
+        page.subtitle_label = _TextWidget("")
+        page._config = SimpleNamespace(title_key="page.title")
+        page._tr = lambda _key, default: default
+
+        UserPresetsPageBase._apply_mode_labels(page)
+
+        self.assertEqual(page.title_label.calls, [])
+        self.assertEqual(page.subtitle_label.calls, [])
+
 
 if __name__ == "__main__":
     unittest.main()
