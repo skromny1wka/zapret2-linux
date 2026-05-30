@@ -285,9 +285,13 @@ class PresetListModel(QAbstractListModel):
             return False
 
         row = self._rows[row_index]
+        next_display_name = str(name or "").strip()
+        current_display_name = str(row.get("name") or "").strip()
+        if current_name == next_name and (not next_display_name or next_display_name == current_display_name):
+            return False
         row["file_name"] = next_name
-        if str(name or "").strip():
-            row["name"] = str(name or "").strip()
+        if next_display_name:
+            row["name"] = next_display_name
         if current_name in self._active_preset_file_names:
             self._active_preset_file_names.discard(current_name)
             self._active_preset_file_names.add(next_name)
