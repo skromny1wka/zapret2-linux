@@ -1,10 +1,25 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 
 class TrayMenuContractTests(unittest.TestCase):
+    def test_tray_launch_state_reads_runtime_snapshot_contract(self) -> None:
+        from app.feature_facades.tray import TrayFeature
+
+        runtime_feature = SimpleNamespace(
+            snapshot=Mock(return_value=SimpleNamespace(running=True, phase="running"))
+        )
+        feature = TrayFeature(
+            _deps=SimpleNamespace(),
+            _runtime_feature=runtime_feature,
+            _telegram_proxy_feature=SimpleNamespace(),
+        )
+
+        self.assertEqual(feature.launch_state(), (True, "running"))
+
     def test_legacy_right_click_callback_opens_context_menu_at_cursor(self) -> None:
         import tray
 

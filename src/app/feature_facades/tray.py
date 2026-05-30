@@ -96,8 +96,14 @@ class TrayFeature:
     def launch_state(self) -> tuple[bool, str]:
         try:
             snapshot = self._runtime_feature.snapshot()
-            running = bool(snapshot.launch_running)
-            phase = str(snapshot.launch_phase or "").strip().lower()
+            running = bool(
+                getattr(snapshot, "running", getattr(snapshot, "launch_running", False))
+            )
+            phase = (
+                str(getattr(snapshot, "phase", getattr(snapshot, "launch_phase", "")) or "")
+                .strip()
+                .lower()
+            )
             return running, phase or ("running" if running else "stopped")
         except Exception:
             return False, "stopped"
