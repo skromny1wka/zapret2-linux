@@ -2754,6 +2754,8 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._profile_key = "profile-1"
         page._payload = payload
         page._enabled_checkbox = Mock()
+        page._enabled_checkbox.isChecked.return_value = False
+        page._enabled_checkbox.isEnabled.return_value = False
         page._loading = False
         page.reload_current_profile = Mock()
         page._on_profile_changed_callback = Mock()

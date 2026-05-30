@@ -472,6 +472,31 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
 
         self.assertEqual(page._enabled_checkbox.enabled_calls, [])
 
+    def test_apply_enabled_locally_skips_duplicate_checkbox_state(self) -> None:
+        from dataclasses import dataclass, replace
+
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        @dataclass(frozen=True)
+        class _Item:
+            enabled: bool
+
+        @dataclass(frozen=True)
+        class _Payload:
+            item: _Item
+
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._payload = _Payload(item=_Item(enabled=True))
+        page._enabled_checkbox = _BoolWidget(checked=True, enabled=True)
+        page._loading = False
+
+        updated_item = ProfileSetupPageBase._apply_enabled_locally(page, True)
+
+        self.assertEqual(updated_item, replace(page._payload.item, enabled=True))
+        self.assertEqual(page._enabled_checkbox.checked_calls, [])
+        self.assertEqual(page._enabled_checkbox.enabled_calls, [])
+        self.assertFalse(page._loading)
+
     def test_editable_settings_skip_duplicate_text_and_visibility(self) -> None:
         from types import SimpleNamespace
         from unittest.mock import Mock, patch

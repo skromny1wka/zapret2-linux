@@ -2168,8 +2168,8 @@ class ProfileSetupPageBase(BasePage):
         if checkbox is not None:
             self._loading = True
             try:
-                checkbox.setChecked(bool(enabled))
-                checkbox.setEnabled(True)
+                set_widget_checked_if_changed(checkbox, bool(enabled))
+                set_widget_enabled_if_changed(checkbox, True)
             finally:
                 self._loading = False
         return updated_item
