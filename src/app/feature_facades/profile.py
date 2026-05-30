@@ -467,3 +467,44 @@ class ProfileFeature:
             profile_id=profile_id,
             parent=parent,
         )
+
+    def create_profile_folder_action_worker(
+        self,
+        request_id: int,
+        *,
+        action: str,
+        folder_key: str = "",
+        name: str = "",
+        direction: int = 0,
+        collapsed: bool = False,
+        context_extra: dict | None = None,
+        parent=None,
+    ):
+        from profile.folders import (
+            create_profile_folder,
+            delete_profile_folder,
+            load_profile_folder_state,
+            move_profile_folder_by_step,
+            rename_profile_folder,
+            reset_profile_folders,
+            set_profile_folder_collapsed,
+        )
+        from profile.profile_setup_loader import ProfileFolderActionWorker
+
+        return ProfileFolderActionWorker(
+            request_id,
+            load_profile_folder_state,
+            create_profile_folder,
+            rename_profile_folder,
+            delete_profile_folder,
+            move_profile_folder_by_step,
+            set_profile_folder_collapsed,
+            reset_profile_folders,
+            action=action,
+            folder_key=folder_key,
+            name=name,
+            direction=direction,
+            collapsed=collapsed,
+            context_extra=context_extra,
+            parent=parent,
+        )

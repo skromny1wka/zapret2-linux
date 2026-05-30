@@ -1377,11 +1377,14 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("self._reset_profile_folders", worker_source)
         self.assertIn("self._load_profile_folder_state", worker_source)
         self.assertNotIn("from profile.folders", worker_source)
+        self.assertNotIn("from profile.folders import", inspect.getsource(PresetSetupPageBase))
         self.assertIn("_profile_folder_action_pending.append", request_source)
         self.assertIn("_profile_folder_action_pending.pop(0)", finished_source)
         self.assertIn("show_menu", action_finished_source)
         self.assertIn("_create_profile_folder_action_worker", request_source)
-        self.assertIn("ProfileFolderActionWorker", inspect.getsource(PresetSetupPageBase._create_profile_folder_action_worker))
+        create_source = inspect.getsource(PresetSetupPageBase._create_profile_folder_action_worker)
+        self.assertNotIn("ProfileFolderActionWorker", create_source)
+        self.assertIn("_create_profile_folder_action_worker_fn", create_source)
 
     def test_profile_move_updates_visible_list_locally_after_worker(self) -> None:
         finished_source = inspect.getsource(PresetSetupPageBase._on_profile_move_finished)

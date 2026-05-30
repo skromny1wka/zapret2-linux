@@ -104,6 +104,7 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("create_user_profile_create_worker", init_source)
         self.assertIn("create_user_profile_update_worker", init_source)
         self.assertIn("create_user_profile_delete_worker", init_source)
+        self.assertIn("create_profile_folder_action_worker", init_source)
         self.assertNotIn("list_profiles", init_source)
         self.assertNotIn("create_user_profile,", init_source)
         self.assertNotIn("update_user_profile,", init_source)
@@ -153,6 +154,10 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
         self.assertIs(
             kwargs["create_user_profile_delete_worker"],
             profile_feature.create_user_profile_delete_worker,
+        )
+        self.assertIs(
+            kwargs["create_profile_folder_action_worker"],
+            profile_feature.create_profile_folder_action_worker,
         )
         self.assertNotIn("list_profiles", kwargs)
         self.assertNotIn("create_user_profile", kwargs)

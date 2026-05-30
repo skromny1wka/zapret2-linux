@@ -5,21 +5,9 @@ import time
 from PyQt6.QtCore import QTimer
 
 from log.log import log
-from profile.folders import (
-    create_profile_folder,
-    delete_profile_folder,
-    load_profile_folder_state,
-    move_profile_folder_by_step,
-    rename_profile_folder,
-    reset_profile_folders,
-    set_profile_folder_collapsed,
-)
 from profile.match_filters import filter_values
 from profile.ui.profile_context_menu import ProfileContextMenuActions, show_profile_context_menu
 from profile.ui.profile_folder_menu import show_profile_folder_menu
-from profile.profile_setup_loader import (
-    ProfileFolderActionWorker,
-)
 from profile.ui.profiles_list import ProfilesList
 from profile.ui.shell import build_profile_shell
 from profile.ui.user_profile_dialog import CreateUserProfileDialog
@@ -83,6 +71,7 @@ class PresetSetupPageBase(BasePage):
         create_user_profile_create_worker,
         create_user_profile_update_worker,
         create_user_profile_delete_worker,
+        create_profile_folder_action_worker,
         open_profile_setup,
         open_profile_order,
         ui_state_store=None,
@@ -99,6 +88,7 @@ class PresetSetupPageBase(BasePage):
         self._create_user_profile_create_worker_fn = create_user_profile_create_worker
         self._create_user_profile_update_worker_fn = create_user_profile_update_worker
         self._create_user_profile_delete_worker_fn = create_user_profile_delete_worker
+        self._create_profile_folder_action_worker_fn = create_profile_folder_action_worker
         self._open_profile_setup = open_profile_setup
         self._open_profile_order_page = open_profile_order
 
@@ -1029,15 +1019,8 @@ class PresetSetupPageBase(BasePage):
         collapsed: bool = False,
         context_extra: dict | None = None,
     ):
-        return ProfileFolderActionWorker(
+        return self._create_profile_folder_action_worker_fn(
             request_id,
-            load_profile_folder_state,
-            create_profile_folder,
-            rename_profile_folder,
-            delete_profile_folder,
-            move_profile_folder_by_step,
-            set_profile_folder_collapsed,
-            reset_profile_folders,
             action=action,
             folder_key=folder_key,
             name=name,

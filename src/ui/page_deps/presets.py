@@ -76,6 +76,7 @@ def build_preset_setup_page_kwargs(*, page_name: PageName, profile_feature, open
         "create_user_profile_create_worker": profile_feature.create_user_profile_create_worker,
         "create_user_profile_update_worker": profile_feature.create_user_profile_update_worker,
         "create_user_profile_delete_worker": profile_feature.create_user_profile_delete_worker,
+        "create_profile_folder_action_worker": profile_feature.create_profile_folder_action_worker,
         "open_profile_setup": lambda profile_key, m=method: open_profile_setup(m, profile_key),
         "open_profile_order": lambda m=method: show_page(resolve_profile_order_page_for_method(m), allow_internal=True),
         "ui_state_store": ui_state_store,
