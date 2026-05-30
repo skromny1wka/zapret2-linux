@@ -103,8 +103,7 @@ class StrategyScanPage(BasePage):
         self._support_prepare_worker = None
         self._support_prepare_request_id = 0
         self._quick_targets_runtime = OneShotWorkerRuntime()
-        self._strategy_scan_resume_save_worker = None
-        self._strategy_scan_resume_save_request_id = 0
+        self._strategy_scan_resume_save_runtime = OneShotWorkerRuntime()
         self._strategy_scan_resume_save_pending = None
         self._strategy_scan_finalize_worker = None
         self._strategy_scan_finalize_request_id = 0
@@ -591,15 +590,9 @@ class StrategyScanPage(BasePage):
             "udp_games_scope": udp_games_scope,
             "next_index": int(next_index),
         }
-        worker = self.__dict__.get("_strategy_scan_resume_save_worker")
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    self._strategy_scan_resume_save_pending = payload
-                    return
-            except Exception:
-                self._strategy_scan_resume_save_pending = payload
-                return
+        if self._strategy_scan_resume_save_runtime.is_running():
+            self._strategy_scan_resume_save_pending = payload
+            return
 
         self._strategy_scan_resume_save_pending = None
         self._start_strategy_scan_resume_save_worker(payload)
@@ -608,32 +601,35 @@ class StrategyScanPage(BasePage):
         if self._cleanup_in_progress:
             return
 
-        self._strategy_scan_resume_save_request_id += 1
-        request_id = self._strategy_scan_resume_save_request_id
-        worker = self.create_strategy_scan_resume_save_worker(request_id, **payload)
-        self._strategy_scan_resume_save_worker = worker
-        worker.completed.connect(self._on_strategy_scan_resume_save_finished)
-        worker.failed.connect(self._on_strategy_scan_resume_save_failed)
-        worker.finished.connect(lambda w=worker: self._on_strategy_scan_resume_save_worker_finished(w))
-        worker.start()
+        def worker_factory(request_id: int):
+            return self.create_strategy_scan_resume_save_worker(request_id, **payload)
+
+        def bind_worker(worker) -> None:
+            worker.completed.connect(self._on_strategy_scan_resume_save_finished)
+            worker.failed.connect(self._on_strategy_scan_resume_save_failed)
+
+        self._strategy_scan_resume_save_runtime.start_qthread_worker(
+            worker_factory=worker_factory,
+            bind_worker=bind_worker,
+            on_finished=self._on_strategy_scan_resume_save_runtime_finished,
+        )
 
     def _on_strategy_scan_resume_save_finished(self, request_id: int, _result) -> None:
-        if request_id != self._strategy_scan_resume_save_request_id or self._cleanup_in_progress:
+        if not self._strategy_scan_resume_save_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
             return
 
     def _on_strategy_scan_resume_save_failed(self, request_id: int, error: str) -> None:
-        if request_id != self._strategy_scan_resume_save_request_id or self._cleanup_in_progress:
+        if not self._strategy_scan_resume_save_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
             return
         logger.warning("Failed to save strategy-scan resume progress: %s", error)
 
-    def _on_strategy_scan_resume_save_worker_finished(self, worker) -> None:
-        if self.__dict__.get("_strategy_scan_resume_save_worker") is worker:
-            self._strategy_scan_resume_save_worker = None
-        try:
-            worker.deleteLater()
-        except Exception:
-            pass
-
+    def _on_strategy_scan_resume_save_runtime_finished(self, _worker) -> None:
         pending = self.__dict__.get("_strategy_scan_resume_save_pending")
         if pending is not None and not self._cleanup_in_progress:
             self._strategy_scan_resume_save_pending = None
@@ -956,13 +952,11 @@ class StrategyScanPage(BasePage):
         )
         self._quick_targets_runtime.cancel()
         self._strategy_scan_resume_save_pending = None
-        resume_save_worker = self.__dict__.get("_strategy_scan_resume_save_worker")
-        if resume_save_worker is not None:
-            try:
-                resume_save_worker.quit()
-            except Exception:
-                pass
-            self._strategy_scan_resume_save_worker = None
+        self._strategy_scan_resume_save_runtime.stop(
+            blocking=False,
+            warning_prefix="strategy scan resume save worker",
+        )
+        self._strategy_scan_resume_save_runtime.cancel()
         finalize_worker = self.__dict__.get("_strategy_scan_finalize_worker")
         if finalize_worker is not None:
             try:
