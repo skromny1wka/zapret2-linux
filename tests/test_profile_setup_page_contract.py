@@ -834,6 +834,39 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertEqual(model.rowCount(), 2)
         self.assertEqual(model.index(1, 0).data(ProfileListModel.ProfileKeyRole), "profile:1")
 
+    def test_profile_model_apply_view_state_skips_reset_for_same_state(self) -> None:
+        from profile.ui.profile_list_model import ProfileListModel, build_profile_list_view_state
+
+        youtube = SimpleNamespace(
+            key="profile:1",
+            persistent_key="p1",
+            profile_index=1,
+            display_name="YouTube",
+            enabled=True,
+            in_preset=True,
+            strategy_id="none",
+            strategy_name="Стратегия не выбрана",
+            match_lines=("--filter-tcp=443", "--hostlist=lists/youtube.txt"),
+            list_type="hostlist",
+            rating="",
+            favorite=False,
+            group="video",
+            group_name="Video",
+            order=2,
+            order_is_manual=False,
+            group_collapsed=False,
+        )
+
+        state = build_profile_list_view_state((youtube,))
+        model = ProfileListModel()
+        model.apply_view_state(state)
+        model.beginResetModel = Mock(side_effect=AssertionError("same view state must not reset the whole model"))
+
+        model.apply_view_state(state)
+
+        self.assertEqual(model.rowCount(), 2)
+        self.assertEqual(model.index(1, 0).data(ProfileListModel.ProfileKeyRole), "profile:1")
+
     def test_profile_model_toggles_one_folder_without_resetting_whole_model(self) -> None:
         from profile.ui.profile_list_model import ProfileListModel
 

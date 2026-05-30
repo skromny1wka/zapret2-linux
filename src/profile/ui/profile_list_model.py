@@ -105,13 +105,28 @@ class ProfileListModel(QAbstractListModel):
         self.apply_view_state(state)
 
     def apply_view_state(self, state: ProfileListViewState) -> None:
+        next_all_items = tuple(state.all_items or ())
+        next_profile_items = dict(state.profile_items or {})
+        next_group_expanded = dict(state.group_expanded or {})
+        next_active_profile_types = set(state.active_profile_types or {"all"})
+        next_search_query = str(state.search_query or "")
+        next_rows = list(state.rows or [])
+        if (
+            self._all_items == next_all_items
+            and self._profile_items == next_profile_items
+            and self._group_expanded == next_group_expanded
+            and self._active_profile_types == next_active_profile_types
+            and self._search_query == next_search_query
+            and self._rows == next_rows
+        ):
+            return
         self.beginResetModel()
-        self._all_items = tuple(state.all_items or ())
-        self._profile_items = dict(state.profile_items or {})
-        self._group_expanded = dict(state.group_expanded or {})
-        self._active_profile_types = set(state.active_profile_types or {"all"})
-        self._search_query = str(state.search_query or "")
-        self._rows = list(state.rows or [])
+        self._all_items = next_all_items
+        self._profile_items = next_profile_items
+        self._group_expanded = next_group_expanded
+        self._active_profile_types = next_active_profile_types
+        self._search_query = next_search_query
+        self._rows = next_rows
         self.endResetModel()
 
     def update_profiles(
