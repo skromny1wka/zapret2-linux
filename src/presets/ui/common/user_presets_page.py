@@ -27,6 +27,7 @@ from presets.ui.common.user_presets_page_runtime import (
     UserPresetsPageRuntimeConfig,
     UserPresetsRuntimeActions,
     apply_preset_search,
+    apply_presets_rows_plan,
     rebuild_presets_rows,
     schedule_preset_search,
     update_presets_view_height,
@@ -226,11 +227,8 @@ class UserPresetsPageBase(BasePage):
             cached_metadata=self._listing_api().get_cached_preset_list_metadata_light,
             load_all_metadata=self._listing_api().load_preset_list_metadata_light,
             load_folder_state=self._load_preset_folder_state_light,
-            rebuild_rows=lambda all_presets, folder_state=None, started_at=None: self._rebuild_presets_rows(
-                all_presets,
-                folder_state=folder_state,
-                started_at=started_at,
-            ),
+            build_rows_plan=self._build_preset_rows_plan,
+            apply_rows_plan=self._apply_presets_rows_plan,
             delete_preset_item_meta=lambda name: self._delete_preset_item_meta_fn(self._folder_scope_key(), name),
         )
 
@@ -958,6 +956,37 @@ class UserPresetsPageBase(BasePage):
             log_fn=log,
             all_presets=all_presets,
             folder_state=folder_state,
+            started_at=started_at,
+            log_source=self._config.log_prefix,
+        )
+
+    def _build_preset_rows_plan(
+        self,
+        *,
+        all_presets: dict[str, dict[str, object]],
+        query: str,
+        active_file_name: str,
+        language: str,
+        folder_state: dict[str, object] | None = None,
+    ):
+        return self._listing_api().build_preset_rows_plan(
+            all_presets=all_presets,
+            query=query,
+            active_file_name=active_file_name,
+            language=language,
+            folder_state=folder_state,
+        )
+
+    def _apply_presets_rows_plan(self, plan, started_at: float | None = None) -> None:
+        apply_presets_rows_plan(
+            runtime_service=self._runtime_service,
+            presets_delegate=self._presets_delegate,
+            presets_model=self._presets_model,
+            presets_list=getattr(self, "presets_list", None),
+            schedule_layout_resync_fn=self._schedule_layout_resync,
+            update_presets_view_height_fn=self._update_presets_view_height,
+            log_fn=log,
+            plan=plan,
             started_at=started_at,
             log_source=self._config.log_prefix,
         )

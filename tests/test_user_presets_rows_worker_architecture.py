@@ -1,0 +1,34 @@
+from __future__ import annotations
+
+import inspect
+import unittest
+
+
+class UserPresetsRowsWorkerArchitectureTests(unittest.TestCase):
+    def test_runtime_refresh_requests_rows_plan_worker_instead_of_building_rows_in_gui(self) -> None:
+        from presets.user_presets_runtime_service import UserPresetsRuntimeService
+
+        refresh_source = inspect.getsource(UserPresetsRuntimeService.refresh_presets_view_from_cache)
+        loaded_source = inspect.getsource(UserPresetsRuntimeService._on_metadata_loaded)
+        request_source = inspect.getsource(UserPresetsRuntimeService._request_rows_plan_refresh)
+
+        self.assertIn("_request_rows_plan_refresh", refresh_source)
+        self.assertIn("_request_rows_plan_refresh", loaded_source)
+        self.assertNotIn("adapter.rebuild_rows(", refresh_source)
+        self.assertNotIn("adapter.rebuild_rows(", loaded_source)
+        self.assertNotIn("adapter.rebuild_rows(", request_source)
+
+    def test_rows_plan_worker_builds_plan_before_gui_applies_rows(self) -> None:
+        import presets.user_presets_runtime_service as runtime_service
+
+        self.assertTrue(hasattr(runtime_service, "UserPresetsRowsPlanWorker"))
+        worker_source = inspect.getsource(runtime_service.UserPresetsRowsPlanWorker.run)
+        apply_source = inspect.getsource(runtime_service.UserPresetsRuntimeService._on_rows_plan_loaded)
+
+        self.assertIn("_build_rows_plan", worker_source)
+        self.assertIn("adapter.apply_rows_plan", apply_source)
+        self.assertNotIn("build_preset_rows_plan", apply_source)
+
+
+if __name__ == "__main__":
+    unittest.main()

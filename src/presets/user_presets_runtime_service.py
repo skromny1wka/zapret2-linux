@@ -20,8 +20,9 @@ class UserPresetsRuntimeAdapter:
     cached_metadata: Callable[[], dict[str, dict[str, object]] | None]
     load_all_metadata: Callable[[], dict[str, dict[str, object]]]
     load_folder_state: Callable[[], dict[str, Any]]
-    rebuild_rows: Callable[[dict[str, dict[str, object]], dict[str, Any] | None, float | None], None]
     delete_preset_item_meta: Callable[[str], None]
+    build_rows_plan: Callable[..., object]
+    apply_rows_plan: Callable[[object, float | None], None]
 
 
 class UserPresetsMetadataLoadWorker(QThread):
@@ -80,6 +81,48 @@ class UserPresetsSingleMetadataWorker(QThread):
         self.loaded.emit(self._request_id, self._file_name, refreshed)
 
 
+class UserPresetsRowsPlanWorker(QThread):
+    loaded = pyqtSignal(int, object, object)
+    failed = pyqtSignal(int, str)
+
+    def __init__(
+        self,
+        request_id: int,
+        build_rows_plan,
+        *,
+        all_presets: dict[str, dict[str, object]],
+        query: str,
+        active_file_name: str,
+        language: str,
+        folder_state: dict[str, Any] | None = None,
+        started_at: float | None = None,
+        parent=None,
+    ):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self._build_rows_plan = build_rows_plan
+        self._all_presets = dict(all_presets or {})
+        self._query = str(query or "")
+        self._active_file_name = str(active_file_name or "")
+        self._language = str(language or "")
+        self._folder_state = dict(folder_state or {})
+        self._started_at = started_at
+
+    def run(self) -> None:
+        try:
+            plan = self._build_rows_plan(
+                all_presets=self._all_presets,
+                query=self._query,
+                active_file_name=self._active_file_name,
+                language=self._language,
+                folder_state=self._folder_state,
+            )
+        except Exception as exc:
+            self.failed.emit(self._request_id, str(exc))
+            return
+        self.loaded.emit(self._request_id, plan, self._started_at)
+
+
 class UserPresetsRuntimeService:
     def __init__(self, *, scope_key: str = "") -> None:
         self._scope_key = str(scope_key or "").strip()
@@ -96,6 +139,9 @@ class UserPresetsRuntimeService:
         self._single_metadata_request_id = 0
         self._single_metadata_worker: UserPresetsSingleMetadataWorker | None = None
         self._single_metadata_pending: list[str] = []
+        self._rows_plan_request_id = 0
+        self._rows_plan_worker: UserPresetsRowsPlanWorker | None = None
+        self._rows_plan_pending: tuple[dict[str, dict[str, object]], dict[str, Any] | None, float | None, object] | None = None
 
     def is_ui_dirty(self) -> bool:
         return bool(self._ui_dirty)
@@ -511,8 +557,10 @@ class UserPresetsRuntimeService:
     def _stop_metadata_workers(self) -> None:
         self._metadata_load_request_id += 1
         self._single_metadata_request_id += 1
+        self._rows_plan_request_id += 1
         self._single_metadata_pending.clear()
-        for attr in ("_metadata_load_worker", "_single_metadata_worker"):
+        self._rows_plan_pending = None
+        for attr in ("_metadata_load_worker", "_single_metadata_worker", "_rows_plan_worker"):
             worker = getattr(self, attr, None)
             if worker is None:
                 continue
@@ -644,7 +692,7 @@ class UserPresetsRuntimeService:
             self._ui_dirty = True
             return
         self._ui_dirty = False
-        adapter.rebuild_rows(all_presets, self._cached_folder_state, started_at)
+        self._request_rows_plan_refresh(all_presets, self._cached_folder_state, started_at, page)
 
     def _on_metadata_failed(self, request_id: int, error: str, page=None) -> None:
         if request_id != self._metadata_load_request_id:
@@ -678,14 +726,76 @@ class UserPresetsRuntimeService:
 
     def refresh_presets_view_from_cache(self, page=None) -> None:
         _ = self._resolve_page(page)
-        adapter = self._resolve_adapter()
         if not self._cached_presets_metadata:
             self.load_presets(page)
             return
         if self._cached_folder_state is None:
             self.load_presets(page)
             return
-        adapter.rebuild_rows(self._cached_presets_metadata, self._cached_folder_state, None)
+        self._request_rows_plan_refresh(self._cached_presets_metadata, self._cached_folder_state, None, page)
+
+    def _request_rows_plan_refresh(
+        self,
+        all_presets: dict[str, dict[str, object]],
+        folder_state: dict[str, Any] | None,
+        started_at: float | None,
+        page=None,
+    ) -> None:
+        page = self._resolve_page(page)
+        adapter = self._resolve_adapter()
+        build_rows_plan = adapter.build_rows_plan
+
+        worker = self._rows_plan_worker
+        if worker is not None:
+            try:
+                if worker.isRunning():
+                    self._rows_plan_pending = (dict(all_presets or {}), dict(folder_state or {}), started_at, page)
+                    return
+            except Exception:
+                return
+
+        self._rows_plan_request_id += 1
+        request_id = self._rows_plan_request_id
+        worker = UserPresetsRowsPlanWorker(
+            request_id,
+            build_rows_plan,
+            all_presets=all_presets,
+            query=self.current_search_query(page),
+            active_file_name=adapter.selected_source_file_name(),
+            language=str(getattr(page, "_ui_language", "") or ""),
+            folder_state=folder_state,
+            started_at=started_at,
+            parent=page,
+        )
+        self._rows_plan_worker = worker
+        worker.loaded.connect(lambda rid, plan, started, p=page: self._on_rows_plan_loaded(rid, plan, started, p))
+        worker.failed.connect(lambda rid, error, p=page: self._on_rows_plan_failed(rid, error, p))
+        worker.finished.connect(lambda w=worker: self._on_rows_plan_worker_finished(w))
+        worker.start()
+
+    def _on_rows_plan_loaded(self, request_id: int, plan, started_at: float | None, page=None) -> None:
+        if request_id != self._rows_plan_request_id:
+            return
+        _ = self._resolve_page(page)
+        adapter = self._resolve_adapter()
+        if callable(adapter.apply_rows_plan):
+            adapter.apply_rows_plan(plan, started_at)
+
+    def _on_rows_plan_failed(self, request_id: int, error: str, page=None) -> None:
+        if request_id != self._rows_plan_request_id:
+            return
+        self._ui_dirty = True
+        log(f"Ошибка подготовки списка пресетов: {error}", "ERROR")
+
+    def _on_rows_plan_worker_finished(self, worker: UserPresetsRowsPlanWorker) -> None:
+        if self._rows_plan_worker is worker:
+            self._rows_plan_worker = None
+        worker.deleteLater()
+        pending = self._rows_plan_pending
+        self._rows_plan_pending = None
+        if pending is not None:
+            all_presets, folder_state, started_at, page = pending
+            self._request_rows_plan_refresh(all_presets, folder_state, started_at, page)
 
     def remove_deleted_preset_locally(self, name: str, page=None) -> bool:
         page = self._resolve_page(page)

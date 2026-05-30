@@ -2377,12 +2377,12 @@ class StartupRuntimeSetupTests(unittest.TestCase):
     def test_user_presets_runtime_uses_cached_metadata_before_worker(self) -> None:
         from presets.user_presets_runtime_service import UserPresetsRuntimeAdapter, UserPresetsRuntimeService
 
-        rebuilt: list[dict[str, dict[str, object]]] = []
         service = UserPresetsRuntimeService(scope_key="winws2")
         page = SimpleNamespace(
             isVisible=Mock(return_value=True),
         )
         service.update_cached_folder_state({})
+        service._request_rows_plan_refresh = Mock()
         adapter = UserPresetsRuntimeAdapter(
             bulk_reset_running=Mock(return_value=False),
             read_single_metadata=Mock(return_value=None),
@@ -2391,14 +2391,20 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             cached_metadata=Mock(return_value={"a.txt": {"display_name": "A"}}),
             load_all_metadata=Mock(return_value={}),
             load_folder_state=Mock(return_value={}),
-            rebuild_rows=lambda metadata, _folder_state=None, _started_at=None: rebuilt.append(dict(metadata)),
             delete_preset_item_meta=Mock(),
+            build_rows_plan=Mock(),
+            apply_rows_plan=Mock(),
         )
         service.attach_page(page, adapter)
 
         service.refresh_presets_view_if_possible(page)
 
-        self.assertEqual(rebuilt, [{"a.txt": {"display_name": "A"}}])
+        service._request_rows_plan_refresh.assert_called_once_with(
+            {"a.txt": {"display_name": "A"}},
+            {},
+            None,
+            page,
+        )
         adapter.load_all_metadata.assert_not_called()
 
     def test_post_startup_tasks_install_dns_page_data_warmup(self) -> None:

@@ -195,6 +195,53 @@ def rebuild_presets_rows(
         log_fn(f"Ошибка загрузки пресетов: {exc}", "ERROR")
 
 
+def apply_presets_rows_plan(
+    *,
+    runtime_service,
+    presets_delegate,
+    presets_model,
+    presets_list,
+    schedule_layout_resync_fn,
+    update_presets_view_height_fn,
+    log_fn,
+    plan: UserPresetListPlan,
+    started_at: float | None = None,
+    log_source: str = "UserPresetsPage",
+) -> None:
+    try:
+        view_state = runtime_service.capture_presets_view_state() if presets_list is not None else {}
+        previous_row_count = presets_model.rowCount() if presets_model else None
+        rows_changed = True
+        if presets_model:
+            rows_changed = bool(presets_model.set_rows(plan.rows))
+        if not rows_changed:
+            if started_at is not None:
+                elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+                log_fn(
+                    f"{log_source}: lightweight list reload skipped {elapsed_ms}ms ({plan.total_presets} presets)",
+                    "DEBUG",
+                )
+            return
+        if presets_delegate:
+            presets_delegate.reset_interaction_state()
+        runtime_service.ensure_preset_list_current_index()
+        if view_state:
+            runtime_service.restore_presets_view_state(view_state)
+        next_row_count = presets_model.rowCount() if presets_model else None
+        if previous_row_count is None or next_row_count != previous_row_count:
+            update_presets_view_height_fn()
+            schedule_layout_resync_fn()
+        if started_at is not None:
+            elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+            log_fn(
+                f"{log_source}: lightweight list reload {elapsed_ms}ms ({plan.total_presets} presets)",
+                "DEBUG",
+            )
+
+    except Exception as exc:
+        log_fn(f"Ошибка загрузки пресетов: {exc}", "ERROR")
+
+
 @dataclass(frozen=True, slots=True)
 class UserPresetsPageApiBundle:
     listing: UserPresetsListingApi
