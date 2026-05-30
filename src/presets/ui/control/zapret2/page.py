@@ -308,11 +308,17 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
                 snapshot = self._ui_state_store.snapshot()
             except Exception:
                 snapshot = None
-        summary.set_premium(
-            is_premium=bool(getattr(snapshot, "subscription_is_premium", False)),
-            days_remaining=getattr(snapshot, "subscription_days_remaining", None),
-        )
+        self._apply_top_summary_premium(snapshot)
         self._request_top_summary_worker()
+
+    def _apply_top_summary_premium(self, state: AppUiState | None = None) -> None:
+        summary = self.top_summary
+        if summary is None:
+            return
+        summary.set_premium(
+            is_premium=bool(getattr(state, "subscription_is_premium", False)),
+            days_remaining=getattr(state, "subscription_days_remaining", None),
+        )
 
     def _open_preset_setup_page(self) -> None:
         self._open_preset_setup_callback()
@@ -660,15 +666,19 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             return
         changed = set(changed_fields or ())
         presets_changed = "active_preset_revision" in changed
-        summary_changed = (
+        top_summary_data_changed = (
             not changed
             or "current_strategy_summary" in changed
             or "preset_content_revision" in changed
-            or "subscription_is_premium" in changed
+        )
+        top_summary_premium_changed = (
+            "subscription_is_premium" in changed
             or "subscription_days_remaining" in changed
         )
-        if summary_changed:
+        if top_summary_data_changed:
             self._refresh_top_summary(state)
+        elif top_summary_premium_changed:
+            self._apply_top_summary_premium(state)
         if "mode_revision" in changed:
             self._sync_profile_ui_mode_from_settings()
         if presets_changed:
