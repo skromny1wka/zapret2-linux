@@ -77,6 +77,16 @@ class ControlPageImmediateStartupTests(unittest.TestCase):
         self.assertNotIn("from ui.fluent_widgets import", shared_import_block)
         self.assertIn("from ui.pulsing_dot import PulsingDot", shared_import_block)
 
+    def test_zapret2_top_summary_icons_are_delayed_past_first_paint(self) -> None:
+        import inspect
+
+        from presets.ui.control.zapret2.page import Zapret2ModeControlPage
+
+        build_ui_source = inspect.getsource(Zapret2ModeControlPage._build_ui)
+
+        self.assertIn("ControlTopSummaryWidget", build_ui_source)
+        self.assertIn("initial_icon_delay_ms=250", build_ui_source)
+
 
 if __name__ == "__main__":
     unittest.main()
