@@ -61,6 +61,13 @@ class UserPresetsRowsWorkerArchitectureTests(unittest.TestCase):
 
         self.assertFalse(hasattr(runtime_service.UserPresetsRuntimeService, "apply_active_preset_marker"))
 
+    def test_file_watcher_change_handler_does_not_stat_changed_preset_on_gui_thread(self) -> None:
+        import presets.user_presets_runtime_service as runtime_service
+
+        source = inspect.getsource(runtime_service.UserPresetsRuntimeService.on_preset_file_changed)
+
+        self.assertNotIn(".exists()", source)
+
 
 if __name__ == "__main__":
     unittest.main()

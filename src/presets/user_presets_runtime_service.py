@@ -576,7 +576,7 @@ class UserPresetsRuntimeService:
         page = self._resolve_page(page)
         try:
             changed_path = Path(path)
-            if self._file_watcher is not None and changed_path.exists():
+            if self._file_watcher is not None:
                 normalized_path = str(changed_path)
                 if normalized_path not in self._file_watcher.files():
                     self._file_watcher.addPath(normalized_path)
