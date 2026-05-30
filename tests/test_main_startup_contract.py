@@ -2762,8 +2762,9 @@ class WindowLifecycleEarlyEventTests(unittest.TestCase):
         ):
             window.showEvent(object())
 
-        refresh_titlebar_layout.assert_called_once_with(window)
+        refresh_titlebar_layout.assert_not_called()
         self.assertIn(0, scheduled_delays)
+        self.assertIn(120, scheduled_delays)
 
     def test_native_minimize_command_hides_to_tray_when_window_setting_is_enabled(self) -> None:
         from main.window_native_commands import SC_MINIMIZE, WM_SYSCOMMAND

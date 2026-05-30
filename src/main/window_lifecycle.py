@@ -170,7 +170,6 @@ class WindowLifecycleMixin:
             geometry_runtime.apply_saved_maximized_state_if_needed()
             QTimer.singleShot(350, geometry_runtime.enable_persistence)
 
-        self._refresh_titlebar_layout_after_show()
         QTimer.singleShot(0, self._refresh_titlebar_layout_after_show)
         QTimer.singleShot(120, self._refresh_titlebar_layout_after_show)
 
