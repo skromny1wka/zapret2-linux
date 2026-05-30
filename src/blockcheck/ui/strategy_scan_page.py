@@ -98,8 +98,7 @@ class StrategyScanPage(BasePage):
         self._prepare_support_btn = None
         self._support_status_label = None
         self._cleanup_in_progress = False
-        self._strategy_apply_worker = None
-        self._strategy_apply_request_id = 0
+        self._strategy_apply_runtime = OneShotWorkerRuntime()
         self._support_prepare_worker = None
         self._support_prepare_request_id = 0
         self._quick_targets_runtime = OneShotWorkerRuntime()
@@ -730,29 +729,30 @@ class StrategyScanPage(BasePage):
         )
 
     def _request_strategy_apply(self, strategy_args: str, strategy_name: str) -> None:
-        worker = self.__dict__.get("_strategy_apply_worker")
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    return
-            except Exception:
-                return
+        if self._strategy_apply_runtime.is_running():
+            return
 
-        self._strategy_apply_request_id += 1
-        request_id = self._strategy_apply_request_id
-        worker = self.create_strategy_apply_worker(
-            request_id,
-            strategy_args=strategy_args,
-            strategy_name=strategy_name,
+        def worker_factory(request_id: int):
+            return self.create_strategy_apply_worker(
+                request_id,
+                strategy_args=strategy_args,
+                strategy_name=strategy_name,
+            )
+
+        def bind_worker(worker) -> None:
+            worker.completed.connect(self._on_strategy_apply_finished)
+            worker.failed.connect(self._on_strategy_apply_failed)
+
+        self._strategy_apply_runtime.start_qthread_worker(
+            worker_factory=worker_factory,
+            bind_worker=bind_worker,
         )
-        self._strategy_apply_worker = worker
-        worker.completed.connect(self._on_strategy_apply_finished)
-        worker.failed.connect(self._on_strategy_apply_failed)
-        worker.finished.connect(lambda w=worker: self._on_strategy_apply_worker_finished(w))
-        worker.start()
 
     def _on_strategy_apply_finished(self, request_id: int, result) -> None:
-        if request_id != self._strategy_apply_request_id or self._cleanup_in_progress:
+        if not self._strategy_apply_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
             return
         message_plan = self._blockcheck.build_apply_success_plan(result)
 
@@ -763,7 +763,10 @@ class StrategyScanPage(BasePage):
         )
 
     def _on_strategy_apply_failed(self, request_id: int, error: str) -> None:
-        if request_id != self._strategy_apply_request_id or self._cleanup_in_progress:
+        if not self._strategy_apply_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
             return
         logger.warning("Failed to apply strategy: %s", error)
         try:
@@ -775,11 +778,6 @@ class StrategyScanPage(BasePage):
             )
         except Exception:
             pass
-
-    def _on_strategy_apply_worker_finished(self, worker) -> None:
-        if self.__dict__.get("_strategy_apply_worker") is worker:
-            self._strategy_apply_worker = None
-        worker.deleteLater()
 
     # ------------------------------------------------------------------
     # UI helpers
@@ -927,13 +925,11 @@ class StrategyScanPage(BasePage):
 
     def cleanup(self) -> None:
         self._cleanup_in_progress = True
-        worker = self.__dict__.get("_strategy_apply_worker")
-        if worker is not None:
-            try:
-                worker.quit()
-            except Exception:
-                pass
-            self._strategy_apply_worker = None
+        self._strategy_apply_runtime.stop(
+            blocking=False,
+            warning_prefix="strategy scan apply worker",
+        )
+        self._strategy_apply_runtime.cancel()
         support_worker = self.__dict__.get("_support_prepare_worker")
         if support_worker is not None:
             try:
