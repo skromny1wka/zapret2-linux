@@ -2332,6 +2332,9 @@ class ProfileSetupPageBase(BasePage):
         if self._loading or not self._profile_key:
             return
         enabled = bool(state == Qt.CheckState.Checked.value or state == 2)
+        item = getattr(self.__dict__.get("_payload"), "item", None)
+        if item is not None and bool(getattr(item, "enabled", False)) == enabled:
+            return
         worker = self._enabled_save_worker
         if worker is not None:
             try:

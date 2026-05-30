@@ -695,6 +695,30 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         )
         self.assertEqual(worker.start_calls, 1)
 
+    def test_enabled_change_skips_same_payload_state(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._loading = False
+        page._profile_key = "profile-1"
+        page._payload = SimpleNamespace(item=SimpleNamespace(enabled=True))
+        page._enabled_save_worker = None
+        page._enabled_save_request_id = 0
+        page._enabled_checkbox = _BoolWidget(checked=True, enabled=True)
+        page._current_filter_kind = lambda: "hostlist"
+        page._current_filter_value = lambda: "lists/youtube.txt"
+        page.create_profile_enabled_save_worker = Mock(
+            side_effect=AssertionError("same enabled state must not start worker")
+        )
+
+        ProfileSetupPageBase._on_enabled_changed(page, 2)
+
+        page.create_profile_enabled_save_worker.assert_not_called()
+        self.assertEqual(page._enabled_checkbox.enabled_calls, [])
+
     def test_enabled_save_failure_skips_duplicate_checkbox_enable(self) -> None:
         from profile.ui.profile_setup_page import ProfileSetupPageBase
 
