@@ -93,6 +93,20 @@ class _VisibleWidget:
         self._visible = value
 
 
+class _StyleWidget:
+    def __init__(self, style: str = "") -> None:
+        self._style = str(style)
+        self.style_calls: list[str] = []
+
+    def styleSheet(self) -> str:  # noqa: N802
+        return self._style
+
+    def setStyleSheet(self, style: str) -> None:  # noqa: N802
+        value = str(style)
+        self.style_calls.append(value)
+        self._style = value
+
+
 class _SpinnerWidget:
     def __init__(self) -> None:
         self.started = 0
@@ -466,6 +480,30 @@ class PresetStatusBarPlanTests(unittest.TestCase):
             icon.set_plan(plan)
 
         icon.setToolTip.assert_not_called()
+
+    def test_title_status_icon_style_update_skips_duplicate_stylesheet(self) -> None:
+        from unittest.mock import patch
+
+        from presets.ui.common.preset_status_bar import PresetStatusIcon
+
+        icon = PresetStatusIcon.__new__(PresetStatusIcon)
+        icon._icon_size = 24
+        current_style = (
+            "color: #ffffff; "
+            "background-color: #6f7378; "
+            "border-radius: 12px; "
+            "font-size: 14px; "
+            "font-weight: 600;"
+        )
+        icon.check_label = _StyleWidget(current_style)
+
+        with patch(
+            "presets.ui.common.preset_status_bar.get_theme_tokens",
+            return_value=SimpleNamespace(is_light=False),
+        ):
+            PresetStatusIcon._apply_mode_style(icon, "neutral")
+
+        self.assertEqual(icon.check_label.style_calls, [])
 
     def test_title_status_icon_text_change_keeps_same_indicator_render(self) -> None:
         from presets.ui.common.preset_status_bar import PresetStatusIcon, build_preset_status_plan

@@ -120,6 +120,17 @@ def set_tool_tip_if_changed(widget, text: str) -> bool:
     return True
 
 
+def set_style_sheet_if_changed(widget, style: str) -> bool:
+    value = str(style or "")
+    try:
+        if str(widget.styleSheet()) == value:
+            return False
+    except Exception:
+        pass
+    widget.setStyleSheet(value)
+    return True
+
+
 class PresetStatusBar(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -188,8 +199,8 @@ class PresetStatusBar(QWidget):
         else:
             color = "#5f6368" if is_light else "#b8b8b8"
 
-        self.check_label.setStyleSheet(f"color: {color}; font-size: 14px; font-weight: 700;")
-        self.text_label.setStyleSheet(f"color: {color};")
+        set_style_sheet_if_changed(self.check_label, f"color: {color}; font-size: 14px; font-weight: 700;")
+        set_style_sheet_if_changed(self.text_label, f"color: {color};")
 
 
 class PresetStatusIcon(QWidget):
@@ -254,7 +265,8 @@ class PresetStatusIcon(QWidget):
                 is_light = False
             background = "#5f6368" if is_light else "#6f7378"
 
-        self.check_label.setStyleSheet(
+        set_style_sheet_if_changed(
+            self.check_label,
             "color: #ffffff; "
             f"background-color: {background}; "
             f"border-radius: {self._icon_size // 2}px; "
