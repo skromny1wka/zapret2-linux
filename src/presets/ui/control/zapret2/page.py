@@ -104,7 +104,7 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         create_additional_settings_load_worker,
         set_wssize_enabled,
         set_debug_log_enabled,
-        runtime_feature,
+        runtime_actions,
         create_program_settings_save_worker,
         create_program_settings_load_worker,
         create_program_settings_admin_check_worker,
@@ -139,7 +139,7 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         self._create_additional_settings_load_worker = create_additional_settings_load_worker
         self._set_wssize_enabled = set_wssize_enabled
         self._set_debug_log_enabled = set_debug_log_enabled
-        self._runtime_feature = runtime_feature
+        self._runtime_actions = runtime_actions
         self._create_program_settings_save_worker = create_program_settings_save_worker
         self._create_program_settings_load_worker = create_program_settings_load_worker
         self._create_program_settings_admin_check_worker = create_program_settings_admin_check_worker

@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.page_names import PageName
 from profile.setup_controller import ProfileSetupActions
 from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE
+from presets.ui.control.control_page_shared import ControlRuntimeActions
 from presets.ui.common.preset_subpage_base import RawPresetRuntimeActions
 from presets.ui.common.user_presets_page_runtime import UserPresetsRuntimeActions
 from ui.navigation_pages import (
@@ -40,7 +41,12 @@ def build_control_page_kwargs(
         "create_additional_settings_load_worker": profile_feature.create_additional_settings_load_worker,
         "set_wssize_enabled": profile_feature.set_wssize_enabled,
         "set_debug_log_enabled": profile_feature.set_debug_log_enabled,
-        "runtime_feature": runtime_feature,
+        "runtime_actions": ControlRuntimeActions(
+            start=runtime_feature.start,
+            stop=runtime_feature.stop,
+            stop_and_exit=runtime_feature.stop_and_exit,
+            is_available=runtime_feature.is_available,
+        ),
         "create_program_settings_save_worker": program_settings_feature.create_program_settings_save_worker,
         "create_program_settings_load_worker": program_settings_feature.create_program_settings_load_worker,
         "create_program_settings_admin_check_worker": program_settings_feature.create_program_settings_admin_check_worker,

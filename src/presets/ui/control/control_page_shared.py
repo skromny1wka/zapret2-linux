@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from PyQt6.QtCore import QTimer
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from presets.ui.control.control_page_runtime_shared import set_toggle_checked
 
@@ -14,6 +15,14 @@ RUNTIME_START_RETRY_MS = 250
 RUNTIME_START_MAX_RETRIES = 24
 
 
+@dataclass(frozen=True, slots=True)
+class ControlRuntimeActions:
+    start: Callable[[], object]
+    stop: Callable[[], object]
+    stop_and_exit: Callable[[], object]
+    is_available: Callable[[], object]
+
+
 class ControlPageActionMixin:
     """Общие действия для страниц управления."""
 
@@ -21,13 +30,10 @@ class ControlPageActionMixin:
         if not self._runtime_start_available():
             self._queue_runtime_start_retry()
             return
-        self._runtime_feature.start()
+        self._runtime_actions.start()
 
     def _runtime_start_available(self) -> bool:
-        try:
-            available = self._runtime_feature.is_available
-        except AttributeError:
-            return False
+        available = getattr(self._runtime_actions, "is_available", None)
         if callable(available):
             try:
                 return bool(available())
@@ -62,7 +68,7 @@ class ControlPageActionMixin:
             set_loading = getattr(self, "set_loading", None)
             if callable(set_loading):
                 set_loading(False, "")
-            self._runtime_feature.start()
+            self._runtime_actions.start()
             return
 
         retries = int(getattr(self, "_runtime_start_retry_count", 0)) + 1
@@ -80,7 +86,7 @@ class ControlPageActionMixin:
         QTimer.singleShot(RUNTIME_START_RETRY_MS, self._retry_start_dpi_after_runtime_ready)
 
     def _stop_dpi(self) -> None:
-        self._runtime_feature.stop()
+        self._runtime_actions.stop()
 
     def _stop_and_exit(self) -> None:
         from log.log import log
@@ -93,7 +99,7 @@ class ControlPageActionMixin:
             request_exit(stop_dpi=True)
             return
 
-        if self._runtime_feature.stop_and_exit():
+        if self._runtime_actions.stop_and_exit():
             return
 
         QApplication.quit()
