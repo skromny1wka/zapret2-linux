@@ -43,6 +43,7 @@ class OneShotWorkerRuntime:
         on_loaded: Callable | None = None,
         on_failed: Callable | None = None,
         on_finished: Callable | None = None,
+        bind_worker: Callable[[object], None] | None = None,
         run_method_name: str = "run",
     ) -> tuple[int, object, QThread]:
         request_id = self.next_request_id()
@@ -60,6 +61,8 @@ class OneShotWorkerRuntime:
         worker.finished.connect(worker.deleteLater)
         thread.finished.connect(lambda req=request_id, th=thread: self._finish_qobject_worker(req, th, on_finished))
         thread.finished.connect(thread.deleteLater)
+        if bind_worker is not None:
+            bind_worker(worker)
 
         self.worker = worker
         self.thread = thread

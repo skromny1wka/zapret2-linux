@@ -6,10 +6,10 @@ import html
 from PyQt6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QLabel,
 )
-from PyQt6.QtCore import QThread
 from PyQt6.QtGui import QFont, QTextCursor
 
 from ui.pages.base_page import BasePage, ScrollBlockingTextEdit
+from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 import dns.dns_check_plans as dns_check_page_plans
 from ui.fluent_widgets import QuickActionsBar, SettingsCard, set_tooltip
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens
@@ -39,13 +39,10 @@ class DNSCheckPage(BasePage):
             subtitle_key="page.dns_check.subtitle",
         )
         self._dns = dns_feature
-        self.worker = None
-        self.thread = None
         self._cleanup_in_progress = False
-        self._save_worker = None
-        self._save_request_id = 0
-        self._quick_worker = None
-        self._quick_request_id = 0
+        self._check_runtime = OneShotWorkerRuntime()
+        self._save_runtime = OneShotWorkerRuntime()
+        self._quick_runtime = OneShotWorkerRuntime()
         self._status_tone = "muted"
         self._status_bold = False
         self._info_icon_labels = []
@@ -274,7 +271,7 @@ class DNSCheckPage(BasePage):
 
     def start_check(self):
         """Начинает полную проверку DNS."""
-        if self.thread and self.thread.isRunning():
+        if self._check_runtime.is_running():
             return
         self._cleanup_in_progress = False
         
@@ -287,22 +284,17 @@ class DNSCheckPage(BasePage):
             progress_visible=start_plan.progress_visible,
         )
         self._set_status(start_plan.status_text, tone=start_plan.status_tone, bold=False)
-        
-        # Создаём поток и worker
-        self.thread = QThread(self)
-        self.worker = self._dns.create_dns_check_worker()
-        self.worker.moveToThread(self.thread)
-        
-        # Подключаем сигналы
-        self.thread.started.connect(self.worker.run)
-        self.worker.update_signal.connect(self.append_result)
-        self.worker.finished_signal.connect(self.on_check_finished)
-        self.worker.finished_signal.connect(self.worker.deleteLater)
-        self.worker.finished_signal.connect(self.thread.quit)
-        self.thread.finished.connect(self.thread.deleteLater)
-        
-        # Запускаем
-        self.thread.start()
+
+        self._check_runtime.start_qobject_worker(
+            parent=self,
+            worker_factory=lambda request_id: self._dns.create_dns_check_worker(request_id),
+            on_finished=self._on_check_worker_finished,
+            bind_worker=self._bind_check_worker,
+        )
+
+    def _bind_check_worker(self, worker) -> None:
+        worker.update_signal.connect(self.append_result)
+        worker.finished_signal.connect(self.on_check_finished)
     
     def append_result(self, text):
         """Добавляет текст в результаты с форматированием."""
@@ -335,9 +327,12 @@ class DNSCheckPage(BasePage):
             self.result_text.verticalScrollBar().maximum()
         )
     
-    def on_check_finished(self, results):
+    def on_check_finished(self, request_id: int, results):
         """Обработчик завершения проверки."""
-        if self._cleanup_in_progress:
+        if not self._check_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
             return
         # Обновляем статус
         plan = dns_check_page_plans.build_finish_plan(results)
@@ -348,26 +343,14 @@ class DNSCheckPage(BasePage):
             progress_visible=plan.progress_visible,
         )
         self._set_status(plan.status_text, tone=plan.status_tone, bold=True)
-        
-        # Очистка потока
-        cleanup_plan = dns_check_page_plans.build_cleanup_plan(
-            has_thread=self.thread is not None,
-            thread_running=bool(self.thread and self.thread.isRunning()),
-        )
-        if cleanup_plan.should_quit_thread and self.thread:
-            self.thread.wait(cleanup_plan.wait_timeout_ms)
-        self.thread = None
-        self.worker = None
+
+    def _on_check_worker_finished(self, _request_id: int, _thread) -> None:
+        pass
     
     def quick_dns_check(self):
         """Выполняет быструю проверку только системного DNS."""
-        worker = self.__dict__.get("_quick_worker")
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    return
-            except Exception:
-                return
+        if self._quick_runtime.is_running():
+            return
         self.result_text.clear()
         self._apply_interaction_state(
             check_enabled=False,
@@ -382,16 +365,20 @@ class DNSCheckPage(BasePage):
         return self._dns.create_dns_quick_check_worker(request_id, parent=self)
 
     def _start_quick_dns_check_worker(self) -> None:
-        self._quick_request_id += 1
-        request_id = self._quick_request_id
-        worker = self.create_dns_quick_check_worker(request_id)
-        self._quick_worker = worker
+        self._quick_runtime.start_qthread_worker(
+            worker_factory=self.create_dns_quick_check_worker,
+            on_finished=self._on_quick_dns_check_worker_finished,
+            bind_worker=self._bind_quick_dns_check_worker,
+        )
+
+    def _bind_quick_dns_check_worker(self, worker) -> None:
         worker.completed.connect(self._on_quick_dns_check_finished)
-        worker.finished.connect(lambda w=worker: self._on_quick_dns_check_worker_finished(w))
-        worker.start()
 
     def _on_quick_dns_check_finished(self, request_id: int, plan) -> None:
-        if self._cleanup_in_progress or request_id != self._quick_request_id:
+        if not self._quick_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
             return
         for line in plan.lines:
             self.append_result(line)
@@ -403,10 +390,8 @@ class DNSCheckPage(BasePage):
         )
         self._set_status("✅ Быстрая проверка завершена", tone="success", bold=True)
 
-    def _on_quick_dns_check_worker_finished(self, worker) -> None:
-        if self.__dict__.get("_quick_worker") is worker:
-            self._quick_worker = None
-        worker.deleteLater()
+    def _on_quick_dns_check_worker_finished(self, _worker) -> None:
+        pass
     
     def save_results(self):
         """Сохраняет результаты в файл."""
@@ -436,27 +421,26 @@ class DNSCheckPage(BasePage):
         )
 
     def _start_save_results_worker(self, *, file_path: str, plain_text: str) -> None:
-        worker = self.__dict__.get("_save_worker")
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    return
-            except Exception:
-                return
-        self._save_request_id += 1
-        request_id = self._save_request_id
-        worker = self.create_dns_check_save_worker(
-            request_id,
-            file_path=file_path,
-            plain_text=plain_text,
+        if self._save_runtime.is_running():
+            return
+        self._save_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: self.create_dns_check_save_worker(
+                request_id,
+                file_path=file_path,
+                plain_text=plain_text,
+            ),
+            on_finished=self._on_save_results_worker_finished,
+            bind_worker=self._bind_save_results_worker,
         )
-        self._save_worker = worker
+
+    def _bind_save_results_worker(self, worker) -> None:
         worker.saved.connect(self._on_save_results_finished)
-        worker.finished.connect(lambda w=worker: self._on_save_results_worker_finished(w))
-        worker.start()
 
     def _on_save_results_finished(self, request_id: int, plan) -> None:
-        if self._cleanup_in_progress or request_id != self._save_request_id:
+        if not self._save_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
             return
         if InfoBar:
             if bool(getattr(plan, "success", False)):
@@ -464,10 +448,8 @@ class DNSCheckPage(BasePage):
             else:
                 InfoBar.error(title=plan.title, content=plan.content, parent=self.window())
 
-    def _on_save_results_worker_finished(self, worker) -> None:
-        if self.__dict__.get("_save_worker") is worker:
-            self._save_worker = None
-        worker.deleteLater()
+    def _on_save_results_worker_finished(self, _worker) -> None:
+        pass
     
     def cleanup(self):
         """Очистка потоков при закрытии"""
@@ -475,41 +457,24 @@ class DNSCheckPage(BasePage):
 
         try:
             self._cleanup_in_progress = True
-            cleanup_plan = dns_check_page_plans.build_cleanup_plan(
-                has_thread=self.thread is not None,
-                thread_running=bool(self.thread and self.thread.isRunning()),
+            self._check_runtime.stop(
+                blocking=True,
+                log_fn=log,
+                warning_prefix="DNS check worker",
             )
-            if cleanup_plan.should_quit_thread and self.thread and self.thread.isRunning():
-                log("Останавливаем DNS check worker...", "DEBUG")
-                if self.worker is not None:
-                    try:
-                        self.worker.stop()
-                    except Exception:
-                        pass
-                self.thread.quit()
-                if not self.thread.wait(cleanup_plan.wait_timeout_ms):
-                    log("⚠ DNS check worker не завершился, принудительно завершаем", "WARNING")
-                    try:
-                        self.thread.terminate()
-                        self.thread.wait(500)
-                    except:
-                        pass
-            self.thread = None
-            self.worker = None
-            save_worker = self.__dict__.get("_save_worker")
-            if save_worker is not None:
-                try:
-                    save_worker.quit()
-                except Exception:
-                    pass
-                self._save_worker = None
-            quick_worker = self.__dict__.get("_quick_worker")
-            if quick_worker is not None:
-                try:
-                    quick_worker.quit()
-                except Exception:
-                    pass
-                self._quick_worker = None
+            self._check_runtime.cancel()
+            self._save_runtime.stop(
+                blocking=False,
+                log_fn=log,
+                warning_prefix="DNS check save worker",
+            )
+            self._save_runtime.cancel()
+            self._quick_runtime.stop(
+                blocking=False,
+                log_fn=log,
+                warning_prefix="DNS quick check worker",
+            )
+            self._quick_runtime.cancel()
         except Exception as e:
             log(f"Ошибка при очистке dns_check_page: {e}", "DEBUG")
 

@@ -154,10 +154,11 @@ def build_dns_feature() -> DnsFeature:
             parent,
         )
 
-    def _create_dns_check_worker():
+    def _create_dns_check_worker(request_id: int):
         from dns.dns_check_worker import DNSCheckWorker
 
         return DNSCheckWorker(
+            request_id,
             run_dns_poisoning_check=feature.run_dns_poisoning_check,
         )
 

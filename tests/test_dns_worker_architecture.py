@@ -5,6 +5,7 @@ import unittest
 
 from app.feature_facades.dns import build_dns_feature
 from dns import dns_check_worker, page_workers
+from dns.ui.dns_check_page import DNSCheckPage
 from dns.ui.page import NetworkPage
 
 
@@ -135,6 +136,28 @@ class DnsWorkerArchitectureTests(unittest.TestCase):
             self.assertNotIn("worker.start()", source)
         self.assertNotIn("start_background_loading(", loading_source)
         self.assertNotIn("start_connectivity_test(", test_source)
+
+    def test_dns_check_page_uses_one_shot_runtime_for_check_save_and_quick(self) -> None:
+        page_source = inspect.getsource(DNSCheckPage)
+        start_source = inspect.getsource(DNSCheckPage.start_check)
+        quick_source = inspect.getsource(DNSCheckPage._start_quick_dns_check_worker)
+        save_source = inspect.getsource(DNSCheckPage._start_save_results_worker)
+        cleanup_source = inspect.getsource(DNSCheckPage.cleanup)
+
+        self.assertIn("OneShotWorkerRuntime", page_source)
+        for name in (
+            "_check_runtime",
+            "_quick_runtime",
+            "_save_runtime",
+        ):
+            self.assertIn(name, page_source)
+            self.assertIn(f"{name}.stop", cleanup_source)
+        self.assertIn("start_qobject_worker", start_source)
+        for source in (quick_source, save_source):
+            self.assertIn("start_qthread_worker", source)
+        for source in (start_source, quick_source, save_source):
+            self.assertNotIn("worker.start()", source)
+        self.assertNotIn("self.thread = QThread", start_source)
 
 
 if __name__ == "__main__":

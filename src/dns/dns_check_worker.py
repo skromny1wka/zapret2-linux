@@ -7,10 +7,12 @@ class DNSCheckWorker(QObject):
     """Worker для выполнения DNS проверки в отдельном потоке."""
 
     update_signal = pyqtSignal(str)
-    finished_signal = pyqtSignal(dict)
+    finished_signal = pyqtSignal(int, dict)
+    finished = pyqtSignal()
 
-    def __init__(self, *, run_dns_poisoning_check):
+    def __init__(self, request_id: int, *, run_dns_poisoning_check):
         super().__init__()
+        self._request_id = int(request_id)
         self._run_dns_poisoning_check = run_dns_poisoning_check
         self._stop_requested = False
 
@@ -26,11 +28,12 @@ class DNSCheckWorker(QObject):
                 log_callback=self.update_signal.emit,
                 should_stop=self.is_stop_requested,
             )
-            self.finished_signal.emit(results)
+            self.finished_signal.emit(self._request_id, results)
         except Exception as e:
             if not self._stop_requested:
                 self.update_signal.emit(f"❌ Ошибка: {str(e)}")
-            self.finished_signal.emit({})
+            self.finished_signal.emit(self._request_id, {})
+        self.finished.emit()
 
 
 class DNSCheckSaveWorker(QThread):
