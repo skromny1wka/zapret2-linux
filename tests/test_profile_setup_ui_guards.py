@@ -255,6 +255,18 @@ class _Signal:
         pass
 
 
+class _Timer:
+    def __init__(self) -> None:
+        self.start_calls: list[int | None] = []
+        self.stop_calls = 0
+
+    def start(self, interval: int | None = None) -> None:
+        self.start_calls.append(interval)
+
+    def stop(self) -> None:
+        self.stop_calls += 1
+
+
 class _LoadWorker:
     def __init__(self) -> None:
         self.loaded = _Signal()
@@ -591,6 +603,50 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
             page._list_file_status_label.text(),
             "Записей всего: 3 • ваших: 2 • есть несохранённые изменения",
         )
+
+    def test_list_file_text_change_defers_large_editor_read_until_timer(self) -> None:
+        from unittest.mock import Mock
+
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._loading = False
+        page._list_file_kind = "hostlist"
+        page._list_file_text = _PlainTextWidget("user.example\nsecond.example")
+        page._list_file_status_label = _TextWidget("")
+        page._list_file_validation_timer = _Timer()
+        page._request_list_file_validation = Mock(
+            side_effect=AssertionError("validation must wait for the timer")
+        )
+
+        ProfileSetupPageBase._on_list_file_text_changed(page)
+
+        self.assertEqual(page._list_file_text.plain_text_read_calls, [])
+        self.assertEqual(page._list_file_validation_timer.start_calls, [180])
+        page._request_list_file_validation.assert_not_called()
+
+    def test_scheduled_list_file_validation_reads_editor_once(self) -> None:
+        from unittest.mock import Mock
+
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._loading = False
+        page._list_file_kind = "hostlist"
+        page._list_file_text = _PlainTextWidget("user.example\nsecond.example")
+        page._list_file_text_snapshot = ""
+        page._list_file_user_entries_count = 0
+        page._request_list_file_validation = Mock()
+
+        ProfileSetupPageBase._run_scheduled_list_file_validation(page)
+
+        self.assertEqual(page._list_file_text.plain_text_read_calls, ["user.example\nsecond.example"])
+        self.assertEqual(page._list_file_text_snapshot, "user.example\nsecond.example")
+        self.assertEqual(page._list_file_user_entries_count, 2)
+        page._request_list_file_validation.assert_called_once_with({
+            "kind": "hostlist",
+            "text": "user.example\nsecond.example",
+        })
 
     def test_list_file_save_uses_cached_text_snapshot(self) -> None:
         from unittest.mock import Mock

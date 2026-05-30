@@ -867,6 +867,9 @@ class ProfileSetupPageBase(BasePage):
         self._list_file_base_entries_count = 0
         self._list_file_normal_style = ""
         self._list_file_error_style = ""
+        self._list_file_validation_timer = QTimer(self)
+        self._list_file_validation_timer.setSingleShot(True)
+        self._list_file_validation_timer.timeout.connect(self._run_scheduled_list_file_validation)
         self._settings_save_timer = QTimer(self)
         self._settings_save_timer.setSingleShot(True)
         self._settings_save_timer.setInterval(350)
@@ -1843,11 +1846,24 @@ class ProfileSetupPageBase(BasePage):
     def _on_list_file_text_changed(self) -> None:
         if self._loading or self._list_file_text is None:
             return
+        timer = self.__dict__.get("_list_file_validation_timer")
+        if timer is not None:
+            try:
+                timer.start(180)
+            except TypeError:
+                timer.start()
+        if self._list_file_status_label is not None:
+            set_widget_text_if_changed(self._list_file_status_label, "Проверка списка...")
+        if timer is not None:
+            return
+        self._run_scheduled_list_file_validation()
+
+    def _run_scheduled_list_file_validation(self) -> None:
+        if self._loading or self._list_file_text is None:
+            return
         text = self._list_file_text.toPlainText()
         self._list_file_text_snapshot = text
         self._list_file_user_entries_count = _list_file_entries_count(text)
-        if self._list_file_status_label is not None:
-            set_widget_text_if_changed(self._list_file_status_label, "Проверка списка...")
         self._request_list_file_validation({
             "kind": self._list_file_kind,
             "text": text,
@@ -2682,6 +2698,12 @@ class ProfileSetupPageBase(BasePage):
     def cleanup(self) -> None:
         self._cleanup_in_progress = True
         timer = self.__dict__.get("_settings_save_timer")
+        if timer is not None:
+            try:
+                timer.stop()
+            except Exception:
+                pass
+        timer = self.__dict__.get("_list_file_validation_timer")
         if timer is not None:
             try:
                 timer.stop()
