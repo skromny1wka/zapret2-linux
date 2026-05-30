@@ -97,6 +97,26 @@ class PresetSubpageUiGuardTests(unittest.TestCase):
         page.create_raw_preset_activate_worker.assert_called_once_with(1, "Default.txt", page)
         self.assertEqual(worker.start_calls, 1)
 
+    def test_status_message_update_skips_runtime_toggle_render(self) -> None:
+        from app.state_store import AppUiState
+        from presets.ui.common.preset_subpage_base import PresetRawEditorPage
+
+        page = PresetRawEditorPage.__new__(PresetRawEditorPage)
+        page._cleanup_in_progress = False
+        page._render_runtime_toggle = Mock(
+            side_effect=AssertionError("status message must not repaint runtime toggle")
+        )
+        page._render_footer_status = Mock()
+
+        PresetRawEditorPage._on_ui_state_changed(
+            page,
+            AppUiState(last_status_message="Запущено"),
+            frozenset({"last_status_message"}),
+        )
+
+        page._render_runtime_toggle.assert_not_called()
+        page._render_footer_status.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()
