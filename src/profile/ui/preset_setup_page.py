@@ -327,9 +327,10 @@ class PresetSetupPageBase(BasePage):
         search_input = self._profile_search_input
         if search_input is not None:
             try:
-                if str(search_input.text() or "") != query:
-                    search_input.setText(query)
+                if str(search_input.text() or "") == query:
                     return True
+                search_input.setText(query)
+                return True
             except Exception:
                 pass
         self._on_profile_search_text_changed(query)

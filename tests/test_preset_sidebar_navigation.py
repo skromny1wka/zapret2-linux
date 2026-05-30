@@ -1199,6 +1199,24 @@ class PresetSidebarNavigationTests(unittest.TestCase):
         self.assertIn("_profile_search_input", handler_source)
         self.assertIn("_on_profile_search_text_changed(query)", handler_source)
 
+    def test_preset_setup_sidebar_search_skips_duplicate_query(self) -> None:
+        from profile.ui.preset_setup_page import PresetSetupPageBase
+
+        search_input = SimpleNamespace(
+            text=lambda: "Discord",
+            setText=Mock(side_effect=AssertionError("same profile search query must not rewrite input")),
+        )
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._profile_search_input = search_input
+        page._on_profile_search_text_changed = Mock(
+            side_effect=AssertionError("same profile search query must not refresh profile list")
+        )
+
+        self.assertTrue(PresetSetupPageBase.apply_sidebar_search_query(page, "Discord"))
+
+        search_input.setText.assert_not_called()
+        page._on_profile_search_text_changed.assert_not_called()
+
     def test_hidden_mode_sidebar_items_are_delayed_until_interactive_ready(self) -> None:
         import ui.navigation.sidebar_builder as sidebar_builder
 
