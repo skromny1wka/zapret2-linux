@@ -97,6 +97,49 @@ class StartupAutostartTests(unittest.TestCase):
             _startup_autostart=True,
         )
 
+    def test_preset_autostart_defers_launch_summary_refresh_until_after_start(self) -> None:
+        from winws_runtime.runtime import autostart
+        from winws_runtime.runtime.autostart import start_dpi_autostart
+
+        calls: list[str] = []
+        scheduled: list[object] = []
+        snapshot = SimpleNamespace(to_selected_mode=Mock(return_value={"is_preset_file": True}))
+        launch_runtime = SimpleNamespace(start_dpi_async=Mock(side_effect=lambda **_kwargs: calls.append("start")))
+        presets_feature = SimpleNamespace(
+            get_launch_snapshot=Mock(return_value=snapshot),
+            refresh_launch_summary_in_store=Mock(side_effect=lambda **_kwargs: calls.append("refresh_summary")),
+        )
+        runtime_feature = SimpleNamespace(
+            objects=SimpleNamespace(
+                runtime_service=SimpleNamespace(mark_start_failed=Mock(), mark_stopped=Mock()),
+                launch_runtime=launch_runtime,
+            ),
+            dependencies=SimpleNamespace(
+                presets_feature=presets_feature,
+                profile_feature=object(),
+            ),
+        )
+        startup_state = SimpleNamespace(dpi_autostart_initiated=False)
+
+        with (
+            patch("program_settings.public.is_auto_dpi_enabled", return_value=True),
+            patch.object(autostart.QTimer, "singleShot", side_effect=lambda _delay, callback: scheduled.append(callback)),
+        ):
+            start_dpi_autostart(
+                startup_state,
+                runtime_feature=runtime_feature,
+                ui_state=object(),
+                launch_method="zapret2_mode",
+            )
+
+        self.assertEqual(calls, ["start"])
+        presets_feature.refresh_launch_summary_in_store.assert_not_called()
+        self.assertEqual(len(scheduled), 1)
+
+        scheduled[0]()
+
+        self.assertEqual(calls, ["start", "refresh_summary"])
+
     def test_preset_autostart_reuses_already_running_expected_process(self) -> None:
         from winws_runtime.runtime.autostart import start_dpi_autostart
 

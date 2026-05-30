@@ -1,3 +1,5 @@
+from PyQt6.QtCore import QTimer
+
 from log.log import log
 from settings.mode import ALL_LAUNCH_METHODS, exe_name_for_launch_method, is_preset_launch_method
 
@@ -42,17 +44,16 @@ def start_dpi_autostart(
         _mark_runtime_failed(runtime_feature, message)
         return
 
-    _refresh_autostart_launch_summary(
-        runtime_feature=runtime_feature,
-        ui_state=ui_state,
-        launch_method=resolved_method,
-    )
-
     log(f"Автозапуск передан в единый DPI runtime-путь: {resolved_method}", "INFO")
     runtime_feature.objects.launch_runtime.start_dpi_async(
         selected_mode=startup_snapshot.to_selected_mode() if startup_snapshot is not None else None,
         launch_method=resolved_method,
         _startup_autostart=True,
+    )
+    _schedule_autostart_launch_summary_refresh(
+        runtime_feature=runtime_feature,
+        ui_state=ui_state,
+        launch_method=resolved_method,
     )
 
 
@@ -93,6 +94,17 @@ def _resolve_startup_snapshot(runtime_feature, launch_method: str):
         )
 
     return None
+
+
+def _schedule_autostart_launch_summary_refresh(*, runtime_feature, ui_state, launch_method: str) -> None:
+    QTimer.singleShot(
+        0,
+        lambda: _refresh_autostart_launch_summary(
+            runtime_feature=runtime_feature,
+            ui_state=ui_state,
+            launch_method=launch_method,
+        ),
+    )
 
 
 def _refresh_autostart_launch_summary(*, runtime_feature, ui_state, launch_method: str) -> None:
