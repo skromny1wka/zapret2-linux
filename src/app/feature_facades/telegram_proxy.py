@@ -134,10 +134,14 @@ class TelegramProxyFeature:
             parent=parent,
         )
 
-    def create_ensure_hosts_worker(self, *, parent=None):
+    def create_ensure_hosts_worker(self, request_id: int, *, parent=None):
         from telegram_proxy.workers import TelegramHostsEnsureWorker
 
-        return TelegramHostsEnsureWorker(ensure_hosts_fn=self.ensure_telegram_hosts, parent=parent)
+        return TelegramHostsEnsureWorker(
+            request_id,
+            ensure_hosts_fn=self.ensure_telegram_hosts,
+            parent=parent,
+        )
 
     def create_settings_save_worker(self, request_id: int, **kwargs):
         from telegram_proxy.workers import TelegramProxySettingsSaveWorker

@@ -123,7 +123,7 @@ class TelegramProxyPage(BasePage):
         self._proxy_stop_worker = None
         self._restart_stop_worker = None
         self._relay_check_worker = None
-        self._ensure_hosts_worker = None
+        self._ensure_hosts_runtime = OneShotWorkerRuntime()
         self._settings_save_worker = None
         self._open_log_file_worker = None
         self._external_link_worker = None
@@ -1259,14 +1259,24 @@ class TelegramProxyPage(BasePage):
 
     def _ensure_telegram_hosts(self):
         """Проверяет и добавляет Telegram-записи в hosts через worker."""
-        worker = self._telegram_proxy.create_ensure_hosts_worker(parent=self)
-        self._ensure_hosts_worker = worker
-        worker.completed.connect(self._on_telegram_hosts_ensured)
-        worker.finished.connect(lambda: setattr(self, "_ensure_hosts_worker", None))
-        worker.finished.connect(worker.deleteLater)
-        worker.start()
+        if self._ensure_hosts_runtime.is_running():
+            return
+        self._ensure_hosts_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: self._telegram_proxy.create_ensure_hosts_worker(
+                request_id,
+                parent=self,
+            ),
+            on_loaded=self._on_telegram_hosts_ensured,
+        )
 
-    def _on_telegram_hosts_ensured(self, plan):
+    def _on_telegram_hosts_ensured(self, request_id: int, plan):
+        if not self._ensure_hosts_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
+            return
+        if plan is None:
+            return
         if not plan.ok and plan.log_line:
             log(plan.log_line, "WARNING")
 
@@ -1314,6 +1324,12 @@ class TelegramProxyPage(BasePage):
             warning_prefix="telegram proxy diagnostics worker",
         )
         self._diag_runtime.cancel()
+        self._ensure_hosts_runtime.stop(
+            blocking=False,
+            log_fn=log,
+            warning_prefix="telegram proxy hosts worker",
+        )
+        self._ensure_hosts_runtime.cancel()
         if self._upstream_restart_timer is not None:
             self._upstream_restart_timer.stop()
             self._upstream_restart_timer.deleteLater()

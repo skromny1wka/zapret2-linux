@@ -4063,6 +4063,21 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("_diag_worker", page_source)
         self.assertNotIn("worker.start()", workflow_source)
 
+    def test_telegram_ensure_hosts_runs_through_worker_runtime(self) -> None:
+        page_source = inspect.getsource(TelegramProxyPage)
+        ensure_source = inspect.getsource(TelegramProxyPage._ensure_telegram_hosts)
+        cleanup_source = inspect.getsource(TelegramProxyPage.cleanup)
+        feature_source = inspect.getsource(TelegramProxyFeature)
+        worker_source = inspect.getsource(telegram_proxy_workers.TelegramHostsEnsureWorker)
+
+        self.assertIn("_ensure_hosts_runtime", page_source)
+        self.assertIn("start_qthread_worker", ensure_source)
+        self.assertIn("create_ensure_hosts_worker", feature_source)
+        self.assertIn("completed = pyqtSignal(int, object)", worker_source)
+        self.assertIn("_ensure_hosts_runtime.stop", cleanup_source)
+        self.assertNotIn("_ensure_hosts_worker =", page_source)
+        self.assertNotIn("worker.start()", ensure_source)
+
     def test_connection_support_bundle_prepares_through_worker(self) -> None:
         support_worker = importlib.import_module("diagnostics.support_worker")
         page_source = inspect.getsource(ConnectionTestPage)

@@ -246,10 +246,11 @@ class TelegramProxyDiagnosticsWorker(QThread):
 
 
 class TelegramHostsEnsureWorker(QThread):
-    completed = pyqtSignal(object)
+    completed = pyqtSignal(int, object)
 
-    def __init__(self, *, ensure_hosts_fn, parent=None):
+    def __init__(self, request_id: int, *, ensure_hosts_fn, parent=None):
         super().__init__(parent)
+        self._request_id = int(request_id)
         self._ensure_hosts_fn = ensure_hosts_fn
 
     def run(self) -> None:
@@ -258,7 +259,7 @@ class TelegramHostsEnsureWorker(QThread):
         except Exception as exc:
             log(f"TelegramHostsEnsureWorker: ошибка проверки hosts: {exc}", "WARNING")
             plan = None
-        self.completed.emit(plan)
+        self.completed.emit(self._request_id, plan)
 
 
 class TelegramProxySettingsSaveWorker(QThread):
