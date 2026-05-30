@@ -2395,6 +2395,27 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._schedule_profiles_payload_request.assert_called_once_with(force=True)
         page._request_profiles_payload.assert_not_called()
 
+    def test_running_profile_payload_worker_coalesces_force_refresh_requests(self) -> None:
+        worker = SimpleNamespace(isRunning=Mock(return_value=True))
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._cleanup_in_progress = False
+        page._profile_payload_loaded_once = True
+        page._profile_payload_dirty = False
+        page._profile_load_worker = worker
+        page._profile_load_request_id = 7
+        page._profile_load_refresh_pending = False
+        page._create_profile_list_load_worker = Mock(
+            side_effect=AssertionError("running worker must not start another worker immediately")
+        )
+
+        PresetSetupPageBase._request_profiles_payload(page, force=True)
+        PresetSetupPageBase._request_profiles_payload(page, force=True)
+
+        self.assertEqual(page._profile_load_request_id, 8)
+        self.assertTrue(page._profile_payload_dirty)
+        self.assertTrue(page._profile_load_refresh_pending)
+        page._create_profile_list_load_worker.assert_not_called()
+
     def test_preset_setup_ui_state_change_schedules_profile_refresh(self) -> None:
         page = PresetSetupPageBase.__new__(PresetSetupPageBase)
         page._cleanup_in_progress = False

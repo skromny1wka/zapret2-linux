@@ -130,6 +130,7 @@ class PresetSetupPageBase(BasePage):
         self._user_profile_delete_worker = None
         self._profile_payload_loaded_once = False
         self._profile_payload_dirty = True
+        self._profile_load_refresh_pending = False
         self._profile_payload_request_scheduled = False
         self._profile_payload_request_force = False
         self._profile_context_action_enabled_by_request: dict[int, bool] = {}
@@ -244,10 +245,13 @@ class PresetSetupPageBase(BasePage):
                 if worker.isRunning():
                     if force:
                         self._profile_payload_dirty = True
-                        self._profile_load_request_id += 1
+                        if not self.__dict__.get("_profile_load_refresh_pending", False):
+                            self._profile_load_refresh_pending = True
+                            self._profile_load_request_id += 1
                     return
             except Exception:
                 return
+        self._profile_load_refresh_pending = False
         self._profile_load_request_id += 1
         request_id = self._profile_load_request_id
         if self._profiles_list is None:
@@ -282,6 +286,7 @@ class PresetSetupPageBase(BasePage):
     def _on_profile_worker_finished(self, worker) -> None:
         if self._profile_load_worker is worker:
             self._profile_load_worker = None
+        self._profile_load_refresh_pending = False
         worker.deleteLater()
         if self._profile_payload_dirty and not self._cleanup_in_progress:
             self._schedule_profiles_payload_request(force=True)
