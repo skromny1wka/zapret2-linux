@@ -150,6 +150,20 @@ class _PlainTextWidget(_BoolWidget):
         self._placeholder = value
 
 
+class _StyleWidget:
+    def __init__(self, style: str = "") -> None:
+        self._style = str(style)
+        self.style_calls: list[str] = []
+
+    def styleSheet(self) -> str:  # noqa: N802
+        return self._style
+
+    def setStyleSheet(self, style: str) -> None:  # noqa: N802
+        value = str(style)
+        self.style_calls.append(value)
+        self._style = value
+
+
 class _IndexWidget:
     def __init__(self, index: int = 0) -> None:
         self._index = int(index)
@@ -461,6 +475,41 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         self.assertEqual(page._list_file_error_label.visible_calls, [])
         self.assertEqual(page._list_file_error_label.show_calls, 0)
         page._refresh_list_file_editor_style.assert_called_once_with(has_error=True)
+
+    def test_list_file_editor_style_skips_duplicate_stylesheet_updates(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        tokens = SimpleNamespace(
+            surface_bg="#111111",
+            surface_border="#222222",
+            surface_bg_hover="#333333",
+            surface_border_hover="#444444",
+            accent_hex="#55aaff",
+            fg="#eeeeee",
+            fg_faint="#999999",
+        )
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._list_file_base_text = _StyleWidget()
+        page._list_file_text = _StyleWidget()
+        page._list_file_error_label = _StyleWidget()
+        page._list_file_status_label = _StyleWidget()
+
+        with patch("profile.ui.profile_setup_page.get_theme_tokens", return_value=tokens):
+            ProfileSetupPageBase._refresh_list_file_editor_style(page, has_error=True)
+            page._list_file_base_text.style_calls.clear()
+            page._list_file_text.style_calls.clear()
+            page._list_file_error_label.style_calls.clear()
+            page._list_file_status_label.style_calls.clear()
+
+            ProfileSetupPageBase._refresh_list_file_editor_style(page, has_error=True)
+
+        self.assertEqual(page._list_file_base_text.style_calls, [])
+        self.assertEqual(page._list_file_text.style_calls, [])
+        self.assertEqual(page._list_file_error_label.style_calls, [])
+        self.assertEqual(page._list_file_status_label.style_calls, [])
 
     def test_match_tab_payload_skips_duplicate_plain_text(self) -> None:
         from types import SimpleNamespace

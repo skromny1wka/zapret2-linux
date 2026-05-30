@@ -112,6 +112,17 @@ def set_widget_property_if_changed(widget, name: str, value) -> bool:
     return True
 
 
+def set_widget_style_sheet_if_changed(widget, style: str) -> bool:
+    value = str(style or "")
+    try:
+        if str(widget.styleSheet()) == value:
+            return False
+    except Exception:
+        pass
+    widget.setStyleSheet(value)
+    return True
+
+
 def set_plain_text_if_changed(widget, text: str) -> bool:
     value = str(text or "")
     try:
@@ -1830,12 +1841,18 @@ class ProfileSetupPageBase(BasePage):
             }}
         """
         if self._list_file_base_text is not None:
-            self._list_file_base_text.setStyleSheet(normal_style)
-        self._list_file_text.setStyleSheet(error_style if has_error else normal_style)
+            set_widget_style_sheet_if_changed(self._list_file_base_text, normal_style)
+        set_widget_style_sheet_if_changed(self._list_file_text, error_style if has_error else normal_style)
         if self._list_file_error_label is not None:
-            self._list_file_error_label.setStyleSheet(f"color: {error_color}; background: transparent;")
+            set_widget_style_sheet_if_changed(
+                self._list_file_error_label,
+                f"color: {error_color}; background: transparent;",
+            )
         if self._list_file_status_label is not None:
-            self._list_file_status_label.setStyleSheet(f"color: {tokens.fg_faint}; background: transparent;")
+            set_widget_style_sheet_if_changed(
+                self._list_file_status_label,
+                f"color: {tokens.fg_faint}; background: transparent;",
+            )
 
     def _apply_feedback_buttons(self, payload) -> None:
         item = payload.item
