@@ -831,11 +831,28 @@ class PresetRawEditorPage(BasePage):
             return "error", value
         return "neutral", value
 
-    def _on_ui_state_changed(self, state, _changed_fields: frozenset[str]) -> None:
+    def _on_ui_state_changed(self, state, changed_fields: frozenset[str]) -> None:
         if self._cleanup_in_progress:
             return
-        self._render_runtime_toggle(state)
-        self._render_footer_status(state)
+        changed = set(changed_fields or ())
+        runtime_toggle_changed = (
+            not changed
+            or bool(changed & {"launch_phase", "launch_running", "launch_busy"})
+        )
+        footer_status_changed = (
+            not changed
+            or bool(changed & {
+                "launch_method",
+                "launch_busy",
+                "launch_busy_text",
+                "last_status_message",
+                "active_preset_revision",
+            })
+        )
+        if runtime_toggle_changed:
+            self._render_runtime_toggle(state)
+        if footer_status_changed:
+            self._render_footer_status(state)
 
     def _render_runtime_toggle(self, state=None) -> None:
         button = getattr(self, "runtimeToggleButton", None)
