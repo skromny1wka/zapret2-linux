@@ -24,6 +24,23 @@ class UserPresetActivationGuardTests(unittest.TestCase):
         page._resolve_display_name.assert_not_called()
         page._request_preset_activation.assert_not_called()
 
+    def test_clicking_preset_while_activation_runs_does_not_repaint_marker_immediately(self) -> None:
+        running_worker = Mock()
+        running_worker.isRunning.return_value = True
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_activate_worker = running_worker
+        page._pending_preset_activation = None
+        page._runtime_service = Mock()
+        page._runtime_service.active_preset_file_name.return_value = "Before.txt"
+        page._runtime_service.apply_active_preset_marker_for_file = Mock()
+        page._restore_preset_activation_marker_file_name = "Before.txt"
+        page._resolve_display_name = Mock(return_value="Next")
+
+        self.assertTrue(UserPresetsPageBase._on_activate_preset(page, "Next.txt"))
+
+        page._runtime_service.apply_active_preset_marker_for_file.assert_not_called()
+        self.assertEqual(page._pending_preset_activation, ("Next.txt", "Next"))
+
     def test_activation_failure_restores_previous_marker_without_settings_read(self) -> None:
         page = UserPresetsPageBase.__new__(UserPresetsPageBase)
         page._preset_activate_request_id = 7

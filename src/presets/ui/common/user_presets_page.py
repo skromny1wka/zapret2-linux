@@ -1300,7 +1300,6 @@ class UserPresetsPageBase(BasePage):
         display_name = self._resolve_display_name(preset_file_name) or preset_file_name
         if not self._preset_activation_worker_running():
             self._restore_preset_activation_marker_file_name = current_file_name
-        self._runtime_service.apply_active_preset_marker_for_file(preset_file_name)
         self._request_preset_activation(preset_file_name, display_name)
         return True
 
@@ -1340,6 +1339,7 @@ class UserPresetsPageBase(BasePage):
             file_name=file_name,
             display_name=display_name,
         )
+        self._runtime_service.apply_active_preset_marker_for_file(str(file_name or "").strip())
         self._preset_activate_worker = worker
         worker.activated.connect(self._on_preset_activation_finished)
         worker.failed.connect(self._on_preset_activation_failed)
