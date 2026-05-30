@@ -826,6 +826,7 @@ class ProfileSetupPageBase(BasePage):
         self._pending_list_file_load = False
         self._list_file_save_request_id = 0
         self._list_file_save_worker = None
+        self._pending_list_file_save: tuple[str, str] | None = None
         self._list_file_validation_request_id = 0
         self._list_file_validation_worker = None
         self._pending_list_file_validation = None
@@ -1987,13 +1988,26 @@ class ProfileSetupPageBase(BasePage):
     def _on_list_file_save_clicked(self) -> None:
         if self._loading or not self._profile_key or self._list_file_text is None:
             return
+        self._request_list_file_save(
+            self._profile_key,
+            str(self.__dict__.get("_list_file_text_snapshot", "") or ""),
+        )
+
+    def _request_list_file_save(self, profile_key: str, text: str) -> None:
+        profile_key = str(profile_key or "").strip()
+        if not profile_key:
+            return
         worker = self._list_file_save_worker
         if worker is not None:
             try:
                 if worker.isRunning():
+                    self._pending_list_file_save = (profile_key, str(text or ""))
                     return
             except Exception:
                 return
+        self._start_list_file_save_worker(profile_key, text)
+
+    def _start_list_file_save_worker(self, profile_key: str, text: str) -> None:
         self._list_file_save_request_id += 1
         request_id = self._list_file_save_request_id
         if self._list_file_status_label is not None:
@@ -2002,8 +2016,8 @@ class ProfileSetupPageBase(BasePage):
             set_widget_enabled_if_changed(self._list_file_save_button, False)
         worker = self.create_profile_list_file_save_worker(
             request_id,
-            self._profile_key,
-            str(self.__dict__.get("_list_file_text_snapshot", "") or ""),
+            profile_key,
+            str(text or ""),
             parent=self,
         )
         self._list_file_save_worker = worker
@@ -2039,7 +2053,7 @@ class ProfileSetupPageBase(BasePage):
             return
         log(f"{self.__class__.__name__}: не удалось сохранить файл списка profile: {error}", "ERROR")
         self._render_list_file_validation((), fallback_error=str(error))
-        if self._list_file_save_button is not None:
+        if self._list_file_save_button is not None and not self.__dict__.get("_pending_list_file_save"):
             set_widget_enabled_if_changed(self._list_file_save_button, True)
         InfoBar.error(title="Ошибка", content=str(error), parent=self.window())
 
@@ -2047,6 +2061,11 @@ class ProfileSetupPageBase(BasePage):
         if self._list_file_save_worker is worker:
             self._list_file_save_worker = None
         worker.deleteLater()
+        pending = self.__dict__.get("_pending_list_file_save")
+        self._pending_list_file_save = None
+        if pending:
+            profile_key, text = pending
+            self._start_list_file_save_worker(profile_key, text)
 
     def _render_list_file_validation(
         self,
@@ -2776,6 +2795,7 @@ class ProfileSetupPageBase(BasePage):
                 pass
         for attr in (
             "_pending_list_file_load",
+            "_pending_list_file_save",
             "_pending_list_file_validation",
             "_pending_settings_save",
             "_pending_raw_profile_save",

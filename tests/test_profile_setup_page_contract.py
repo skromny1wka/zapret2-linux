@@ -3263,6 +3263,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         sync_label = inspect.getsource(ProfileSetupPageBase._sync_editor_tab_label)
         switch_tab = inspect.getsource(ProfileSetupPageBase._switch_strategy_tab)
         save_handler = inspect.getsource(ProfileSetupPageBase._on_list_file_save_clicked)
+        save_start_handler = inspect.getsource(ProfileSetupPageBase._start_list_file_save_worker)
         validation = inspect.getsource(ProfileSetupPageBase._render_list_file_validation)
 
         self.assertIn('addItem("editor", "Редактор"', build)
@@ -3275,7 +3276,8 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertIn("_list_file_base_text", ensure_editor)
         self.assertIn("Ваши записи", ensure_editor)
         self.assertNotIn("_apply_list_file_editor_state", apply_payload)
-        self.assertIn("create_profile_list_file_save_worker", save_handler)
+        self.assertIn("_request_list_file_save", save_handler)
+        self.assertIn("create_profile_list_file_save_worker", save_start_handler)
         self.assertNotIn("save_list_file_text", save_handler)
         self.assertIn("Неверные строки", validation)
 
@@ -3301,6 +3303,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._loading = False
         page._profile_key = "profile-1"
         page._list_file_text = SimpleNamespace(toPlainText=lambda: "example.com")
+        page._list_file_text_snapshot = "example.com"
         page._list_file_save_request_id = 0
         page._list_file_save_worker = None
         page._list_file_status_label = Mock()
@@ -3318,6 +3321,56 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         )
         page._list_file_save_button.setEnabled.assert_called_once_with(False)
         worker.start.assert_called_once()
+
+    def test_list_file_save_keeps_latest_pending_click_while_worker_runs(self) -> None:
+        class _Signal:
+            def __init__(self) -> None:
+                self.callbacks = []
+
+            def connect(self, callback) -> None:
+                self.callbacks.append(callback)
+
+        class _Worker:
+            def __init__(self, *, running: bool) -> None:
+                self._running = running
+                self.saved = _Signal()
+                self.failed = _Signal()
+                self.finished = _Signal()
+                self.start = Mock()
+                self.deleteLater = Mock()
+
+            def isRunning(self) -> bool:
+                return self._running
+
+        running_worker = _Worker(running=True)
+        next_worker = _Worker(running=False)
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._loading = False
+        page._profile_key = "profile-1"
+        page._list_file_text = SimpleNamespace(toPlainText=lambda: "ignored.example")
+        page._list_file_text_snapshot = "latest.example"
+        page._list_file_save_request_id = 1
+        page._list_file_save_worker = running_worker
+        page._pending_list_file_save = None
+        page._list_file_status_label = Mock()
+        page._list_file_save_button = Mock()
+        page.create_profile_list_file_save_worker = Mock(return_value=next_worker)
+
+        ProfileSetupPageBase._on_list_file_save_clicked(page)
+
+        page.create_profile_list_file_save_worker.assert_not_called()
+        self.assertEqual(page._pending_list_file_save, ("profile-1", "latest.example"))
+
+        ProfileSetupPageBase._on_list_file_save_worker_finished(page, running_worker)
+
+        page.create_profile_list_file_save_worker.assert_called_once_with(
+            2,
+            "profile-1",
+            "latest.example",
+            parent=page,
+        )
+        next_worker.start.assert_called_once()
+        self.assertIsNone(page._pending_list_file_save)
 
     def test_list_file_save_worker_emits_saved_state_and_payload(self) -> None:
         save_text = Mock()
@@ -3434,6 +3487,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._list_file_validation_request_id = 1
         page._pending_list_file_validation = None
         page._list_file_text = SimpleNamespace(toPlainText=lambda: "bad domain", isReadOnly=lambda: False)
+        page._list_file_text_snapshot = "bad domain"
         page._list_file_base_text = SimpleNamespace(toPlainText=lambda: "base.example\n")
         page._list_file_status_label = Mock()
         page._list_file_save_button = Mock()
