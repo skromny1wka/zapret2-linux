@@ -2308,10 +2308,8 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._user_profile_update_worker = None
         page._update_user_profile_button = Mock()
         page._delete_user_profile_button = Mock()
-        page._controller = Mock()
         worker = _Worker()
-        page._controller.create_user_profile_update_worker.return_value = worker
-        page._controller.update_user_profile.side_effect = AssertionError("update must run in worker")
+        page.create_profile_user_update_worker = Mock(return_value=worker)
 
         ProfileSetupPageBase._request_user_profile_update(
             page,
@@ -2321,8 +2319,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             ports="443",
         )
 
-        page._controller.update_user_profile.assert_not_called()
-        page._controller.create_user_profile_update_worker.assert_called_once_with(
+        page.create_profile_user_update_worker.assert_called_once_with(
             1,
             profile_id="user-1",
             name="YouTube",
@@ -2357,15 +2354,12 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._user_profile_delete_worker = None
         page._update_user_profile_button = Mock()
         page._delete_user_profile_button = Mock()
-        page._controller = Mock()
         worker = _Worker()
-        page._controller.create_user_profile_delete_worker.return_value = worker
-        page._controller.delete_user_profile.side_effect = AssertionError("delete must run in worker")
+        page.create_profile_user_delete_worker = Mock(return_value=worker)
 
         ProfileSetupPageBase._request_user_profile_delete(page, "user-1")
 
-        page._controller.delete_user_profile.assert_not_called()
-        page._controller.create_user_profile_delete_worker.assert_called_once_with(
+        page.create_profile_user_delete_worker.assert_called_once_with(
             1,
             profile_id="user-1",
             parent=page,
@@ -2558,7 +2552,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertIn("_raw_profile_text", ensure_match)
         self.assertIn("Сохранить текст profile", ensure_match)
         self.assertIn("in_preset", apply_match)
-        self.assertIn("create_raw_profile_save_worker", handler)
+        self.assertIn("create_profile_raw_text_save_worker", handler)
         self.assertNotIn("save_raw_profile_text", handler)
         self.assertIn("Текст profile обновлён только в текущем preset", saved_handler)
 
@@ -2587,15 +2581,12 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._raw_profile_save_request_id = 0
         page._raw_profile_save_worker = None
         page._raw_profile_save_button = Mock()
-        page._controller = Mock()
         worker = _Worker()
-        page._controller.create_raw_profile_save_worker.return_value = worker
-        page._controller.save_raw_profile_text.side_effect = AssertionError("raw save must run in worker")
+        page.create_profile_raw_text_save_worker = Mock(return_value=worker)
 
         ProfileSetupPageBase._on_raw_profile_save_clicked(page)
 
-        page._controller.save_raw_profile_text.assert_not_called()
-        page._controller.create_raw_profile_save_worker.assert_called_once_with(
+        page.create_profile_raw_text_save_worker.assert_called_once_with(
             1,
             "profile-1",
             "--new\n--lua-desync=fake",
@@ -2671,15 +2662,12 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._enabled_checkbox = Mock()
         page._current_filter_kind = lambda: "hostlist"
         page._current_filter_value = lambda: "lists/youtube.txt"
-        page._controller = Mock()
         worker = _Worker()
-        page._controller.create_enabled_save_worker.return_value = worker
-        page._controller.set_enabled.side_effect = AssertionError("enabled save must run in worker")
+        page.create_profile_enabled_save_worker = Mock(return_value=worker)
 
         ProfileSetupPageBase._on_enabled_changed(page, 2)
 
-        page._controller.set_enabled.assert_not_called()
-        page._controller.create_enabled_save_worker.assert_called_once_with(
+        page.create_profile_enabled_save_worker.assert_called_once_with(
             1,
             profile_key="profile-1",
             enabled=True,
@@ -2831,7 +2819,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertIn("_list_file_base_text", ensure_editor)
         self.assertIn("Ваши записи", ensure_editor)
         self.assertNotIn("_apply_list_file_editor_state", apply_payload)
-        self.assertIn("create_list_file_save_worker", save_handler)
+        self.assertIn("create_profile_list_file_save_worker", save_handler)
         self.assertNotIn("save_list_file_text", save_handler)
         self.assertIn("Неверные строки", validation)
 
@@ -2861,15 +2849,12 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._list_file_save_worker = None
         page._list_file_status_label = Mock()
         page._list_file_save_button = Mock()
-        page._controller = Mock()
         worker = _Worker()
-        page._controller.create_list_file_save_worker.return_value = worker
-        page._controller.save_list_file_text.side_effect = AssertionError("save must run in worker")
+        page.create_profile_list_file_save_worker = Mock(return_value=worker)
 
         ProfileSetupPageBase._on_list_file_save_clicked(page)
 
-        page._controller.save_list_file_text.assert_not_called()
-        page._controller.create_list_file_save_worker.assert_called_once_with(
+        page.create_profile_list_file_save_worker.assert_called_once_with(
             1,
             "profile-1",
             "example.com",
@@ -2949,15 +2934,12 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._list_file_status_label = Mock()
         page._list_file_save_button = Mock()
         page._render_list_file_validation = Mock()
-        page._controller = Mock()
         worker = _Worker()
-        page._controller.create_list_file_validation_worker.return_value = worker
-        page._controller.validate_list_file_text.side_effect = AssertionError("validation must run in worker")
+        page.create_profile_list_file_validation_worker = Mock(return_value=worker)
 
         ProfileSetupPageBase._on_list_file_text_changed(page)
 
-        page._controller.validate_list_file_text.assert_not_called()
-        page._controller.create_list_file_validation_worker.assert_called_once_with(
+        page.create_profile_list_file_validation_worker.assert_called_once_with(
             1,
             kind="hostlist",
             text="bad domain",
@@ -3133,15 +3115,12 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._settings_save_request_id = 0
         page._settings_save_worker = None
         page._pending_settings_save = None
-        page._controller = Mock()
         worker = _Worker()
-        page._controller.create_settings_save_worker.return_value = worker
-        page._controller.save_winws2_settings.side_effect = AssertionError("settings save must run in worker")
+        page.create_profile_settings_save_worker = Mock(return_value=worker)
 
         ProfileSetupPageBase._autosave_editable_settings(page)
 
-        page._controller.save_winws2_settings.assert_not_called()
-        page._controller.create_settings_save_worker.assert_called_once_with(
+        page.create_profile_settings_save_worker.assert_called_once_with(
             1,
             profile_key="profile-1",
             filter_kind="hostlist",
@@ -3309,9 +3288,8 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._strategy_apply_worker = None
         page._strategy_apply_request_id = 0
         page._pending_strategy_apply = None
-        page._controller = Mock()
         worker = _Worker()
-        page._controller.create_strategy_apply_worker.return_value = worker
+        page.create_profile_strategy_apply_worker = Mock(return_value=worker)
         page.reload_current_profile = Mock()
         page._on_profile_changed_callback = Mock()
         page._apply_strategy_detail = Mock(side_effect=AssertionError("detail page must not open"))
@@ -3319,8 +3297,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         ProfileSetupPageBase._on_strategy_list_activated(page, "tls_fake")
 
-        page._controller.apply_strategy.assert_not_called()
-        page._controller.create_strategy_apply_worker.assert_called_once_with(
+        page.create_profile_strategy_apply_worker.assert_called_once_with(
             1,
             profile_key="profile-1",
             strategy_id="tls_fake",
@@ -3332,6 +3309,17 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         worker.start.assert_called_once()
 
     def test_clicking_template_strategy_applies_worker_payload_without_reload(self) -> None:
+        class _Signal:
+            def connect(self, _callback) -> None:
+                pass
+
+        class _Worker:
+            def __init__(self) -> None:
+                self.applied = _Signal()
+                self.failed = _Signal()
+                self.finished = _Signal()
+                self.start = Mock()
+
         item = SimpleNamespace(key="profile-1", strategy_id="tls_fake", in_preset=True, enabled=True)
         payload = SimpleNamespace(item=item)
         page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
@@ -3341,7 +3329,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._strategy_apply_worker = None
         page._strategy_apply_request_id = 0
         page._pending_strategy_apply = None
-        page._controller = Mock()
+        page.create_profile_strategy_apply_worker = Mock(return_value=_Worker())
         page.reload_current_profile = Mock()
         page._apply_payload = Mock()
         page._on_profile_changed_callback = Mock()
@@ -3403,7 +3391,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._strategy_apply_request_id = 1
         page._strategy_apply_worker_strategy_id = "first"
         page._pending_strategy_apply = None
-        page._controller = Mock()
+        page.create_profile_strategy_apply_worker = Mock()
         page.reload_current_profile = Mock()
         page._on_profile_changed_callback = Mock()
         page._apply_strategy_locally = Mock(return_value=True)
@@ -3412,7 +3400,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         page._apply_strategy_locally.assert_called_once_with("second")
         self.assertEqual(page._pending_strategy_apply, "second")
-        page._controller.create_strategy_apply_worker.assert_not_called()
+        page.create_profile_strategy_apply_worker.assert_not_called()
         page._on_profile_changed_callback.assert_not_called()
 
     def test_stale_strategy_apply_finish_waits_for_pending_last_choice(self) -> None:
@@ -3551,10 +3539,8 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             raw_strategy_text="",
             match_summary="",
         )
-        page._controller = Mock()
         worker = _Worker()
-        page._controller.create_strategy_feedback_save_worker.return_value = worker
-        page._controller.set_strategy_feedback.side_effect = AssertionError("feedback save must run in worker")
+        page.create_profile_strategy_feedback_save_worker = Mock(return_value=worker)
         page._strategy_feedback_save_request_id = 0
         page._strategy_feedback_save_worker = None
         page._strategy_list = Mock()
@@ -3564,8 +3550,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         ProfileSetupPageBase._set_current_strategy_feedback(page, rating="work")
 
-        page._controller.set_strategy_feedback.assert_not_called()
-        page._controller.create_strategy_feedback_save_worker.assert_called_once_with(
+        page.create_profile_strategy_feedback_save_worker.assert_called_once_with(
             1,
             profile_key="profile-1",
             strategy_id="tls_fake",
@@ -3658,7 +3643,6 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._loading = False
         page._profile_key = "profile-1"
         page._payload = SimpleNamespace(item=SimpleNamespace(in_preset=True, enabled=True, strategy_id="tls_fake"))
-        page._controller = Mock()
         page._apply_strategy_locally = Mock(side_effect=AssertionError("current strategy must not be applied again"))
         page._request_strategy_apply = Mock(side_effect=AssertionError("current strategy must not start worker again"))
         page.reload_current_profile = Mock()
@@ -3676,13 +3660,13 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._loading = False
         page._profile_key = "profile-1"
         page._payload = SimpleNamespace(item=SimpleNamespace(in_preset=True, enabled=False))
-        page._controller = Mock()
+        page.create_profile_strategy_apply_worker = Mock()
         page.reload_current_profile = Mock()
         page._on_profile_changed_callback = Mock()
 
         ProfileSetupPageBase._on_strategy_list_activated(page, "tls_fake")
 
-        page._controller.apply_strategy.assert_not_called()
+        page.create_profile_strategy_apply_worker.assert_not_called()
         page.reload_current_profile.assert_not_called()
         page._on_profile_changed_callback.assert_not_called()
 

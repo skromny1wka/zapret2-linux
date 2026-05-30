@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from app.page_names import PageName
-from profile.setup_controller import ProfileSetupActions
 from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE
 from presets.ui.control.control_page_shared import ControlRuntimeActions
 from presets.ui.common.preset_subpage_base import RawPresetRuntimeActions
@@ -98,20 +97,16 @@ def build_profile_setup_page_kwargs(
     )
     return {
         "create_profile_setup_load_worker": profile_feature.create_profile_setup_load_worker,
-        "profile_setup_actions": ProfileSetupActions(
-            get_profile_setup=profile_feature.get_profile_setup,
-            get_profile_list_file_editor_state=profile_feature.get_profile_list_file_editor_state,
-            update_winws2_profile_settings=profile_feature.update_winws2_profile_settings,
-            update_profile_raw_text=profile_feature.update_profile_raw_text,
-            validate_profile_list_file_text=profile_feature.validate_profile_list_file_text,
-            save_profile_list_file_text=profile_feature.save_profile_list_file_text,
-            set_profile_enabled=profile_feature.set_profile_enabled,
-            update_user_profile=profile_feature.update_user_profile,
-            list_profiles=profile_feature.list_profiles,
-            delete_user_profile=profile_feature.delete_user_profile,
-            apply_strategy_to_profile=profile_feature.apply_strategy_to_profile,
-            set_current_strategy_state=profile_feature.set_current_strategy_state,
-        ),
+        "create_profile_list_file_load_worker": profile_feature.create_profile_list_file_load_worker,
+        "create_profile_list_file_save_worker": profile_feature.create_profile_list_file_save_worker,
+        "create_profile_list_file_validation_worker": profile_feature.create_profile_list_file_validation_worker,
+        "create_profile_settings_save_worker": profile_feature.create_profile_settings_save_worker,
+        "create_profile_raw_text_save_worker": profile_feature.create_profile_raw_text_save_worker,
+        "create_profile_enabled_save_worker": profile_feature.create_profile_enabled_save_worker,
+        "create_profile_user_update_worker": profile_feature.create_profile_user_update_worker,
+        "create_profile_user_delete_worker": profile_feature.create_profile_user_delete_worker,
+        "create_profile_strategy_apply_worker": profile_feature.create_profile_strategy_apply_worker,
+        "create_profile_strategy_feedback_save_worker": profile_feature.create_profile_strategy_feedback_save_worker,
         "open_profiles": lambda page=profiles_page: show_page(page, allow_internal=True),
         "open_root": lambda m=method: show_page(resolve_profile_setup_root_page_for_method(m), allow_internal=True),
         "on_profile_changed": lambda profile_key, change_kind, profile_item=None, m=method: on_profile_setup_changed(

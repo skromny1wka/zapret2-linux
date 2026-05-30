@@ -475,13 +475,12 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         page._list_file_status_label = _TextWidget("Загрузка файла списка...")
         page._current_filter_kind = lambda: "hostlist"
         page._current_filter_value = lambda: "lists/youtube.txt"
-        page._controller = Mock()
-        page._controller.create_list_file_load_worker.return_value = worker
+        page.create_profile_list_file_load_worker = Mock(return_value=worker)
 
         ProfileSetupPageBase._request_list_file_editor_state(page)
 
         self.assertEqual(page._list_file_status_label.calls, [])
-        page._controller.create_list_file_load_worker.assert_called_once_with(
+        page.create_profile_list_file_load_worker.assert_called_once_with(
             1,
             "profile-1",
             filter_kind="hostlist",
@@ -654,13 +653,12 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         page._raw_profile_save_worker = None
         page._raw_profile_save_request_id = 0
         page._raw_profile_save_button = _BoolWidget(enabled=False)
-        page._controller = Mock()
-        page._controller.create_raw_profile_save_worker.return_value = worker
+        page.create_profile_raw_text_save_worker = Mock(return_value=worker)
 
         ProfileSetupPageBase._on_raw_profile_save_clicked(page)
 
         self.assertEqual(page._raw_profile_save_button.enabled_calls, [])
-        page._controller.create_raw_profile_save_worker.assert_called_once_with(
+        page.create_profile_raw_text_save_worker.assert_called_once_with(
             1,
             "profile-1",
             "--new\n",
@@ -682,13 +680,12 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         page._enabled_checkbox = _BoolWidget(checked=True, enabled=False)
         page._current_filter_kind = lambda: "hostlist"
         page._current_filter_value = lambda: "lists/youtube.txt"
-        page._controller = Mock()
-        page._controller.create_enabled_save_worker.return_value = worker
+        page.create_profile_enabled_save_worker = Mock(return_value=worker)
 
         ProfileSetupPageBase._on_enabled_changed(page, 2)
 
         self.assertEqual(page._enabled_checkbox.enabled_calls, [])
-        page._controller.create_enabled_save_worker.assert_called_once_with(
+        page.create_profile_enabled_save_worker.assert_called_once_with(
             1,
             profile_key="profile-1",
             enabled=True,

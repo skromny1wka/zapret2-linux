@@ -28,7 +28,6 @@ from profile.ui.profile_setup_controls import (
     set_range_controls,
     sync_range_value_enabled,
 )
-from profile.setup_controller import ProfileSetupActions, ProfileSetupController
 from profile.strategy_visuals import describe_strategy_visual
 from profile.strategy_state import ProfileStrategyState
 from profile.ui.user_profile_dialog import CreateUserProfileDialog
@@ -770,7 +769,16 @@ class ProfileSetupPageBase(BasePage):
         parent=None,
         *,
         create_profile_setup_load_worker,
-        profile_setup_actions: ProfileSetupActions,
+        create_profile_list_file_load_worker,
+        create_profile_list_file_save_worker,
+        create_profile_list_file_validation_worker,
+        create_profile_settings_save_worker,
+        create_profile_raw_text_save_worker,
+        create_profile_enabled_save_worker,
+        create_profile_user_update_worker,
+        create_profile_user_delete_worker,
+        create_profile_strategy_apply_worker,
+        create_profile_strategy_feedback_save_worker,
         open_profiles,
         open_root,
         on_profile_changed,
@@ -781,10 +789,16 @@ class ProfileSetupPageBase(BasePage):
             title_key=self.title_key_name,
         )
         self._create_profile_setup_load_worker_fn = create_profile_setup_load_worker
-        self._controller = ProfileSetupController(
-            profile_setup_actions=profile_setup_actions,
-            launch_method=self.launch_method,
-        )
+        self._create_profile_list_file_load_worker_fn = create_profile_list_file_load_worker
+        self._create_profile_list_file_save_worker_fn = create_profile_list_file_save_worker
+        self._create_profile_list_file_validation_worker_fn = create_profile_list_file_validation_worker
+        self._create_profile_settings_save_worker_fn = create_profile_settings_save_worker
+        self._create_profile_raw_text_save_worker_fn = create_profile_raw_text_save_worker
+        self._create_profile_enabled_save_worker_fn = create_profile_enabled_save_worker
+        self._create_profile_user_update_worker_fn = create_profile_user_update_worker
+        self._create_profile_user_delete_worker_fn = create_profile_user_delete_worker
+        self._create_profile_strategy_apply_worker_fn = create_profile_strategy_apply_worker
+        self._create_profile_strategy_feedback_save_worker_fn = create_profile_strategy_feedback_save_worker
         self._open_profiles = open_profiles
         self._open_root = open_root
         self._on_profile_changed_callback = on_profile_changed
@@ -1135,7 +1149,7 @@ class ProfileSetupPageBase(BasePage):
             set_widget_text_if_changed(self._list_file_status_label, "Загрузка файла списка...")
         self._list_file_load_request_id += 1
         request_id = self._list_file_load_request_id
-        worker = self._controller.create_list_file_load_worker(
+        worker = self.create_profile_list_file_load_worker(
             request_id,
             self._profile_key,
             filter_kind=self._current_filter_kind(),
@@ -1355,7 +1369,7 @@ class ProfileSetupPageBase(BasePage):
         self._user_profile_update_request_id = int(getattr(self, "_user_profile_update_request_id", 0) or 0) + 1
         request_id = self._user_profile_update_request_id
         self._set_user_profile_buttons_enabled(False)
-        worker = self._controller.create_user_profile_update_worker(
+        worker = self.create_profile_user_update_worker(
             request_id,
             profile_id=profile_id,
             name=name,
@@ -1438,7 +1452,7 @@ class ProfileSetupPageBase(BasePage):
         self._user_profile_delete_request_id = int(getattr(self, "_user_profile_delete_request_id", 0) or 0) + 1
         request_id = self._user_profile_delete_request_id
         self._set_user_profile_buttons_enabled(False)
-        worker = self._controller.create_user_profile_delete_worker(
+        worker = self.create_profile_user_delete_worker(
             request_id,
             profile_id=profile_id,
             parent=self,
@@ -1500,6 +1514,150 @@ class ProfileSetupPageBase(BasePage):
             request_id,
             self.launch_method,
             profile_key=profile_key,
+            parent=parent,
+        )
+
+    def create_profile_list_file_load_worker(
+        self,
+        request_id: int,
+        profile_key: str,
+        *,
+        filter_kind: str = "",
+        filter_value: str = "",
+        parent=None,
+    ):
+        return self._create_profile_list_file_load_worker_fn(
+            request_id,
+            self.launch_method,
+            profile_key=profile_key,
+            filter_kind=filter_kind,
+            filter_value=filter_value,
+            parent=parent,
+        )
+
+    def create_profile_list_file_save_worker(self, request_id: int, profile_key: str, text: str, parent=None):
+        return self._create_profile_list_file_save_worker_fn(
+            request_id,
+            self.launch_method,
+            profile_key=profile_key,
+            text=text,
+            parent=parent,
+        )
+
+    def create_profile_list_file_validation_worker(self, request_id: int, *, kind: str, text: str, parent=None):
+        return self._create_profile_list_file_validation_worker_fn(
+            request_id,
+            self.launch_method,
+            kind=kind,
+            text=text,
+            parent=parent,
+        )
+
+    def create_profile_settings_save_worker(
+        self,
+        request_id: int,
+        *,
+        profile_key: str,
+        filter_kind: str,
+        filter_value: str,
+        in_range: str,
+        out_range: str,
+        parent=None,
+    ):
+        return self._create_profile_settings_save_worker_fn(
+            request_id,
+            self.launch_method,
+            profile_key=profile_key,
+            filter_kind=filter_kind,
+            filter_value=filter_value,
+            in_range=in_range,
+            out_range=out_range,
+            parent=parent,
+        )
+
+    def create_profile_raw_text_save_worker(self, request_id: int, profile_key: str, raw_text: str, parent=None):
+        return self._create_profile_raw_text_save_worker_fn(
+            request_id,
+            self.launch_method,
+            profile_key=profile_key,
+            raw_text=raw_text,
+            parent=parent,
+        )
+
+    def create_profile_enabled_save_worker(
+        self,
+        request_id: int,
+        *,
+        profile_key: str,
+        enabled: bool,
+        filter_kind: str = "",
+        filter_value: str = "",
+        parent=None,
+    ):
+        return self._create_profile_enabled_save_worker_fn(
+            request_id,
+            self.launch_method,
+            profile_key=profile_key,
+            enabled=enabled,
+            filter_kind=filter_kind,
+            filter_value=filter_value,
+            parent=parent,
+        )
+
+    def create_profile_user_update_worker(
+        self,
+        request_id: int,
+        *,
+        profile_id: str,
+        name: str,
+        protocol: str,
+        ports: str,
+        parent=None,
+    ):
+        return self._create_profile_user_update_worker_fn(
+            request_id,
+            self.launch_method,
+            profile_id=profile_id,
+            name=name,
+            protocol=protocol,
+            ports=ports,
+            parent=parent,
+        )
+
+    def create_profile_user_delete_worker(self, request_id: int, *, profile_id: str, parent=None):
+        return self._create_profile_user_delete_worker_fn(
+            request_id,
+            self.launch_method,
+            profile_id=profile_id,
+            parent=parent,
+        )
+
+    def create_profile_strategy_apply_worker(self, request_id: int, *, profile_key: str, strategy_id: str, parent=None):
+        return self._create_profile_strategy_apply_worker_fn(
+            request_id,
+            self.launch_method,
+            profile_key=profile_key,
+            strategy_id=strategy_id,
+            parent=parent,
+        )
+
+    def create_profile_strategy_feedback_save_worker(
+        self,
+        request_id: int,
+        *,
+        profile_key: str,
+        strategy_id: str,
+        rating: str | None = None,
+        favorite: bool | None = None,
+        parent=None,
+    ):
+        return self._create_profile_strategy_feedback_save_worker_fn(
+            request_id,
+            self.launch_method,
+            profile_key=profile_key,
+            strategy_id=strategy_id,
+            rating=rating,
+            favorite=favorite,
             parent=parent,
         )
 
@@ -1697,7 +1855,7 @@ class ProfileSetupPageBase(BasePage):
     def _start_list_file_validation_worker(self, request: dict) -> None:
         self._list_file_validation_request_id = int(getattr(self, "_list_file_validation_request_id", 0) or 0) + 1
         request_id = self._list_file_validation_request_id
-        worker = self._controller.create_list_file_validation_worker(
+        worker = self.create_profile_list_file_validation_worker(
             request_id,
             kind=str(request.get("kind") or ""),
             text=str(request.get("text") or ""),
@@ -1785,7 +1943,7 @@ class ProfileSetupPageBase(BasePage):
             set_widget_text_if_changed(self._list_file_status_label, "Сохранение списка...")
         if self._list_file_save_button is not None:
             set_widget_enabled_if_changed(self._list_file_save_button, False)
-        worker = self._controller.create_list_file_save_worker(
+        worker = self.create_profile_list_file_save_worker(
             request_id,
             self._profile_key,
             self._list_file_text.toPlainText(),
@@ -2063,7 +2221,7 @@ class ProfileSetupPageBase(BasePage):
     def _start_settings_save_worker(self, request: dict) -> None:
         self._settings_save_request_id += 1
         request_id = self._settings_save_request_id
-        worker = self._controller.create_settings_save_worker(
+        worker = self.create_profile_settings_save_worker(
             request_id,
             profile_key=str(request.get("profile_key") or ""),
             filter_kind=str(request.get("filter_kind") or ""),
@@ -2122,7 +2280,7 @@ class ProfileSetupPageBase(BasePage):
         request_id = self._raw_profile_save_request_id
         if self._raw_profile_save_button is not None:
             set_widget_enabled_if_changed(self._raw_profile_save_button, False)
-        worker = self._controller.create_raw_profile_save_worker(
+        worker = self.create_profile_raw_text_save_worker(
             request_id,
             self._profile_key,
             self._raw_profile_text.toPlainText(),
@@ -2185,7 +2343,7 @@ class ProfileSetupPageBase(BasePage):
         request_id = self._enabled_save_request_id
         if self._enabled_checkbox is not None:
             set_widget_enabled_if_changed(self._enabled_checkbox, False)
-        worker = self._controller.create_enabled_save_worker(
+        worker = self.create_profile_enabled_save_worker(
             request_id,
             profile_key=self._profile_key,
             enabled=enabled,
@@ -2291,7 +2449,7 @@ class ProfileSetupPageBase(BasePage):
             return
         self._strategy_apply_request_id = int(getattr(self, "_strategy_apply_request_id", 0) or 0) + 1
         request_id = self._strategy_apply_request_id
-        worker = self._controller.create_strategy_apply_worker(
+        worker = self.create_profile_strategy_apply_worker(
             request_id,
             profile_key=self._profile_key,
             strategy_id=strategy_id,
@@ -2424,7 +2582,7 @@ class ProfileSetupPageBase(BasePage):
             return
         self._strategy_feedback_save_request_id = int(getattr(self, "_strategy_feedback_save_request_id", 0) or 0) + 1
         request_id = self._strategy_feedback_save_request_id
-        worker = self._controller.create_strategy_feedback_save_worker(
+        worker = self.create_profile_strategy_feedback_save_worker(
             request_id,
             profile_key=self._profile_key,
             strategy_id=strategy_id,

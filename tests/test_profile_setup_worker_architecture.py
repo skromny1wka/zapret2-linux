@@ -6,21 +6,40 @@ from unittest.mock import Mock
 
 
 class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
-    def test_profile_setup_page_receives_actions_instead_of_profile_feature(self) -> None:
-        from profile.setup_controller import ProfileSetupController
+    def test_profile_setup_page_receives_worker_factories_instead_of_controller(self) -> None:
+        from app.feature_facades.profile import ProfileFeature
         from profile.ui.profile_setup_page import ProfileSetupPageBase
         from ui.navigation_pages import PageName
         from ui.page_deps.presets import build_profile_setup_page_kwargs
 
         init_source = inspect.getsource(ProfileSetupPageBase.__init__)
-        controller_init_source = inspect.getsource(ProfileSetupController.__init__)
-        controller_source = inspect.getsource(ProfileSetupController)
+        page_source = inspect.getsource(ProfileSetupPageBase)
+        deps_source = inspect.getsource(build_profile_setup_page_kwargs)
+        feature_source = inspect.getsource(ProfileFeature)
+        worker_factories = (
+            "create_profile_setup_load_worker",
+            "create_profile_list_file_load_worker",
+            "create_profile_list_file_save_worker",
+            "create_profile_list_file_validation_worker",
+            "create_profile_settings_save_worker",
+            "create_profile_raw_text_save_worker",
+            "create_profile_enabled_save_worker",
+            "create_profile_user_update_worker",
+            "create_profile_user_delete_worker",
+            "create_profile_strategy_apply_worker",
+            "create_profile_strategy_feedback_save_worker",
+        )
 
-        self.assertIn("profile_setup_actions", init_source)
+        for factory_name in worker_factories:
+            self.assertIn(factory_name, init_source)
+            self.assertIn(factory_name, deps_source)
+            self.assertIn(factory_name, feature_source)
+            self.assertIn(f"_{factory_name}_fn", page_source)
+
+        self.assertNotIn("ProfileSetupController", page_source)
+        self.assertNotIn("_controller", page_source)
+        self.assertNotIn("profile_setup_actions", init_source)
         self.assertNotIn("profile_feature", init_source)
-        self.assertIn("profile_setup_actions", controller_init_source)
-        self.assertNotIn("profile_feature", controller_init_source)
-        self.assertNotIn("self._profile", controller_source)
 
         profile_feature = Mock()
         kwargs = build_profile_setup_page_kwargs(
@@ -30,12 +49,11 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
             on_profile_setup_changed=Mock(),
         )
 
-        self.assertIn("profile_setup_actions", kwargs)
+        for factory_name in worker_factories:
+            self.assertIs(kwargs[factory_name], getattr(profile_feature, factory_name))
+
+        self.assertNotIn("profile_setup_actions", kwargs)
         self.assertNotIn("profile_feature", kwargs)
-        actions = kwargs["profile_setup_actions"]
-        self.assertIs(actions.get_profile_setup, profile_feature.get_profile_setup)
-        self.assertIs(actions.apply_strategy_to_profile, profile_feature.apply_strategy_to_profile)
-        self.assertIs(actions.update_profile_raw_text, profile_feature.update_profile_raw_text)
 
     def test_profile_setup_load_worker_comes_from_profile_feature(self) -> None:
         from app.feature_facades.profile import ProfileFeature

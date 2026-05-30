@@ -75,6 +75,337 @@ class ProfileFeature:
             parent,
         )
 
+    def create_profile_list_file_load_worker(
+        self,
+        request_id: int,
+        launch_method: str,
+        *,
+        profile_key: str,
+        filter_kind: str = "",
+        filter_value: str = "",
+        parent=None,
+    ):
+        from profile.profile_setup_loader import ProfileListFileLoadWorker
+
+        clean_launch_method = str(launch_method or "")
+
+        def _load_list_file_editor_state(
+            profile_key: str,
+            *,
+            filter_kind: str = "",
+            filter_value: str = "",
+        ):
+            return self.get_profile_list_file_editor_state(
+                clean_launch_method,
+                profile_key,
+                filter_kind=filter_kind,
+                filter_value=filter_value,
+            )
+
+        return ProfileListFileLoadWorker(
+            request_id,
+            _load_list_file_editor_state,
+            profile_key,
+            filter_kind=filter_kind,
+            filter_value=filter_value,
+            parent=parent,
+        )
+
+    def create_profile_list_file_save_worker(
+        self,
+        request_id: int,
+        launch_method: str,
+        *,
+        profile_key: str,
+        text: str,
+        parent=None,
+    ):
+        from profile.profile_setup_loader import ProfileListFileSaveWorker
+
+        clean_launch_method = str(launch_method or "")
+
+        def _save_list_file_text(*, profile_key: str, text: str):
+            return self.save_profile_list_file_text(clean_launch_method, profile_key, text)
+
+        def _load_profile_setup(profile_key: str):
+            return self.get_profile_setup(clean_launch_method, profile_key)
+
+        return ProfileListFileSaveWorker(
+            request_id,
+            _save_list_file_text,
+            _load_profile_setup,
+            profile_key,
+            text,
+            parent,
+        )
+
+    def create_profile_list_file_validation_worker(
+        self,
+        request_id: int,
+        launch_method: str,
+        *,
+        kind: str,
+        text: str,
+        parent=None,
+    ):
+        from profile.profile_setup_loader import ProfileListFileValidationWorker
+
+        clean_launch_method = str(launch_method or "")
+
+        def _validate_list_file_text(*, kind: str, text: str):
+            return self.validate_profile_list_file_text(clean_launch_method, kind, text)
+
+        return ProfileListFileValidationWorker(
+            request_id,
+            _validate_list_file_text,
+            kind=kind,
+            text=text,
+            parent=parent,
+        )
+
+    def create_profile_settings_save_worker(
+        self,
+        request_id: int,
+        launch_method: str,
+        *,
+        profile_key: str,
+        filter_kind: str,
+        filter_value: str,
+        in_range: str,
+        out_range: str,
+        parent=None,
+    ):
+        from profile.profile_setup_loader import ProfileSettingsSaveWorker
+
+        clean_launch_method = str(launch_method or "")
+
+        def _save_settings(
+            *,
+            profile_key: str,
+            filter_kind: str,
+            filter_value: str,
+            in_range: str,
+            out_range: str,
+        ):
+            return self.update_winws2_profile_settings(
+                clean_launch_method,
+                profile_key,
+                filter_kind=filter_kind,
+                filter_value=filter_value,
+                in_range=in_range,
+                out_range=out_range,
+            )
+
+        def _load_profile_setup(profile_key: str):
+            return self.get_profile_setup(clean_launch_method, profile_key)
+
+        return ProfileSettingsSaveWorker(
+            request_id,
+            _save_settings,
+            _load_profile_setup,
+            profile_key=profile_key,
+            filter_kind=filter_kind,
+            filter_value=filter_value,
+            in_range=in_range,
+            out_range=out_range,
+            parent=parent,
+        )
+
+    def create_profile_raw_text_save_worker(
+        self,
+        request_id: int,
+        launch_method: str,
+        *,
+        profile_key: str,
+        raw_text: str,
+        parent=None,
+    ):
+        from profile.profile_setup_loader import ProfileRawTextSaveWorker
+
+        clean_launch_method = str(launch_method or "")
+
+        def _save_raw_text(*, profile_key: str, raw_text: str):
+            return self.update_profile_raw_text(clean_launch_method, profile_key, raw_text)
+
+        def _load_profile_setup(profile_key: str):
+            return self.get_profile_setup(clean_launch_method, profile_key)
+
+        return ProfileRawTextSaveWorker(
+            request_id,
+            _save_raw_text,
+            _load_profile_setup,
+            profile_key,
+            raw_text,
+            parent,
+        )
+
+    def create_profile_enabled_save_worker(
+        self,
+        request_id: int,
+        launch_method: str,
+        *,
+        profile_key: str,
+        enabled: bool,
+        filter_kind: str = "",
+        filter_value: str = "",
+        parent=None,
+    ):
+        from profile.profile_setup_loader import ProfileEnabledSaveWorker
+
+        clean_launch_method = str(launch_method or "")
+
+        def _set_enabled(
+            *,
+            profile_key: str,
+            enabled: bool,
+            filter_kind: str = "",
+            filter_value: str = "",
+        ):
+            return self.set_profile_enabled(
+                clean_launch_method,
+                profile_key,
+                enabled,
+                filter_kind=filter_kind,
+                filter_value=filter_value,
+            )
+
+        def _load_profile_setup(profile_key: str):
+            return self.get_profile_setup(clean_launch_method, profile_key)
+
+        return ProfileEnabledSaveWorker(
+            request_id,
+            _set_enabled,
+            _load_profile_setup,
+            profile_key=profile_key,
+            enabled=enabled,
+            filter_kind=filter_kind,
+            filter_value=filter_value,
+            parent=parent,
+        )
+
+    def create_profile_user_update_worker(
+        self,
+        request_id: int,
+        launch_method: str,
+        *,
+        profile_id: str,
+        name: str,
+        protocol: str,
+        ports: str,
+        parent=None,
+    ):
+        from profile.profile_setup_loader import ProfileUserProfileUpdateWorker, load_user_profile_items_from_payload
+
+        clean_launch_method = str(launch_method or "")
+
+        def _update_user_profile(*, profile_id: str, name: str, protocol: str, ports: str) -> int:
+            return self.update_user_profile(
+                profile_id,
+                name=name,
+                protocol=protocol,
+                ports=ports,
+            )
+
+        def _load_user_profile_items(profile_id: str):
+            return load_user_profile_items_from_payload(lambda: self.list_profiles(clean_launch_method), profile_id)
+
+        return ProfileUserProfileUpdateWorker(
+            request_id,
+            _update_user_profile,
+            _load_user_profile_items,
+            profile_id=profile_id,
+            name=name,
+            protocol=protocol,
+            ports=ports,
+            parent=parent,
+        )
+
+    def create_profile_user_delete_worker(
+        self,
+        request_id: int,
+        launch_method: str,
+        *,
+        profile_id: str,
+        parent=None,
+    ):
+        from profile.profile_setup_loader import ProfileUserProfileDeleteWorker
+
+        def _delete_user_profile(*, profile_id: str) -> int:
+            return self.delete_user_profile(profile_id)
+
+        return ProfileUserProfileDeleteWorker(
+            request_id,
+            _delete_user_profile,
+            profile_id=profile_id,
+            parent=parent,
+        )
+
+    def create_profile_strategy_apply_worker(
+        self,
+        request_id: int,
+        launch_method: str,
+        *,
+        profile_key: str,
+        strategy_id: str,
+        parent=None,
+    ):
+        from profile.profile_setup_loader import ProfileStrategyApplyWorker
+
+        clean_launch_method = str(launch_method or "")
+
+        def _apply_strategy(*, profile_key: str, strategy_id: str):
+            return self.apply_strategy_to_profile(clean_launch_method, profile_key, strategy_id)
+
+        def _load_profile_setup(profile_key: str):
+            return self.get_profile_setup(clean_launch_method, profile_key)
+
+        return ProfileStrategyApplyWorker(
+            request_id,
+            _apply_strategy,
+            _load_profile_setup,
+            profile_key,
+            strategy_id,
+            parent,
+        )
+
+    def create_profile_strategy_feedback_save_worker(
+        self,
+        request_id: int,
+        launch_method: str,
+        *,
+        profile_key: str,
+        strategy_id: str,
+        rating: str | None = None,
+        favorite: bool | None = None,
+        parent=None,
+    ):
+        from profile.profile_setup_loader import ProfileStrategyFeedbackSaveWorker
+
+        clean_launch_method = str(launch_method or "")
+
+        def _save_feedback(
+            *,
+            profile_key: str,
+            rating: str | None = None,
+            favorite: bool | None = None,
+        ):
+            return self.set_current_strategy_state(
+                clean_launch_method,
+                profile_key,
+                rating=rating,
+                favorite=favorite,
+            )
+
+        return ProfileStrategyFeedbackSaveWorker(
+            request_id,
+            _save_feedback,
+            profile_key=profile_key,
+            strategy_id=strategy_id,
+            rating=rating,
+            favorite=favorite,
+            parent=parent,
+        )
+
     def get_profile_list_file_editor_state(
         self,
         launch_method: str,
