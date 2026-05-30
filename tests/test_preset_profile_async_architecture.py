@@ -1329,12 +1329,16 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("self._reset_preset_folders", worker_source)
         self.assertIn("self._load_preset_folder_state", worker_source)
         self.assertNotIn("from presets.folders", worker_source)
+        self.assertNotIn("from presets.folders import", inspect.getsource(UserPresetsPageBase))
         self.assertIn('context["folder_state"]', worker_source)
         self.assertIn("_preset_folder_action_pending.append", request_source)
         self.assertIn("_preset_folder_action_pending.pop(0)", finished_source)
         self.assertIn("update_cached_folder_state", action_finished_source)
         self.assertIn("show_menu", action_finished_source)
         self.assertIn("create_preset_folder_action_worker", request_source)
+        create_source = inspect.getsource(UserPresetsPageBase.create_preset_folder_action_worker)
+        self.assertNotIn("UserPresetFolderActionWorker", create_source)
+        self.assertIn("_create_preset_folder_action_worker_fn", create_source)
 
     def test_profile_folder_actions_run_through_worker(self) -> None:
         toggle_source = inspect.getsource(PresetSetupPageBase._on_folder_toggled)

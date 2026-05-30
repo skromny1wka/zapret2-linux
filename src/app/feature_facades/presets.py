@@ -216,6 +216,59 @@ class PresetsFeature:
             parent=parent,
         )
 
+    def load_preset_folder_state(self, scope_key: str):
+        from presets.folders import load_preset_folder_state
+
+        return load_preset_folder_state(scope_key)
+
+    def delete_preset_item_meta(self, scope_key: str, file_name: str):
+        from presets.folders import delete_preset_item_meta
+
+        return delete_preset_item_meta(scope_key, file_name)
+
+    def create_preset_folder_action_worker(
+        self,
+        request_id: int,
+        *,
+        scope_key: str,
+        action: str,
+        folder_key: str = "",
+        name: str = "",
+        direction: int = 0,
+        collapsed: bool = False,
+        context_extra: dict | None = None,
+        parent=None,
+    ):
+        from presets.folders import (
+            create_preset_folder,
+            delete_preset_folder,
+            load_preset_folder_state,
+            move_preset_folder_by_step,
+            rename_preset_folder,
+            reset_preset_folders,
+            set_preset_folder_collapsed,
+        )
+        from presets.user_presets_action_workers import UserPresetFolderActionWorker
+
+        return UserPresetFolderActionWorker(
+            request_id,
+            load_preset_folder_state,
+            create_preset_folder,
+            rename_preset_folder,
+            delete_preset_folder,
+            move_preset_folder_by_step,
+            set_preset_folder_collapsed,
+            reset_preset_folders,
+            scope_key=scope_key,
+            action=action,
+            folder_key=folder_key,
+            name=name,
+            direction=direction,
+            collapsed=collapsed,
+            context_extra=context_extra,
+            parent=parent,
+        )
+
     def open_preset_source_file(self, path) -> None:
         return self._commands().open_preset_source_file(path)
 

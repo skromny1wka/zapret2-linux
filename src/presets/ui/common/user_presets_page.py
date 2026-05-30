@@ -18,16 +18,6 @@ from PyQt6.QtWidgets import (
 from ui.pages.base_page import BasePage
 from presets.ui.common.preset_actions_menu import show_preset_actions_menu
 from presets.ui.common.preset_rating_menu import show_preset_rating_menu
-from presets.folders import (
-    create_preset_folder,
-    delete_preset_folder,
-    delete_preset_item_meta,
-    load_preset_folder_state,
-    move_preset_folder_by_step,
-    rename_preset_folder,
-    reset_preset_folders,
-    set_preset_folder_collapsed,
-)
 from presets.user_presets_runtime_service import (
     UserPresetsRuntimeAdapter,
     UserPresetsRuntimeService,
@@ -36,7 +26,6 @@ from presets.user_presets_action_workers import (
     UserPresetActivateWorker,
     UserPresetBulkActionWorker,
     UserPresetEditActionWorker,
-    UserPresetFolderActionWorker,
     UserPresetItemActionWorker,
     UserPresetLinkActionWorker,
     UserPresetStorageActionWorker,
@@ -126,6 +115,9 @@ class UserPresetsPageBase(BasePage):
         preset_runtime_actions: UserPresetsRuntimeActions,
         connect_preset_signals,
         create_user_presets_open_folder_worker,
+        create_preset_folder_action_worker,
+        load_preset_folder_state,
+        delete_preset_item_meta,
         open_preset_raw_editor,
         open_url,
         ui_state_store,
@@ -140,6 +132,9 @@ class UserPresetsPageBase(BasePage):
         self._preset_runtime_actions = preset_runtime_actions
         self._connect_preset_signals = connect_preset_signals
         self._create_user_presets_open_folder_worker = create_user_presets_open_folder_worker
+        self._create_preset_folder_action_worker_fn = create_preset_folder_action_worker
+        self._load_preset_folder_state_fn = load_preset_folder_state
+        self._delete_preset_item_meta_fn = delete_preset_item_meta
         self._open_url = open_url
         self._open_preset_raw_editor_callback = open_preset_raw_editor
         self._page_api = self._build_page_runtime().build_page_api()
@@ -232,7 +227,7 @@ class UserPresetsPageBase(BasePage):
                 folder_state=folder_state,
                 started_at=started_at,
             ),
-            delete_preset_item_meta=lambda name: delete_preset_item_meta(self._folder_scope_key(), name),
+            delete_preset_item_meta=lambda name: self._delete_preset_item_meta_fn(self._folder_scope_key(), name),
         )
 
     def _apply_mode_labels(self) -> None:
@@ -356,7 +351,7 @@ class UserPresetsPageBase(BasePage):
         return self._config.folder_scope
 
     def _load_preset_folder_state_light(self) -> dict[str, object]:
-        return load_preset_folder_state(self._folder_scope_key())
+        return self._load_preset_folder_state_fn(self._folder_scope_key())
 
     def on_page_activated(self) -> None:
         activate_user_presets_page(
@@ -1041,15 +1036,8 @@ class UserPresetsPageBase(BasePage):
         collapsed: bool = False,
         context_extra: dict | None = None,
     ):
-        return UserPresetFolderActionWorker(
+        return self._create_preset_folder_action_worker_fn(
             request_id,
-            load_preset_folder_state,
-            create_preset_folder,
-            rename_preset_folder,
-            delete_preset_folder,
-            move_preset_folder_by_step,
-            set_preset_folder_collapsed,
-            reset_preset_folders,
             scope_key=self._folder_scope_key(),
             action=action,
             folder_key=folder_key,
