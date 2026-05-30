@@ -135,6 +135,17 @@ def set_visible_if_changed(widget, visible: bool) -> bool:
     return True
 
 
+def set_plain_text_if_changed(widget, text: str) -> bool:
+    value = str(text or "")
+    try:
+        if str(widget.toPlainText()) == value:
+            return False
+    except Exception:
+        pass
+    widget.setPlainText(value)
+    return True
+
+
 class _RenameDialog(MessageBoxBase):
     def __init__(self, current_name: str, existing_names: list[str], parent=None):
         if parent is not None and not parent.isWindow():
@@ -515,7 +526,7 @@ class PresetRawEditorPage(BasePage):
             self._preset_name = str(result.display_name or "").strip()
         self._preset_path = getattr(result, "path", None)
         self._preset_origin = str(getattr(result, "origin", "") or "user").strip().lower() or "user"
-        self.editor.setPlainText(result.text)
+        set_plain_text_if_changed(self.editor, result.text)
         self._set_footer(result.footer_text)
         self._is_loading = False
         self._refresh_header()
