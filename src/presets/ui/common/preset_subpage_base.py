@@ -135,6 +135,17 @@ def set_visible_if_changed(widget, visible: bool) -> bool:
     return True
 
 
+def set_enabled_if_changed(widget, enabled: bool) -> bool:
+    value = bool(enabled)
+    try:
+        if bool(widget.isEnabled()) == value:
+            return False
+    except Exception:
+        pass
+    widget.setEnabled(value)
+    return True
+
+
 def set_plain_text_if_changed(widget, text: str) -> bool:
     value = str(text or "")
     try:
@@ -890,7 +901,7 @@ class PresetRawEditorPage(BasePage):
         self._raw_activate_request_id += 1
         request_id = self._raw_activate_request_id
         if self.activateButton is not None:
-            self.activateButton.setEnabled(False)
+            set_enabled_if_changed(self.activateButton, False)
         worker = self._controller.create_activate_worker(request_id, self._preset_file_name, self)
         self._raw_activate_worker = worker
         worker.activated.connect(self._on_preset_activation_finished)
@@ -918,7 +929,7 @@ class PresetRawEditorPage(BasePage):
             self._raw_activate_worker = None
         worker.deleteLater()
         if self.activateButton is not None:
-            self.activateButton.setEnabled(True)
+            set_enabled_if_changed(self.activateButton, True)
 
     def _request_raw_preset_action(self, action: str, **payload) -> None:
         worker = self._raw_action_worker

@@ -19,6 +19,36 @@ class _PlainTextEditor:
         self._text = value
 
 
+class _Button:
+    def __init__(self, *, enabled: bool = True) -> None:
+        self._enabled = bool(enabled)
+        self.enabled_calls: list[bool] = []
+
+    def isEnabled(self) -> bool:  # noqa: N802
+        return self._enabled
+
+    def setEnabled(self, enabled: bool) -> None:  # noqa: N802
+        value = bool(enabled)
+        self.enabled_calls.append(value)
+        self._enabled = value
+
+
+class _Signal:
+    def connect(self, _callback) -> None:
+        pass
+
+
+class _Worker:
+    def __init__(self) -> None:
+        self.activated = _Signal()
+        self.failed = _Signal()
+        self.finished = _Signal()
+        self.start_calls = 0
+
+    def start(self) -> None:
+        self.start_calls += 1
+
+
 class PresetSubpageUiGuardTests(unittest.TestCase):
     def test_raw_preset_load_skips_duplicate_plain_text_update(self) -> None:
         from presets.ui.common.preset_subpage_base import PresetRawEditorPage
@@ -49,6 +79,24 @@ class PresetSubpageUiGuardTests(unittest.TestCase):
         page._set_footer.assert_called_once_with("Готово")
         page._refresh_header.assert_called_once_with()
         self.assertFalse(page._is_loading)
+
+    def test_raw_preset_activation_skips_duplicate_button_disable(self) -> None:
+        from presets.ui.common.preset_subpage_base import PresetRawEditorPage
+
+        worker = _Worker()
+        page = PresetRawEditorPage.__new__(PresetRawEditorPage)
+        page._raw_activate_worker = None
+        page._raw_activate_request_id = 0
+        page._preset_file_name = "Default.txt"
+        page.activateButton = _Button(enabled=False)
+        page._controller = Mock()
+        page._controller.create_activate_worker.return_value = worker
+
+        PresetRawEditorPage._request_preset_activation(page)
+
+        self.assertEqual(page.activateButton.enabled_calls, [])
+        page._controller.create_activate_worker.assert_called_once_with(1, "Default.txt", page)
+        self.assertEqual(worker.start_calls, 1)
 
 
 if __name__ == "__main__":
