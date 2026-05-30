@@ -916,6 +916,25 @@ class UserPresetsPageRuntime:
         preset_display_name = str(display_name or preset_file_name).strip() or preset_file_name
 
         try:
+            try:
+                selected_file_name = str(
+                    self._preset_actions().get_selected_source_preset_file_name(
+                        self._config.launch_method,
+                    )
+                    or ""
+                ).strip()
+            except Exception:
+                selected_file_name = ""
+            if selected_file_name and selected_file_name.casefold() == preset_file_name.casefold():
+                return UserPresetActivationResult(
+                    ok=True,
+                    log_level="DEBUG",
+                    log_message=f"Пресет '{preset_display_name}' уже выбран",
+                    infobar_level=None,
+                    infobar_title="",
+                    infobar_content="",
+                    activated_file_name=selected_file_name,
+                )
             self._preset_actions().activate_preset_file(
                 self._config.launch_method,
                 preset_file_name,
