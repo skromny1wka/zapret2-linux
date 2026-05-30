@@ -3200,15 +3200,16 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("self._controller.load_preset", worker_source)
 
     def test_raw_preset_editor_saves_file_through_worker(self) -> None:
+        from app.feature_facades.presets import PresetsFeature
+
         save_source = inspect.getsource(PresetRawEditorPage._save_file)
-        workflow_source = inspect.getsource(__import__("presets.raw_preset_editor_workflow", fromlist=["RawPresetEditorController"]).RawPresetEditorController)
+        feature_source = inspect.getsource(PresetsFeature.create_raw_preset_save_worker)
         worker_init_source = inspect.getsource(RawPresetSaveWorker.__init__)
         worker_source = inspect.getsource(RawPresetSaveWorker.run)
 
         self.assertNotIn("self._controller.save_text(", save_source)
         self.assertIn("_request_raw_preset_save", save_source)
-        self.assertIn("create_save_worker", workflow_source)
-        self.assertIn("RawPresetSaveWorker", workflow_source)
+        self.assertIn("RawPresetSaveWorker", feature_source)
         self.assertIn("save_text", worker_init_source)
         self.assertIn("self._save_text", worker_init_source)
         self.assertNotIn("controller", worker_init_source)
@@ -3249,7 +3250,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("_activate_selected_preset()", source)
         self.assertNotIn("self._controller.activate(", source)
         self.assertIn("_request_preset_activation", source)
-        self.assertIn("create_activate_worker", request_source)
+        self.assertIn("create_raw_preset_activate_worker", request_source)
         self.assertIn("activate", worker_init_source)
         self.assertIn("self._activate", worker_init_source)
         self.assertNotIn("controller", worker_init_source)
@@ -3257,6 +3258,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("controller.activate", worker_source)
 
     def test_raw_preset_editor_file_actions_run_through_worker(self) -> None:
+        from app.feature_facades.presets import PresetsFeature
+
         action_sources = "\n".join(
             inspect.getsource(method)
             for method in (
@@ -3268,7 +3271,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
                 PresetRawEditorPage._delete_preset,
             )
         )
-        workflow_source = inspect.getsource(__import__("presets.raw_preset_editor_workflow", fromlist=["RawPresetEditorController"]).RawPresetEditorController)
+        feature_source = inspect.getsource(PresetsFeature.create_raw_preset_action_worker)
         worker_init_source = inspect.getsource(RawPresetActionWorker.__init__)
         worker_source = inspect.getsource(RawPresetActionWorker.run)
 
@@ -3282,8 +3285,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         ):
             self.assertNotIn(call, action_sources)
         self.assertIn("_request_raw_preset_action", action_sources)
-        self.assertIn("create_action_worker", workflow_source)
-        self.assertIn("RawPresetActionWorker", workflow_source)
+        self.assertIn("RawPresetActionWorker", feature_source)
         self.assertIn("open_source_file", worker_init_source)
         self.assertIn("rename_preset", worker_init_source)
         self.assertIn("duplicate_preset", worker_init_source)

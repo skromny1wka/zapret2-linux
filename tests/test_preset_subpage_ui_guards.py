@@ -89,13 +89,12 @@ class PresetSubpageUiGuardTests(unittest.TestCase):
         page._raw_activate_request_id = 0
         page._preset_file_name = "Default.txt"
         page.activateButton = _Button(enabled=False)
-        page._controller = Mock()
-        page._controller.create_activate_worker.return_value = worker
+        page.create_raw_preset_activate_worker = Mock(return_value=worker)
 
         PresetRawEditorPage._request_preset_activation(page)
 
         self.assertEqual(page.activateButton.enabled_calls, [])
-        page._controller.create_activate_worker.assert_called_once_with(1, "Default.txt", page)
+        page.create_raw_preset_activate_worker.assert_called_once_with(1, "Default.txt", page)
         self.assertEqual(worker.start_calls, 1)
 
 

@@ -204,6 +204,165 @@ class PresetsFeature:
     def open_user_presets_folder(self, launch_method: str) -> None:
         return self._commands().open_user_presets_folder(launch_method, preset_services=self._preset_services())
 
+    def get_selected_raw_preset_name(self, launch_method: str) -> str:
+        selected = self.get_selected_source_preset_manifest(launch_method)
+        return (selected.name if selected is not None else "").strip()
+
+    def get_selected_raw_preset_file_name(self, launch_method: str) -> str:
+        return (self.get_selected_source_preset_file_name(launch_method) or "").strip()
+
+    def create_raw_preset_load_worker(self, request_id: int, *, launch_method: str, file_name: str, parent=None):
+        from presets.raw_preset_editor_workflow import load_raw_preset_for_file
+        from presets.raw_preset_loader import RawPresetLoadWorker
+
+        clean_launch_method = str(launch_method or "").strip()
+
+        def _load_preset(file_name: str):
+            return load_raw_preset_for_file(
+                presets_feature=self,
+                launch_method=clean_launch_method,
+                file_name=file_name,
+            )
+
+        return RawPresetLoadWorker(request_id, _load_preset, file_name, parent)
+
+    def create_raw_preset_save_worker(
+        self,
+        request_id: int,
+        *,
+        launch_method: str,
+        file_name: str,
+        source_text: str,
+        publish_content_changed: bool,
+        parent=None,
+    ):
+        from presets.raw_preset_editor_workflow import save_raw_preset_text
+        from presets.raw_preset_loader import RawPresetSaveWorker
+
+        clean_launch_method = str(launch_method or "").strip()
+
+        def _save_text(
+            *,
+            file_name: str,
+            source_text: str,
+            publish_content_changed: bool = True,
+        ):
+            return save_raw_preset_text(
+                presets_feature=self,
+                launch_method=clean_launch_method,
+                file_name=file_name,
+                source_text=source_text,
+                publish_content_changed=publish_content_changed,
+            )
+
+        return RawPresetSaveWorker(
+            request_id,
+            _save_text,
+            file_name=file_name,
+            source_text=source_text,
+            publish_content_changed=publish_content_changed,
+            parent=parent,
+        )
+
+    def create_raw_preset_activate_worker(self, request_id: int, *, launch_method: str, file_name: str, parent=None):
+        from presets.raw_preset_editor_workflow import activate_raw_preset
+        from presets.raw_preset_loader import RawPresetActivateWorker
+
+        clean_launch_method = str(launch_method or "").strip()
+
+        def _activate(*, file_name: str) -> bool:
+            return activate_raw_preset(
+                presets_feature=self,
+                launch_method=clean_launch_method,
+                file_name=file_name,
+            )
+
+        return RawPresetActivateWorker(request_id, _activate, file_name, parent)
+
+    def create_raw_preset_action_worker(
+        self,
+        request_id: int,
+        *,
+        launch_method: str,
+        action: str,
+        payload: dict | None = None,
+        parent=None,
+    ):
+        from presets.raw_preset_editor_workflow import (
+            delete_raw_preset,
+            duplicate_raw_preset,
+            export_raw_preset,
+            get_raw_preset_source_path,
+            open_raw_preset_source_file,
+            rename_raw_preset,
+            reset_raw_preset_to_builtin,
+        )
+        from presets.raw_preset_loader import RawPresetActionWorker
+
+        clean_launch_method = str(launch_method or "").strip()
+
+        def _open_source_file(path) -> None:
+            open_raw_preset_source_file(presets_feature=self, path=path)
+
+        def _rename_preset(*, file_name: str, new_name: str):
+            return rename_raw_preset(
+                presets_feature=self,
+                launch_method=clean_launch_method,
+                file_name=file_name,
+                new_name=new_name,
+            )
+
+        def _duplicate_preset(*, file_name: str, new_name: str):
+            return duplicate_raw_preset(
+                presets_feature=self,
+                launch_method=clean_launch_method,
+                file_name=file_name,
+                new_name=new_name,
+            )
+
+        def _export_preset(*, file_name: str, target_path: str) -> None:
+            export_raw_preset(
+                presets_feature=self,
+                launch_method=clean_launch_method,
+                file_name=file_name,
+                target_path=target_path,
+            )
+
+        def _reset_to_builtin(*, file_name: str):
+            return reset_raw_preset_to_builtin(
+                presets_feature=self,
+                launch_method=clean_launch_method,
+                file_name=file_name,
+            )
+
+        def _delete_preset(*, file_name: str) -> None:
+            delete_raw_preset(
+                presets_feature=self,
+                launch_method=clean_launch_method,
+                file_name=file_name,
+            )
+
+        def _source_path(file_name: str):
+            return get_raw_preset_source_path(
+                presets_feature=self,
+                launch_method=clean_launch_method,
+                file_name=file_name,
+            )
+
+        return RawPresetActionWorker(
+            request_id,
+            _open_source_file,
+            _rename_preset,
+            _duplicate_preset,
+            _export_preset,
+            _reset_to_builtin,
+            _delete_preset,
+            _source_path,
+            action=action,
+            payload=payload,
+            parent=parent,
+        )
+
     def create_user_presets_open_folder_worker(self, request_id: int, *, launch_method: str, parent=None):
         from presets.user_presets_action_workers import UserPresetOpenFolderWorker
 

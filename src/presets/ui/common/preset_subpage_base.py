@@ -34,7 +34,6 @@ from qfluentwidgets import (
     StrongBodyLabel,
     TransparentToolButton,
 )
-from presets.raw_preset_editor_workflow import RawPresetEditorController
 
 
 def _fluent_icon(name: str):
@@ -213,19 +212,12 @@ class PresetRawEditorPage(BasePage):
         self,
         parent=None,
         *,
-        save_preset_source_by_file_name,
-        get_preset_source_path_by_file_name,
-        get_preset_manifest_by_file_name,
-        open_preset_source_file,
-        rename_preset_by_file_name,
-        duplicate_preset_by_file_name,
-        export_preset_plain_text,
-        reset_preset_to_builtin_by_file_name,
-        delete_preset_by_file_name,
-        get_selected_source_preset_manifest,
-        get_selected_source_preset_file_name,
-        activate_preset_file,
-        publish_preset_content_changed,
+        create_raw_preset_load_worker,
+        create_raw_preset_save_worker,
+        create_raw_preset_activate_worker,
+        create_raw_preset_action_worker,
+        get_selected_raw_preset_name,
+        get_selected_raw_preset_file_name,
         launch_method: str,
         title: str,
         open_back,
@@ -263,23 +255,12 @@ class PresetRawEditorPage(BasePage):
         self._content_publish_pending = False
         self._app_event_filter_installed = False
         self._runtime_toggle_should_stop = False
-
-        self._controller = RawPresetEditorController(
-            save_preset_source_by_file_name=save_preset_source_by_file_name,
-            get_preset_source_path_by_file_name=get_preset_source_path_by_file_name,
-            get_preset_manifest_by_file_name=get_preset_manifest_by_file_name,
-            open_preset_source_file=open_preset_source_file,
-            rename_preset_by_file_name=rename_preset_by_file_name,
-            duplicate_preset_by_file_name=duplicate_preset_by_file_name,
-            export_preset_plain_text=export_preset_plain_text,
-            reset_preset_to_builtin_by_file_name=reset_preset_to_builtin_by_file_name,
-            delete_preset_by_file_name=delete_preset_by_file_name,
-            get_selected_source_preset_manifest=get_selected_source_preset_manifest,
-            get_selected_source_preset_file_name=get_selected_source_preset_file_name,
-            activate_preset_file=activate_preset_file,
-            publish_preset_content_changed=publish_preset_content_changed,
-            launch_method=self._launch_method,
-        )
+        self._create_raw_preset_load_worker_fn = create_raw_preset_load_worker
+        self._create_raw_preset_save_worker_fn = create_raw_preset_save_worker
+        self._create_raw_preset_activate_worker_fn = create_raw_preset_activate_worker
+        self._create_raw_preset_action_worker_fn = create_raw_preset_action_worker
+        self._get_selected_raw_preset_name_fn = get_selected_raw_preset_name
+        self._get_selected_raw_preset_file_name_fn = get_selected_raw_preset_file_name
         self._save_timer = QTimer(self)
         self._save_timer.setSingleShot(True)
         self._save_timer.timeout.connect(self._save_file)
@@ -548,12 +529,55 @@ class PresetRawEditorPage(BasePage):
     def _load_file(self) -> None:
         self._request_raw_preset_text()
 
+    def create_raw_preset_load_worker(self, request_id: int, file_name: str, parent=None):
+        return self._create_raw_preset_load_worker_fn(
+            request_id,
+            launch_method=self._launch_method,
+            file_name=file_name,
+            parent=parent,
+        )
+
+    def create_raw_preset_save_worker(
+        self,
+        request_id: int,
+        *,
+        file_name: str,
+        source_text: str,
+        publish_content_changed: bool,
+        parent=None,
+    ):
+        return self._create_raw_preset_save_worker_fn(
+            request_id,
+            launch_method=self._launch_method,
+            file_name=file_name,
+            source_text=source_text,
+            publish_content_changed=publish_content_changed,
+            parent=parent,
+        )
+
+    def create_raw_preset_activate_worker(self, request_id: int, file_name: str, parent=None):
+        return self._create_raw_preset_activate_worker_fn(
+            request_id,
+            launch_method=self._launch_method,
+            file_name=file_name,
+            parent=parent,
+        )
+
+    def create_raw_preset_action_worker(self, request_id: int, *, action: str, payload: dict | None = None, parent=None):
+        return self._create_raw_preset_action_worker_fn(
+            request_id,
+            launch_method=self._launch_method,
+            action=action,
+            payload=payload,
+            parent=parent,
+        )
+
     def _request_raw_preset_text(self) -> None:
         self._raw_load_request_id += 1
         request_id = self._raw_load_request_id
         self._is_loading = True
         self._set_footer("Загрузка...")
-        worker = self._controller.create_load_worker(request_id, self._preset_file_name, self)
+        worker = self.create_raw_preset_load_worker(request_id, self._preset_file_name, self)
         self._raw_load_worker = worker
         worker.loaded.connect(self._on_raw_preset_text_loaded)
         worker.failed.connect(self._on_raw_preset_text_failed)
@@ -660,7 +684,7 @@ class PresetRawEditorPage(BasePage):
         request_id = self._raw_save_request_id
         self._raw_save_succeeded = False
         self._set_footer("Сохранение...")
-        worker = self._controller.create_save_worker(
+        worker = self.create_raw_preset_save_worker(
             request_id,
             file_name=str(file_name or "").strip(),
             source_text=str(source_text or ""),
@@ -934,7 +958,7 @@ class PresetRawEditorPage(BasePage):
         request_id = self._raw_activate_request_id
         if self.activateButton is not None:
             set_enabled_if_changed(self.activateButton, False)
-        worker = self._controller.create_activate_worker(request_id, self._preset_file_name, self)
+        worker = self.create_raw_preset_activate_worker(request_id, self._preset_file_name, self)
         self._raw_activate_worker = worker
         worker.activated.connect(self._on_preset_activation_finished)
         worker.failed.connect(self._on_preset_activation_failed)
@@ -973,7 +997,7 @@ class PresetRawEditorPage(BasePage):
                 return
         self._raw_action_request_id += 1
         request_id = self._raw_action_request_id
-        worker = self._controller.create_action_worker(
+        worker = self.create_raw_preset_action_worker(
             request_id,
             action=action,
             payload=payload,
@@ -1177,13 +1201,13 @@ class PresetRawEditorPage(BasePage):
 
     def _current_selected_name(self) -> str:
         try:
-            return self._controller.selected_name()
+            return self._get_selected_raw_preset_name_fn(self._launch_method)
         except Exception:
             return ""
 
     def _current_selected_file_name(self) -> str:
         try:
-            return self._controller.selected_file_name()
+            return self._get_selected_raw_preset_file_name_fn(self._launch_method)
         except Exception:
             return ""
 
