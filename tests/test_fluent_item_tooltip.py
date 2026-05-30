@@ -17,6 +17,21 @@ from ui.widgets.fluent_item_tooltip import (
     install_fluent_item_tooltips,
     set_fluent_item_tooltip,
 )
+from ui.fluent_widgets import set_tooltip
+
+
+class _TooltipWidget:
+    def __init__(self, text: str) -> None:
+        self._text = text
+        self._fluent_tooltip_filter = object()
+        self.set_calls: list[str] = []
+
+    def toolTip(self) -> str:  # noqa: N802
+        return self._text
+
+    def setToolTip(self, text: str) -> None:  # noqa: N802
+        self.set_calls.append(str(text))
+        self._text = str(text)
 
 
 class FluentItemToolTipTests(unittest.TestCase):
@@ -59,6 +74,13 @@ class FluentItemToolTipTests(unittest.TestCase):
 
         self.assertIs(first, second)
         self.assertIsInstance(first, FluentItemViewToolTipController)
+
+    def test_set_tooltip_skips_duplicate_text(self) -> None:
+        widget = _TooltipWidget("same")
+
+        set_tooltip(widget, "same")
+
+        self.assertEqual(widget.set_calls, [])
 
     def test_source_uses_fluent_tooltip_entrypoints(self) -> None:
         root = Path(__file__).resolve().parents[1]

@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QSizePolicy, QWidget
 from qfluentwidgets import CaptionLabel
 
 from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE, normalize_launch_method
+from ui.fluent_widgets import set_tooltip
 from ui.theme import get_theme_tokens
 from ui.widgets.win11_spinner import Win11Spinner
 
@@ -106,17 +107,6 @@ def set_text_if_changed(widget, text: str) -> bool:
     except Exception:
         pass
     widget.setText(value)
-    return True
-
-
-def set_tool_tip_if_changed(widget, text: str) -> bool:
-    value = str(text or "")
-    try:
-        if str(widget.toolTip()) == value:
-            return False
-    except Exception:
-        pass
-    widget.setToolTip(value)
     return True
 
 
@@ -248,7 +238,7 @@ class PresetStatusIcon(QWidget):
                 self.spinner.stop()
                 self.check_label.setVisible(indicator == "check")
 
-        set_tool_tip_if_changed(self, normalized_plan.text)
+        set_tooltip(self, normalized_plan.text)
         if indicator_changed:
             self.setVisible(indicator in {"spinner", "check"})
         self._apply_mode_style(mode)

@@ -41,7 +41,12 @@ def set_tooltip(widget, text: str, *, position=None, delay: int = 300) -> None:
         position: ``ToolTipPosition`` value; defaults to ``TOP``.
         delay:    Hover-to-show delay in milliseconds (default 300).
     """
-    widget.setToolTip(text)
+    value = str(text or "")
+    try:
+        if str(widget.toolTip()) != value:
+            widget.setToolTip(value)
+    except Exception:
+        widget.setToolTip(value)
     # Install only once — skip if already done for this widget.
     if getattr(widget, "_fluent_tooltip_filter", None) is None:
         pos = position if position is not None else ToolTipPosition.TOP
