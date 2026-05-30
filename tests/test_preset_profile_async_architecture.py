@@ -2830,7 +2830,9 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("create_open_url_worker", feature_source)
         self.assertIn("create_external_open_url_worker", shared_source)
         self.assertIn("_external_open_url_runtime", shared_source)
+        self.assertIn("open_url=self.open_url", feature_source)
         self.assertIn("open_url", worker_source)
+        self.assertNotIn("external_commands", worker_source)
         self.assertIn("_stop_external_open_url_worker", zapret1_cleanup_source)
         self.assertIn("_stop_external_open_url_worker", zapret2_cleanup_source)
 
