@@ -2308,12 +2308,15 @@ class ProfileSetupPageBase(BasePage):
     def _on_raw_profile_save_finished(self, request_id: int, profile_key: str, payload=None) -> None:
         if request_id != self._raw_profile_save_request_id:
             return
+        old_key = str(self._profile_key or "").strip()
         new_key = str(profile_key or "").strip()
         if new_key:
             self._profile_key = new_key
         if payload is None:
             self.reload_current_profile()
             self._on_profile_changed_callback(self._profile_key, "raw_profile")
+        elif self.__dict__.get("_payload") is payload and (not new_key or new_key == old_key):
+            pass
         else:
             self._payload = payload
             self._apply_payload(payload)
