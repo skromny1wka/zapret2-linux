@@ -3241,6 +3241,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
             .ProgramSettingsFeature.create_program_settings_save_worker
         )
         shared_source = inspect.getsource(control_page_shared.ControlPageActionMixin)
+        runtime_source = inspect.getsource(control_additional_settings_runtime.ModeControlRefreshRuntime)
 
         for source in (
             zapret1_auto_source,
@@ -3254,6 +3255,9 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
         self.assertIn("create_program_settings_save_worker", shared_source)
         self.assertIn("program_settings_save_pending", shared_source)
+        self.assertIn("program_settings_save_runtime", runtime_source)
+        self.assertIn("start_qthread_worker", inspect.getsource(control_page_shared.ControlPageActionMixin._request_program_settings_save))
+        self.assertNotIn("worker.start()", inspect.getsource(control_page_shared.ControlPageActionMixin._request_program_settings_save))
         self.assertIn("save_action=self._program_settings_save_action(action)", feature_source)
         self.assertIn("_save_action", worker_source)
         self.assertNotIn("program_settings_commands", worker_source)
@@ -3296,7 +3300,9 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("refresh_program_settings_snapshot", zapret1_sync_source)
         self.assertNotIn("refresh_program_settings_snapshot", zapret2_sync_source)
         self.assertIn("create_program_settings_load_worker", shared_source)
-        self.assertIn("program_settings_load_worker", runtime_source)
+        self.assertIn("program_settings_load_runtime", runtime_source)
+        self.assertIn("start_qthread_worker", inspect.getsource(control_page_shared.ControlPageActionMixin._request_program_settings_load))
+        self.assertNotIn("worker.start()", inspect.getsource(control_page_shared.ControlPageActionMixin._request_program_settings_load))
         self.assertIn("load_program_settings_snapshot", worker_source)
         self.assertIn("publish_program_settings_snapshot", shared_source)
         self.assertIn("emit_initial=False", attach_source)

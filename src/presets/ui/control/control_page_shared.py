@@ -231,26 +231,23 @@ class ControlPageActionMixin:
 
     def _request_program_settings_load(self) -> None:
         runtime = self._refresh_runtime
-        worker = runtime.program_settings_load_worker
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    runtime.program_settings_load_pending = True
-                    return
-            except Exception:
-                runtime.program_settings_load_worker = None
+        if runtime.program_settings_load_runtime.is_running():
+            runtime.program_settings_load_pending = True
+            return
 
-        request_id = runtime.next_program_settings_load_request_id()
-        worker = self.create_program_settings_load_worker(request_id)
-        runtime.program_settings_load_worker = worker
-        worker.loaded.connect(self._on_program_settings_load_finished)
-        worker.failed.connect(self._on_program_settings_load_failed)
-        worker.finished.connect(lambda w=worker: self._on_program_settings_load_worker_finished(w))
-        worker.start()
+        runtime.program_settings_load_runtime.start_qthread_worker(
+            worker_factory=self.create_program_settings_load_worker,
+            on_loaded=self._on_program_settings_load_finished,
+            on_failed=self._on_program_settings_load_failed,
+            on_finished=self._on_program_settings_load_worker_finished,
+        )
 
     def _on_program_settings_load_finished(self, request_id: int, snapshot) -> None:
         runtime = self._refresh_runtime
-        if request_id != runtime.program_settings_load_request_id or bool(getattr(self, "_cleanup_in_progress", False)):
+        if not runtime.program_settings_load_runtime.is_current(
+            request_id,
+            cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
+        ):
             return
         try:
             self._publish_program_settings_snapshot(snapshot)
@@ -262,7 +259,10 @@ class ControlPageActionMixin:
 
     def _on_program_settings_load_failed(self, request_id: int, error: str) -> None:
         runtime = self._refresh_runtime
-        if request_id != runtime.program_settings_load_request_id or bool(getattr(self, "_cleanup_in_progress", False)):
+        if not runtime.program_settings_load_runtime.is_current(
+            request_id,
+            cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
+        ):
             return
         try:
             from log.log import log
@@ -271,11 +271,8 @@ class ControlPageActionMixin:
         except Exception:
             pass
 
-    def _on_program_settings_load_worker_finished(self, worker) -> None:
+    def _on_program_settings_load_worker_finished(self, _worker) -> None:
         runtime = self._refresh_runtime
-        if runtime.program_settings_load_worker is worker:
-            runtime.program_settings_load_worker = None
-        worker.deleteLater()
         if runtime.program_settings_load_pending and not bool(getattr(self, "_cleanup_in_progress", False)):
             runtime.program_settings_load_pending = False
             self._request_program_settings_load()
@@ -284,38 +281,43 @@ class ControlPageActionMixin:
 
     def _request_program_settings_save(self, action: str, enabled: bool) -> None:
         runtime = self._refresh_runtime
-        worker = runtime.program_settings_save_worker
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    runtime.program_settings_save_pending = (action, bool(enabled))
-                    return
-            except Exception:
-                return
-        request_id = runtime.next_program_settings_save_request_id()
-        worker = self.create_program_settings_save_worker(
-            request_id,
-            action=action,
-            enabled=bool(enabled),
+        if runtime.program_settings_save_runtime.is_running():
+            runtime.program_settings_save_pending = (action, bool(enabled))
+            return
+
+        runtime.program_settings_save_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: self.create_program_settings_save_worker(
+                request_id,
+                action=action,
+                enabled=bool(enabled),
+            ),
+            on_loaded=self._on_program_settings_save_finished,
+            on_failed=self._on_program_settings_save_failed,
+            on_finished=self._on_program_settings_save_worker_finished,
+            bind_worker=self._bind_program_settings_save_worker,
+            loaded_signal_name="saved",
         )
-        runtime.program_settings_save_worker = worker
-        worker.saved.connect(self._on_program_settings_save_finished)
-        worker.failed.connect(self._on_program_settings_save_failed)
+
+    def _bind_program_settings_save_worker(self, worker) -> None:
         status_signal = getattr(worker, "status", None)
         if status_signal is not None:
             status_signal.connect(self._on_program_settings_save_status)
-        worker.finished.connect(lambda w=worker: self._on_program_settings_save_worker_finished(w))
-        worker.start()
 
     def _on_program_settings_save_status(self, request_id: int, _action: str, message: str) -> None:
         runtime = self._refresh_runtime
-        if request_id != runtime.program_settings_save_request_id:
+        if not runtime.program_settings_save_runtime.is_current(
+            request_id,
+            cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
+        ):
             return
         self._set_status(str(message or ""))
 
     def _on_program_settings_save_finished(self, request_id: int, action: str, result) -> None:
         runtime = self._refresh_runtime
-        if request_id != runtime.program_settings_save_request_id:
+        if not runtime.program_settings_save_runtime.is_current(
+            request_id,
+            cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
+        ):
             return
         try:
             if action == "auto_dpi":
@@ -340,7 +342,10 @@ class ControlPageActionMixin:
 
     def _on_program_settings_save_failed(self, request_id: int, action: str, error: str) -> None:
         runtime = self._refresh_runtime
-        if request_id != runtime.program_settings_save_request_id:
+        if not runtime.program_settings_save_runtime.is_current(
+            request_id,
+            cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
+        ):
             return
         from qfluentwidgets import InfoBar
 
@@ -349,11 +354,8 @@ class ControlPageActionMixin:
         if callable(sync_program_settings):
             sync_program_settings()
 
-    def _on_program_settings_save_worker_finished(self, worker) -> None:
+    def _on_program_settings_save_worker_finished(self, _worker) -> None:
         runtime = self._refresh_runtime
-        if runtime.program_settings_save_worker is worker:
-            runtime.program_settings_save_worker = None
-        worker.deleteLater()
         pending = runtime.program_settings_save_pending
         runtime.program_settings_save_pending = None
         if pending is not None and not bool(getattr(self, "_cleanup_in_progress", False)):
@@ -416,19 +418,9 @@ def cleanup_control_page_subscriptions(owner) -> None:
             runtime.top_summary_worker = None
 
         runtime.program_settings_load_pending = False
-        worker = getattr(runtime, "program_settings_load_worker", None)
-        if worker is not None:
-            try:
-                worker.quit()
-            except Exception:
-                pass
-            runtime.program_settings_load_worker = None
+        runtime.program_settings_load_runtime.stop(warning_prefix="Program settings load worker")
+        runtime.program_settings_load_runtime.cancel()
 
         runtime.program_settings_save_pending = None
-        worker = getattr(runtime, "program_settings_save_worker", None)
-        if worker is not None:
-            try:
-                worker.quit()
-            except Exception:
-                pass
-            runtime.program_settings_save_worker = None
+        runtime.program_settings_save_runtime.stop(warning_prefix="Program settings save worker")
+        runtime.program_settings_save_runtime.cancel()

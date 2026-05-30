@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from ui.one_shot_worker_runtime import OneShotWorkerRuntime
+
 
 class ModeControlRefreshRuntime:
     def __init__(self) -> None:
@@ -12,12 +14,10 @@ class ModeControlRefreshRuntime:
         self.top_summary_worker = None
         self.top_summary_pending = False
         self.top_summary_request_id = 0
-        self.program_settings_load_worker = None
+        self.program_settings_load_runtime = OneShotWorkerRuntime()
         self.program_settings_load_pending = False
-        self.program_settings_load_request_id = 0
-        self.program_settings_save_worker = None
+        self.program_settings_save_runtime = OneShotWorkerRuntime()
         self.program_settings_save_pending = None
-        self.program_settings_save_request_id = 0
 
     def has_pending_refresh(self) -> bool:
         return bool(self.additional_settings_dirty)
@@ -41,14 +41,6 @@ class ModeControlRefreshRuntime:
     def next_additional_settings_save_request_id(self) -> int:
         self.additional_settings_save_request_id += 1
         return self.additional_settings_save_request_id
-
-    def next_program_settings_save_request_id(self) -> int:
-        self.program_settings_save_request_id += 1
-        return self.program_settings_save_request_id
-
-    def next_program_settings_load_request_id(self) -> int:
-        self.program_settings_load_request_id += 1
-        return self.program_settings_load_request_id
 
     def next_top_summary_request_id(self) -> int:
         self.top_summary_request_id += 1
