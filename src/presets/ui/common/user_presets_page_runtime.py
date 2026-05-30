@@ -63,6 +63,28 @@ class UserPresetActivationResult:
 
 
 @dataclass(frozen=True, slots=True)
+class UserPresetsRuntimeActions:
+    create_preset: Callable[..., object]
+    rename_preset_by_file_name: Callable[..., object]
+    is_selected_preset_file_name: Callable[..., object]
+    import_preset_from_file: Callable[..., object]
+    reset_all_presets_to_builtin: Callable[..., object]
+    get_selected_source_preset_file_name: Callable[..., object]
+    duplicate_preset_by_file_name: Callable[..., object]
+    reset_preset_to_builtin_by_file_name: Callable[..., object]
+    delete_preset_by_file_name: Callable[..., object]
+    export_preset_plain_text: Callable[..., object]
+    get_preset_manifest_by_file_name: Callable[..., object]
+    list_preset_manifests: Callable[..., object]
+    get_selected_source_preset_manifest: Callable[..., object]
+    get_user_presets_dir: Callable[..., object]
+    get_cached_preset_list_metadata: Callable[..., object]
+    warm_preset_list_metadata_cache: Callable[..., object]
+    get_preset_source_path_by_file_name: Callable[..., object]
+    activate_preset_file: Callable[..., object]
+
+
+@dataclass(frozen=True, slots=True)
 class UserPresetsPageRuntimeConfig:
     launch_method: str
     folder_scope: str
@@ -71,7 +93,7 @@ class UserPresetsPageRuntimeConfig:
     list_log_prefix: str
     activate_error_level: str
     activate_error_mode: str
-    get_presets_feature: Callable[[], object]
+    preset_runtime_actions: UserPresetsRuntimeActions
     open_url: Callable[[str], object]
 
 
@@ -406,11 +428,11 @@ class UserPresetsPageRuntime:
     def build_page_api(self) -> UserPresetsPageApiBundle:
         return self._page_api
 
-    def _presets(self):
-        return self._config.get_presets_feature()
+    def _preset_actions(self) -> UserPresetsRuntimeActions:
+        return self._config.preset_runtime_actions
 
     def create_preset(self, *, name: str, from_current: bool) -> UserPresetActionResult:
-        created = self._presets().create_preset(
+        created = self._preset_actions().create_preset(
             self._config.launch_method,
             name,
             from_current=from_current,
@@ -428,7 +450,7 @@ class UserPresetsPageRuntime:
         )
 
     def rename_preset(self, *, current_name: str, new_name: str) -> UserPresetActionResult:
-        presets = self._presets()
+        presets = self._preset_actions()
         updated = presets.rename_preset_by_file_name(
             self._config.launch_method,
             current_name,
@@ -458,7 +480,7 @@ class UserPresetsPageRuntime:
 
     def import_preset_from_file(self, *, file_path: str) -> UserPresetImportResult:
         requested_name = str(Path(file_path).stem or "").strip() or "Imported"
-        imported = self._presets().import_preset_from_file(
+        imported = self._preset_actions().import_preset_from_file(
             self._config.launch_method,
             file_path,
             requested_name,
@@ -490,7 +512,7 @@ class UserPresetsPageRuntime:
         )
 
     def reset_all_presets(self) -> UserPresetResetAllResult:
-        presets = self._presets()
+        presets = self._preset_actions()
         success_count, total, failed = presets.reset_all_presets_to_builtin(
             self._config.launch_method,
         )
@@ -525,7 +547,7 @@ class UserPresetsPageRuntime:
 
     def duplicate_preset(self, *, file_name: str, display_name: str) -> UserPresetActionResult:
         new_name = f"{display_name} (копия)"
-        duplicated = self._presets().duplicate_preset_by_file_name(
+        duplicated = self._preset_actions().duplicate_preset_by_file_name(
             self._config.launch_method,
             file_name,
             new_name,
@@ -543,7 +565,7 @@ class UserPresetsPageRuntime:
         )
 
     def reset_preset_to_builtin(self, *, file_name: str, display_name: str) -> UserPresetActionResult:
-        self._presets().reset_preset_to_builtin_by_file_name(
+        self._preset_actions().reset_preset_to_builtin_by_file_name(
             self._config.launch_method,
             file_name,
         )
@@ -571,7 +593,7 @@ class UserPresetsPageRuntime:
             )
 
         try:
-            self._presets().delete_preset_by_file_name(
+            self._preset_actions().delete_preset_by_file_name(
                 self._config.launch_method,
                 file_name,
             )
@@ -599,7 +621,7 @@ class UserPresetsPageRuntime:
         )
 
     def export_preset(self, *, file_name: str, file_path: str, display_name: str) -> UserPresetActionResult:
-        self._presets().export_preset_plain_text(
+        self._preset_actions().export_preset_plain_text(
             self._config.launch_method,
             file_name,
             file_path,
@@ -673,7 +695,7 @@ class UserPresetsPageRuntime:
         if not candidate or not candidate.lower().endswith(".txt"):
             return False
         try:
-            manifest = self._presets().get_preset_manifest_by_file_name(
+            manifest = self._preset_actions().get_preset_manifest_by_file_name(
                 self._config.launch_method,
                 candidate,
             )
@@ -693,7 +715,7 @@ class UserPresetsPageRuntime:
                     "storage_scope": item.storage_scope,
                     "is_builtin": str(item.kind or "").strip().lower() == "builtin",
                 }
-                for item in self._presets().list_preset_manifests(
+                for item in self._preset_actions().list_preset_manifests(
                     self._config.launch_method,
                 )
             ]
@@ -703,7 +725,7 @@ class UserPresetsPageRuntime:
 
     def get_active_preset_name_light(self) -> str:
         try:
-            preset = self._presets().get_selected_source_preset_manifest(
+            preset = self._preset_actions().get_selected_source_preset_manifest(
                 self._config.launch_method,
             )
             return str(preset.name if preset is not None else "").strip()
@@ -713,7 +735,7 @@ class UserPresetsPageRuntime:
     def get_selected_source_preset_file_name_light(self) -> str:
         try:
             return str(
-                self._presets().get_selected_source_preset_file_name(
+                self._preset_actions().get_selected_source_preset_file_name(
                     self._config.launch_method,
                 )
                 or ""
@@ -722,16 +744,16 @@ class UserPresetsPageRuntime:
             return ""
 
     def get_presets_dir_light(self):
-        return self._presets().get_user_presets_dir(
+        return self._preset_actions().get_user_presets_dir(
             self._config.launch_method,
         )
 
     def get_cached_preset_list_metadata_light(self) -> dict[str, dict[str, object]] | None:
-        cached = self._presets().get_cached_preset_list_metadata(self._config.launch_method)
+        cached = self._preset_actions().get_cached_preset_list_metadata(self._config.launch_method)
         return dict(cached) if cached else None
 
     def load_preset_list_metadata_light(self) -> dict[str, dict[str, object]]:
-        return dict(self._presets().warm_preset_list_metadata_cache(self._config.launch_method) or {})
+        return dict(self._preset_actions().warm_preset_list_metadata_cache(self._config.launch_method) or {})
 
     def read_single_preset_list_metadata_light(self, file_name: str) -> tuple[str, dict[str, object]] | None:
         from presets.lightweight_metadata import build_lightweight_preset_metadata
@@ -756,7 +778,7 @@ class UserPresetsPageRuntime:
         kind = str(matched_entry.get("kind") or "").strip() or "user"
         is_builtin = bool(matched_entry.get("is_builtin", False))
 
-        path = self._presets().get_preset_source_path_by_file_name(
+        path = self._preset_actions().get_preset_source_path_by_file_name(
             self._config.launch_method,
             candidate_file_name,
         )
@@ -776,7 +798,7 @@ class UserPresetsPageRuntime:
             return ""
         if candidate.lower().endswith(".txt"):
             try:
-                manifest = self._presets().get_preset_manifest_by_file_name(
+                manifest = self._preset_actions().get_preset_manifest_by_file_name(
                     self._config.launch_method,
                     candidate,
                 )
@@ -894,7 +916,7 @@ class UserPresetsPageRuntime:
         preset_display_name = str(display_name or preset_file_name).strip() or preset_file_name
 
         try:
-            self._presets().activate_preset_file(
+            self._preset_actions().activate_preset_file(
                 self._config.launch_method,
                 preset_file_name,
             )

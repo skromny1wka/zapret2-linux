@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.page_names import PageName
 from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE
+from presets.ui.common.user_presets_page_runtime import UserPresetsRuntimeActions
 from ui.navigation_pages import (
     resolve_preset_raw_editor_back_page_for_method,
     resolve_preset_raw_editor_root_page_for_method,
@@ -135,7 +136,28 @@ def build_user_presets_page_kwargs(
 ) -> dict:
     method = ZAPRET2_MODE if page_name == PageName.ZAPRET2_USER_PRESETS else ZAPRET1_MODE
     return {
-        "presets_feature": presets_feature,
+        "preset_runtime_actions": UserPresetsRuntimeActions(
+            create_preset=presets_feature.create_preset,
+            rename_preset_by_file_name=presets_feature.rename_preset_by_file_name,
+            is_selected_preset_file_name=presets_feature.is_selected_preset_file_name,
+            import_preset_from_file=presets_feature.import_preset_from_file,
+            reset_all_presets_to_builtin=presets_feature.reset_all_presets_to_builtin,
+            get_selected_source_preset_file_name=presets_feature.get_selected_source_preset_file_name,
+            duplicate_preset_by_file_name=presets_feature.duplicate_preset_by_file_name,
+            reset_preset_to_builtin_by_file_name=presets_feature.reset_preset_to_builtin_by_file_name,
+            delete_preset_by_file_name=presets_feature.delete_preset_by_file_name,
+            export_preset_plain_text=presets_feature.export_preset_plain_text,
+            get_preset_manifest_by_file_name=presets_feature.get_preset_manifest_by_file_name,
+            list_preset_manifests=presets_feature.list_preset_manifests,
+            get_selected_source_preset_manifest=presets_feature.get_selected_source_preset_manifest,
+            get_user_presets_dir=presets_feature.get_user_presets_dir,
+            get_cached_preset_list_metadata=presets_feature.get_cached_preset_list_metadata,
+            warm_preset_list_metadata_cache=presets_feature.warm_preset_list_metadata_cache,
+            get_preset_source_path_by_file_name=presets_feature.get_preset_source_path_by_file_name,
+            activate_preset_file=presets_feature.activate_preset_file,
+        ),
+        "connect_preset_signals": presets_feature.connect_preset_signals,
+        "create_user_presets_open_folder_worker": presets_feature.create_user_presets_open_folder_worker,
         "open_preset_raw_editor": lambda preset_name, m=method: open_preset_raw_editor(
             m,
             preset_name,

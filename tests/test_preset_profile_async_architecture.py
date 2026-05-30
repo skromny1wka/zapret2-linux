@@ -342,17 +342,18 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("get_page_smooth_scroll_enabled", source)
         self.assertNotIn("load_smooth_scroll_enabled", source)
 
-    def test_user_presets_page_uses_current_presets_feature_attribute(self) -> None:
+    def test_user_presets_page_uses_narrow_preset_dependencies(self) -> None:
         after_ui_source = inspect.getsource(UserPresetsPageBase._after_ui_built)
         open_folder_source = inspect.getsource(UserPresetsPageBase._open_presets_folder)
         page_source = inspect.getsource(UserPresetsPageBase)
 
-        self.assertIn("self._presets_feature.connect_preset_signals", after_ui_source)
+        self.assertIn("self._connect_preset_signals", after_ui_source)
         self.assertIn("_request_preset_open_folder_action", open_folder_source)
         self.assertNotIn("open_presets_folder_action", open_folder_source)
         self.assertNotIn("open_user_presets_folder", open_folder_source)
         self.assertIn("create_preset_open_folder_worker", page_source)
         self.assertIn("_preset_open_folder_worker", page_source)
+        self.assertNotIn("self._presets_feature", page_source)
         self.assertNotIn("self._presets.", after_ui_source)
         self.assertNotIn("self._presets.", open_folder_source)
 
@@ -361,7 +362,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         worker_source = inspect.getsource(user_presets_action_workers.UserPresetOpenFolderWorker.run)
         worker_init_source = inspect.getsource(user_presets_action_workers.UserPresetOpenFolderWorker.__init__)
         feature_source = inspect.getsource(presets_feature_facade.PresetsFeature.create_user_presets_open_folder_worker)
-        self.assertIn("create_user_presets_open_folder_worker", create_worker_source)
+        self.assertIn("_create_user_presets_open_folder_worker", create_worker_source)
         self.assertNotIn("UserPresetOpenFolderWorker(", create_worker_source)
         self.assertNotIn("_presets_feature", worker_init_source)
         self.assertIn("open_folder", worker_init_source)

@@ -44,6 +44,7 @@ from presets.user_presets_action_workers import (
 from presets.ui.common.user_presets_page_runtime import (
     UserPresetsPageRuntime,
     UserPresetsPageRuntimeConfig,
+    UserPresetsRuntimeActions,
     apply_preset_search,
     rebuild_presets_rows,
     schedule_preset_search,
@@ -122,7 +123,9 @@ class UserPresetsPageBase(BasePage):
         self,
         parent=None,
         *,
-        presets_feature,
+        preset_runtime_actions: UserPresetsRuntimeActions,
+        connect_preset_signals,
+        create_user_presets_open_folder_worker,
         open_preset_raw_editor,
         open_url,
         ui_state_store,
@@ -134,7 +137,9 @@ class UserPresetsPageBase(BasePage):
             parent,
             title_key=self._config.title_key,
         )
-        self._presets_feature = presets_feature
+        self._preset_runtime_actions = preset_runtime_actions
+        self._connect_preset_signals = connect_preset_signals
+        self._create_user_presets_open_folder_worker = create_user_presets_open_folder_worker
         self._open_url = open_url
         self._open_preset_raw_editor_callback = open_preset_raw_editor
         self._page_api = self._build_page_runtime().build_page_api()
@@ -195,9 +200,6 @@ class UserPresetsPageBase(BasePage):
     def _tr(self, key: str, default: str, **kwargs) -> str:
         return _tr_text(key, self._ui_language, default, **kwargs)
 
-    def _resolve_presets_feature(self):
-        return self._presets_feature
-
     def _build_page_runtime(self):
         return UserPresetsPageRuntime(
             UserPresetsPageRuntimeConfig(
@@ -208,7 +210,7 @@ class UserPresetsPageBase(BasePage):
                 list_log_prefix=self._config.log_prefix,
                 activate_error_level=self._config.activate_error_level,
                 activate_error_mode=self._config.activate_error_mode,
-                get_presets_feature=self._resolve_presets_feature,
+                preset_runtime_actions=self._preset_runtime_actions,
                 open_url=self._open_url,
             )
         )
@@ -380,7 +382,7 @@ class UserPresetsPageBase(BasePage):
     def _after_ui_built(self) -> None:
         after_user_presets_ui_built(
             apply_page_theme_fn=self._apply_page_theme,
-            connect_preset_signals_fn=lambda **callbacks: self._presets_feature.connect_preset_signals(
+            connect_preset_signals_fn=lambda **callbacks: self._connect_preset_signals(
                 self._config.launch_method,
                 **callbacks,
             ),
@@ -561,7 +563,7 @@ class UserPresetsPageBase(BasePage):
         self._request_preset_open_folder_action()
 
     def create_preset_open_folder_worker(self, request_id: int):
-        return self._presets_feature.create_user_presets_open_folder_worker(
+        return self._create_user_presets_open_folder_worker(
             request_id,
             launch_method=self._config.launch_method,
             parent=self,

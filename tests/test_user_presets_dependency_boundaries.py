@@ -32,6 +32,43 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
         self.assertIs(kwargs["open_url"], external_actions.open_url)
         self.assertNotIn("external_actions_feature", kwargs)
 
+    def test_user_presets_page_receives_concrete_preset_actions_instead_of_feature(self) -> None:
+        from app.page_names import PageName
+        from presets.ui.common.user_presets_page import UserPresetsPageBase
+        from presets.ui.common.user_presets_page_runtime import UserPresetsPageRuntimeConfig
+        from ui.page_deps.presets import build_user_presets_page_kwargs
+
+        init_source = inspect.getsource(UserPresetsPageBase.__init__)
+        page_source = inspect.getsource(UserPresetsPageBase)
+        runtime_config_source = inspect.getsource(UserPresetsPageRuntimeConfig)
+        runtime_build_source = inspect.getsource(UserPresetsPageBase._build_page_runtime)
+
+        self.assertNotIn("presets_feature", init_source)
+        self.assertNotIn("self._presets_feature", page_source)
+        self.assertNotIn("get_presets_feature", runtime_config_source)
+        self.assertNotIn("get_presets_feature", runtime_build_source)
+        self.assertIn("preset_runtime_actions", init_source)
+        self.assertIn("connect_preset_signals", init_source)
+        self.assertIn("create_user_presets_open_folder_worker", init_source)
+
+        presets = Mock()
+        external_actions = Mock()
+        kwargs = build_user_presets_page_kwargs(
+            page_name=PageName.ZAPRET2_USER_PRESETS,
+            presets_feature=presets,
+            external_actions_feature=external_actions,
+            open_preset_raw_editor=Mock(),
+            ui_state_store=Mock(),
+        )
+
+        self.assertNotIn("presets_feature", kwargs)
+        self.assertIn("preset_runtime_actions", kwargs)
+        self.assertIs(kwargs["connect_preset_signals"], presets.connect_preset_signals)
+        self.assertIs(
+            kwargs["create_user_presets_open_folder_worker"],
+            presets.create_user_presets_open_folder_worker,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
