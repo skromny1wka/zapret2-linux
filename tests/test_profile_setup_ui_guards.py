@@ -83,6 +83,27 @@ class _PropertyWidget(_BoolWidget):
         self._properties[key] = value
 
 
+class _LabelWidget(_PropertyWidget):
+    def __init__(self, text: str = "", *, visible: bool = True) -> None:
+        super().__init__(visible=visible)
+        self._text = str(text)
+        self.show_calls = 0
+        self.hide_calls = 0
+        self.clear_calls = 0
+
+    def show(self) -> None:
+        self.show_calls += 1
+        self._visible = True
+
+    def hide(self) -> None:
+        self.hide_calls += 1
+        self._visible = False
+
+    def clear(self) -> None:
+        self.clear_calls += 1
+        self._text = ""
+
+
 class _PlainTextWidget(_BoolWidget):
     def __init__(
         self,
@@ -381,6 +402,23 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         self.assertEqual(page._list_file_save_button.enabled_calls, [])
         self.assertEqual(page._list_file_status_label.calls, [])
         page._render_list_file_validation.assert_called_once_with(())
+
+    def test_list_file_validation_label_skips_duplicate_error_render(self) -> None:
+        from unittest.mock import Mock
+
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._list_file_text = _PlainTextWidget("bad value")
+        page._refresh_list_file_editor_style = Mock()
+        page._list_file_error_label = _LabelWidget("Неверные строки:\nСтрока 1: bad value", visible=True)
+
+        ProfileSetupPageBase._render_list_file_validation(page, ((1, "bad value"),))
+
+        self.assertEqual(page._list_file_error_label.text_calls, [])
+        self.assertEqual(page._list_file_error_label.visible_calls, [])
+        self.assertEqual(page._list_file_error_label.show_calls, 0)
+        page._refresh_list_file_editor_style.assert_called_once_with(has_error=True)
 
     def test_match_tab_payload_skips_duplicate_plain_text(self) -> None:
         from types import SimpleNamespace

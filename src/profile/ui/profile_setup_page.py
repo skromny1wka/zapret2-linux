@@ -1782,15 +1782,15 @@ class ProfileSetupPageBase(BasePage):
             ]
             if len(invalid_lines) > 5:
                 lines.append(f"И ещё ошибок: {len(invalid_lines) - 5}")
-            self._list_file_error_label.setText("Неверные строки:\n" + "\n".join(lines))
-            self._list_file_error_label.show()
+            set_widget_text_if_changed(self._list_file_error_label, "Неверные строки:\n" + "\n".join(lines))
+            set_widget_visible_if_changed(self._list_file_error_label, True)
             return
         if fallback_error:
-            self._list_file_error_label.setText(fallback_error)
-            self._list_file_error_label.show()
+            set_widget_text_if_changed(self._list_file_error_label, fallback_error)
+            set_widget_visible_if_changed(self._list_file_error_label, True)
             return
-        self._list_file_error_label.clear()
-        self._list_file_error_label.hide()
+        set_widget_text_if_changed(self._list_file_error_label, "")
+        set_widget_visible_if_changed(self._list_file_error_label, False)
 
     def _refresh_list_file_editor_style(self, *, has_error: bool) -> None:
         if self._list_file_text is None:
