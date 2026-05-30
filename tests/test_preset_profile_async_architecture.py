@@ -1161,6 +1161,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
     def test_user_presets_item_file_actions_run_through_worker(self) -> None:
         worker_source = inspect.getsource(UserPresetItemActionWorker.run)
         request_source = inspect.getsource(UserPresetsPageBase._request_preset_item_action)
+        create_worker_source = inspect.getsource(UserPresetsPageBase.create_preset_item_action_worker)
 
         for method in (
             UserPresetsPageBase._on_duplicate_preset,
@@ -1183,6 +1184,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_is_builtin_preset_file", delete_source)
         self.assertNotIn("_storage_api().is_builtin_preset_file", delete_source)
         self.assertIn("create_preset_item_action_worker", request_source)
+        self.assertNotIn("UserPresetItemActionWorker", create_worker_source)
+        self.assertIn("_create_preset_item_action_worker_fn", create_worker_source)
         self.assertIn("self._duplicate_preset", worker_source)
         self.assertIn("self._reset_preset_to_builtin", worker_source)
         self.assertIn("self._delete_preset", worker_source)
@@ -1196,6 +1199,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertTrue(hasattr(user_presets_action_workers, "UserPresetBulkActionWorker"))
         worker_source = inspect.getsource(user_presets_action_workers.UserPresetBulkActionWorker.run)
         request_source = inspect.getsource(UserPresetsPageBase._request_preset_bulk_action)
+        create_worker_source = inspect.getsource(UserPresetsPageBase.create_preset_bulk_action_worker)
 
         for source in (import_source, reset_source):
             self.assertIn("_request_preset_bulk_action", source)
@@ -1205,6 +1209,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
             self.assertNotIn(".reset_all_presets(", source)
 
         self.assertIn("create_preset_bulk_action_worker", request_source)
+        self.assertNotIn("UserPresetBulkActionWorker", create_worker_source)
+        self.assertIn("_create_preset_bulk_action_worker_fn", create_worker_source)
         self.assertIn("self._import_preset_from_file", worker_source)
         self.assertIn("self._reset_all_presets", worker_source)
         self.assertNotIn("actions_api.", worker_source)
@@ -1216,6 +1222,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertTrue(hasattr(user_presets_action_workers, "UserPresetEditActionWorker"))
         worker_source = inspect.getsource(user_presets_action_workers.UserPresetEditActionWorker.run)
         request_source = inspect.getsource(UserPresetsPageBase._request_preset_edit_action)
+        create_worker_source = inspect.getsource(UserPresetsPageBase.create_preset_edit_action_worker)
 
         for source in (create_source, rename_source):
             body_source = "\n".join(source.splitlines()[1:])
@@ -1226,6 +1233,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
             self.assertNotIn(".rename_preset(", source)
 
         self.assertIn("create_preset_edit_action_worker", request_source)
+        self.assertNotIn("UserPresetEditActionWorker", create_worker_source)
+        self.assertIn("_create_preset_edit_action_worker_fn", create_worker_source)
         self.assertIn("self._create_preset", worker_source)
         self.assertIn("self._rename_preset", worker_source)
         self.assertNotIn("actions_api.", worker_source)
@@ -1238,6 +1247,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
         self.assertTrue(hasattr(user_presets_action_workers, "UserPresetLinkActionWorker"))
         worker_source = inspect.getsource(user_presets_action_workers.UserPresetLinkActionWorker.run)
+        create_worker_source = inspect.getsource(UserPresetsPageBase.create_preset_link_action_worker)
 
         for source in (info_source, post_source):
             self.assertIn("_request_preset_link_action", source)
@@ -1245,6 +1255,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
             self.assertNotIn("open_new_configs_post_action", source)
 
         self.assertIn("create_preset_link_action_worker", request_source)
+        self.assertNotIn("UserPresetLinkActionWorker", create_worker_source)
+        self.assertIn("_create_preset_link_action_worker_fn", create_worker_source)
         self.assertIn("self._open_presets_info", worker_source)
         self.assertIn("self._open_new_configs_post", worker_source)
         self.assertNotIn("actions_api.", worker_source)
@@ -3125,15 +3137,15 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("publish_program_settings_snapshot", shared_source)
         self.assertIn("emit_initial=False", attach_source)
 
-    def test_zapret2_control_defers_initial_store_snapshot_during_startup(self) -> None:
+    def test_zapret2_control_initial_store_snapshot_is_applied_immediately(self) -> None:
         helper_source = inspect.getsource(control_page_shared.bind_control_ui_state_store)
         bind_source = inspect.getsource(Zapret2ModeControlPage.bind_ui_state_store)
 
         self.assertIn("emit_initial: bool = True", helper_source)
         self.assertIn("emit_initial=bool(emit_initial)", helper_source)
-        self.assertIn("defer_initial_state", bind_source)
-        self.assertIn("emit_initial=not defer_initial_state", bind_source)
-        self.assertIn("_wait_for_startup_interactive_before_initial_ui_state", bind_source)
+        self.assertNotIn("defer_initial_state", bind_source)
+        self.assertNotIn("emit_initial=not defer_initial_state", bind_source)
+        self.assertNotIn("_wait_for_startup_interactive_before_initial_ui_state", bind_source)
 
     def test_raw_preset_editor_loads_file_through_worker(self) -> None:
         source = inspect.getsource(PresetRawEditorPage._load_file)

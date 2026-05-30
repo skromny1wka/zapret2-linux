@@ -1,4 +1,4 @@
-"""Build-helper deferred-секций для Zapret1ModeControlPage."""
+"""Build-helper основных секций для Zapret1ModeControlPage."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from ui.theme import get_themed_qta_icon
 
 
 @dataclass(slots=True)
-class Zapret1DeferredBuildWidgets:
+class Zapret1SettingsBuildWidgets:
     program_settings_section_label: object | None
     program_settings_card: object
     auto_dpi_toggle: object
@@ -33,7 +33,7 @@ class Zapret1DeferredBuildWidgets:
     docs_card: object
 
 
-def build_winws1_pages_deferred_sections(
+def build_winws1_pages_settings_sections(
     *,
     add_section_title,
     tr_fn,
@@ -52,7 +52,7 @@ def build_winws1_pages_deferred_sections(
     on_open_connection_test,
     on_open_folder,
     on_open_docs,
-) -> Zapret1DeferredBuildWidgets:
+) -> Zapret1SettingsBuildWidgets:
     program_settings_title = tr_fn("page.winws1_control.section.program_settings", "Настройки программы")
     program_settings_section_label = None
     program_settings_card = setting_card_group_cls(program_settings_title, content_parent)
@@ -176,7 +176,7 @@ def build_winws1_pages_deferred_sections(
     extra_card.addSettingCard(docs_card)
     enable_setting_card_group_auto_height(extra_card)
 
-    return Zapret1DeferredBuildWidgets(
+    return Zapret1SettingsBuildWidgets(
         program_settings_section_label=program_settings_section_label,
         program_settings_card=program_settings_card,
         auto_dpi_toggle=auto_dpi_toggle,

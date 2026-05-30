@@ -1,4 +1,4 @@
-"""Build-helper deferred-секций для Zapret2ModeControlPage."""
+"""Build-helper основных секций для Zapret2ModeControlPage."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from ui.theme import get_cached_qta_pixmap, get_theme_tokens, get_themed_qta_ico
 
 
 @dataclass(slots=True)
-class Zapret2DeferredBuildWidgets:
+class Zapret2SettingsBuildWidgets:
     profile_ui_mode_btn: object
     profile_ui_mode_label: object
     profile_ui_mode_caption: object
@@ -37,7 +37,7 @@ class Zapret2DeferredBuildWidgets:
     docs_card: object
 
 
-def build_winws2_pages_deferred_sections(
+def build_winws2_pages_settings_sections(
     *,
     add_section_title,
     tr_fn,
@@ -57,7 +57,7 @@ def build_winws2_pages_deferred_sections(
     on_open_connection_test,
     on_open_folder,
     on_open_docs,
-) -> Zapret2DeferredBuildWidgets:
+) -> Zapret2SettingsBuildWidgets:
     profile_ui_mode_card = build_push_setting_card_common(
         push_setting_card_cls=push_setting_card_cls,
         button_text=tr_fn("page.winws2_control.button.change_mode", "Изменить режим"),
@@ -197,7 +197,7 @@ def build_winws2_pages_deferred_sections(
     extra_card.addSettingCard(docs_card)
     enable_setting_card_group_auto_height(extra_card)
 
-    return Zapret2DeferredBuildWidgets(
+    return Zapret2SettingsBuildWidgets(
         profile_ui_mode_btn=profile_ui_mode_card.button,
         profile_ui_mode_label=profile_ui_mode_card.titleLabel,
         profile_ui_mode_caption=profile_ui_mode_card.contentLabel,

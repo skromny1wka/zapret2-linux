@@ -1,7 +1,7 @@
 # dpi/ui/zapret1_mode/page.py
 """Zapret 1 mode management page (entry point for zapret1_mode mode)."""
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import QTimer
 
 from ui.pages.base_page import BasePage
 from settings.mode import EXE_NAME_WINWS1, ZAPRET1_MODE
@@ -9,8 +9,8 @@ from presets.ui.control.zapret1.build import (
     build_winws1_pages_management_section,
     build_winws1_pages_status_section,
 )
-from presets.ui.control.zapret1.deferred_build import (
-    build_winws1_pages_deferred_sections,
+from presets.ui.control.zapret1.sections_build import (
+    build_winws1_pages_settings_sections,
 )
 from presets.ui.control.zapret1.runtime_helpers import (
     apply_program_settings_snapshot,
@@ -46,7 +46,6 @@ from qfluentwidgets import (
 )
 
 
-STARTUP_DEFERRED_SECTIONS_AFTER_INTERACTIVE_MS = 8_000
 TOP_SUMMARY_PROFILE_RETRY_MS = 750
 TOP_SUMMARY_PROFILE_RETRY_LIMIT = 10
 
@@ -116,10 +115,6 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         self._cleanup_in_progress = False
         self._last_known_dpi_running = False
         self._program_settings_runtime_attached = False
-        self._deferred_sections_built = False
-        self._deferred_sections_hydrated = False
-        self._startup_deferred_sections_waiting = False
-        self._startup_top_summary_waiting = False
         self._top_summary_profile_retry_count = 0
         self._top_summary_profile_retry_pending = False
         self._refresh_runtime = winws1_page_runtime.create_refresh_runtime()
@@ -149,11 +144,7 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         self.docs_card = None
         self._build_ui()
         self.bind_ui_state_store(ui_state_store)
-        if self._startup_can_refresh_top_summary():
-            self._refresh_preset_name()
-        else:
-            self._wait_for_startup_interactive_before_top_summary()
-        self.run_when_page_ready(self._run_deferred_show_work)
+        self._refresh_preset_name()
 
     def _open_docs(self) -> None:
         from config.urls import DOCS_URL
@@ -174,93 +165,8 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         except Exception:
             pass
 
-    def _run_deferred_show_work(self) -> None:
-        if self._cleanup_in_progress:
-            return
-        if not self.isVisible():
-            return
-        if not self._startup_can_run_deferred_sections():
-            self._wait_for_startup_interactive_before_deferred_sections()
-            return
-        if not self._deferred_sections_built:
-            self._build_deferred_sections()
-            self._deferred_sections_built = True
-            QTimer.singleShot(0, lambda: (not self._cleanup_in_progress) and self._run_deferred_show_work())
-            return
-        if not self._deferred_sections_hydrated:
-            self._attach_program_settings_runtime()
-            self._deferred_sections_hydrated = True
-            self._schedule_additional_settings_reload(force=True)
-            return
-        self._schedule_additional_settings_reload()
-
-    def _startup_can_run_deferred_sections(self) -> bool:
-        try:
-            state = getattr(self.window(), "startup_state", None)
-        except Exception:
-            return True
-        if state is None:
-            return True
-        return bool(getattr(state, "interactive_logged", False))
-
-    def _wait_for_startup_interactive_before_deferred_sections(self) -> None:
-        if bool(self._startup_deferred_sections_waiting):
-            return
-        self._startup_deferred_sections_waiting = True
-        try:
-            signal = getattr(self.window(), "startup_interactive_ready", None)
-            signal.connect(
-                self._on_startup_interactive_ready_for_deferred_sections,
-                Qt.ConnectionType.QueuedConnection,
-            )
-        except Exception:
-            QTimer.singleShot(
-                STARTUP_DEFERRED_SECTIONS_AFTER_INTERACTIVE_MS,
-                self._request_deferred_sections_after_startup,
-            )
-
-    def _on_startup_interactive_ready_for_deferred_sections(self, *_args) -> None:
-        QTimer.singleShot(
-            STARTUP_DEFERRED_SECTIONS_AFTER_INTERACTIVE_MS,
-            self._request_deferred_sections_after_startup,
-        )
-
-    def _request_deferred_sections_after_startup(self) -> None:
-        self._startup_deferred_sections_waiting = False
-        if self._cleanup_in_progress:
-            return
-        self.run_when_page_ready(self._run_deferred_show_work)
-
     def _startup_can_refresh_top_summary(self) -> bool:
-        return self._startup_can_run_deferred_sections()
-
-    def _wait_for_startup_interactive_before_top_summary(self) -> None:
-        if bool(self._startup_top_summary_waiting):
-            return
-        self._startup_top_summary_waiting = True
-        try:
-            signal = getattr(self.window(), "startup_interactive_ready", None)
-            signal.connect(
-                self._on_startup_interactive_ready_for_top_summary,
-                Qt.ConnectionType.QueuedConnection,
-            )
-        except Exception:
-            QTimer.singleShot(
-                STARTUP_DEFERRED_SECTIONS_AFTER_INTERACTIVE_MS,
-                self._request_top_summary_after_startup,
-            )
-
-    def _on_startup_interactive_ready_for_top_summary(self, *_args) -> None:
-        QTimer.singleShot(
-            STARTUP_DEFERRED_SECTIONS_AFTER_INTERACTIVE_MS,
-            self._request_top_summary_after_startup,
-        )
-
-    def _request_top_summary_after_startup(self) -> None:
-        self._startup_top_summary_waiting = False
-        if self._cleanup_in_progress:
-            return
-        self.run_when_page_ready(self._refresh_top_summary)
+        return True
 
     def _build_ui(self):
         self.top_summary = ControlTopSummaryWidget(
@@ -308,12 +214,15 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         self.progress_bar = management_widgets.progress_bar
         self.loading_label = management_widgets.loading_label
         self.add_widget(management_widgets.card)
+        self._build_settings_sections()
+        self._attach_program_settings_runtime()
+        self._schedule_additional_settings_reload(force=True)
 
-    def _build_deferred_sections(self) -> None:
+    def _build_settings_sections(self) -> None:
         self.add_spacing(8)
         from ui.widgets.win11_controls import Win11ToggleRow
 
-        deferred_widgets = build_winws1_pages_deferred_sections(
+        section_widgets = build_winws1_pages_settings_sections(
             add_section_title=self.add_section_title,
             tr_fn=lambda key, default: tr_catalog(key, language=self._ui_language, default=default),
             content_parent=self.content,
@@ -332,22 +241,22 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             on_open_folder=self._open_folder,
             on_open_docs=self._open_docs,
         )
-        self.program_settings_section_label = deferred_widgets.program_settings_section_label
-        self.program_settings_card = deferred_widgets.program_settings_card
-        self.auto_dpi_toggle = deferred_widgets.auto_dpi_toggle
-        self.hide_to_tray_toggle = deferred_widgets.hide_to_tray_toggle
-        self.defender_toggle = deferred_widgets.defender_toggle
-        self.max_block_toggle = deferred_widgets.max_block_toggle
+        self.program_settings_section_label = section_widgets.program_settings_section_label
+        self.program_settings_card = section_widgets.program_settings_card
+        self.auto_dpi_toggle = section_widgets.auto_dpi_toggle
+        self.hide_to_tray_toggle = section_widgets.hide_to_tray_toggle
+        self.defender_toggle = section_widgets.defender_toggle
+        self.max_block_toggle = section_widgets.max_block_toggle
         self.add_widget(self.program_settings_card)
 
         self.add_spacing(16)
-        self.additional_settings_card = deferred_widgets.additional_settings_card
-        self.additional_settings_notice = deferred_widgets.additional_settings_notice
-        self.discord_restart_toggle = deferred_widgets.discord_restart_toggle
-        self.wssize_toggle = deferred_widgets.wssize_toggle
-        self.debug_log_toggle = deferred_widgets.debug_log_toggle
-        self.blobs_action_card = deferred_widgets.blobs_action_card
-        self.blobs_open_btn = deferred_widgets.blobs_open_btn
+        self.additional_settings_card = section_widgets.additional_settings_card
+        self.additional_settings_notice = section_widgets.additional_settings_notice
+        self.discord_restart_toggle = section_widgets.discord_restart_toggle
+        self.wssize_toggle = section_widgets.wssize_toggle
+        self.debug_log_toggle = section_widgets.debug_log_toggle
+        self.blobs_action_card = section_widgets.blobs_action_card
+        self.blobs_open_btn = section_widgets.blobs_open_btn
         self.add_widget(self.additional_settings_card)
 
         self.add_spacing(16)
@@ -364,10 +273,10 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         self._refresh_last_status_message()
 
         self.add_spacing(16)
-        self.extra_card = deferred_widgets.extra_card
-        self.test_card = deferred_widgets.test_card
-        self.folder_card = deferred_widgets.folder_card
-        self.docs_card = deferred_widgets.docs_card
+        self.extra_card = section_widgets.extra_card
+        self.test_card = section_widgets.test_card
+        self.folder_card = section_widgets.folder_card
+        self.docs_card = section_widgets.docs_card
         self.test_btn = self.test_card.button
         self.folder_btn = self.folder_card.button
         self.docs_btn = self.docs_card.button
@@ -422,8 +331,6 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
 
     def _apply_pending_additional_settings_refresh(self) -> None:
         if not self._refresh_runtime.additional_settings_dirty:
-            return
-        if not self._deferred_sections_hydrated:
             return
         if not self.is_page_ready():
             return
@@ -659,13 +566,9 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         changed = set(changed_fields or ())
         if "active_preset_revision" in changed:
             self._refresh_runtime.additional_settings_dirty = True
-            if self._startup_can_refresh_top_summary():
-                self._refresh_preset_name()
-            else:
-                self._wait_for_startup_interactive_before_top_summary()
+            self._refresh_preset_name()
             if self.isVisible():
-                if self._deferred_sections_hydrated:
-                    self._schedule_additional_settings_reload(force=True)
+                self._schedule_additional_settings_reload(force=True)
             else:
                 self.run_when_page_ready(self._apply_pending_preset_name_refresh)
                 self.run_when_page_ready(self._apply_pending_additional_settings_refresh)
@@ -676,10 +579,7 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             or "subscription_is_premium" in changed
             or "subscription_days_remaining" in changed
         ):
-            if self._startup_can_refresh_top_summary():
-                self._refresh_top_summary(state)
-            else:
-                self._wait_for_startup_interactive_before_top_summary()
+            self._refresh_top_summary(state)
         self.set_loading(bool(state.launch_busy), str(state.launch_busy_text or ""))
         if not changed or "last_status_message" in changed:
             self._refresh_last_status_message(state)
