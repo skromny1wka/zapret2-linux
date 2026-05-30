@@ -11,15 +11,14 @@ class TelegramProxyInitialStateWorker(QThread):
     completed = pyqtSignal(int, object)
     failed = pyqtSignal(int, str)
 
-    def __init__(self, request_id: int, *, parent=None):
+    def __init__(self, request_id: int, *, load_page_initial_state, parent=None):
         super().__init__(parent)
         self._request_id = int(request_id)
+        self._load_page_initial_state = load_page_initial_state
 
     def run(self) -> None:
         try:
-            import telegram_proxy.commands as telegram_proxy_commands
-
-            result = telegram_proxy_commands.load_page_initial_state()
+            result = self._load_page_initial_state()
         except Exception as exc:
             log(f"TelegramProxyInitialStateWorker: не удалось загрузить начальное состояние: {exc}", "WARNING")
             self.failed.emit(self._request_id, str(exc))
@@ -30,21 +29,30 @@ class TelegramProxyInitialStateWorker(QThread):
 class TelegramProxyStartWorker(QThread):
     completed = pyqtSignal(bool)
 
-    def __init__(self, *, manager, port: int, mode: str, host: str, upstream_config=None, parent=None):
+    def __init__(
+        self,
+        *,
+        manager,
+        port: int,
+        mode: str,
+        host: str,
+        build_upstream_config,
+        upstream_config=None,
+        parent=None,
+    ):
         super().__init__(parent)
         self._manager = manager
         self._port = int(port)
         self._mode = str(mode or "socks5")
         self._host = str(host or "127.0.0.1")
+        self._build_upstream_config = build_upstream_config
         self._upstream_config = upstream_config
 
     def run(self) -> None:
         try:
-            import telegram_proxy.commands as telegram_proxy_commands
-
             upstream_config = self._upstream_config
             if upstream_config is None:
-                upstream_config = telegram_proxy_commands.build_upstream_config()
+                upstream_config = self._build_upstream_config()
             ok = self._manager.start_proxy(
                 port=self._port,
                 mode=self._mode,
@@ -184,19 +192,19 @@ class TelegramProxyRelayCheckWorker(QThread):
     completed = pyqtSignal(int, dict)
     warning = pyqtSignal(str)
 
-    def __init__(self, *, generation: int, get_zapret_running, parent=None):
+    def __init__(self, *, generation: int, check_relay_reachable, check_relay_http, get_zapret_running, parent=None):
         super().__init__(parent)
         self._generation = int(generation)
+        self._check_relay_reachable = check_relay_reachable
+        self._check_relay_http = check_relay_http
         self._get_zapret_running = get_zapret_running
 
     def run(self) -> None:
         try:
-            import telegram_proxy.commands as telegram_proxy_commands
-
             time.sleep(2)
             best_result = None
             for attempt in range(3):
-                result = telegram_proxy_commands.check_relay_reachable(timeout=5.0)
+                result = self._check_relay_reachable(timeout=5.0)
                 if result["reachable"]:
                     best_result = result
                     break
@@ -208,7 +216,7 @@ class TelegramProxyRelayCheckWorker(QThread):
             else:
                 diag = {
                     "status": "fail",
-                    "http_ok": telegram_proxy_commands.check_relay_http(),
+                    "http_ok": self._check_relay_http(),
                     "zapret_running": bool(self._get_zapret_running()),
                 }
             self.completed.emit(self._generation, diag)
@@ -261,6 +269,7 @@ class TelegramProxySettingsSaveWorker(QThread):
         self,
         request_id: int,
         *,
+        save_settings_action,
         action: str,
         host: str = "",
         port: int = 0,
@@ -272,6 +281,7 @@ class TelegramProxySettingsSaveWorker(QThread):
     ):
         super().__init__(parent)
         self._request_id = int(request_id)
+        self._save_settings_action = save_settings_action
         self._action = str(action or "").strip()
         self._host = str(host or "").strip()
         self._port = int(port or 0)
@@ -281,8 +291,6 @@ class TelegramProxySettingsSaveWorker(QThread):
         self._context_extra = dict(context_extra or {})
 
     def run(self) -> None:
-        import telegram_proxy.commands as telegram_proxy_commands
-
         context = {
             "host": self._host,
             "port": self._port,
@@ -292,7 +300,7 @@ class TelegramProxySettingsSaveWorker(QThread):
         }
         context.update(self._context_extra)
         try:
-            result = telegram_proxy_commands.save_settings_action(
+            result = self._save_settings_action(
                 self._action,
                 host=self._host,
                 port=self._port,

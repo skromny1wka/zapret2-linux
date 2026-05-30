@@ -2048,7 +2048,9 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("get_tg_proxy_host", settings_source)
         self.assertNotIn("get_tg_proxy_port", settings_source)
         self.assertNotIn("get_tg_proxy_upstream_enabled", settings_source)
-        self.assertIn("telegram_proxy.commands", worker_source)
+        self.assertIn("load_page_initial_state=self.load_page_initial_state", feature_source)
+        self.assertIn("_load_page_initial_state", worker_source)
+        self.assertNotIn("telegram_proxy.commands", worker_source)
         self.assertNotIn("telegram_proxy.settings", worker_source)
         self.assertIn("load_page_initial_state", worker_source)
 
@@ -2214,7 +2216,10 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("telegram_proxy_settings.set_proxy_enabled", runtime_source)
         self.assertIn("request_proxy_enabled_save", runtime_source)
         self.assertIn('"proxy_enabled"', page_source)
-        self.assertIn("telegram_proxy.commands", worker_source)
+        feature_source = inspect.getsource(TelegramProxyFeature)
+        self.assertIn("save_settings_action=self.save_settings_action", feature_source)
+        self.assertIn("_save_settings_action", worker_source)
+        self.assertNotIn("telegram_proxy.commands", worker_source)
         self.assertNotIn("telegram_proxy.settings", worker_source)
         self.assertIn("save_settings_action", worker_source)
         self.assertIn("set_host", command_source)
@@ -2226,13 +2231,18 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
     def test_telegram_proxy_relay_http_probe_is_command_not_ui_runtime(self) -> None:
         page_runtime_source = inspect.getsource(telegram_page.telegram_proxy_page_runtime)
+        feature_source = inspect.getsource(TelegramProxyFeature)
         worker_source = inspect.getsource(telegram_proxy_workers.TelegramProxyRelayCheckWorker.run)
 
         self.assertTrue(hasattr(telegram_proxy_commands, "check_relay_http"))
         command_source = inspect.getsource(telegram_proxy_commands.check_relay_http)
 
         self.assertNotIn("socket.", page_runtime_source)
-        self.assertIn("telegram_proxy.commands", worker_source)
+        self.assertIn("check_relay_reachable=self.check_relay_reachable", feature_source)
+        self.assertIn("check_relay_http=self.check_relay_http", feature_source)
+        self.assertIn("_check_relay_reachable", worker_source)
+        self.assertIn("_check_relay_http", worker_source)
+        self.assertNotIn("telegram_proxy.commands", worker_source)
         self.assertIn("check_relay_http", worker_source)
         self.assertIn("socket.create_connection", command_source)
 

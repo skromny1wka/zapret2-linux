@@ -1,9 +1,10 @@
 import inspect
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 
 from telegram_proxy import commands as telegram_proxy_commands
 from telegram_proxy import workers as telegram_proxy_workers
+from app.feature_facades.telegram_proxy import TelegramProxyFeature
 
 
 class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
@@ -37,12 +38,15 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
         )
 
     def test_relay_reachability_probe_is_owned_by_commands(self) -> None:
+        feature_source = inspect.getsource(TelegramProxyFeature)
         worker_source = inspect.getsource(telegram_proxy_workers.TelegramProxyRelayCheckWorker.run)
 
         self.assertTrue(hasattr(telegram_proxy_commands, "check_relay_reachable"))
         command_source = inspect.getsource(telegram_proxy_commands.check_relay_reachable)
 
-        self.assertIn("telegram_proxy_commands.check_relay_reachable", worker_source)
+        self.assertIn("check_relay_reachable=self.check_relay_reachable", feature_source)
+        self.assertIn("_check_relay_reachable", worker_source)
+        self.assertNotIn("telegram_proxy.commands", worker_source)
         self.assertNotIn("telegram_proxy.wss_proxy", worker_source)
         self.assertIn("telegram_proxy.wss_proxy", command_source)
         self.assertIn("check_relay_reachable", command_source)
@@ -51,12 +55,15 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
         from telegram_proxy.ui import proxy_runtime_workflow
 
         runtime_source = inspect.getsource(proxy_runtime_workflow.start_proxy_runtime)
+        feature_source = inspect.getsource(TelegramProxyFeature)
         worker_source = inspect.getsource(telegram_proxy_workers.TelegramProxyStartWorker.run)
 
         self.assertTrue(hasattr(telegram_proxy_commands, "build_upstream_config"))
         self.assertNotIn("telegram_proxy.settings", runtime_source)
         self.assertNotIn("build_upstream_config", runtime_source)
-        self.assertIn("telegram_proxy_commands.build_upstream_config", worker_source)
+        self.assertIn("build_upstream_config=self.build_upstream_config", feature_source)
+        self.assertIn("_build_upstream_config", worker_source)
+        self.assertNotIn("telegram_proxy.commands", worker_source)
 
     def test_start_worker_passes_command_loaded_upstream_config_to_manager(self) -> None:
         manager = Mock()
@@ -67,10 +74,10 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
             port=1353,
             mode="socks5",
             host="127.0.0.1",
+            build_upstream_config=Mock(return_value=upstream_config),
         )
 
-        with patch.object(telegram_proxy_commands, "build_upstream_config", return_value=upstream_config):
-            worker.run()
+        worker.run()
 
         manager.start_proxy.assert_called_once_with(
             port=1353,

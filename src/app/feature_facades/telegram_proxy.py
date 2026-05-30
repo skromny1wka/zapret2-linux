@@ -10,6 +10,11 @@ class TelegramProxyFeature:
     get_proxy_manager: Callable
     get_start_config: Callable
     set_enabled: Callable
+    build_upstream_config: Callable
+    load_page_initial_state: Callable
+    save_settings_action: Callable
+    check_relay_reachable: Callable
+    check_relay_http: Callable
     build_diagnostics_start_plan: Callable
     build_diagnostics_poll_plan: Callable
     build_diagnostics_finish_plan: Callable
@@ -57,6 +62,7 @@ class TelegramProxyFeature:
             mode=mode,
             host=host,
             upstream_config=upstream_config,
+            build_upstream_config=self.build_upstream_config,
             parent=parent,
         )
 
@@ -113,6 +119,8 @@ class TelegramProxyFeature:
 
         return TelegramProxyRelayCheckWorker(
             generation=generation,
+            check_relay_reachable=self.check_relay_reachable,
+            check_relay_http=self.check_relay_http,
             get_zapret_running=get_zapret_running,
             parent=parent,
         )
@@ -134,12 +142,20 @@ class TelegramProxyFeature:
     def create_settings_save_worker(self, request_id: int, **kwargs):
         from telegram_proxy.workers import TelegramProxySettingsSaveWorker
 
-        return TelegramProxySettingsSaveWorker(request_id, **kwargs)
+        return TelegramProxySettingsSaveWorker(
+            request_id,
+            save_settings_action=self.save_settings_action,
+            **kwargs,
+        )
 
     def create_page_initial_state_worker(self, request_id: int, *, parent=None):
         from telegram_proxy.workers import TelegramProxyInitialStateWorker
 
-        return TelegramProxyInitialStateWorker(request_id, parent=parent)
+        return TelegramProxyInitialStateWorker(
+            request_id,
+            load_page_initial_state=self.load_page_initial_state,
+            parent=parent,
+        )
 
     def toggle_async(self) -> None:
         try:
@@ -183,6 +199,11 @@ def build_telegram_proxy_feature() -> TelegramProxyFeature:
         get_proxy_manager=lambda *args, **kwargs: _commands().get_proxy_manager(*args, **kwargs),
         get_start_config=lambda *args, **kwargs: _commands().get_start_config(*args, **kwargs),
         set_enabled=lambda *args, **kwargs: _public().set_enabled(*args, **kwargs),
+        build_upstream_config=lambda *args, **kwargs: _commands().build_upstream_config(*args, **kwargs),
+        load_page_initial_state=lambda *args, **kwargs: _commands().load_page_initial_state(*args, **kwargs),
+        save_settings_action=lambda *args, **kwargs: _commands().save_settings_action(*args, **kwargs),
+        check_relay_reachable=lambda *args, **kwargs: _commands().check_relay_reachable(*args, **kwargs),
+        check_relay_http=lambda *args, **kwargs: _commands().check_relay_http(*args, **kwargs),
         build_diagnostics_start_plan=lambda *args, **kwargs: _public().build_diagnostics_start_plan(*args, **kwargs),
         build_diagnostics_poll_plan=lambda *args, **kwargs: _public().build_diagnostics_poll_plan(*args, **kwargs),
         build_diagnostics_finish_plan=lambda *args, **kwargs: _public().build_diagnostics_finish_plan(*args, **kwargs),
