@@ -62,8 +62,12 @@ def build_logs_feature():
     return LogsFeature()
 
 
+def iter_lazy_feature_facade_modules() -> tuple[str, ...]:
+    return tuple(sorted({module_name for module_name, _ in _EXPORTS.values()}))
+
+
 def __dir__() -> list[str]:
     return sorted((*globals().keys(), *_EXPORTS.keys()))
 
 
-__all__ = sorted((*_EXPORTS, "build_logs_feature"))
+__all__ = sorted((*_EXPORTS, "build_logs_feature", "iter_lazy_feature_facade_modules"))

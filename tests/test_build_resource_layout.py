@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 import unittest
 
 
@@ -75,6 +76,21 @@ class BuildResourceLayoutTests(unittest.TestCase):
         self.assertNotIn("root_path / icon_file", builder)
         self.assertNotIn("root_path / 'ico' / icon_file", builder)
         self.assertNotIn("сборка без иконки", builder)
+
+    def test_pyinstaller_hiddenimports_include_lazy_feature_facades(self) -> None:
+        build_path = PRIVATE_ROOT / "build_zapret"
+        old_path = list(sys.path)
+        sys.path.insert(0, str(build_path))
+        try:
+            sys.modules.pop("pyinstaller_builder", None)
+            import pyinstaller_builder
+
+            hiddenimports = pyinstaller_builder._hiddenimports_for_spec()
+        finally:
+            sys.modules.pop("pyinstaller_builder", None)
+            sys.path[:] = old_path
+
+        self.assertIn("app.feature_facades.blockcheck", hiddenimports)
 
 
 if __name__ == "__main__":
