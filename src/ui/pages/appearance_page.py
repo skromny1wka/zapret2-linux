@@ -168,6 +168,12 @@ class AppearancePage(BasePage):
         if changed == {"window_opacity"}:
             self.set_opacity_value(state.window_opacity)
             return
+        if changed == {"garland_enabled"} and bool(state.subscription_is_premium):
+            self.set_garland_state(state.garland_enabled)
+            return
+        if changed == {"snowflakes_enabled"} and bool(state.subscription_is_premium):
+            self.set_snowflakes_state(state.snowflakes_enabled)
+            return
         premium_effects = appearance_settings.AppearancePremiumEffectsPlan(
             garland_enabled=bool(state.garland_enabled),
             snowflakes_enabled=bool(state.snowflakes_enabled),

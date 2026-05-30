@@ -51,6 +51,76 @@ class AppearancePageUiGuardTests(unittest.TestCase):
         page.set_garland_state.assert_not_called()
         page.set_snowflakes_state.assert_not_called()
 
+    def test_garland_state_change_skips_unrelated_appearance_repaint_for_premium(self) -> None:
+        from ui.pages.appearance_page import AppearancePage
+
+        page = AppearancePage.__new__(AppearancePage)
+        page._cleanup_in_progress = False
+        page.set_garland_state = Mock()
+        page.set_snowflakes_state = Mock(
+            side_effect=AssertionError("garland-only change must not repaint snowflakes checkbox")
+        )
+        page.set_opacity_value = Mock(
+            side_effect=AssertionError("garland-only change must not repaint opacity")
+        )
+        page.set_premium_status = Mock(
+            side_effect=AssertionError("garland-only change must not repaint premium controls")
+        )
+        page._current_bg_preset_from_ui = Mock(
+            side_effect=AssertionError("garland-only change must not read background preset UI")
+        )
+
+        AppearancePage._on_ui_state_changed(
+            page,
+            AppUiState(
+                subscription_is_premium=True,
+                garland_enabled=True,
+                snowflakes_enabled=False,
+                window_opacity=100,
+            ),
+            frozenset({"garland_enabled"}),
+        )
+
+        page.set_garland_state.assert_called_once_with(True)
+        page.set_snowflakes_state.assert_not_called()
+        page.set_opacity_value.assert_not_called()
+        page.set_premium_status.assert_not_called()
+
+    def test_snowflakes_state_change_skips_unrelated_appearance_repaint_for_premium(self) -> None:
+        from ui.pages.appearance_page import AppearancePage
+
+        page = AppearancePage.__new__(AppearancePage)
+        page._cleanup_in_progress = False
+        page.set_snowflakes_state = Mock()
+        page.set_garland_state = Mock(
+            side_effect=AssertionError("snowflakes-only change must not repaint garland checkbox")
+        )
+        page.set_opacity_value = Mock(
+            side_effect=AssertionError("snowflakes-only change must not repaint opacity")
+        )
+        page.set_premium_status = Mock(
+            side_effect=AssertionError("snowflakes-only change must not repaint premium controls")
+        )
+        page._current_bg_preset_from_ui = Mock(
+            side_effect=AssertionError("snowflakes-only change must not read background preset UI")
+        )
+
+        AppearancePage._on_ui_state_changed(
+            page,
+            AppUiState(
+                subscription_is_premium=True,
+                garland_enabled=False,
+                snowflakes_enabled=True,
+                window_opacity=100,
+            ),
+            frozenset({"snowflakes_enabled"}),
+        )
+
+        page.set_snowflakes_state.assert_called_once_with(True)
+        page.set_garland_state.assert_not_called()
+        page.set_opacity_value.assert_not_called()
+        page.set_premium_status.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
