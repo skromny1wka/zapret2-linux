@@ -72,12 +72,22 @@ class TelegramProxyFeature:
             parent=parent,
         )
 
-    def create_stop_runtime_worker(self, *, manager, emit_status: bool = False, parent=None):
+    def create_stop_runtime_worker(
+        self,
+        *,
+        manager,
+        emit_status: bool = False,
+        set_enabled=None,
+        enabled_after_stop=None,
+        parent=None,
+    ):
         from telegram_proxy.workers import TelegramProxyStopRuntimeWorker
 
         return TelegramProxyStopRuntimeWorker(
             manager=manager,
             emit_status=bool(emit_status),
+            set_enabled=set_enabled,
+            enabled_after_stop=enabled_after_stop,
             parent=parent,
         )
 
@@ -177,11 +187,12 @@ class TelegramProxyFeature:
                     worker_factory=lambda _request_id: self.create_stop_runtime_worker(
                         manager=manager,
                         emit_status=True,
+                        set_enabled=self.set_enabled,
+                        enabled_after_stop=False,
                     ),
                     signal_includes_request_id=False,
                     loaded_signal_name="stopped",
                 )
-                self.set_enabled(False)
                 return
             if self._tray_start_runtime.is_running():
                 return

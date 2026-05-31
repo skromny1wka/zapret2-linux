@@ -92,6 +92,7 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("create_stop_runtime_worker", toggle_source)
         self.assertIn("_tray_stop_runtime.start_qthread_worker", toggle_source)
         self.assertNotIn("manager.stop_proxy()", toggle_source)
+        self.assertNotIn("self.set_enabled(False)", toggle_source)
 
     def test_tray_toggle_running_proxy_starts_stop_runtime(self) -> None:
         class _Runtime:
@@ -134,9 +135,15 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
         feature.toggle_async()
 
         manager.stop_proxy.assert_not_called()
-        self.assertEqual(enabled_values, [False])
+        self.assertEqual(enabled_values, [])
         self.assertIsNotNone(stop_runtime.started)
         self.assertEqual(stop_runtime.started.get("loaded_signal_name"), "stopped")
+        worker = stop_runtime.started["worker_factory"](1)
+
+        worker.run()
+
+        manager.stop_proxy.assert_called_once_with()
+        self.assertEqual(enabled_values, [False])
 
     def test_start_worker_passes_command_loaded_upstream_config_to_manager(self) -> None:
         manager = Mock()
