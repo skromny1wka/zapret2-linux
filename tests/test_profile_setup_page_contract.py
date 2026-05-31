@@ -1689,11 +1689,18 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             def __init__(self) -> None:
                 self.quit = Mock()
 
+        class _Runtime:
+            def __init__(self) -> None:
+                self.stop = Mock()
+                self.cancel = Mock()
+
+        runtime_attrs = (
+            "_setup_load_runtime",
+            "_list_file_load_runtime",
+            "_list_file_save_runtime",
+            "_list_file_validation_runtime",
+        )
         worker_attrs = (
-            "_setup_load_worker",
-            "_list_file_load_worker",
-            "_list_file_save_worker",
-            "_list_file_validation_worker",
             "_settings_save_worker",
             "_raw_profile_save_worker",
             "_enabled_save_worker",
@@ -1716,6 +1723,9 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             "_strategy_feedback_save_request_id",
         )
         page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        runtimes = {attr: _Runtime() for attr in runtime_attrs}
+        for attr, runtime in runtimes.items():
+            setattr(page, attr, runtime)
         workers = {attr: _Worker() for attr in worker_attrs}
         for attr, worker in workers.items():
             setattr(page, attr, worker)
@@ -1729,6 +1739,9 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         ProfileSetupPageBase.cleanup(page)
 
+        for runtime in runtimes.values():
+            runtime.stop.assert_called_once()
+            runtime.cancel.assert_called_once()
         for worker in workers.values():
             worker.quit.assert_called_once()
         for attr in worker_attrs:
@@ -2557,6 +2570,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
                 self.failed = _Signal()
                 self.finished = _Signal()
                 self.start = Mock()
+                self.deleteLater = Mock()
 
             def isRunning(self) -> bool:
                 return False
@@ -3001,6 +3015,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
                 self.failed = _Signal()
                 self.finished = _Signal()
                 self.start = Mock()
+                self.deleteLater = Mock()
 
             def isRunning(self) -> bool:
                 return False
@@ -3150,6 +3165,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
                 self.failed = _Signal()
                 self.finished = _Signal()
                 self.start = Mock()
+                self.deleteLater = Mock()
 
             def isRunning(self) -> bool:
                 return False
@@ -3357,6 +3373,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
                 self.failed = _Signal()
                 self.finished = _Signal()
                 self.start = Mock()
+                self.deleteLater = Mock()
 
             def isRunning(self) -> bool:
                 return False
@@ -3404,15 +3421,28 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             def isRunning(self) -> bool:
                 return self._running
 
-        running_worker = _Worker(running=True)
         next_worker = _Worker(running=False)
+
+        class _Runtime:
+            def __init__(self) -> None:
+                self.running = True
+
+            def is_running(self) -> bool:
+                return self.running
+
+            def start_qthread_worker(self, *, worker_factory, **_kwargs):
+                worker = worker_factory(0)
+                worker.start()
+                return 0, worker
+
+        runtime = _Runtime()
         page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
         page._loading = False
         page._profile_key = "profile-1"
         page._list_file_text = SimpleNamespace(toPlainText=lambda: "ignored.example")
         page._list_file_text_snapshot = "latest.example"
         page._list_file_save_request_id = 1
-        page._list_file_save_worker = running_worker
+        page._list_file_save_runtime = runtime
         page._pending_list_file_save = None
         page._list_file_status_label = Mock()
         page._list_file_save_button = Mock()
@@ -3423,7 +3453,8 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page.create_profile_list_file_save_worker.assert_not_called()
         self.assertEqual(page._pending_list_file_save, ("profile-1", "latest.example"))
 
-        ProfileSetupPageBase._on_list_file_save_worker_finished(page, running_worker)
+        runtime.running = False
+        ProfileSetupPageBase._on_list_file_save_worker_finished(page, object())
 
         page.create_profile_list_file_save_worker.assert_called_once_with(
             2,
@@ -3514,6 +3545,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
                 self.failed = _Signal()
                 self.finished = _Signal()
                 self.start = Mock()
+                self.deleteLater = Mock()
 
             def isRunning(self) -> bool:
                 return False

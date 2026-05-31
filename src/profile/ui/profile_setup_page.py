@@ -825,11 +825,11 @@ class ProfileSetupPageBase(BasePage):
         self._list_file_load_runtime = OneShotWorkerRuntime()
         self._list_file_load_request_id = 0
         self._pending_list_file_load = False
+        self._list_file_save_runtime = OneShotWorkerRuntime()
         self._list_file_save_request_id = 0
-        self._list_file_save_worker = None
         self._pending_list_file_save: tuple[str, str] | None = None
+        self._list_file_validation_runtime = OneShotWorkerRuntime()
         self._list_file_validation_request_id = 0
-        self._list_file_validation_worker = None
         self._pending_list_file_validation = None
         self._settings_save_request_id = 0
         self._settings_save_worker = None
@@ -1934,30 +1934,28 @@ class ProfileSetupPageBase(BasePage):
         })
 
     def _request_list_file_validation(self, request: dict) -> None:
-        worker = self.__dict__.get("_list_file_validation_worker")
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    self._pending_list_file_validation = dict(request)
-                    return
-            except Exception:
-                pass
+        runtime = self._worker_runtime("_list_file_validation_runtime")
+        if runtime.is_running():
+            self._pending_list_file_validation = dict(request)
+            return
         self._start_list_file_validation_worker(request)
 
     def _start_list_file_validation_worker(self, request: dict) -> None:
+        runtime = self._worker_runtime("_list_file_validation_runtime")
         self._list_file_validation_request_id = int(getattr(self, "_list_file_validation_request_id", 0) or 0) + 1
         request_id = self._list_file_validation_request_id
-        worker = self.create_profile_list_file_validation_worker(
-            request_id,
-            kind=str(request.get("kind") or ""),
-            text=str(request.get("text") or ""),
-            parent=self,
+        runtime.start_qthread_worker(
+            worker_factory=lambda _runtime_request_id: self.create_profile_list_file_validation_worker(
+                request_id,
+                kind=str(request.get("kind") or ""),
+                text=str(request.get("text") or ""),
+                parent=self,
+            ),
+            on_loaded=self._on_list_file_validation_finished,
+            on_failed=self._on_list_file_validation_failed,
+            on_finished=self._on_list_file_validation_worker_finished,
+            loaded_signal_name="validated",
         )
-        self._list_file_validation_worker = worker
-        worker.validated.connect(self._on_list_file_validation_finished)
-        worker.failed.connect(self._on_list_file_validation_failed)
-        worker.finished.connect(lambda w=worker: self._on_list_file_validation_worker_finished(w))
-        worker.start()
 
     def _on_list_file_validation_finished(
         self,
@@ -2006,10 +2004,7 @@ class ProfileSetupPageBase(BasePage):
         if self._list_file_status_label is not None:
             set_widget_text_if_changed(self._list_file_status_label, "Ошибка проверки списка.")
 
-    def _on_list_file_validation_worker_finished(self, worker) -> None:
-        if self.__dict__.get("_list_file_validation_worker") is worker:
-            self._list_file_validation_worker = None
-        worker.deleteLater()
+    def _on_list_file_validation_worker_finished(self, _worker) -> None:
         pending = self.__dict__.get("_pending_list_file_validation")
         self._pending_list_file_validation = None
         if pending:
@@ -2027,34 +2022,32 @@ class ProfileSetupPageBase(BasePage):
         profile_key = str(profile_key or "").strip()
         if not profile_key:
             return
-        worker = self._list_file_save_worker
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    self._pending_list_file_save = (profile_key, str(text or ""))
-                    return
-            except Exception:
-                return
+        runtime = self._worker_runtime("_list_file_save_runtime")
+        if runtime.is_running():
+            self._pending_list_file_save = (profile_key, str(text or ""))
+            return
         self._start_list_file_save_worker(profile_key, text)
 
     def _start_list_file_save_worker(self, profile_key: str, text: str) -> None:
+        runtime = self._worker_runtime("_list_file_save_runtime")
         self._list_file_save_request_id += 1
         request_id = self._list_file_save_request_id
         if self._list_file_status_label is not None:
             set_widget_text_if_changed(self._list_file_status_label, "Сохранение списка...")
         if self._list_file_save_button is not None:
             set_widget_enabled_if_changed(self._list_file_save_button, False)
-        worker = self.create_profile_list_file_save_worker(
-            request_id,
-            profile_key,
-            str(text or ""),
-            parent=self,
+        runtime.start_qthread_worker(
+            worker_factory=lambda _runtime_request_id: self.create_profile_list_file_save_worker(
+                request_id,
+                profile_key,
+                str(text or ""),
+                parent=self,
+            ),
+            on_loaded=self._on_list_file_save_finished,
+            on_failed=self._on_list_file_save_failed,
+            on_finished=self._on_list_file_save_worker_finished,
+            loaded_signal_name="saved",
         )
-        self._list_file_save_worker = worker
-        worker.saved.connect(self._on_list_file_save_finished)
-        worker.failed.connect(self._on_list_file_save_failed)
-        worker.finished.connect(lambda w=worker: self._on_list_file_save_worker_finished(w))
-        worker.start()
 
     def _on_list_file_save_finished(self, request_id: int, state, payload=None) -> None:
         if request_id != self._list_file_save_request_id:
@@ -2087,10 +2080,7 @@ class ProfileSetupPageBase(BasePage):
             set_widget_enabled_if_changed(self._list_file_save_button, True)
         InfoBar.error(title="Ошибка", content=str(error), parent=self.window())
 
-    def _on_list_file_save_worker_finished(self, worker) -> None:
-        if self._list_file_save_worker is worker:
-            self._list_file_save_worker = None
-        worker.deleteLater()
+    def _on_list_file_save_worker_finished(self, _worker) -> None:
         pending = self.__dict__.get("_pending_list_file_save")
         self._pending_list_file_save = None
         if pending:
@@ -2852,6 +2842,8 @@ class ProfileSetupPageBase(BasePage):
         for attr, warning_prefix in (
             ("_setup_load_runtime", "profile setup load worker"),
             ("_list_file_load_runtime", "profile list file load worker"),
+            ("_list_file_validation_runtime", "profile list file validation worker"),
+            ("_list_file_save_runtime", "profile list file save worker"),
         ):
             runtime = self.__dict__.get(attr)
             if runtime is None:
@@ -2859,8 +2851,6 @@ class ProfileSetupPageBase(BasePage):
             runtime.stop(blocking=True, log_fn=log, warning_prefix=warning_prefix)
             runtime.cancel()
         for attr in (
-            "_list_file_save_worker",
-            "_list_file_validation_worker",
             "_settings_save_worker",
             "_raw_profile_save_worker",
             "_enabled_save_worker",
