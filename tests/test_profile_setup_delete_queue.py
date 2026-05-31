@@ -70,6 +70,68 @@ class ProfileSetupDeleteQueueTests(unittest.TestCase):
         page._delete_user_profile_button.setEnabled.assert_called_once_with(False)
         self.assertEqual(page._pending_user_profile_deletes, [])
 
+    def test_user_profile_delete_waits_while_update_worker_runs(self) -> None:
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._user_profile_update_runtime = _Runtime(running=True)
+        page._user_profile_delete_runtime = _Runtime(running=False)
+        page._user_profile_delete_request_id = 0
+        page._pending_user_profile_operations = []
+        page._pending_user_profile_deletes = []
+        page._update_user_profile_button = Mock()
+        page._delete_user_profile_button = Mock()
+        page.create_profile_user_delete_worker = Mock(return_value=_Worker())
+
+        ProfileSetupPageBase._request_user_profile_delete(page, "user-3")
+
+        page.create_profile_user_delete_worker.assert_not_called()
+        self.assertEqual(
+            page._pending_user_profile_operations,
+            [
+                {
+                    "action": "delete",
+                    "profile_id": "user-3",
+                    "name": "",
+                    "protocol": "",
+                    "ports": "",
+                }
+            ],
+        )
+
+    def test_user_profile_update_waits_while_delete_worker_runs(self) -> None:
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._user_profile_update_runtime = _Runtime(running=False)
+        page._user_profile_delete_runtime = _Runtime(running=True)
+        page._user_profile_update_request_id = 0
+        page._pending_user_profile_operations = []
+        page._pending_user_profile_updates = []
+        page._update_user_profile_button = Mock()
+        page._delete_user_profile_button = Mock()
+        update_worker = _Worker()
+        update_worker.updated = _Signal()
+        page.create_profile_user_update_worker = Mock(return_value=update_worker)
+
+        ProfileSetupPageBase._request_user_profile_update(
+            page,
+            "user-4",
+            name="Updated",
+            protocol="tcp",
+            ports="80,443",
+        )
+
+        page.create_profile_user_update_worker.assert_not_called()
+        self.assertEqual(
+            page._pending_user_profile_operations,
+            [
+                {
+                    "action": "update",
+                    "profile_id": "user-4",
+                    "name": "Updated",
+                    "protocol": "tcp",
+                    "ports": "80,443",
+                }
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
