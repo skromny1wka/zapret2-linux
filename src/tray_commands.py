@@ -37,10 +37,16 @@ def toggle_github_api_removal(*, status_callback=None) -> bool:
         return False
 
 
-def toggle_discord_restart(*, status_callback=None) -> None:
-    from discord.discord_restart import toggle_discord_restart as _toggle_discord_restart
+def get_discord_restart_enabled(default: bool = True) -> bool:
+    from discord.discord_restart import get_discord_restart_setting
 
-    _toggle_discord_restart(status_callback=status_callback)
+    return bool(get_discord_restart_setting(default=default))
+
+
+def set_discord_restart_enabled(enabled: bool) -> bool:
+    from discord.discord_restart import set_discord_restart_setting
+
+    return bool(set_discord_restart_setting(bool(enabled)))
 
 
 def apply_window_opacity(*, set_window_opacity, value: int) -> None:

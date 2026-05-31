@@ -10,7 +10,7 @@ from ctypes import wintypes
 
 from PyQt6.QtCore import QTimer, QPoint
 from PyQt6.QtGui import QCursor, QFontMetrics
-from PyQt6.QtWidgets import QApplication, QMenu, QWidget
+from PyQt6.QtWidgets import QApplication, QMenu, QMessageBox, QWidget
 from qfluentwidgets import RoundMenu, Action, FluentIcon
 
 try:
@@ -782,6 +782,7 @@ class SystemTrayManager:
         if cmd.lower() == "ркн":
             self._tray_feature.toggle_discord_restart(
                 status_callback=lambda m: self.show_notification("Консоль", m),
+                confirm_disable=self._confirm_disable_discord_restart,
             )
             return
 
@@ -800,6 +801,17 @@ class SystemTrayManager:
             self.window_port.show()
         except Exception:
             pass
+
+    def _confirm_disable_discord_restart(self) -> bool:
+        box = QMessageBox()
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setWindowTitle("Отключение автоперезапуска Discord")
+        box.setText("Вы действительно хотите отключить автоматический перезапуск Discord?")
+        box.setInformativeText(
+            "После отключения вам придётся вручную перезапускать Discord при смене стратегии."
+        )
+        box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        return box.exec() == QMessageBox.StandardButton.Yes
 
     def _set_window_opacity(self, value: int) -> None:
         self._tray_feature.apply_window_opacity(int(value))

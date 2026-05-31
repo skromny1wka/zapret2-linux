@@ -124,6 +124,75 @@ class TrayOpacityWorkerTests(unittest.TestCase):
         self.assertIn("self._toggle_github_api_removal", worker_source)
         self.assertNotIn("import tray_commands", worker_source)
 
+    def test_discord_restart_toggle_starts_worker_instead_of_direct_command(self) -> None:
+        from app.feature_facades.tray import TrayFeature
+        from tray_workers import TrayDiscordRestartToggleWorker
+
+        class FakeWorker:
+            def __init__(self) -> None:
+                self.completed = SimpleNamespace(connect=Mock())
+                self.failed = SimpleNamespace(connect=Mock())
+                self.finished = SimpleNamespace(connect=Mock())
+                self.deleteLater = Mock()
+                self.started = False
+
+            def isRunning(self) -> bool:
+                return False
+
+            def start(self) -> None:
+                self.started = True
+
+        worker = FakeWorker()
+        status_callback = Mock()
+        deps = SimpleNamespace(set_window_opacity=Mock())
+        feature = TrayFeature(
+            _deps=deps,
+            _runtime_feature=SimpleNamespace(),
+            _telegram_proxy_feature=SimpleNamespace(),
+        )
+        commands = SimpleNamespace(
+            get_discord_restart_enabled=Mock(return_value=False),
+            set_discord_restart_enabled=Mock(return_value=True),
+            toggle_discord_restart=Mock(),
+        )
+
+        with (
+            patch.object(TrayFeature, "_commands", staticmethod(lambda: commands)),
+            patch.object(
+                TrayFeature,
+                "create_discord_restart_toggle_worker",
+                return_value=worker,
+            ) as create_worker,
+        ):
+            queued = feature.toggle_discord_restart(status_callback=status_callback)
+
+        self.assertTrue(queued)
+        commands.toggle_discord_restart.assert_not_called()
+        create_worker.assert_called_once_with(enabled=True, parent=None)
+        self.assertTrue(worker.started)
+
+        toggle_source = inspect.getsource(TrayFeature.toggle_discord_restart)
+        feature_source = inspect.getsource(TrayFeature.create_discord_restart_toggle_worker)
+        worker_init_signature = inspect.signature(TrayDiscordRestartToggleWorker.__init__)
+        worker_source = inspect.getsource(TrayDiscordRestartToggleWorker.run)
+
+        self.assertIn("_discord_restart_toggle_runtime", toggle_source)
+        self.assertIn("start_qthread_worker", toggle_source)
+        self.assertNotIn("worker.start()", toggle_source)
+        self.assertNotIn("_commands().toggle_discord_restart", toggle_source)
+        self.assertIn("set_discord_restart_enabled=self._commands().set_discord_restart_enabled", feature_source)
+        self.assertIn("set_discord_restart_enabled", worker_init_signature.parameters)
+        self.assertIn("self._set_discord_restart_enabled", worker_source)
+        self.assertNotIn("import tray_commands", worker_source)
+
+    def test_discord_restart_commands_do_not_keep_legacy_qmessagebox_toggle(self) -> None:
+        import discord.discord_restart as discord_restart
+
+        source = inspect.getsource(discord_restart)
+
+        self.assertFalse(hasattr(discord_restart, "toggle_discord_restart"))
+        self.assertNotIn("QMessageBox", source)
+
 
 if __name__ == "__main__":
     unittest.main()

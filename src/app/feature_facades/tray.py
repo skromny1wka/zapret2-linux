@@ -17,6 +17,7 @@ class TrayFeature:
     _opacity_save_runtime: OneShotWorkerRuntime = field(default_factory=OneShotWorkerRuntime)
     _opacity_save_pending: int | None = None
     _github_api_removal_toggle_runtime: OneShotWorkerRuntime = field(default_factory=OneShotWorkerRuntime)
+    _discord_restart_toggle_runtime: OneShotWorkerRuntime = field(default_factory=OneShotWorkerRuntime)
 
     @staticmethod
     def _commands():
@@ -147,8 +148,44 @@ class TrayFeature:
         )
         return True
 
-    def toggle_discord_restart(self, *, status_callback=None) -> None:
-        self._commands().toggle_discord_restart(status_callback=status_callback)
+    def toggle_discord_restart(self, *, status_callback=None, confirm_disable=None) -> bool:
+        if self._discord_restart_toggle_runtime.is_running():
+            if status_callback:
+                status_callback("Переключение автоперезапуска Discord уже выполняется")
+            return False
+
+        commands = self._commands()
+        try:
+            current = bool(commands.get_discord_restart_enabled(default=True))
+        except Exception:
+            current = True
+        enabled = not current
+
+        if current and callable(confirm_disable):
+            try:
+                if not bool(confirm_disable()):
+                    return False
+            except Exception:
+                return False
+
+        self._discord_restart_toggle_runtime.start_qthread_worker(
+            worker_factory=lambda _request_id: self.create_discord_restart_toggle_worker(
+                enabled=enabled,
+                parent=None,
+            ),
+            on_loaded=lambda _request_id, ok, message: self._on_discord_restart_toggle_finished(
+                bool(ok),
+                str(message or ""),
+                status_callback,
+            ),
+            on_failed=lambda _request_id, error: self._on_discord_restart_toggle_failed(
+                str(error or ""),
+                status_callback,
+            ),
+            signal_includes_request_id=False,
+            loaded_signal_name="completed",
+        )
+        return True
 
     def apply_window_opacity(self, value: int) -> None:
         normalized = max(0, min(100, int(value)))
@@ -175,12 +212,31 @@ class TrayFeature:
             parent=parent,
         )
 
+    def create_discord_restart_toggle_worker(self, *, enabled: bool, parent=None):
+        from tray_workers import TrayDiscordRestartToggleWorker
+
+        return TrayDiscordRestartToggleWorker(
+            set_discord_restart_enabled=self._commands().set_discord_restart_enabled,
+            enabled=bool(enabled),
+            parent=parent,
+        )
+
     def _on_github_api_removal_toggle_finished(self, ok: bool, message: str, status_callback) -> None:
         if status_callback and message:
             status_callback(message)
 
     def _on_github_api_removal_toggle_failed(self, error: str, status_callback) -> None:
         message = error or "Ошибка при переключении удаления GitHub API"
+        if status_callback:
+            status_callback(message)
+
+    def _on_discord_restart_toggle_finished(self, ok: bool, message: str, status_callback) -> None:
+        _ = ok
+        if status_callback and message:
+            status_callback(message)
+
+    def _on_discord_restart_toggle_failed(self, error: str, status_callback) -> None:
+        message = error or "Ошибка при переключении автоперезапуска Discord"
         if status_callback:
             status_callback(message)
 
