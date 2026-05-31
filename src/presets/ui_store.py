@@ -77,7 +77,11 @@ class PresetUiStore(QObject):
         self.presets_changed.emit()
 
     def notify_preset_switched(self, file_name: str) -> None:
-        self._selected_source_file_name = str(file_name or "").strip() or None
+        selected = str(file_name or "").strip() or None
+        current = str(self._selected_source_file_name or "").strip() or None
+        if current and selected and current.casefold() == selected.casefold():
+            return
+        self._selected_source_file_name = selected
         self.preset_switched.emit(self._selected_source_file_name or "")
 
     def notify_preset_identity_changed(self, file_name: str) -> None:

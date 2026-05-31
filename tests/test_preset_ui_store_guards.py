@@ -42,6 +42,21 @@ class PresetUiStoreGuardTests(unittest.TestCase):
 
         self.assertEqual(emitted, ["Default v5.txt", "Default v5.txt"])
 
+    def test_duplicate_preset_switch_signal_is_not_emitted_for_same_file_name(self) -> None:
+        store = PresetUiStore(
+            ENGINE_WINWS2,
+            preset_file_store=object(),
+            selection_service=object(),
+        )
+        emitted: list[str] = []
+        store.preset_switched.connect(lambda file_name: emitted.append(file_name))
+
+        store.notify_preset_switched("Default v5.txt")
+        store.notify_preset_switched("default V5.TXT")
+        store.notify_preset_switched("Other.txt")
+
+        self.assertEqual(emitted, ["Default v5.txt", "Other.txt"])
+
 
 if __name__ == "__main__":
     unittest.main()
