@@ -54,12 +54,13 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
         coordinator.setup_active_preset_file_watcher = lambda: None
 
         coordinator.handle_preset_content_changed(ZAPRET2_MODE, "Default v5.txt")
+        self._app.processEvents()
 
         self.assertEqual(content_calls, [(ZAPRET2_MODE, "preset_content_changed", "Default v5.txt")])
         self.assertEqual(switch_calls, [])
         self.assertEqual(ui_state.content_revision, 1)
 
-    def test_duplicate_active_preset_content_change_does_not_reapply_same_runtime_payload(self) -> None:
+    def test_rapid_active_preset_content_changes_coalesce_to_one_apply(self) -> None:
         from core.runtime.preset_runtime_coordinator import PresetRuntimeCoordinator
         from settings.mode import ZAPRET2_MODE
 
@@ -100,25 +101,74 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
             coordinator.handle_preset_content_changed(ZAPRET2_MODE, "Default v5.txt")
             active_path.write_text("--new\n--filter-tcp=80\n", encoding="utf-8")
             coordinator.handle_preset_content_changed(ZAPRET2_MODE, "Default v5.txt")
+            self._app.processEvents()
 
         self.assertEqual(
             content_calls,
             [
                 (ZAPRET2_MODE, "preset_content_changed", "Default v5.txt"),
-                (ZAPRET2_MODE, "preset_content_changed", "Default v5.txt"),
             ],
         )
-        self.assertEqual(ui_state.content_revision, 2)
+        self.assertEqual(ui_state.content_revision, 1)
 
-    def test_preset_content_fingerprint_does_not_read_file_body_in_qt_handler(self) -> None:
+    def test_preset_content_change_handler_does_not_stat_source_file(self) -> None:
         from core.runtime.preset_runtime_coordinator import PresetRuntimeCoordinator
 
-        source = inspect.getsource(PresetRuntimeCoordinator._build_preset_content_apply_fingerprint)
+        handle_source = inspect.getsource(PresetRuntimeCoordinator.handle_preset_content_changed)
+        apply_source = inspect.getsource(PresetRuntimeCoordinator._apply_pending_preset_content_change)
 
-        self.assertNotIn("open(", source)
-        self.assertNotIn(".read(", source)
-        self.assertNotIn("hashlib", source)
-        self.assertIn("os.stat", source)
+        self.assertFalse(hasattr(PresetRuntimeCoordinator, "_build_preset_content_apply_fingerprint"))
+        self.assertNotIn("os.stat", handle_source)
+        self.assertNotIn("os.stat", apply_source)
+        self.assertNotIn("open(", handle_source + apply_source)
+        self.assertNotIn(".read(", handle_source + apply_source)
+
+    def test_preset_content_change_defers_watcher_and_apply_after_signal(self) -> None:
+        from core.runtime.preset_runtime_coordinator import PresetRuntimeCoordinator
+        from settings.mode import ZAPRET2_MODE
+
+        watcher_calls: list[str] = []
+        content_calls: list[tuple[str, str, str]] = []
+        ui_state = SimpleNamespace(
+            content_revision=0,
+            bump_preset_content_revision=lambda: setattr(
+                ui_state,
+                "content_revision",
+                ui_state.content_revision + 1,
+            ),
+        )
+        coordinator = PresetRuntimeCoordinator(
+            presets_feature=SimpleNamespace(
+                is_selected_source_preset_file=lambda method, file_name: (
+                    method == ZAPRET2_MODE and file_name == "Default v5.txt"
+                )
+            ),
+            ui_state_store=ui_state,
+            get_launch_method=lambda: ZAPRET2_MODE,
+            get_active_preset_path=lambda: "C:/Zapret/Dev/presets/winws2/Default v5.txt",
+            refresh_after_switch=lambda: None,
+            request_selected_source_preset_apply=lambda *_args: True,
+            request_preset_content_apply=lambda method, reason, file_name: content_calls.append(
+                (method, reason, file_name)
+            )
+            or True,
+        )
+        coordinator.setup_active_preset_file_watcher = lambda: watcher_calls.append("watcher")
+
+        coordinator.handle_preset_content_changed(ZAPRET2_MODE, "Default v5.txt")
+
+        self.assertEqual(watcher_calls, [])
+        self.assertEqual(content_calls, [])
+        self.assertEqual(ui_state.content_revision, 0)
+
+        self._app.processEvents()
+
+        self.assertEqual(watcher_calls, ["watcher"])
+        self.assertEqual(
+            content_calls,
+            [(ZAPRET2_MODE, "preset_content_changed", "Default v5.txt")],
+        )
+        self.assertEqual(ui_state.content_revision, 1)
 
     def test_active_preset_revision_is_published_after_click_event(self) -> None:
         from core.runtime.preset_runtime_coordinator import PresetRuntimeCoordinator

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import os
 from typing import Callable, Optional
 
 from PyQt6.QtCore import QFileSystemWatcher, QTimer, QObject
@@ -53,10 +52,11 @@ class PresetRuntimeCoordinator(QObject):
         self._preset_switch_apply_timer: QTimer | None = None
         self._active_preset_file_path: str = ""
         self._pending_preset_apply: PendingPresetApply | None = None
-        self._last_preset_content_apply_fingerprint: str = ""
+        self._pending_preset_content_apply: PendingPresetApply | None = None
         self._last_active_preset_key: tuple[str, str] | None = None
         self._active_preset_revision_publish_pending = False
         self._active_preset_file_watcher_setup_pending = False
+        self._preset_content_apply_timer: QTimer | None = None
 
     def setup_active_preset_file_watcher(self) -> None:
         watched_path = self._get_active_preset_path()
@@ -152,32 +152,10 @@ class PresetRuntimeCoordinator(QObject):
         if not updated_file_name or not self._is_selected_source_preset(method, updated_file_name):
             return
 
-        old_path = self._active_preset_file_path
-        self.setup_active_preset_file_watcher()
-        new_path = str(self._get_active_preset_path() or "").strip()
-        fingerprint = self._build_preset_content_apply_fingerprint(
-            method,
-            updated_file_name,
-            new_path,
+        self._schedule_preset_content_apply(
+            launch_method=method,
+            preset_file_name=updated_file_name,
         )
-        if fingerprint and fingerprint == self._last_preset_content_apply_fingerprint:
-            log(
-                f"Preset runtime apply пропущен: содержимое active preset уже применяют ({method}, preset={updated_file_name})",
-                "DEBUG",
-            )
-            return
-
-        if new_path:
-            self._publish_active_preset_content_changed(new_path)
-
-        if not self._same_path(old_path, new_path):
-            log(
-                f"Активный preset сохранён в новом source-файле: {new_path or updated_file_name}",
-                "INFO",
-            )
-
-        if self._request_preset_content_apply(method, "preset_content_changed", updated_file_name):
-            self._last_preset_content_apply_fingerprint = fingerprint
 
     def _request_selected_source_preset_apply(
         self,
@@ -231,11 +209,49 @@ class PresetRuntimeCoordinator(QObject):
         self._pending_preset_apply = None
         if pending is None:
             return
-        self._last_preset_content_apply_fingerprint = ""
         self._request_selected_source_preset_apply(
             launch_method=pending.launch_method,
             reason=pending.reason,
             preset_file_name=pending.preset_file_name,
+        )
+
+    def _schedule_preset_content_apply(
+        self,
+        *,
+        launch_method: str,
+        preset_file_name: str,
+        delay_ms: int = 0,
+    ) -> None:
+        method = normalize_launch_method(launch_method, default="")
+        selected_file_name = str(preset_file_name or "").strip()
+        self._pending_preset_content_apply = PendingPresetApply(
+            launch_method=method,
+            reason="preset_content_changed",
+            preset_file_name=selected_file_name,
+        )
+        try:
+            timer = self._preset_content_apply_timer
+            if timer is None:
+                timer = QTimer(self)
+                timer.setSingleShot(True)
+                timer.timeout.connect(self._apply_pending_preset_content_change)
+                self._preset_content_apply_timer = timer
+            timer.start(max(0, int(delay_ms)))
+        except Exception:
+            self._apply_pending_preset_content_change()
+
+    def _apply_pending_preset_content_change(self) -> None:
+        pending = self._pending_preset_content_apply
+        self._pending_preset_content_apply = None
+        if pending is None:
+            return
+
+        self.setup_active_preset_file_watcher()
+        self._publish_active_preset_content_changed(pending.preset_file_name)
+        self._request_preset_content_apply(
+            pending.launch_method,
+            pending.reason,
+            pending.preset_file_name,
         )
 
     def _publish_active_preset_content_changed(self, path: str) -> None:
@@ -303,40 +319,6 @@ class PresetRuntimeCoordinator(QObject):
             return False
         current_method = normalize_launch_method(self._get_launch_method(), default="")
         return bool(current_method and method == current_method)
-
-    @staticmethod
-    def _same_path(left: str, right: str) -> bool:
-        left_value = str(left or "").strip()
-        right_value = str(right or "").strip()
-        if not left_value or not right_value:
-            return left_value == right_value
-        return (
-            os.path.abspath(left_value).replace("\\", "/").lower()
-            == os.path.abspath(right_value).replace("\\", "/").lower()
-        )
-
-    @staticmethod
-    def _build_preset_content_apply_fingerprint(
-        launch_method: str,
-        preset_file_name: str,
-        path: str,
-    ) -> str:
-        path_value = str(path or "").strip()
-        if not path_value:
-            return ""
-        try:
-            file_stat = os.stat(path_value)
-        except Exception:
-            return ""
-        return "|".join(
-            (
-                normalize_launch_method(launch_method, default=""),
-                os.path.abspath(path_value).replace("\\", "/").lower(),
-                str(preset_file_name or "").strip().lower(),
-                str(int(getattr(file_stat, "st_size", 0) or 0)),
-                str(int(getattr(file_stat, "st_mtime_ns", 0) or 0)),
-            )
-        )
 
     def schedule_refresh_after_preset_switch(self, delay_ms: int = 0) -> None:
         try:
