@@ -118,7 +118,7 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
         request_sources = (
             inspect.getsource(UserPresetsPageBase._start_preset_open_folder_worker),
             inspect.getsource(UserPresetsPageBase._request_preset_edit_action),
-            inspect.getsource(UserPresetsPageBase._request_preset_bulk_action),
+            inspect.getsource(UserPresetsPageBase._start_preset_bulk_action_worker),
             inspect.getsource(UserPresetsPageBase._request_preset_folder_action),
             inspect.getsource(UserPresetsPageBase._request_preset_storage_action),
             inspect.getsource(UserPresetsPageBase._request_preset_activation),

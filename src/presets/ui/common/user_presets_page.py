@@ -182,6 +182,7 @@ class UserPresetsPageBase(BasePage):
         self._preset_bulk_action_runtime = OneShotWorkerRuntime()
         self._preset_bulk_action_request_id = 0
         self._preset_bulk_action_kind = ""
+        self._preset_bulk_action_pending: list[dict[str, str]] = []
         self._preset_edit_action_runtime = OneShotWorkerRuntime()
         self._preset_edit_action_request_id = 0
         self._preset_edit_action_pending: list[dict[str, object]] = []
@@ -841,7 +842,18 @@ class UserPresetsPageBase(BasePage):
     def _request_preset_bulk_action(self, action: str, *, file_path: str = "") -> bool:
         runtime = self._worker_runtime("_preset_bulk_action_runtime")
         if runtime.is_running():
-            return False
+            self._preset_bulk_action_pending.append(
+                {
+                    "action": str(action or ""),
+                    "file_path": str(file_path or ""),
+                }
+            )
+            return True
+        self._start_preset_bulk_action_worker(action, file_path=file_path)
+        return True
+
+    def _start_preset_bulk_action_worker(self, action: str, *, file_path: str = "") -> None:
+        runtime = self._worker_runtime("_preset_bulk_action_runtime")
         self._preset_bulk_action_request_id = int(self.__dict__.get("_preset_bulk_action_request_id", 0) or 0) + 1
         request_id = self._preset_bulk_action_request_id
         self._preset_bulk_action_kind = str(action or "")
@@ -859,7 +871,6 @@ class UserPresetsPageBase(BasePage):
             bind_worker=_bind_worker,
             on_finished=self._on_preset_bulk_action_worker_finished,
         )
-        return True
 
     def _on_preset_bulk_action_finished(self, request_id: int, action: str, result, _context) -> None:
         if request_id != int(getattr(self, "_preset_bulk_action_request_id", 0) or 0):
@@ -908,6 +919,13 @@ class UserPresetsPageBase(BasePage):
             self._bulk_reset_running = False
             if self._runtime_service.is_ui_dirty() and self.isVisible():
                 self.refresh_presets_view_if_possible()
+        pending = self.__dict__.get("_preset_bulk_action_pending") or []
+        if pending and not self._cleanup_in_progress:
+            next_action = pending.pop(0)
+            self._start_preset_bulk_action_worker(
+                str(next_action.get("action") or ""),
+                file_path=str(next_action.get("file_path") or ""),
+            )
 
     def _show_reset_all_result(self, success_count: int, total_count: int, failed_count: int = 0) -> None:
         show_reset_all_result(
@@ -1764,6 +1782,7 @@ class UserPresetsPageBase(BasePage):
         self._preset_open_folder_pending = False
         self.__dict__.setdefault("_preset_item_action_pending", []).clear()
         self._preset_link_action_pending = ""
+        self.__dict__.setdefault("_preset_bulk_action_pending", []).clear()
         self._preset_bulk_action_kind = ""
         self._bulk_reset_running = False
 

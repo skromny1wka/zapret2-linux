@@ -1221,6 +1221,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertTrue(hasattr(user_presets_action_workers, "UserPresetBulkActionWorker"))
         worker_source = inspect.getsource(user_presets_action_workers.UserPresetBulkActionWorker.run)
         request_source = inspect.getsource(UserPresetsPageBase._request_preset_bulk_action)
+        start_source = inspect.getsource(UserPresetsPageBase._start_preset_bulk_action_worker)
         create_worker_source = inspect.getsource(UserPresetsPageBase.create_preset_bulk_action_worker)
 
         for source in (import_source, reset_source):
@@ -1230,7 +1231,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
             self.assertNotIn(".import_preset_from_file(", source)
             self.assertNotIn(".reset_all_presets(", source)
 
-        self.assertIn("create_preset_bulk_action_worker", request_source)
+        self.assertIn("_start_preset_bulk_action_worker", request_source)
+        self.assertIn("create_preset_bulk_action_worker", start_source)
         self.assertNotIn("UserPresetBulkActionWorker", create_worker_source)
         self.assertIn("_create_preset_bulk_action_worker_fn", create_worker_source)
         self.assertIn("self._import_preset_from_file", worker_source)
