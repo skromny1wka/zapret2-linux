@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 import unittest
+from unittest.mock import Mock
 
 from app.feature_facades.external import ExternalActionsFeature
 from ui.page_composition import PAGE_DEPS_BUILDERS
@@ -30,6 +31,124 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
         self.assertIn("_create_about_open_action_worker", about_source)
         self.assertNotIn("ui.pages.support_open_worker", support_source)
         self.assertNotIn("ui.pages.about_open_worker", about_source)
+
+    def test_support_open_actions_are_queued_while_worker_runs(self) -> None:
+        class _Runtime:
+            def is_running(self) -> bool:
+                return True
+
+        page = SupportPage.__new__(SupportPage)
+        page._support_open_runtime = _Runtime()
+        page._support_open_pending = []
+        page._start_support_open_action_worker = Mock()
+        first_action = Mock()
+        second_action = Mock()
+
+        SupportPage._request_support_open_action(
+            page,
+            "telegram",
+            first_action,
+            error_key="telegram.error",
+            error_default="telegram {error}",
+        )
+        SupportPage._request_support_open_action(
+            page,
+            "discord",
+            second_action,
+            error_key="discord.error",
+            error_default="discord {error}",
+        )
+
+        self.assertEqual(
+            page._support_open_pending,
+            [
+                ("telegram", first_action, "telegram.error", "telegram {error}"),
+                ("discord", second_action, "discord.error", "discord {error}"),
+            ],
+        )
+        page._start_support_open_action_worker.assert_not_called()
+
+    def test_support_open_worker_finished_starts_next_queued_action(self) -> None:
+        page = SupportPage.__new__(SupportPage)
+        first_action = Mock()
+        second_action = Mock()
+        page._support_open_pending = [
+            ("telegram", first_action, "telegram.error", "telegram {error}"),
+            ("discord", second_action, "discord.error", "discord {error}"),
+        ]
+        page._start_support_open_action_worker = Mock()
+
+        SupportPage._on_support_open_action_worker_finished(page, object())
+
+        page._start_support_open_action_worker.assert_called_once_with(
+            "telegram",
+            first_action,
+            "telegram.error",
+            "telegram {error}",
+        )
+        self.assertEqual(
+            page._support_open_pending,
+            [("discord", second_action, "discord.error", "discord {error}")],
+        )
+
+    def test_about_open_actions_are_queued_while_worker_runs(self) -> None:
+        class _Runtime:
+            def is_running(self) -> bool:
+                return True
+
+        page = AboutPage.__new__(AboutPage)
+        page._about_open_runtime = _Runtime()
+        page._about_open_pending = []
+        page._start_about_open_action_worker = Mock()
+        first_action = Mock()
+        second_action = Mock()
+
+        AboutPage._request_about_open_action(
+            page,
+            "telegram",
+            first_action,
+            error_default="telegram {error}",
+        )
+        AboutPage._request_about_open_action(
+            page,
+            "github",
+            second_action,
+            error_default="github {error}",
+            raw_error_message="raw",
+        )
+
+        self.assertEqual(
+            page._about_open_pending,
+            [
+                ("telegram", first_action, "telegram {error}", ""),
+                ("github", second_action, "github {error}", "raw"),
+            ],
+        )
+        page._start_about_open_action_worker.assert_not_called()
+
+    def test_about_open_worker_finished_starts_next_queued_action(self) -> None:
+        page = AboutPage.__new__(AboutPage)
+        page._cleanup_in_progress = False
+        first_action = Mock()
+        second_action = Mock()
+        page._about_open_pending = [
+            ("telegram", first_action, "telegram {error}", ""),
+            ("github", second_action, "github {error}", "raw"),
+        ]
+        page._start_about_open_action_worker = Mock()
+
+        AboutPage._on_about_open_action_worker_finished(page, object())
+
+        page._start_about_open_action_worker.assert_called_once_with(
+            "telegram",
+            first_action,
+            "telegram {error}",
+            "",
+        )
+        self.assertEqual(
+            page._about_open_pending,
+            [("github", second_action, "github {error}", "raw")],
+        )
 
 
 if __name__ == "__main__":

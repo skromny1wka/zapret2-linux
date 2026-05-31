@@ -28,7 +28,7 @@ class SupportPage(BasePage):
         self._open_discord_action = open_discord
         self._create_support_open_action_worker = create_open_action_worker
         self._support_open_runtime = OneShotWorkerRuntime()
-        self._support_open_pending = None
+        self._support_open_pending: list[tuple[str, object, str, str]] = []
 
         self._support_card = None
         self._support_group = None
@@ -206,9 +206,8 @@ class SupportPage(BasePage):
     ) -> None:
         request = (str(action_name or "").strip(), action_fn, str(error_key), str(error_default))
         if self._support_open_runtime.is_running():
-            self._support_open_pending = request
+            self.__dict__.setdefault("_support_open_pending", []).append(request)
             return
-        self._support_open_pending = None
         self._start_support_open_action_worker(*request)
 
     def _start_support_open_action_worker(
@@ -271,8 +270,8 @@ class SupportPage(BasePage):
         self._show_support_open_error(error_key, error_default, str(error))
 
     def _on_support_open_action_worker_finished(self, _worker) -> None:
-        pending = self._support_open_pending
-        self._support_open_pending = None
+        pending_actions = self.__dict__.setdefault("_support_open_pending", [])
+        pending = pending_actions.pop(0) if pending_actions else None
         if pending is not None:
             self._start_support_open_action_worker(*pending)
 
@@ -285,5 +284,5 @@ class SupportPage(BasePage):
             )
 
     def cleanup(self) -> None:
-        self._support_open_pending = None
+        self.__dict__.setdefault("_support_open_pending", []).clear()
         self._support_open_runtime.stop(blocking=True, warning_prefix="Support open action worker")

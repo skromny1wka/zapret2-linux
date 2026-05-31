@@ -84,7 +84,7 @@ class AboutPage(BasePage):
         self._open_kvn_github_action = open_kvn_github
         self._create_about_open_action_worker = create_open_action_worker
         self._about_open_runtime = OneShotWorkerRuntime()
-        self._about_open_pending = None
+        self._about_open_pending: list[tuple[str, object, str, str]] = []
         self._support_icon_label: QLabel | None = None
         self._support_discussions_card = None
         self._support_telegram_card = None
@@ -589,9 +589,8 @@ class AboutPage(BasePage):
             str(raw_error_message or ""),
         )
         if self._about_open_runtime.is_running():
-            self._about_open_pending = request
+            self.__dict__.setdefault("_about_open_pending", []).append(request)
             return
-        self._about_open_pending = None
         self._start_about_open_action_worker(*request)
 
     def _start_about_open_action_worker(
@@ -653,8 +652,8 @@ class AboutPage(BasePage):
         self._show_about_open_error(str(error), error_default=error_default, raw_error_message=raw_error_message)
 
     def _on_about_open_action_worker_finished(self, _worker) -> None:
-        pending = self._about_open_pending
-        self._about_open_pending = None
+        pending_actions = self.__dict__.setdefault("_about_open_pending", [])
+        pending = pending_actions.pop(0) if pending_actions else None
         if pending is not None and not self._cleanup_in_progress:
             self._start_about_open_action_worker(*pending)
 
@@ -703,7 +702,7 @@ class AboutPage(BasePage):
     def cleanup(self) -> None:
         self._cleanup_in_progress = True
         self._pending_tab_key = None
-        self._about_open_pending = None
+        self.__dict__.setdefault("_about_open_pending", []).clear()
         self._about_open_runtime.stop(blocking=True, warning_prefix="About open action worker")
 
         unsubscribe = getattr(self, "_ui_state_unsubscribe", None)
