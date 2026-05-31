@@ -9,7 +9,7 @@ import blobs.workers as blobs_workers
 
 
 class BlobsWorkerArchitectureTests(unittest.TestCase):
-    def test_blobs_workers_use_public_commands_not_feature_object(self) -> None:
+    def test_blobs_workers_receive_commands_from_feature(self) -> None:
         feature_source = inspect.getsource(build_blobs_feature)
         worker_source = "\n".join(
             (
@@ -21,12 +21,19 @@ class BlobsWorkerArchitectureTests(unittest.TestCase):
 
         self.assertNotIn("blobs_feature=feature", feature_source)
         self.assertNotIn("self._blobs", worker_source)
-        self.assertIn("blobs_public.get_blobs_info", worker_source)
-        self.assertIn("blobs_public.reload_blobs", worker_source)
-        self.assertIn("blobs_public.save_user_blob", worker_source)
-        self.assertIn("blobs_public.delete_user_blob", worker_source)
-        self.assertIn("blobs_public.open_bin_folder", worker_source)
-        self.assertIn("blobs_public.open_blobs_json", worker_source)
+        self.assertNotIn("import blobs.public", worker_source)
+        self.assertIn("get_blobs_info=", feature_source)
+        self.assertIn("reload_blobs=", feature_source)
+        self.assertIn("save_user_blob=", feature_source)
+        self.assertIn("delete_user_blob=", feature_source)
+        self.assertIn("open_bin_folder=", feature_source)
+        self.assertIn("open_blobs_json=", feature_source)
+        self.assertIn("self._get_blobs_info", worker_source)
+        self.assertIn("self._reload_blobs", worker_source)
+        self.assertIn("self._save_user_blob", worker_source)
+        self.assertIn("self._delete_user_blob", worker_source)
+        self.assertIn("self._open_bin_folder", worker_source)
+        self.assertIn("self._open_blobs_json", worker_source)
 
     def test_blobs_page_uses_one_shot_runtime_for_workers(self) -> None:
         page_source = inspect.getsource(BlobsPage)

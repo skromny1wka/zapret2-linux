@@ -29,6 +29,8 @@ def build_blobs_feature() -> BlobsFeature:
 
         return BlobsLoadWorker(
             request_id,
+            get_blobs_info=_public().get_blobs_info,
+            reload_blobs=_public().reload_blobs,
             reload=bool(reload),
             parent=parent,
         )
@@ -48,6 +50,8 @@ def build_blobs_feature() -> BlobsFeature:
         return BlobActionWorker(
             request_id,
             action=action,
+            save_user_blob=_public().save_user_blob,
+            delete_user_blob=_public().delete_user_blob,
             name=name,
             blob_type=blob_type,
             value=value,
@@ -61,6 +65,8 @@ def build_blobs_feature() -> BlobsFeature:
         return BlobOpenActionWorker(
             request_id,
             action=action,
+            open_bin_folder=_public().open_bin_folder,
+            open_blobs_json=_public().open_blobs_json,
             parent=parent,
         )
 
