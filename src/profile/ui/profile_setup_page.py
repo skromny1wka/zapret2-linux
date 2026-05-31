@@ -950,6 +950,7 @@ class ProfileSetupPageBase(BasePage):
         self._strategy_apply_runtime_strategy_id = ""
         self._strategy_apply_runtime_branch_id = ""
         self._pending_strategy_apply = None
+        self._pending_profile_setup_write_operations: list[dict[str, object]] = []
         self._strategy_feedback_save_runtime = OneShotWorkerRuntime()
         self._strategy_feedback_save_request_id = 0
         self._pending_strategy_feedback_save = None
@@ -1006,6 +1007,71 @@ class ProfileSetupPageBase(BasePage):
             runtime = OneShotWorkerRuntime()
             setattr(self, attr, runtime)
         return runtime
+
+    def _profile_setup_write_is_running(self) -> bool:
+        for attr in (
+            "_list_file_save_runtime",
+            "_settings_save_runtime",
+            "_raw_profile_save_runtime",
+            "_enabled_save_runtime",
+            "_strategy_apply_runtime",
+        ):
+            runtime = self.__dict__.get(attr)
+            if runtime is not None and runtime.is_running():
+                return True
+        return False
+
+    def _queue_profile_setup_write_operation(self, operation: dict[str, object]) -> None:
+        pending = self.__dict__.setdefault("_pending_profile_setup_write_operations", [])
+        queued = dict(operation)
+        if pending and pending[-1] == queued:
+            return
+        if pending and pending[-1].get("kind") == queued.get("kind"):
+            pending[-1] = queued
+            return
+        pending.append(queued)
+
+    def _start_next_profile_setup_write_operation(self) -> bool:
+        if self.__dict__.get("_cleanup_in_progress"):
+            return False
+        if self._profile_setup_write_is_running():
+            return False
+        pending = self.__dict__.setdefault("_pending_profile_setup_write_operations", [])
+        if not pending:
+            return False
+        operation = dict(pending.pop(0))
+        kind = str(operation.get("kind") or "")
+        if kind == "list_file_save":
+            self._pending_list_file_save = None
+            self._start_list_file_save_worker(
+                str(operation.get("profile_key") or ""),
+                str(operation.get("text") or ""),
+            )
+            return True
+        if kind == "settings_save":
+            self._pending_settings_save = None
+            request = operation.get("request")
+            self._start_settings_save_worker(dict(request if isinstance(request, dict) else {}))
+            return True
+        if kind == "raw_profile_save":
+            self._pending_raw_profile_save = None
+            self._start_raw_profile_save_worker(
+                str(operation.get("profile_key") or ""),
+                str(operation.get("text") or ""),
+            )
+            return True
+        if kind == "enabled_save":
+            self._pending_enabled_save = None
+            self._start_enabled_save_worker(bool(operation.get("enabled")))
+            return True
+        if kind == "strategy_apply":
+            self._pending_strategy_apply = None
+            self._start_strategy_apply_worker(
+                str(operation.get("strategy_id") or ""),
+                strategy_branch_id=str(operation.get("branch_id") or ""),
+            )
+            return True
+        return bool(self._start_next_profile_setup_write_operation())
 
     def _build_content(self) -> None:
         if self.title_label is not None:
@@ -2273,8 +2339,12 @@ class ProfileSetupPageBase(BasePage):
         if not profile_key:
             return
         runtime = self._worker_runtime("_list_file_save_runtime")
-        if runtime.is_running():
-            self._pending_list_file_save = (profile_key, str(text or ""))
+        text = str(text or "")
+        if self._profile_setup_write_is_running():
+            self._pending_list_file_save = (profile_key, text)
+            self._queue_profile_setup_write_operation(
+                {"kind": "list_file_save", "profile_key": profile_key, "text": text}
+            )
             return
         self._start_list_file_save_worker(profile_key, text)
 
@@ -2331,6 +2401,8 @@ class ProfileSetupPageBase(BasePage):
         InfoBar.error(title="Ошибка", content=str(error), parent=self.window())
 
     def _on_list_file_save_worker_finished(self, _worker) -> None:
+        if self._start_next_profile_setup_write_operation():
+            return
         pending = self.__dict__.get("_pending_list_file_save")
         self._pending_list_file_save = None
         if pending:
@@ -2564,11 +2636,13 @@ class ProfileSetupPageBase(BasePage):
         self._request_settings_save(request)
 
     def _request_settings_save(self, request: dict) -> None:
+        request = dict(request)
         runtime = self._worker_runtime("_settings_save_runtime")
-        if runtime.is_running():
+        if self._profile_setup_write_is_running():
             if self.__dict__.get("_pending_settings_save") == dict(request):
                 return
-            self._pending_settings_save = dict(request)
+            self._pending_settings_save = request
+            self._queue_profile_setup_write_operation({"kind": "settings_save", "request": request})
             return
         self._start_settings_save_worker(request)
 
@@ -2617,6 +2691,8 @@ class ProfileSetupPageBase(BasePage):
         log(f"{self.__class__.__name__}: не удалось сохранить настройки профиля: {error}", "ERROR")
 
     def _on_settings_save_worker_finished(self, _worker) -> None:
+        if self._start_next_profile_setup_write_operation():
+            return
         pending = self._pending_settings_save
         self._pending_settings_save = None
         if pending:
@@ -2632,8 +2708,12 @@ class ProfileSetupPageBase(BasePage):
         if not profile_key:
             return
         runtime = self._worker_runtime("_raw_profile_save_runtime")
-        if runtime.is_running():
-            self._pending_raw_profile_save = (profile_key, str(raw_text or ""))
+        raw_text = str(raw_text or "")
+        if self._profile_setup_write_is_running():
+            self._pending_raw_profile_save = (profile_key, raw_text)
+            self._queue_profile_setup_write_operation(
+                {"kind": "raw_profile_save", "profile_key": profile_key, "text": raw_text}
+            )
             return
         self._start_raw_profile_save_worker(profile_key, raw_text)
 
@@ -2691,6 +2771,8 @@ class ProfileSetupPageBase(BasePage):
         )
 
     def _on_raw_profile_save_worker_finished(self, _worker) -> None:
+        if self._start_next_profile_setup_write_operation():
+            return
         pending = self.__dict__.get("_pending_raw_profile_save")
         self._pending_raw_profile_save = None
         if pending:
@@ -2702,12 +2784,13 @@ class ProfileSetupPageBase(BasePage):
             return
         enabled = bool(state == Qt.CheckState.Checked.value or state == 2)
         runtime = self._worker_runtime("_enabled_save_runtime")
-        if runtime.is_running():
+        item = getattr(self.__dict__.get("_payload"), "item", None)
+        if not runtime.is_running() and item is not None and bool(getattr(item, "enabled", False)) == enabled:
+            return
+        if self._profile_setup_write_is_running():
             if self.__dict__.get("_enabled_save_runtime_enabled") != enabled:
                 self._pending_enabled_save = enabled
-            return
-        item = getattr(self.__dict__.get("_payload"), "item", None)
-        if item is not None and bool(getattr(item, "enabled", False)) == enabled:
+                self._queue_profile_setup_write_operation({"kind": "enabled_save", "enabled": enabled})
             return
         self._start_enabled_save_worker(enabled)
 
@@ -2791,6 +2874,8 @@ class ProfileSetupPageBase(BasePage):
 
     def _on_enabled_save_worker_finished(self, _worker) -> None:
         self._enabled_save_runtime_enabled = None
+        if self._start_next_profile_setup_write_operation():
+            return
         pending = self.__dict__.get("_pending_enabled_save")
         self._pending_enabled_save = None
         if pending is None:
@@ -2820,12 +2905,19 @@ class ProfileSetupPageBase(BasePage):
         strategy_id = str(strategy_id or "").strip()
         branch_id = _current_strategy_branch_id(self._payload)
         runtime = self._worker_runtime("_strategy_apply_runtime")
-        if runtime.is_running():
+        if self._profile_setup_write_is_running():
             if (
                 strategy_id != str(getattr(self, "_strategy_apply_runtime_strategy_id", "") or "").strip()
                 or branch_id != str(getattr(self, "_strategy_apply_runtime_branch_id", "") or "").strip()
             ):
                 self._pending_strategy_apply = (strategy_id, branch_id) if branch_id else strategy_id
+                self._queue_profile_setup_write_operation(
+                    {
+                        "kind": "strategy_apply",
+                        "strategy_id": strategy_id,
+                        "branch_id": branch_id,
+                    }
+                )
             return
         self._start_strategy_apply_worker(strategy_id, strategy_branch_id=branch_id)
 
@@ -2914,6 +3006,8 @@ class ProfileSetupPageBase(BasePage):
     def _on_strategy_apply_worker_finished(self, _worker) -> None:
         self._strategy_apply_runtime_strategy_id = ""
         self._strategy_apply_runtime_branch_id = ""
+        if self._start_next_profile_setup_write_operation():
+            return
         pending = getattr(self, "_pending_strategy_apply", None)
         self._pending_strategy_apply = None
         if pending:
@@ -3117,6 +3211,7 @@ class ProfileSetupPageBase(BasePage):
             "_pending_strategy_feedback_save",
         ):
             setattr(self, attr, None)
+        self.__dict__.setdefault("_pending_profile_setup_write_operations", []).clear()
         self.__dict__.setdefault("_pending_user_profile_updates", []).clear()
         for attr in (
             "_setup_load_request_id",

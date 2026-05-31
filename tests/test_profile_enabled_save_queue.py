@@ -26,14 +26,22 @@ class _Worker:
         return self._running
 
 
+class _Runtime:
+    def __init__(self, *, running: bool = False) -> None:
+        self._running = running
+
+    def is_running(self) -> bool:
+        return self._running
+
+
 class ProfileEnabledSaveQueueTests(unittest.TestCase):
     def test_enabled_change_keeps_pending_final_state_while_worker_runs(self) -> None:
         page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
         page._loading = False
         page._profile_key = "profile-1"
         page._payload = SimpleNamespace(item=SimpleNamespace(enabled=False))
-        page._enabled_save_worker = _Worker(running=True)
-        page._enabled_save_worker_enabled = True
+        page._enabled_save_runtime = _Runtime(running=True)
+        page._enabled_save_runtime_enabled = True
         page._pending_enabled_save = None
 
         ProfileSetupPageBase._on_enabled_changed(page, 0)
