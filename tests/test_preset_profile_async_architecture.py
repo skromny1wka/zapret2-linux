@@ -2929,16 +2929,31 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("logs_feature.build_stats.total", stats_source)
 
     def test_logs_page_file_listing_and_stats_are_loaded_through_worker(self) -> None:
+        from app.page_names import PageName
+        from ui.page_deps.system import build_logs_page_kwargs
+
+        init_source = inspect.getsource(LogsPage.__init__)
+        page_source = inspect.getsource(LogsPage)
         refresh_source = inspect.getsource(LogsPage._refresh_logs_list)
         stats_source = inspect.getsource(LogsPage._update_stats)
         runtime_source = inspect.getsource(LogsPage._run_runtime_init_once)
 
+        self.assertNotIn("runtime_feature", init_source)
+        self.assertNotIn("self._runtime =", page_source)
         self.assertIn("_start_logs_overview_worker", refresh_source)
         self.assertIn("_start_logs_overview_worker", stats_source)
         self.assertNotIn(".list_logs(", refresh_source)
         self.assertNotIn(".build_stats(", stats_source)
         self.assertIn("refresh_logs_fn=self._refresh_logs_list", runtime_source)
         self.assertIn("update_stats_fn=self._update_stats", runtime_source)
+
+        kwargs = build_logs_page_kwargs(
+            page_name=PageName.LOGS,
+            logs_feature=Mock(),
+            orchestra_feature=Mock(),
+            runtime_feature=Mock(),
+        )
+        self.assertNotIn("runtime_feature", kwargs)
 
     def test_logs_page_secondary_panels_are_built_after_initial_shell(self) -> None:
         build_source = inspect.getsource(LogsPage._build_logs_tab)

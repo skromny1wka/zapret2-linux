@@ -79,7 +79,7 @@ EXCLUDE_PATTERNS = [
 class LogsPage(BasePage):
     """Страница просмотра логов"""
     
-    def __init__(self, parent=None, *, logs_feature, orchestra_feature, runtime_feature):
+    def __init__(self, parent=None, *, logs_feature, orchestra_feature):
         super().__init__(
             "Логи",
             "Просмотр логов приложения в реальном времени",
@@ -94,7 +94,6 @@ class LogsPage(BasePage):
         self._cleanup_in_progress = False
         self._logs = logs_feature
         self._orchestra = orchestra_feature
-        self._runtime = runtime_feature
         self.current_log_file = self._logs.get_current_log_file()
         self._tail_file_signature = None
         self._error_pattern = re.compile('|'.join(ERROR_PATTERNS))
