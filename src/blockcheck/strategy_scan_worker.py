@@ -16,6 +16,7 @@ class StrategyScanWorker(QObject):
     scan_log = pyqtSignal(str)
     phase_changed = pyqtSignal(str)
     scan_finished = pyqtSignal(object)
+    finished = pyqtSignal(object)
     run_log_started = pyqtSignal(object)
 
     def __init__(
@@ -75,11 +76,13 @@ class StrategyScanWorker(QObject):
             report = self._scanner.run()
             self._drain_pending_log_messages()
             self.scan_finished.emit(report)
+            self.finished.emit(report)
         except Exception as e:
             logger.exception("StrategyScanWorker crashed")
             self._append_run_log(f"ERROR: {e}")
             self.scan_log.emit(f"ERROR: {e}")
             self.scan_finished.emit(None)
+            self.finished.emit(None)
 
     def stop(self):
         self._cancelled = True

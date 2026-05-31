@@ -73,6 +73,14 @@ class BlockcheckWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("_append_run_log_action", worker_source)
         self.assertNotIn("blockcheck.commands", worker_source)
 
+    def test_strategy_scan_worker_exposes_finished_signal_for_shared_runtime(self) -> None:
+        worker_source = inspect.getsource(strategy_scan_worker.StrategyScanWorker)
+
+        self.assertTrue(hasattr(strategy_scan_worker.StrategyScanWorker, "finished"))
+        self.assertIn("finished = pyqtSignal(object)", worker_source)
+        self.assertIn("self.finished.emit(report)", worker_source)
+        self.assertIn("self.finished.emit(None)", worker_source)
+
     def test_strategy_scan_worker_receives_runtime_shutdown_callable_not_full_runtime_feature(self) -> None:
         from blockcheck.strategy_scanner import StrategyScanner
 
