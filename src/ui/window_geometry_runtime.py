@@ -652,7 +652,7 @@ class WindowGeometryRuntime:
             loaded_signal_name="saved",
         )
 
-    def _on_geometry_save_finished(self, geometry, maximized) -> None:
+    def _on_geometry_save_finished(self, _request_id: int, geometry, maximized) -> None:
         self._last_persisted_maximized = bool(maximized)
         self._pending_window_maximized_state = bool(maximized)
         if geometry is not None:
