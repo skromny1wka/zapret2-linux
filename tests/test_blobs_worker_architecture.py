@@ -89,6 +89,25 @@ class BlobsWorkerArchitectureTests(unittest.TestCase):
 
         page._start_blobs_load_worker.assert_called_once_with(reload=True)
 
+    def test_blobs_load_scheduled_start_uses_latest_pending_reload(self) -> None:
+        page = BlobsPage.__new__(BlobsPage)
+        page._cleanup_in_progress = False
+        page._blobs_load_pending = True
+        page._blobs_load_pending_reload = False
+        page._blobs_load_start_scheduled = False
+        page._blobs_load_runtime = SimpleNamespace(is_running=Mock(return_value=False), start_qthread_worker=Mock())
+        page._start_blobs_load_worker = Mock()
+        page.reload_btn = SimpleNamespace(set_loading=Mock())
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(blobs_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
+            BlobsPage._on_blobs_load_worker_finished(page, object())
+            BlobsPage._request_blobs_load(page, reload=True)
+
+        single_shot.call_args.args[1]()
+
+        page._start_blobs_load_worker.assert_called_once_with(reload=True)
+
     def test_blob_action_pending_restarts_after_event_loop_turn(self) -> None:
         page = BlobsPage.__new__(BlobsPage)
         page._cleanup_in_progress = False

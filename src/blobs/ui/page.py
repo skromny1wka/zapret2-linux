@@ -238,21 +238,25 @@ class BlobsPage(BasePage):
         if hasattr(self, "reload_btn"):
             self.reload_btn.set_loading(False)
         if self._blobs_load_pending and not self._cleanup_in_progress:
-            reload = bool(self._blobs_load_pending_reload)
-            self._blobs_load_pending = False
-            self._blobs_load_pending_reload = False
-            self._schedule_blobs_load_worker_start(reload=reload)
+            self._schedule_blobs_load_worker_start()
 
-    def _schedule_blobs_load_worker_start(self, *, reload: bool) -> None:
+    def _schedule_blobs_load_worker_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
+        if self.__dict__.get("_blobs_load_start_scheduled", False):
+            return
         self._blobs_load_start_scheduled = True
-        QTimer.singleShot(0, lambda value=bool(reload): self._run_scheduled_blobs_load_worker_start(reload=value))
+        QTimer.singleShot(0, self._run_scheduled_blobs_load_worker_start)
 
-    def _run_scheduled_blobs_load_worker_start(self, *, reload: bool) -> None:
+    def _run_scheduled_blobs_load_worker_start(self) -> None:
         self._blobs_load_start_scheduled = False
         if self.__dict__.get("_cleanup_in_progress", False):
             return
+        if not self.__dict__.get("_blobs_load_pending", False):
+            return
+        reload = bool(self.__dict__.get("_blobs_load_pending_reload", False))
+        self._blobs_load_pending = False
+        self._blobs_load_pending_reload = False
         self._start_blobs_load_worker(reload=bool(reload))
             
     def _filter_blobs(self, text: str):
