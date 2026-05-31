@@ -41,6 +41,15 @@ class StartupBootstrapMetricsTests(unittest.TestCase):
 
         self.assertNotIn("_install_non_transient_scrollbars_style", source)
 
+    def test_qt_runtime_does_not_read_windows_accent_during_startup(self) -> None:
+        from main import qt_runtime
+
+        source = inspect.getsource(qt_runtime.application_bootstrap)
+
+        self.assertNotIn("load_windows_system_accent", source)
+        self.assertNotIn("save_accent_color", source)
+        self.assertIn("load_accent_color", source)
+
     def test_entry_logs_pre_window_bootstrap_substeps(self) -> None:
         from main import entry
 

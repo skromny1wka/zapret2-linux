@@ -199,24 +199,13 @@ def application_bootstrap() -> QApplication:
 
     t_accent = _time.perf_counter()
     try:
-        from settings.appearance import (
-            load_accent_color,
-            load_tinted_settings,
-            load_windows_system_accent,
-            save_accent_color,
-        )
+        from settings.appearance import load_accent_color
 
-        tinted_settings = load_tinted_settings()
-        if tinted_settings.follow_windows_accent:
-            accent_hex = load_windows_system_accent().hex_color
-        else:
-            accent_hex = load_accent_color().hex_color
+        accent_hex = load_accent_color().hex_color
         if accent_hex:
             color = QColor(accent_hex)
             if color.isValid():
                 qconfig.set(qconfig.themeColor, color)
-                if tinted_settings.follow_windows_accent:
-                    save_accent_color(accent_hex)
     except Exception:
         pass
     emit_startup_metric(
