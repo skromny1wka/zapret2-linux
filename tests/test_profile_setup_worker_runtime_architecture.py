@@ -24,6 +24,10 @@ class ProfileSetupWorkerRuntimeArchitectureTests(unittest.TestCase):
         user_update_request_source = inspect.getsource(ProfileSetupPageBase._request_user_profile_update)
         user_update_start_source = inspect.getsource(ProfileSetupPageBase._start_user_profile_update_worker)
         user_delete_source = inspect.getsource(ProfileSetupPageBase._request_user_profile_delete)
+        strategy_apply_request_source = inspect.getsource(ProfileSetupPageBase._request_strategy_apply)
+        strategy_apply_start_source = inspect.getsource(ProfileSetupPageBase._start_strategy_apply_worker)
+        strategy_feedback_request_source = inspect.getsource(ProfileSetupPageBase._request_strategy_feedback_save)
+        strategy_feedback_start_source = inspect.getsource(ProfileSetupPageBase._start_strategy_feedback_save_worker)
         cleanup_source = inspect.getsource(ProfileSetupPageBase.cleanup)
 
         expected_runtimes = (
@@ -36,6 +40,8 @@ class ProfileSetupWorkerRuntimeArchitectureTests(unittest.TestCase):
             "_enabled_save_runtime",
             "_user_profile_update_runtime",
             "_user_profile_delete_runtime",
+            "_strategy_apply_runtime",
+            "_strategy_feedback_save_runtime",
         )
         for attr in expected_runtimes:
             self.assertIn(f"{attr} = OneShotWorkerRuntime()", init_source)
@@ -51,6 +57,8 @@ class ProfileSetupWorkerRuntimeArchitectureTests(unittest.TestCase):
             ("_enabled_save_runtime", enabled_source + enabled_start_source),
             ("_user_profile_update_runtime", user_update_request_source + user_update_start_source),
             ("_user_profile_delete_runtime", user_delete_source),
+            ("_strategy_apply_runtime", strategy_apply_request_source + strategy_apply_start_source),
+            ("_strategy_feedback_save_runtime", strategy_feedback_request_source + strategy_feedback_start_source),
         ):
             self.assertIn(f'_worker_runtime("{attr}")', source)
             self.assertIn("start_qthread_worker", source)
@@ -66,6 +74,8 @@ class ProfileSetupWorkerRuntimeArchitectureTests(unittest.TestCase):
             "self._enabled_save_worker",
             "self._user_profile_update_worker",
             "self._user_profile_delete_worker",
+            "self._strategy_apply_worker",
+            "self._strategy_feedback_save_worker",
         ):
             self.assertNotIn(old_attr, init_source)
 

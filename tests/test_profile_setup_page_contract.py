@@ -1704,11 +1704,10 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             "_enabled_save_runtime",
             "_user_profile_update_runtime",
             "_user_profile_delete_runtime",
+            "_strategy_apply_runtime",
+            "_strategy_feedback_save_runtime",
         )
-        worker_attrs = (
-            "_strategy_apply_worker",
-            "_strategy_feedback_save_worker",
-        )
+        worker_attrs = ()
         request_attrs = (
             "_setup_load_request_id",
             "_list_file_load_request_id",
@@ -4011,12 +4010,12 @@ class ProfileSetupPageContractTests(unittest.TestCase):
                 self.failed = _Signal()
                 self.finished = _Signal()
                 self.start = Mock()
+                self.deleteLater = Mock()
 
         page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
         page._loading = False
         page._profile_key = "profile-1"
         page._payload = SimpleNamespace(item=SimpleNamespace(strategy_id="pass", in_preset=True, enabled=True))
-        page._strategy_apply_worker = None
         page._strategy_apply_request_id = 0
         page._pending_strategy_apply = None
         worker = _Worker()
@@ -4050,6 +4049,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
                 self.failed = _Signal()
                 self.finished = _Signal()
                 self.start = Mock()
+                self.deleteLater = Mock()
 
         item = SimpleNamespace(key="profile-1", strategy_id="tls_fake", in_preset=True, enabled=True)
         payload = SimpleNamespace(item=item)
@@ -4057,7 +4057,6 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._loading = False
         page._profile_key = "template:profile-1"
         page._payload = SimpleNamespace(item=SimpleNamespace(strategy_id="none", in_preset=False, enabled=True))
-        page._strategy_apply_worker = None
         page._strategy_apply_request_id = 0
         page._pending_strategy_apply = None
         page.create_profile_strategy_apply_worker = Mock(return_value=_Worker())
@@ -4110,17 +4109,17 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._on_profile_changed_callback.assert_called_once_with("profile-1", "strategy", current_item)
 
     def test_clicking_strategy_while_apply_is_running_keeps_last_choice_pending(self) -> None:
-        class _Worker:
-            def isRunning(self) -> bool:
+        class _Runtime:
+            def is_running(self) -> bool:
                 return True
 
         page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
         page._loading = False
         page._profile_key = "profile-1"
         page._payload = SimpleNamespace(item=SimpleNamespace(strategy_id="first", in_preset=True, enabled=True))
-        page._strategy_apply_worker = _Worker()
+        page._strategy_apply_runtime = _Runtime()
         page._strategy_apply_request_id = 1
-        page._strategy_apply_worker_strategy_id = "first"
+        page._strategy_apply_runtime_strategy_id = "first"
         page._pending_strategy_apply = None
         page.create_profile_strategy_apply_worker = Mock()
         page.reload_current_profile = Mock()
@@ -4286,6 +4285,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
                 self.failed = _Signal()
                 self.finished = _Signal()
                 self.start = Mock()
+                self.deleteLater = Mock()
 
             def isRunning(self) -> bool:
                 return False
@@ -4321,7 +4321,6 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         worker = _Worker()
         page.create_profile_strategy_feedback_save_worker = Mock(return_value=worker)
         page._strategy_feedback_save_request_id = 0
-        page._strategy_feedback_save_worker = None
         page._strategy_list = Mock()
         page._apply_feedback_buttons = Mock()
         page.reload_current_profile = Mock()

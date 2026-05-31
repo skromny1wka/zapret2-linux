@@ -846,12 +846,12 @@ class ProfileSetupPageBase(BasePage):
         self._pending_user_profile_update: dict[str, str] | None = None
         self._user_profile_delete_runtime = OneShotWorkerRuntime()
         self._user_profile_delete_request_id = 0
+        self._strategy_apply_runtime = OneShotWorkerRuntime()
         self._strategy_apply_request_id = 0
-        self._strategy_apply_worker = None
-        self._strategy_apply_worker_strategy_id = ""
+        self._strategy_apply_runtime_strategy_id = ""
         self._pending_strategy_apply = None
+        self._strategy_feedback_save_runtime = OneShotWorkerRuntime()
         self._strategy_feedback_save_request_id = 0
-        self._strategy_feedback_save_worker = None
         self._pending_strategy_feedback_save = None
         self._payload = None
         self._strategy_stack = None
@@ -2557,35 +2557,33 @@ class ProfileSetupPageBase(BasePage):
 
     def _request_strategy_apply(self, strategy_id: str) -> None:
         strategy_id = str(strategy_id or "").strip()
-        worker = getattr(self, "_strategy_apply_worker", None)
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    if strategy_id != str(getattr(self, "_strategy_apply_worker_strategy_id", "") or "").strip():
-                        self._pending_strategy_apply = strategy_id
-                    return
-            except Exception:
-                pass
+        runtime = self._worker_runtime("_strategy_apply_runtime")
+        if runtime.is_running():
+            if strategy_id != str(getattr(self, "_strategy_apply_runtime_strategy_id", "") or "").strip():
+                self._pending_strategy_apply = strategy_id
+            return
         self._start_strategy_apply_worker(strategy_id)
 
     def _start_strategy_apply_worker(self, strategy_id: str) -> None:
         strategy_id = str(strategy_id or "").strip()
         if not strategy_id or not self._profile_key:
             return
+        runtime = self._worker_runtime("_strategy_apply_runtime")
         self._strategy_apply_request_id = int(getattr(self, "_strategy_apply_request_id", 0) or 0) + 1
         request_id = self._strategy_apply_request_id
-        worker = self.create_profile_strategy_apply_worker(
-            request_id,
-            profile_key=self._profile_key,
-            strategy_id=strategy_id,
-            parent=self,
+        self._strategy_apply_runtime_strategy_id = strategy_id
+        runtime.start_qthread_worker(
+            worker_factory=lambda _runtime_request_id: self.create_profile_strategy_apply_worker(
+                request_id,
+                profile_key=self._profile_key,
+                strategy_id=strategy_id,
+                parent=self,
+            ),
+            on_loaded=self._on_strategy_apply_finished,
+            on_failed=self._on_strategy_apply_failed,
+            on_finished=self._on_strategy_apply_worker_finished,
+            loaded_signal_name="applied",
         )
-        self._strategy_apply_worker = worker
-        self._strategy_apply_worker_strategy_id = strategy_id
-        worker.applied.connect(self._on_strategy_apply_finished)
-        worker.failed.connect(self._on_strategy_apply_failed)
-        worker.finished.connect(lambda w=worker: self._on_strategy_apply_worker_finished(w))
-        worker.start()
 
     def _on_strategy_apply_finished(
         self,
@@ -2633,11 +2631,8 @@ class ProfileSetupPageBase(BasePage):
         log(f"{self.__class__.__name__}: не удалось применить стратегию: {error}", "ERROR")
         self.reload_current_profile()
 
-    def _on_strategy_apply_worker_finished(self, worker) -> None:
-        if getattr(self, "_strategy_apply_worker", None) is worker:
-            self._strategy_apply_worker = None
-            self._strategy_apply_worker_strategy_id = ""
-        worker.deleteLater()
+    def _on_strategy_apply_worker_finished(self, _worker) -> None:
+        self._strategy_apply_runtime_strategy_id = ""
         pending = str(getattr(self, "_pending_strategy_apply", "") or "").strip()
         self._pending_strategy_apply = None
         if pending:
@@ -2692,14 +2687,10 @@ class ProfileSetupPageBase(BasePage):
         self._request_strategy_feedback_save({"rating": None, "favorite": not current})
 
     def _request_strategy_feedback_save(self, request: dict) -> None:
-        worker = getattr(self, "_strategy_feedback_save_worker", None)
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    self._pending_strategy_feedback_save = dict(request)
-                    return
-            except Exception:
-                pass
+        runtime = self._worker_runtime("_strategy_feedback_save_runtime")
+        if runtime.is_running():
+            self._pending_strategy_feedback_save = dict(request)
+            return
         self._start_strategy_feedback_save_worker(request)
 
     def _start_strategy_feedback_save_worker(self, request: dict) -> None:
@@ -2709,21 +2700,23 @@ class ProfileSetupPageBase(BasePage):
         strategy_id = str(getattr(item, "strategy_id", "") or "").strip()
         if not strategy_id or strategy_id in {"none", "custom"}:
             return
+        runtime = self._worker_runtime("_strategy_feedback_save_runtime")
         self._strategy_feedback_save_request_id = int(getattr(self, "_strategy_feedback_save_request_id", 0) or 0) + 1
         request_id = self._strategy_feedback_save_request_id
-        worker = self.create_profile_strategy_feedback_save_worker(
-            request_id,
-            profile_key=self._profile_key,
-            strategy_id=strategy_id,
-            rating=request.get("rating"),
-            favorite=request.get("favorite"),
-            parent=self,
+        runtime.start_qthread_worker(
+            worker_factory=lambda _runtime_request_id: self.create_profile_strategy_feedback_save_worker(
+                request_id,
+                profile_key=self._profile_key,
+                strategy_id=strategy_id,
+                rating=request.get("rating"),
+                favorite=request.get("favorite"),
+                parent=self,
+            ),
+            on_loaded=self._on_strategy_feedback_save_finished,
+            on_failed=self._on_strategy_feedback_save_failed,
+            on_finished=self._on_strategy_feedback_save_worker_finished,
+            loaded_signal_name="saved",
         )
-        self._strategy_feedback_save_worker = worker
-        worker.saved.connect(self._on_strategy_feedback_save_finished)
-        worker.failed.connect(self._on_strategy_feedback_save_failed)
-        worker.finished.connect(lambda w=worker: self._on_strategy_feedback_save_worker_finished(w))
-        worker.start()
 
     def _on_strategy_feedback_save_finished(
         self,
@@ -2764,10 +2757,7 @@ class ProfileSetupPageBase(BasePage):
         if not self.__dict__.get("_pending_strategy_feedback_save"):
             self.reload_current_profile()
 
-    def _on_strategy_feedback_save_worker_finished(self, worker) -> None:
-        if getattr(self, "_strategy_feedback_save_worker", None) is worker:
-            self._strategy_feedback_save_worker = None
-        worker.deleteLater()
+    def _on_strategy_feedback_save_worker_finished(self, _worker) -> None:
         pending = self.__dict__.get("_pending_strategy_feedback_save")
         self._pending_strategy_feedback_save = None
         if pending:
@@ -2823,25 +2813,15 @@ class ProfileSetupPageBase(BasePage):
             ("_enabled_save_runtime", "profile enabled save worker"),
             ("_user_profile_update_runtime", "profile user update worker"),
             ("_user_profile_delete_runtime", "profile user delete worker"),
+            ("_strategy_apply_runtime", "profile strategy apply worker"),
+            ("_strategy_feedback_save_runtime", "profile strategy feedback save worker"),
         ):
             runtime = self.__dict__.get(attr)
             if runtime is None:
                 continue
             runtime.stop(blocking=True, log_fn=log, warning_prefix=warning_prefix)
             runtime.cancel()
-        for attr in (
-            "_strategy_apply_worker",
-            "_strategy_feedback_save_worker",
-        ):
-            worker = self.__dict__.get(attr)
-            if worker is None:
-                continue
-            try:
-                worker.quit()
-            except Exception:
-                pass
-            setattr(self, attr, None)
-        self._strategy_apply_worker_strategy_id = ""
+        self._strategy_apply_runtime_strategy_id = ""
         self._enabled_save_runtime_enabled = None
         try:
             super().cleanup()
