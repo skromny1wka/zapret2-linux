@@ -28,16 +28,16 @@ class DnsWorkerArchitectureTests(unittest.TestCase):
         self.assertNotIn("dns_public.", worker_source)
 
         for expected in (
-            "get_force_dns_status=feature.get_force_dns_status",
-            "enable_force_dns=feature.enable_force_dns",
-            "disable_force_dns=feature.disable_force_dns",
-            "flush_dns_cache=feature.flush_dns_cache",
-            "apply_auto_dns=feature.apply_auto_dns",
-            "apply_provider_dns=feature.apply_provider_dns",
-            "apply_custom_dns=feature.apply_custom_dns",
-            "refresh_dns_info=feature.refresh_dns_info",
-            "is_isp_dns_warning_shown=feature.is_isp_dns_warning_shown",
-            "mark_isp_dns_warning_shown=feature.mark_isp_dns_warning_shown",
+            "get_force_dns_status=get_force_dns_status",
+            "enable_force_dns=enable_force_dns",
+            "disable_force_dns=disable_force_dns",
+            "flush_dns_cache=flush_dns_cache",
+            "apply_auto_dns=apply_auto_dns",
+            "apply_provider_dns=apply_provider_dns",
+            "apply_custom_dns=apply_custom_dns",
+            "refresh_dns_info=refresh_dns_info",
+            "is_isp_dns_warning_shown=is_isp_dns_warning_shown",
+            "mark_isp_dns_warning_shown=mark_isp_dns_warning_shown",
             "normalize_adapter_alias=feature.normalize_adapter_alias",
         ):
             self.assertIn(expected, feature_source)
@@ -68,9 +68,9 @@ class DnsWorkerArchitectureTests(unittest.TestCase):
         )
 
         for expected in (
-            "run_dns_poisoning_check=feature.run_dns_poisoning_check",
-            "save_dns_check_results=feature.save_dns_check_results",
-            "run_quick_dns_check=feature.run_quick_dns_check",
+            "run_dns_poisoning_check=run_dns_poisoning_check",
+            "save_dns_check_results=save_dns_check_results",
+            "run_quick_dns_check=run_quick_dns_check",
         ):
             self.assertIn(expected, feature_source)
 
@@ -173,6 +173,28 @@ class DnsWorkerArchitectureTests(unittest.TestCase):
         self.assertNotIn("global _startup_worker", async_source)
         self.assertNotIn("worker.start()", async_source)
         self.assertNotIn("worker.deleteLater()", cleanup_source)
+
+    def test_dns_feature_does_not_expose_heavy_direct_commands(self) -> None:
+        feature = build_dns_feature()
+
+        for attr_name in (
+            "load_page_data",
+            "refresh_dns_info",
+            "apply_auto_dns",
+            "apply_provider_dns",
+            "apply_custom_dns",
+            "get_force_dns_status",
+            "is_isp_dns_warning_shown",
+            "mark_isp_dns_warning_shown",
+            "enable_force_dns",
+            "disable_force_dns",
+            "flush_dns_cache",
+            "run_connectivity_test",
+            "run_dns_poisoning_check",
+            "save_dns_check_results",
+            "run_quick_dns_check",
+        ):
+            self.assertFalse(hasattr(feature, attr_name), attr_name)
 
 
 if __name__ == "__main__":
