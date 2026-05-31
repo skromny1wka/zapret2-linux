@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from qfluentwidgets import BodyLabel, CaptionLabel, LineEdit, MessageBox, MessageBoxBase, RoundMenu, SubtitleLabel
 
 from ui.fluent_widgets import style_semantic_caption_label
+from ui.popup_menu import exec_popup_menu
 from ui.presets_menu.common import fluent_icon, make_menu_action
 
 
@@ -85,87 +86,102 @@ def show_folder_context_menu(
     is_collapsed = bool(folder.get("collapsed", False)) if isinstance(folder, dict) else False
 
     menu = RoundMenu(parent=parent)
+    action_map: dict[object, tuple[str, dict]] = {}
+
+    def _add_action(text: str, *, icon_name: str, command: str, payload: dict | None = None):
+        action = make_menu_action(text, icon=fluent_icon(icon_name), parent=menu)
+        menu.addAction(action)
+        action_map[action] = (str(command or ""), dict(payload or {}))
+        return action
 
     if is_existing_folder:
-        collapse_action = make_menu_action("Развернуть" if is_collapsed else "Свернуть", icon=fluent_icon("DOWN" if is_collapsed else "UP"), parent=menu)
-        collapse_action.triggered.connect(
-            lambda: _run_folder_action(
-                parent,
-                actions,
-                "set_collapsed",
-                {"folder_key": key, "collapsed": not is_collapsed},
-                refresh_fn,
-                log_fn,
-                f"не удалось свернуть или развернуть папку {labels.action_error_suffix}",
-            )
+        _add_action(
+            "Развернуть" if is_collapsed else "Свернуть",
+            icon_name="DOWN" if is_collapsed else "UP",
+            command="set_collapsed",
+            payload={"folder_key": key, "collapsed": not is_collapsed},
         )
-        menu.addAction(collapse_action)
 
     if is_service:
-        menu.exec(global_pos)
+        chosen = exec_popup_menu(menu, global_pos, owner=parent, capture_action=True)
+        _dispatch_folder_menu_action(
+            chosen,
+            action_map,
+            parent,
+            actions,
+            labels,
+            key,
+            folder,
+            refresh_fn,
+            log_fn,
+        )
         return
 
     if menu.actions():
         menu.addSeparator()
-    create_action = make_menu_action("Создать папку", icon=fluent_icon("ADD"), parent=menu)
-    create_action.triggered.connect(lambda: _create_folder(parent, actions, labels, refresh_fn, log_fn))
-    menu.addAction(create_action)
+    _add_action("Создать папку", icon_name="ADD", command="create")
 
     if is_existing_folder and not is_system:
         menu.addSeparator()
-        rename_action = make_menu_action("Переименовать папку", icon=fluent_icon("EDIT"), parent=menu)
-        rename_action.triggered.connect(
-            lambda: _rename_folder(
-                parent,
-                actions,
-                labels,
-                key,
-                str(folder.get("name") or ""),
-                refresh_fn,
-                log_fn,
-            )
-        )
-        menu.addAction(rename_action)
-
-        delete_action = make_menu_action("Удалить папку", icon=fluent_icon("DELETE"), parent=menu)
-        delete_action.triggered.connect(lambda: _delete_folder(parent, actions, labels, key, refresh_fn, log_fn))
-        menu.addAction(delete_action)
+        _add_action("Переименовать папку", icon_name="EDIT", command="rename")
+        _add_action("Удалить папку", icon_name="DELETE", command="delete")
 
     if is_existing_folder:
         menu.addSeparator()
-        move_up_action = make_menu_action("Переместить выше", icon=fluent_icon("UP"), parent=menu)
-        move_down_action = make_menu_action("Переместить ниже", icon=fluent_icon("DOWN"), parent=menu)
-        move_up_action.triggered.connect(
-            lambda: _run_folder_action(
-                parent,
-                actions,
-                "move_step",
-                {"folder_key": key, "direction": -1},
-                refresh_fn,
-                log_fn,
-                f"не удалось переместить папку {labels.action_error_suffix}",
-            )
-        )
-        move_down_action.triggered.connect(
-            lambda: _run_folder_action(
-                parent,
-                actions,
-                "move_step",
-                {"folder_key": key, "direction": 1},
-                refresh_fn,
-                log_fn,
-                f"не удалось переместить папку {labels.action_error_suffix}",
-            )
-        )
-        menu.addAction(move_up_action)
-        menu.addAction(move_down_action)
+        _add_action("Переместить выше", icon_name="UP", command="move_step", payload={"folder_key": key, "direction": -1})
+        _add_action("Переместить ниже", icon_name="DOWN", command="move_step", payload={"folder_key": key, "direction": 1})
 
     menu.addSeparator()
-    reset_action = make_menu_action(labels.reset_title, icon=fluent_icon("SYNC"), parent=menu)
-    reset_action.triggered.connect(lambda: _reset_folders(parent, actions, labels, refresh_fn, log_fn))
-    menu.addAction(reset_action)
+    _add_action(labels.reset_title, icon_name="SYNC", command="reset")
 
-    menu.exec(global_pos)
+    chosen = exec_popup_menu(menu, global_pos, owner=parent, capture_action=True)
+    _dispatch_folder_menu_action(
+        chosen,
+        action_map,
+        parent,
+        actions,
+        labels,
+        key,
+        folder,
+        refresh_fn,
+        log_fn,
+    )
+
+
+def _dispatch_folder_menu_action(
+    chosen_action,
+    action_map: dict[object, tuple[str, dict]],
+    parent,
+    actions: FolderMenuActions,
+    labels: FolderMenuLabels,
+    folder_key: str,
+    folder,
+    refresh_fn: Callable[[], object],
+    log_fn,
+) -> None:
+    command, payload = action_map.get(chosen_action, ("", {}))
+    if not command:
+        return
+    if command == "create":
+        _create_folder(parent, actions, labels, refresh_fn, log_fn)
+        return
+    if command == "rename":
+        current_name = str(folder.get("name") or "") if isinstance(folder, dict) else ""
+        _rename_folder(parent, actions, labels, folder_key, current_name, refresh_fn, log_fn)
+        return
+    if command == "delete":
+        _delete_folder(parent, actions, labels, folder_key, refresh_fn, log_fn)
+        return
+    if command == "reset":
+        _reset_folders(parent, actions, labels, refresh_fn, log_fn)
+        return
+    if command == "set_collapsed":
+        error_text = f"не удалось свернуть или развернуть папку {labels.action_error_suffix}"
+    elif command == "move_step":
+        error_text = f"не удалось переместить папку {labels.action_error_suffix}"
+    else:
+        error_text = f"не удалось выполнить действие папки {labels.action_error_suffix}"
+    _run_folder_action(parent, actions, command, payload, refresh_fn, log_fn, error_text)
 
 
 def _create_folder(parent, actions: FolderMenuActions, labels: FolderMenuLabels, refresh_fn: Callable[[], object], log_fn) -> None:
