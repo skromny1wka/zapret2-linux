@@ -5,7 +5,7 @@ import unittest
 
 
 class ProfileSetupWorkerRuntimeArchitectureTests(unittest.TestCase):
-    def test_profile_setup_list_file_workers_start_through_runtime(self) -> None:
+    def test_profile_setup_save_workers_start_through_runtime(self) -> None:
         from profile.ui.profile_setup_page import ProfileSetupPageBase
 
         init_source = inspect.getsource(ProfileSetupPageBase.__init__)
@@ -15,6 +15,12 @@ class ProfileSetupWorkerRuntimeArchitectureTests(unittest.TestCase):
         validation_start_source = inspect.getsource(ProfileSetupPageBase._start_list_file_validation_worker)
         save_request_source = inspect.getsource(ProfileSetupPageBase._request_list_file_save)
         save_start_source = inspect.getsource(ProfileSetupPageBase._start_list_file_save_worker)
+        settings_request_source = inspect.getsource(ProfileSetupPageBase._request_settings_save)
+        settings_start_source = inspect.getsource(ProfileSetupPageBase._start_settings_save_worker)
+        raw_request_source = inspect.getsource(ProfileSetupPageBase._request_raw_profile_save)
+        raw_start_source = inspect.getsource(ProfileSetupPageBase._start_raw_profile_save_worker)
+        enabled_source = inspect.getsource(ProfileSetupPageBase._on_enabled_changed)
+        enabled_start_source = inspect.getsource(ProfileSetupPageBase._start_enabled_save_worker)
         cleanup_source = inspect.getsource(ProfileSetupPageBase.cleanup)
 
         expected_runtimes = (
@@ -22,6 +28,9 @@ class ProfileSetupWorkerRuntimeArchitectureTests(unittest.TestCase):
             "_list_file_load_runtime",
             "_list_file_validation_runtime",
             "_list_file_save_runtime",
+            "_settings_save_runtime",
+            "_raw_profile_save_runtime",
+            "_enabled_save_runtime",
         )
         for attr in expected_runtimes:
             self.assertIn(f"{attr} = OneShotWorkerRuntime()", init_source)
@@ -32,6 +41,9 @@ class ProfileSetupWorkerRuntimeArchitectureTests(unittest.TestCase):
             ("_list_file_load_runtime", list_load_source),
             ("_list_file_validation_runtime", validation_request_source + validation_start_source),
             ("_list_file_save_runtime", save_request_source + save_start_source),
+            ("_settings_save_runtime", settings_request_source + settings_start_source),
+            ("_raw_profile_save_runtime", raw_request_source + raw_start_source),
+            ("_enabled_save_runtime", enabled_source + enabled_start_source),
         ):
             self.assertIn(f'_worker_runtime("{attr}")', source)
             self.assertIn("start_qthread_worker", source)
@@ -42,6 +54,9 @@ class ProfileSetupWorkerRuntimeArchitectureTests(unittest.TestCase):
             "self._list_file_load_worker",
             "self._list_file_validation_worker",
             "self._list_file_save_worker",
+            "self._settings_save_worker",
+            "self._raw_profile_save_worker",
+            "self._enabled_save_worker",
         ):
             self.assertNotIn(old_attr, init_source)
 

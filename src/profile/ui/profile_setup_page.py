@@ -831,15 +831,15 @@ class ProfileSetupPageBase(BasePage):
         self._list_file_validation_runtime = OneShotWorkerRuntime()
         self._list_file_validation_request_id = 0
         self._pending_list_file_validation = None
+        self._settings_save_runtime = OneShotWorkerRuntime()
         self._settings_save_request_id = 0
-        self._settings_save_worker = None
         self._pending_settings_save = None
+        self._raw_profile_save_runtime = OneShotWorkerRuntime()
         self._raw_profile_save_request_id = 0
-        self._raw_profile_save_worker = None
         self._pending_raw_profile_save: tuple[str, str] | None = None
+        self._enabled_save_runtime = OneShotWorkerRuntime()
         self._enabled_save_request_id = 0
-        self._enabled_save_worker = None
-        self._enabled_save_worker_enabled: bool | None = None
+        self._enabled_save_runtime_enabled: bool | None = None
         self._pending_enabled_save: bool | None = None
         self._user_profile_update_request_id = 0
         self._user_profile_update_worker = None
@@ -2314,35 +2314,33 @@ class ProfileSetupPageBase(BasePage):
         self._request_settings_save(request)
 
     def _request_settings_save(self, request: dict) -> None:
-        worker = self._settings_save_worker
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    if self.__dict__.get("_pending_settings_save") == dict(request):
-                        return
-                    self._pending_settings_save = dict(request)
-                    return
-            except Exception:
+        runtime = self._worker_runtime("_settings_save_runtime")
+        if runtime.is_running():
+            if self.__dict__.get("_pending_settings_save") == dict(request):
                 return
+            self._pending_settings_save = dict(request)
+            return
         self._start_settings_save_worker(request)
 
     def _start_settings_save_worker(self, request: dict) -> None:
+        runtime = self._worker_runtime("_settings_save_runtime")
         self._settings_save_request_id += 1
         request_id = self._settings_save_request_id
-        worker = self.create_profile_settings_save_worker(
-            request_id,
-            profile_key=str(request.get("profile_key") or ""),
-            filter_kind=str(request.get("filter_kind") or ""),
-            filter_value=str(request.get("filter_value") or ""),
-            in_range=str(request.get("in_range") or ""),
-            out_range=str(request.get("out_range") or ""),
-            parent=self,
+        runtime.start_qthread_worker(
+            worker_factory=lambda _runtime_request_id: self.create_profile_settings_save_worker(
+                request_id,
+                profile_key=str(request.get("profile_key") or ""),
+                filter_kind=str(request.get("filter_kind") or ""),
+                filter_value=str(request.get("filter_value") or ""),
+                in_range=str(request.get("in_range") or ""),
+                out_range=str(request.get("out_range") or ""),
+                parent=self,
+            ),
+            on_loaded=self._on_settings_save_finished,
+            on_failed=self._on_settings_save_failed,
+            on_finished=self._on_settings_save_worker_finished,
+            loaded_signal_name="saved",
         )
-        self._settings_save_worker = worker
-        worker.saved.connect(self._on_settings_save_finished)
-        worker.failed.connect(self._on_settings_save_failed)
-        worker.finished.connect(lambda w=worker: self._on_settings_save_worker_finished(w))
-        worker.start()
 
     def _on_settings_save_finished(self, request_id: int, profile_key: str, payload=None) -> None:
         if request_id != self._settings_save_request_id:
@@ -2368,10 +2366,7 @@ class ProfileSetupPageBase(BasePage):
             return
         log(f"{self.__class__.__name__}: не удалось сохранить настройки профиля: {error}", "ERROR")
 
-    def _on_settings_save_worker_finished(self, worker) -> None:
-        if self._settings_save_worker is worker:
-            self._settings_save_worker = None
-        worker.deleteLater()
+    def _on_settings_save_worker_finished(self, _worker) -> None:
         pending = self._pending_settings_save
         self._pending_settings_save = None
         if pending:
@@ -2386,32 +2381,30 @@ class ProfileSetupPageBase(BasePage):
         profile_key = str(profile_key or "").strip()
         if not profile_key:
             return
-        worker = self._raw_profile_save_worker
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    self._pending_raw_profile_save = (profile_key, str(raw_text or ""))
-                    return
-            except Exception:
-                return
+        runtime = self._worker_runtime("_raw_profile_save_runtime")
+        if runtime.is_running():
+            self._pending_raw_profile_save = (profile_key, str(raw_text or ""))
+            return
         self._start_raw_profile_save_worker(profile_key, raw_text)
 
     def _start_raw_profile_save_worker(self, profile_key: str, raw_text: str) -> None:
+        runtime = self._worker_runtime("_raw_profile_save_runtime")
         self._raw_profile_save_request_id += 1
         request_id = self._raw_profile_save_request_id
         if self._raw_profile_save_button is not None:
             set_widget_enabled_if_changed(self._raw_profile_save_button, False)
-        worker = self.create_profile_raw_text_save_worker(
-            request_id,
-            profile_key,
-            str(raw_text or ""),
-            parent=self,
+        runtime.start_qthread_worker(
+            worker_factory=lambda _runtime_request_id: self.create_profile_raw_text_save_worker(
+                request_id,
+                profile_key,
+                str(raw_text or ""),
+                parent=self,
+            ),
+            on_loaded=self._on_raw_profile_save_finished,
+            on_failed=self._on_raw_profile_save_failed,
+            on_finished=self._on_raw_profile_save_worker_finished,
+            loaded_signal_name="saved",
         )
-        self._raw_profile_save_worker = worker
-        worker.saved.connect(self._on_raw_profile_save_finished)
-        worker.failed.connect(self._on_raw_profile_save_failed)
-        worker.finished.connect(lambda w=worker: self._on_raw_profile_save_worker_finished(w))
-        worker.start()
 
     def _on_raw_profile_save_finished(self, request_id: int, profile_key: str, payload=None) -> None:
         if request_id != self._raw_profile_save_request_id:
@@ -2447,10 +2440,7 @@ class ProfileSetupPageBase(BasePage):
             parent=self.window(),
         )
 
-    def _on_raw_profile_save_worker_finished(self, worker) -> None:
-        if self._raw_profile_save_worker is worker:
-            self._raw_profile_save_worker = None
-        worker.deleteLater()
+    def _on_raw_profile_save_worker_finished(self, _worker) -> None:
         pending = self.__dict__.get("_pending_raw_profile_save")
         self._pending_raw_profile_save = None
         if pending:
@@ -2461,39 +2451,37 @@ class ProfileSetupPageBase(BasePage):
         if self._loading or not self._profile_key:
             return
         enabled = bool(state == Qt.CheckState.Checked.value or state == 2)
-        worker = self._enabled_save_worker
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    if self.__dict__.get("_enabled_save_worker_enabled") != enabled:
-                        self._pending_enabled_save = enabled
-                    return
-            except Exception:
-                return
+        runtime = self._worker_runtime("_enabled_save_runtime")
+        if runtime.is_running():
+            if self.__dict__.get("_enabled_save_runtime_enabled") != enabled:
+                self._pending_enabled_save = enabled
+            return
         item = getattr(self.__dict__.get("_payload"), "item", None)
         if item is not None and bool(getattr(item, "enabled", False)) == enabled:
             return
         self._start_enabled_save_worker(enabled)
 
     def _start_enabled_save_worker(self, enabled: bool) -> None:
+        runtime = self._worker_runtime("_enabled_save_runtime")
         self._enabled_save_request_id += 1
         request_id = self._enabled_save_request_id
         if self._enabled_checkbox is not None:
             set_widget_enabled_if_changed(self._enabled_checkbox, False)
-        worker = self.create_profile_enabled_save_worker(
-            request_id,
-            profile_key=self._profile_key,
-            enabled=enabled,
-            filter_kind=self._current_filter_kind(),
-            filter_value=self._current_filter_value(),
-            parent=self,
+        self._enabled_save_runtime_enabled = bool(enabled)
+        runtime.start_qthread_worker(
+            worker_factory=lambda _runtime_request_id: self.create_profile_enabled_save_worker(
+                request_id,
+                profile_key=self._profile_key,
+                enabled=enabled,
+                filter_kind=self._current_filter_kind(),
+                filter_value=self._current_filter_value(),
+                parent=self,
+            ),
+            on_loaded=self._on_enabled_save_finished,
+            on_failed=self._on_enabled_save_failed,
+            on_finished=self._on_enabled_save_worker_finished,
+            loaded_signal_name="saved",
         )
-        self._enabled_save_worker = worker
-        self._enabled_save_worker_enabled = bool(enabled)
-        worker.saved.connect(self._on_enabled_save_finished)
-        worker.failed.connect(self._on_enabled_save_failed)
-        worker.finished.connect(lambda w=worker: self._on_enabled_save_worker_finished(w))
-        worker.start()
 
     def _on_enabled_save_finished(self, request_id: int, profile_key: str, enabled: bool, payload=None) -> None:
         if request_id != self._enabled_save_request_id:
@@ -2551,11 +2539,8 @@ class ProfileSetupPageBase(BasePage):
             set_widget_enabled_if_changed(self._enabled_checkbox, True)
         log(f"{self.__class__.__name__}: не удалось изменить состояние профиля: {error}", "ERROR")
 
-    def _on_enabled_save_worker_finished(self, worker) -> None:
-        if self._enabled_save_worker is worker:
-            self._enabled_save_worker = None
-            self._enabled_save_worker_enabled = None
-        worker.deleteLater()
+    def _on_enabled_save_worker_finished(self, _worker) -> None:
+        self._enabled_save_runtime_enabled = None
         pending = self.__dict__.get("_pending_enabled_save")
         self._pending_enabled_save = None
         if pending is None:
@@ -2844,6 +2829,9 @@ class ProfileSetupPageBase(BasePage):
             ("_list_file_load_runtime", "profile list file load worker"),
             ("_list_file_validation_runtime", "profile list file validation worker"),
             ("_list_file_save_runtime", "profile list file save worker"),
+            ("_settings_save_runtime", "profile settings save worker"),
+            ("_raw_profile_save_runtime", "profile raw text save worker"),
+            ("_enabled_save_runtime", "profile enabled save worker"),
         ):
             runtime = self.__dict__.get(attr)
             if runtime is None:
@@ -2851,9 +2839,6 @@ class ProfileSetupPageBase(BasePage):
             runtime.stop(blocking=True, log_fn=log, warning_prefix=warning_prefix)
             runtime.cancel()
         for attr in (
-            "_settings_save_worker",
-            "_raw_profile_save_worker",
-            "_enabled_save_worker",
             "_user_profile_update_worker",
             "_user_profile_delete_worker",
             "_strategy_apply_worker",
@@ -2868,7 +2853,7 @@ class ProfileSetupPageBase(BasePage):
                 pass
             setattr(self, attr, None)
         self._strategy_apply_worker_strategy_id = ""
-        self._enabled_save_worker_enabled = None
+        self._enabled_save_runtime_enabled = None
         try:
             super().cleanup()
         except Exception:

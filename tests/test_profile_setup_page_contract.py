@@ -1699,11 +1699,11 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             "_list_file_load_runtime",
             "_list_file_save_runtime",
             "_list_file_validation_runtime",
+            "_settings_save_runtime",
+            "_raw_profile_save_runtime",
+            "_enabled_save_runtime",
         )
         worker_attrs = (
-            "_settings_save_worker",
-            "_raw_profile_save_worker",
-            "_enabled_save_worker",
             "_user_profile_update_worker",
             "_user_profile_delete_worker",
             "_strategy_apply_worker",
@@ -3025,7 +3025,6 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._profile_key = "profile-1"
         page._raw_profile_text = SimpleNamespace(toPlainText=lambda: "--new\n--lua-desync=fake")
         page._raw_profile_save_request_id = 0
-        page._raw_profile_save_worker = None
         page._raw_profile_save_button = Mock()
         worker = _Worker()
         page.create_profile_raw_text_save_worker = Mock(return_value=worker)
@@ -3061,14 +3060,27 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             def isRunning(self) -> bool:
                 return self._running
 
-        running_worker = _Worker(running=True)
         next_worker = _Worker(running=False)
+
+        class _Runtime:
+            def __init__(self) -> None:
+                self.running = True
+
+            def is_running(self) -> bool:
+                return self.running
+
+            def start_qthread_worker(self, *, worker_factory, **_kwargs):
+                worker = worker_factory(0)
+                worker.start()
+                return 0, worker
+
+        runtime = _Runtime()
         page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
         page._loading = False
         page._profile_key = "profile-1"
         page._raw_profile_text = SimpleNamespace(toPlainText=lambda: "--new\n--lua-desync=split")
         page._raw_profile_save_request_id = 1
-        page._raw_profile_save_worker = running_worker
+        page._raw_profile_save_runtime = runtime
         page._pending_raw_profile_save = None
         page._raw_profile_save_button = Mock()
         page.create_profile_raw_text_save_worker = Mock(return_value=next_worker)
@@ -3078,7 +3090,8 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page.create_profile_raw_text_save_worker.assert_not_called()
         self.assertEqual(page._pending_raw_profile_save, ("profile-1", "--new\n--lua-desync=split"))
 
-        ProfileSetupPageBase._on_raw_profile_save_worker_finished(page, running_worker)
+        runtime.running = False
+        ProfileSetupPageBase._on_raw_profile_save_worker_finished(page, object())
 
         page.create_profile_raw_text_save_worker.assert_called_once_with(
             2,
@@ -3166,6 +3179,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
                 self.finished = _Signal()
                 self.start = Mock()
                 self.deleteLater = Mock()
+                self.deleteLater = Mock()
 
             def isRunning(self) -> bool:
                 return False
@@ -3174,7 +3188,6 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._loading = False
         page._profile_key = "profile-1"
         page._enabled_save_request_id = 0
-        page._enabled_save_worker = None
         page._enabled_checkbox = Mock()
         page._current_filter_kind = lambda: "hostlist"
         page._current_filter_value = lambda: "lists/youtube.txt"
@@ -3717,6 +3730,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
                 self.failed = _Signal()
                 self.finished = _Signal()
                 self.start = Mock()
+                self.deleteLater = Mock()
 
             def isRunning(self) -> bool:
                 return False
@@ -3740,7 +3754,6 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._in_range_value = SimpleNamespace(text=lambda: "")
         page._out_range_value = SimpleNamespace(text=lambda: "")
         page._settings_save_request_id = 0
-        page._settings_save_worker = None
         page._pending_settings_save = None
         worker = _Worker()
         page.create_profile_settings_save_worker = Mock(return_value=worker)
@@ -3864,12 +3877,12 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._on_profile_changed_callback.assert_not_called()
 
     def test_settings_autosave_while_worker_runs_keeps_last_pending_request(self) -> None:
-        class _Worker:
-            def isRunning(self) -> bool:
+        class _Runtime:
+            def is_running(self) -> bool:
                 return True
 
         page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
-        page._settings_save_worker = _Worker()
+        page._settings_save_runtime = _Runtime()
         page._pending_settings_save = None
         page._start_settings_save_worker = Mock()
 
@@ -3887,8 +3900,8 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._start_settings_save_worker.assert_not_called()
 
     def test_settings_autosave_while_worker_runs_skips_duplicate_pending_request(self) -> None:
-        class _Worker:
-            def isRunning(self) -> bool:
+        class _Runtime:
+            def is_running(self) -> bool:
                 return True
 
         request = {
@@ -3900,7 +3913,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         }
         pending = dict(request)
         page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
-        page._settings_save_worker = _Worker()
+        page._settings_save_runtime = _Runtime()
         page._pending_settings_save = pending
         page._start_settings_save_worker = Mock()
 

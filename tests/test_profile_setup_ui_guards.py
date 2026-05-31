@@ -778,7 +778,6 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         page._loading = False
         page._profile_key = "profile-1"
         page._raw_profile_text = _PlainTextWidget("--new\n")
-        page._raw_profile_save_worker = None
         page._raw_profile_save_request_id = 0
         page._raw_profile_save_button = _BoolWidget(enabled=False)
         page.create_profile_raw_text_save_worker = Mock(return_value=worker)
@@ -803,7 +802,6 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
         page._loading = False
         page._profile_key = "profile-1"
-        page._enabled_save_worker = None
         page._enabled_save_request_id = 0
         page._enabled_checkbox = _BoolWidget(checked=True, enabled=False)
         page._current_filter_kind = lambda: "hostlist"
@@ -833,7 +831,6 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         page._loading = False
         page._profile_key = "profile-1"
         page._payload = SimpleNamespace(item=SimpleNamespace(enabled=True))
-        page._enabled_save_worker = None
         page._enabled_save_request_id = 0
         page._enabled_checkbox = _BoolWidget(checked=True, enabled=True)
         page._current_filter_kind = lambda: "hostlist"
