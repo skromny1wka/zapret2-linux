@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from PyQt6.QtCore import QObject, QThread, pyqtSignal
+from PyQt6.QtCore import QObject, QThread, QTimer, pyqtSignal
 
 from log.log import log
 from settings.mode import is_preset_launch_method, normalize_launch_method
@@ -61,13 +61,14 @@ class PresetProfileStrategySummaryRefreshRuntime(QObject):
         self._get_launch_method = get_launch_method
         self._summary_runtime = OneShotWorkerRuntime()
         self._pending = False
+        self._start_scheduled = False
 
     def request_refresh(self) -> None:
         method = normalize_launch_method(self._get_launch_method(), default="")
         if not method or not is_preset_launch_method(method):
             return
 
-        if self._summary_runtime.is_running():
+        if self._summary_runtime.is_running() or self.__dict__.get("_start_scheduled", False):
             self._pending = True
             return
 
@@ -103,10 +104,23 @@ class PresetProfileStrategySummaryRefreshRuntime(QObject):
 
     def _on_worker_finished(self, _worker) -> None:
         if self._pending:
-            self.request_refresh()
+            self._schedule_refresh_start()
+
+    def _schedule_refresh_start(self) -> None:
+        if self.__dict__.get("_start_scheduled", False):
+            return
+        self._start_scheduled = True
+        QTimer.singleShot(0, self._run_scheduled_refresh_start)
+
+    def _run_scheduled_refresh_start(self) -> None:
+        self._start_scheduled = False
+        if not self._pending:
+            return
+        self.request_refresh()
 
     def cleanup(self) -> None:
         self._pending = False
+        self._start_scheduled = False
         self._summary_runtime.stop(
             blocking=True,
             log_fn=log,

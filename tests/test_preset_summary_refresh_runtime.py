@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import inspect
 import unittest
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 
 class PresetSummaryRefreshRuntimeTests(unittest.TestCase):
@@ -24,6 +26,28 @@ class PresetSummaryRefreshRuntimeTests(unittest.TestCase):
         self.assertNotIn("worker.deleteLater()", finish_source)
         self.assertIn("_summary_runtime.stop", cleanup_source)
         self.assertIn("_summary_runtime.cancel", cleanup_source)
+
+    def test_pending_summary_refresh_restarts_after_event_loop_turn(self) -> None:
+        import presets.display_state_refresh as display_state_refresh
+        from presets.display_state_refresh import PresetProfileStrategySummaryRefreshRuntime
+
+        runtime = PresetProfileStrategySummaryRefreshRuntime.__new__(
+            PresetProfileStrategySummaryRefreshRuntime
+        )
+        runtime._pending = True
+        runtime.request_refresh = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(display_state_refresh, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            PresetProfileStrategySummaryRefreshRuntime._on_worker_finished(runtime, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        runtime.request_refresh.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        runtime.request_refresh.assert_called_once_with()
 
     def test_window_close_cleans_up_summary_refresh_runtime(self) -> None:
         import main.application_lifecycle_port as lifecycle_port
