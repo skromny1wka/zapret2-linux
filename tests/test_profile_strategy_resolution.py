@@ -129,6 +129,77 @@ class ProfileStrategyResolutionTests(unittest.TestCase):
 
         self.assertEqual(invalid_lines, [])
 
+    def test_new_199_builtin_presets_do_not_mix_payload_scoped_strategies(self) -> None:
+        violations: list[str] = []
+        for path in sorted(Path("src/presets/builtin/winws2").glob("*1.9.9*.txt")):
+            preset = parse_preset_text(path.read_text(encoding="utf-8"), engine="winws2", source_name=path.name)
+            for profile in preset.profiles:
+                payload_groups = _payload_groups_with_lua(profile.strategy.strategy_lines)
+                if payload_groups > 1:
+                    violations.append(f"{path.name}: {profile.display_name}: {payload_groups}")
+
+        self.assertEqual(violations, [])
+
+    def test_new_199_builtin_presets_use_payload_all_only(self) -> None:
+        violations: list[str] = []
+        for path in sorted(Path("src/presets/builtin/winws2").glob("*1.9.9*.txt")):
+            preset = parse_preset_text(path.read_text(encoding="utf-8"), engine="winws2", source_name=path.name)
+            for profile in preset.profiles:
+                for line in _normalize_lines(profile.strategy.strategy_lines):
+                    if line.lower().startswith("--payload=") and line != "--payload=all":
+                        violations.append(f"{path.name}: {profile.display_name}: {line}")
+
+        self.assertEqual(violations, [])
+
+    def test_new_199_builtin_presets_do_not_add_inner_payload_to_fake_instances(self) -> None:
+        violations: list[str] = []
+        for path in sorted(Path("src/presets/builtin/winws2").glob("*1.9.9*.txt")):
+            preset = parse_preset_text(path.read_text(encoding="utf-8"), engine="winws2", source_name=path.name)
+            for profile in preset.profiles:
+                violations.extend(
+                    f"{path.name}: {profile.display_name}: {line}"
+                    for line in _normalize_lines(profile.strategy.strategy_lines)
+                    if line.startswith("--lua-desync=fake:") and ":payload=" in line
+                )
+
+        self.assertEqual(violations, [])
+
+    def test_new_199_alt4_telegram_keeps_two_tls_fakes_and_http_fake_under_payload_all(self) -> None:
+        preset = parse_preset_text(
+            Path("src/presets/builtin/winws2/general ALT4 1.9.9 (game filter).txt").read_text(encoding="utf-8"),
+            engine="winws2",
+            source_name="general ALT4 1.9.9 (game filter).txt",
+        )
+        profile = next(profile for profile in preset.profiles if profile.display_name == "Telegram")
+
+        self.assertEqual(
+            _normalize_lines(profile.strategy.strategy_lines),
+            (
+                "--payload=all",
+                "--lua-desync=fake:blob=fake_stun_as_tls:tcp_seq=1000:repeats=6",
+                "--lua-desync=fake:blob=tls_google:tcp_seq=1000:repeats=6",
+                "--lua-desync=fake:blob=fake_http_max:tcp_seq=1000:repeats=6",
+                "--lua-desync=multisplit:pos=2",
+            ),
+        )
+
+    def test_new_199_alt12_voice_keeps_two_discord_fakes_under_payload_all(self) -> None:
+        preset = parse_preset_text(
+            Path("src/presets/builtin/winws2/general ALT12 1.9.9 (game filter).txt").read_text(encoding="utf-8"),
+            engine="winws2",
+            source_name="general ALT12 1.9.9 (game filter).txt",
+        )
+        profile = next(profile for profile in preset.profiles if profile.display_name == "Голосовые звонки/чаты")
+
+        self.assertEqual(
+            _normalize_lines(profile.strategy.strategy_lines),
+            (
+                "--payload=all",
+                "--lua-desync=fake:blob=fake_stun:repeats=3",
+                "--lua-desync=fake:blob=fake_dbankcloud:repeats=3",
+            ),
+        )
+
     def test_catalog_entry_contains_strategy_visual_description(self) -> None:
         entry = self.catalogs["tcp"]["stock_default_v5_11"]
 
@@ -147,6 +218,25 @@ def _ready_strategy_identity(engine: str, lines) -> tuple[str, ...]:
     if engine == "winws2":
         return tuple(line for line in normalized if line.lower().startswith("--lua-desync="))
     return normalized
+
+
+def _payload_groups_with_lua(lines) -> int:
+    payload_groups = 0
+    in_payload = False
+    has_lua = False
+    for line in _normalize_lines(lines):
+        lowered = line.lower()
+        if lowered.startswith("--payload="):
+            if in_payload and has_lua:
+                payload_groups += 1
+            in_payload = True
+            has_lua = False
+            continue
+        if lowered.startswith("--lua-desync=") and in_payload:
+            has_lua = True
+    if in_payload and has_lua:
+        payload_groups += 1
+    return payload_groups
 
 
 if __name__ == "__main__":
