@@ -79,6 +79,7 @@ class ServersPage(BasePage):
         self._cleanup_in_progress = False
         self._changelog_link_open_runtime = OneShotWorkerRuntime()
         self._changelog_link_open_pending: str | None = None
+        self._changelog_link_open_start_scheduled = False
 
         self._build_ui()
         self._apply_page_theme(force=True)
@@ -356,7 +357,10 @@ class ServersPage(BasePage):
 
     def _request_changelog_link_open(self, url: str) -> None:
         target = str(url or "").strip()
-        if self._changelog_link_open_runtime.is_running():
+        if (
+            self._changelog_link_open_runtime.is_running()
+            or self.__dict__.get("_changelog_link_open_start_scheduled", False)
+        ):
             self._changelog_link_open_pending = target
             return
         self._changelog_link_open_pending = None
@@ -395,7 +399,20 @@ class ServersPage(BasePage):
         pending = self._changelog_link_open_pending
         self._changelog_link_open_pending = None
         if pending is not None and not self._cleanup_in_progress:
-            self._start_changelog_link_open_worker(pending)
+            self._schedule_changelog_link_open_worker_start(pending)
+
+    def _schedule_changelog_link_open_worker_start(self, url: str) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        target = str(url or "").strip()
+        self._changelog_link_open_start_scheduled = True
+        QTimer.singleShot(0, lambda value=target: self._run_scheduled_changelog_link_open_worker_start(value))
+
+    def _run_scheduled_changelog_link_open_worker_start(self, url: str) -> None:
+        self._changelog_link_open_start_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._start_changelog_link_open_worker(str(url or "").strip())
 
     def _show_changelog_link_open_error(self, error: str) -> None:
         InfoBar.warning(
@@ -409,6 +426,7 @@ class ServersPage(BasePage):
 
     def _stop_changelog_link_open_worker(self) -> None:
         self._changelog_link_open_pending = None
+        self._changelog_link_open_start_scheduled = False
         self._changelog_link_open_runtime.stop(
             blocking=True,
             warning_prefix="Changelog link open worker",
