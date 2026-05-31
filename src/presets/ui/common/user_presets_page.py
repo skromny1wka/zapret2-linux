@@ -184,6 +184,7 @@ class UserPresetsPageBase(BasePage):
         self._preset_bulk_action_kind = ""
         self._preset_edit_action_runtime = OneShotWorkerRuntime()
         self._preset_edit_action_request_id = 0
+        self._preset_edit_action_pending: list[dict[str, object]] = []
         self._preset_storage_action_runtime = OneShotWorkerRuntime()
         self._preset_storage_action_request_id = 0
         self._pending_preset_storage_action: dict[str, object] | None = None
@@ -728,6 +729,15 @@ class UserPresetsPageBase(BasePage):
     ) -> None:
         runtime = self._worker_runtime("_preset_edit_action_runtime")
         if runtime.is_running():
+            self._preset_edit_action_pending.append(
+                {
+                    "action": str(action or ""),
+                    "name": str(name or ""),
+                    "current_name": str(current_name or ""),
+                    "new_name": str(new_name or ""),
+                    "from_current": bool(from_current),
+                }
+            )
             return
         self._preset_edit_action_request_id = int(self.__dict__.get("_preset_edit_action_request_id", 0) or 0) + 1
         request_id = self._preset_edit_action_request_id
@@ -786,7 +796,16 @@ class UserPresetsPageBase(BasePage):
         )
 
     def _on_preset_edit_action_worker_finished(self, worker) -> None:
-        return
+        pending = self.__dict__.get("_preset_edit_action_pending") or []
+        if pending and not bool(self.__dict__.get("_cleanup_in_progress", False)):
+            next_action = pending.pop(0)
+            self._request_preset_edit_action(
+                str(next_action.get("action") or ""),
+                name=str(next_action.get("name") or ""),
+                current_name=str(next_action.get("current_name") or ""),
+                new_name=str(next_action.get("new_name") or ""),
+                from_current=bool(next_action.get("from_current")),
+            )
 
     def _on_create_clicked(self):
         self._show_inline_action_create()
@@ -1739,6 +1758,7 @@ class UserPresetsPageBase(BasePage):
     def _stop_action_workers_for_cleanup(self) -> None:
         self._pending_preset_activation = None
         self._restore_preset_activation_marker_file_name = ""
+        self.__dict__.setdefault("_preset_edit_action_pending", []).clear()
         self._pending_preset_storage_action = None
         self._preset_folder_action_pending.clear()
         self._preset_open_folder_pending = False
