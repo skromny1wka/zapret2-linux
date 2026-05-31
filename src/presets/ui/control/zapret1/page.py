@@ -476,8 +476,12 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         runtime = self._refresh_runtime
         runtime.mark_additional_settings_written()
         if runtime.additional_settings_save_runtime.is_running():
-            runtime.additional_settings_save_pending = (setting, bool(enabled), launch_method)
+            runtime.additional_settings_save_pending.append((setting, bool(enabled), launch_method))
             return
+        self._start_additional_settings_save_worker(setting, enabled, launch_method=launch_method)
+
+    def _start_additional_settings_save_worker(self, setting: str, enabled: bool, *, launch_method: str) -> None:
+        runtime = self._refresh_runtime
         request_id = runtime.next_additional_settings_save_request_id()
         runtime.additional_settings_save_runtime.start_qthread_worker(
             worker_factory=lambda _runtime_request_id: self._create_additional_settings_save_worker(
@@ -504,12 +508,12 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
     def _on_additional_settings_save_worker_finished(self, worker) -> None:
         runtime = self._refresh_runtime
         pending = runtime.additional_settings_save_pending
-        runtime.additional_settings_save_pending = None
-        if pending is not None and not self._cleanup_in_progress:
-            self._request_additional_settings_save(
-                str(pending[0]),
-                bool(pending[1]),
-                launch_method=str(pending[2]),
+        if pending and not self._cleanup_in_progress:
+            next_save = pending.pop(0)
+            self._start_additional_settings_save_worker(
+                str(next_save[0]),
+                bool(next_save[1]),
+                launch_method=str(next_save[2]),
             )
 
     def _open_preset_setup_page(self) -> None:

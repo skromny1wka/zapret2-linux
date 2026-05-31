@@ -8,7 +8,7 @@ class ModeControlRefreshRuntime:
         self.additional_settings_load_runtime = OneShotWorkerRuntime()
         self.additional_settings_load_pending = False
         self.additional_settings_save_runtime = OneShotWorkerRuntime()
-        self.additional_settings_save_pending = None
+        self.additional_settings_save_pending: list[tuple[str, bool, str]] = []
         self.additional_settings_request_id = 0
         self.additional_settings_save_request_id = 0
         self.additional_settings_dirty = True

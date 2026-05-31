@@ -36,12 +36,14 @@ class ControlTopSummaryWorkerArchitectureTests(unittest.TestCase):
         for page_cls in (Zapret1ModeControlPage, Zapret2ModeControlPage):
             init_source = inspect.getsource(page_cls.__init__)
             request_source = inspect.getsource(page_cls._request_additional_settings_save)
+            start_source = inspect.getsource(page_cls._start_additional_settings_save_worker)
 
             self.assertIn("create_additional_settings_save_worker", init_source)
             self.assertNotIn("set_wssize_enabled", init_source)
             self.assertNotIn("set_debug_log_enabled", init_source)
             self.assertNotIn("set_discord_restart_setting", request_source)
-            self.assertIn("self._create_additional_settings_save_worker", request_source)
+            self.assertIn("_start_additional_settings_save_worker", request_source)
+            self.assertIn("self._create_additional_settings_save_worker", start_source)
             self.assertNotIn("_set_wssize_enabled", request_source)
             self.assertNotIn("_set_debug_log_enabled", request_source)
 
@@ -49,7 +51,7 @@ class ControlTopSummaryWorkerArchitectureTests(unittest.TestCase):
         for page_cls in (Zapret1ModeControlPage, Zapret2ModeControlPage):
             top_summary_source = inspect.getsource(page_cls._request_top_summary_worker)
             load_source = inspect.getsource(page_cls._schedule_additional_settings_reload)
-            save_source = inspect.getsource(page_cls._request_additional_settings_save)
+            save_source = inspect.getsource(page_cls._start_additional_settings_save_worker)
             page_source = inspect.getsource(page_cls)
 
             for source in (top_summary_source, load_source, save_source):

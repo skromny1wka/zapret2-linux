@@ -28,7 +28,7 @@ class ControlPageImmediateStartupTests(unittest.TestCase):
         module_source = inspect.getsource(zapret2_page)
         import_block = "\n".join(module_source.splitlines()[:90])
         reload_source = inspect.getsource(zapret2_page.Zapret2ModeControlPage._schedule_additional_settings_reload)
-        save_source = inspect.getsource(zapret2_page.Zapret2ModeControlPage._request_additional_settings_save)
+        save_source = inspect.getsource(zapret2_page.Zapret2ModeControlPage._start_additional_settings_save_worker)
 
         self.assertNotIn("create_additional_settings_worker as create_control_additional_settings_worker", import_block)
         self.assertIn("create_additional_settings_worker as create_control_additional_settings_worker", reload_source)
