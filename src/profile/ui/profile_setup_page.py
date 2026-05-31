@@ -1746,7 +1746,7 @@ class ProfileSetupPageBase(BasePage):
             self._payload = replace(payload, item=updated_item)
         except Exception:
             return False
-        self._apply_payload(self._payload)
+        self._schedule_profile_setup_payload_apply(self._payload)
         return True
 
     def _request_user_profile_delete(self, profile_id: str) -> None:
@@ -2402,7 +2402,7 @@ class ProfileSetupPageBase(BasePage):
             pass
         else:
             self._payload = payload
-            self._apply_payload(payload)
+            self._schedule_profile_setup_payload_apply(payload)
             self._on_profile_changed_callback(self._profile_key, "list_file", getattr(payload, "item", None))
         InfoBar.success(
             title="Список сохранён",
@@ -2700,7 +2700,7 @@ class ProfileSetupPageBase(BasePage):
         if self.__dict__.get("_payload") is payload and (not new_key or new_key == old_key):
             return
         self._payload = payload
-        self._apply_payload(payload)
+        self._schedule_profile_setup_payload_apply(payload)
         self._on_profile_changed_callback(self._profile_key, "settings", getattr(payload, "item", None))
 
     def _on_settings_save_failed(self, request_id: int, error: str) -> None:
@@ -2767,7 +2767,7 @@ class ProfileSetupPageBase(BasePage):
             pass
         else:
             self._payload = payload
-            self._apply_payload(payload)
+            self._schedule_profile_setup_payload_apply(payload)
             self._on_profile_changed_callback(self._profile_key, "raw_profile", getattr(payload, "item", None))
         InfoBar.success(
             title="Profile сохранён",
@@ -2844,7 +2844,7 @@ class ProfileSetupPageBase(BasePage):
             if new_key:
                 self._profile_key = new_key
             self._payload = payload
-            self._apply_payload(payload)
+            self._schedule_profile_setup_payload_apply(payload)
             self._on_profile_changed_callback(
                 self._profile_key,
                 "enabled" if enabled else "disabled",
@@ -2998,7 +2998,7 @@ class ProfileSetupPageBase(BasePage):
             if branch_id:
                 payload = _payload_with_strategy_branch(payload, branch_id)
             self._payload = payload
-            self._apply_payload(payload)
+            self._schedule_profile_setup_payload_apply(payload)
             self._on_profile_changed_callback(
                 self._profile_key,
                 "strategy",

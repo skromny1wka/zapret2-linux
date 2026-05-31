@@ -2861,11 +2861,21 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page.reload_current_profile = Mock()
         page._on_profile_changed_callback = Mock()
         page.window = Mock(return_value=None)
+        callbacks = []
 
-        with patch("profile.ui.profile_setup_page.InfoBar.success"):
+        with (
+            patch("profile.ui.profile_setup_page.InfoBar.success"),
+            patch(
+                "profile.ui.profile_setup_page.QTimer.singleShot",
+                side_effect=lambda _delay, callback: callbacks.append(callback),
+            ),
+        ):
             ProfileSetupPageBase._on_user_profile_update_finished(page, 1, "user-1", 3, (updated_item,))
 
         page.reload_current_profile.assert_not_called()
+        page._apply_payload.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+        callbacks[0]()
         page._apply_payload.assert_called_once_with(page._payload)
         self.assertIs(page._payload.item, updated_item)
         page._on_profile_changed_callback.assert_called_once_with(
@@ -3225,12 +3235,22 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._apply_payload = Mock()
         page._on_profile_changed_callback = Mock()
         page.window = Mock(return_value=None)
+        callbacks = []
 
-        with patch("profile.ui.profile_setup_page.InfoBar.success"):
+        with (
+            patch("profile.ui.profile_setup_page.InfoBar.success"),
+            patch(
+                "profile.ui.profile_setup_page.QTimer.singleShot",
+                side_effect=lambda _delay, callback: callbacks.append(callback),
+            ),
+        ):
             ProfileSetupPageBase._on_raw_profile_save_finished(page, 7, "profile-2", payload)
 
         self.assertEqual(page._profile_key, "profile-2")
         page.reload_current_profile.assert_not_called()
+        page._apply_payload.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+        callbacks[0]()
         page._apply_payload.assert_called_once_with(payload)
         page._on_profile_changed_callback.assert_called_once_with("profile-2", "raw_profile", item)
 
@@ -3413,10 +3433,18 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._apply_payload = Mock()
         page.reload_current_profile = Mock()
         page._on_profile_changed_callback = Mock()
+        callbacks = []
 
-        ProfileSetupPageBase._on_enabled_save_finished(page, 9, "profile-2", True, payload)
+        with patch(
+            "profile.ui.profile_setup_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            ProfileSetupPageBase._on_enabled_save_finished(page, 9, "profile-2", True, payload)
 
         page.reload_current_profile.assert_not_called()
+        page._apply_payload.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+        callbacks[0]()
         page._apply_payload.assert_called_once_with(payload)
         page._on_profile_changed_callback.assert_called_once_with("profile-2", "enabled", item)
 
@@ -3604,11 +3632,21 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._apply_payload = Mock()
         page._on_profile_changed_callback = Mock()
         page.window = Mock(return_value=None)
+        callbacks = []
 
-        with patch("profile.ui.profile_setup_page.InfoBar.success"):
+        with (
+            patch("profile.ui.profile_setup_page.InfoBar.success"),
+            patch(
+                "profile.ui.profile_setup_page.QTimer.singleShot",
+                side_effect=lambda _delay, callback: callbacks.append(callback),
+            ),
+        ):
             ProfileSetupPageBase._on_list_file_save_finished(page, 3, object(), payload)
 
         page.reload_current_profile.assert_not_called()
+        page._apply_payload.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+        callbacks[0]()
         page._apply_payload.assert_called_once_with(payload)
         page._on_profile_changed_callback.assert_called_once_with("profile-1", "list_file", item)
 
@@ -3940,11 +3978,19 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page.reload_current_profile = Mock()
         page._apply_payload = Mock()
         page._on_profile_changed_callback = Mock()
+        callbacks = []
 
-        ProfileSetupPageBase._on_settings_save_finished(page, 4, "profile-2", payload)
+        with patch(
+            "profile.ui.profile_setup_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            ProfileSetupPageBase._on_settings_save_finished(page, 4, "profile-2", payload)
 
         self.assertEqual(page._profile_key, "profile-2")
         page.reload_current_profile.assert_not_called()
+        page._apply_payload.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+        callbacks[0]()
         page._apply_payload.assert_called_once_with(payload)
         page._on_profile_changed_callback.assert_called_once_with("profile-2", "settings", item)
 
@@ -4141,19 +4187,27 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._apply_payload = Mock()
         page._on_profile_changed_callback = Mock()
         page._apply_strategy_locally = Mock(return_value=False)
+        callbacks = []
 
         ProfileSetupPageBase._on_strategy_list_activated(page, "tls_fake")
 
-        ProfileSetupPageBase._on_strategy_apply_finished(
-            page,
-            1,
-            "template:profile-1",
-            "profile-1",
-            "tls_fake",
-            payload,
-        )
+        with patch(
+            "profile.ui.profile_setup_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            ProfileSetupPageBase._on_strategy_apply_finished(
+                page,
+                1,
+                "template:profile-1",
+                "profile-1",
+                "tls_fake",
+                payload,
+            )
 
         page.reload_current_profile.assert_not_called()
+        page._apply_payload.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+        callbacks[0]()
         page._apply_payload.assert_called_once_with(payload)
         page._on_profile_changed_callback.assert_called_once_with("profile-1", "strategy", item)
 
@@ -4655,6 +4709,22 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         callbacks[0]()
 
         page._apply_payload.assert_called_once_with(payload)
+
+    def test_profile_setup_worker_result_payloads_use_deferred_apply(self) -> None:
+        handlers = (
+            ProfileSetupPageBase._apply_user_profile_update_locally,
+            ProfileSetupPageBase._on_list_file_save_finished,
+            ProfileSetupPageBase._on_settings_save_finished,
+            ProfileSetupPageBase._on_raw_profile_save_finished,
+            ProfileSetupPageBase._on_enabled_save_finished,
+            ProfileSetupPageBase._on_strategy_apply_finished,
+        )
+
+        for handler in handlers:
+            source = inspect.getsource(handler)
+            self.assertNotIn("self._apply_payload(payload)", source)
+            self.assertNotIn("self._apply_payload(self._payload)", source)
+            self.assertIn("_schedule_profile_setup_payload_apply", source)
 
     def test_strategy_feedback_worker_emits_state(self) -> None:
         state = ProfileStrategyState(rating="work", favorite=True)
