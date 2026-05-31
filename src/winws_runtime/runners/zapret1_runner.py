@@ -259,6 +259,98 @@ class Winws1StrategyRunner(StrategyRunnerBase):
             f.write(config_text)
         return config_path
 
+    def _write_winws1_dry_run_at_config(self, artifact: PreparedPresetArtifact) -> str:
+        launch_arg = str((artifact.launch_args or ("",))[0] or "")
+        if not launch_arg.startswith("@") or len(launch_arg) <= 1:
+            raise ValueError("Zapret 1 dry-run requires an @config launch artifact")
+
+        source_config_path = launch_arg[1:]
+        with open(source_config_path, "r", encoding="utf-8", errors="replace") as f:
+            config_text = f.read()
+        if "--dry-run" not in {line.strip() for line in config_text.splitlines()}:
+            config_text = config_text.rstrip("\r\n") + "\n--dry-run\n"
+
+        digest_source = f"{os.path.abspath(source_config_path)}\0{config_text}".encode(
+            "utf-8",
+            "surrogatepass",
+        )
+        digest = hashlib.sha1(digest_source).hexdigest()[:20]
+        config_dir = self._winws1_at_config_dir()
+        os.makedirs(config_dir, exist_ok=True)
+        config_path = os.path.join(config_dir, f"winws1_dry_run_{digest}.txt")
+
+        try:
+            with open(config_path, "r", encoding="utf-8", errors="replace") as f:
+                if f.read() == config_text:
+                    return config_path
+        except FileNotFoundError:
+            pass
+        except Exception:
+            pass
+
+        with open(config_path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(config_text)
+        return config_path
+
+    def _run_preset_dry_run_locked(
+        self,
+        artifact: PreparedPresetArtifact,
+        *,
+        notify_failure: bool = True,
+    ) -> bool:
+        try:
+            dry_run_config_path = self._write_winws1_dry_run_at_config(artifact)
+            completed = subprocess.run(
+                [self.winws_exe, f"@{dry_run_config_path}"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                stdin=subprocess.DEVNULL,
+                startupinfo=self._create_startup_info(),
+                creationflags=CREATE_NO_WINDOW,
+                cwd=self.work_dir,
+                timeout=8.0,
+            )
+        except subprocess.TimeoutExpired:
+            message = "Проверка preset для winws зависла"
+            self._last_spawn_exit_code = -1
+            self._last_spawn_stderr = message
+            self._set_last_error(message, notify=notify_failure)
+            log(message, "ERROR" if notify_failure else "WARNING")
+            return False
+        except Exception as e:
+            message = f"Не удалось проверить preset перед запуском: {e}"
+            self._last_spawn_exit_code = -1
+            self._last_spawn_stderr = message
+            self._set_last_error(message, notify=notify_failure)
+            log(message, "ERROR" if notify_failure else "WARNING")
+            return False
+
+        output = self._decode_dry_run_output(completed.stdout, completed.stderr)
+        self._last_spawn_exit_code = int(completed.returncode)
+        self._last_spawn_stderr = output
+        if completed.returncode == 0:
+            return True
+
+        first_line = next((line.strip() for line in output.splitlines() if line.strip()), "")
+        detail = f": {first_line[:200]}" if first_line else ""
+        message = f"Проверка preset для winws не прошла (код {completed.returncode}){detail}"
+        self._set_last_error(message, notify=notify_failure)
+        if output:
+            log(f"Winws1 dry-run error: {output[:500]}", "ERROR" if notify_failure else "WARNING")
+        else:
+            log(message, "ERROR" if notify_failure else "WARNING")
+        return False
+
+    @staticmethod
+    def _decode_dry_run_output(stdout_data, stderr_data) -> str:
+        data = b""
+        for chunk in (stdout_data, stderr_data):
+            if isinstance(chunk, bytes):
+                data += chunk
+            elif chunk:
+                data += str(chunk).encode("utf-8", errors="replace")
+        return data.decode("utf-8", errors="replace").strip()
+
     @staticmethod
     def _launch_args_files_exist(launch_args: tuple[str, ...]) -> bool:
         if not launch_args:
@@ -534,6 +626,19 @@ class Winws1StrategyRunner(StrategyRunnerBase):
                 stable_start_window_seconds=stable_start_window_seconds,
             )
 
+        if self._should_retry_unclassified_code_one(exit_code, stderr_output, retry_count=retry_count):
+            log(
+                "Winws1 exited with code 1 without diagnostic output after dry-run passed; retrying once",
+                "WARNING",
+            )
+            return self._start_from_preset_file_locked(
+                preset_path,
+                strategy_name,
+                retry_count=retry_count + 1,
+                max_retries=max_retries,
+                stable_start_window_seconds=stable_start_window_seconds,
+            )
+
         if self._is_windivert_system_error(stderr_output, exit_code):
             log("WinDivert system error — retry will not help", "WARNING")
             return False
@@ -555,6 +660,14 @@ class Winws1StrategyRunner(StrategyRunnerBase):
                 log(f"  {line}", "INFO")
 
         return False
+
+    @staticmethod
+    def _should_retry_unclassified_code_one(exit_code: int, stderr_output: str, *, retry_count: int) -> bool:
+        if retry_count >= 1:
+            return False
+        if int(exit_code) != 1:
+            return False
+        return not str(stderr_output or "").strip()
 
     def _start_from_preset_file_locked(
         self,
@@ -591,6 +704,9 @@ class Winws1StrategyRunner(StrategyRunnerBase):
         if not os.path.exists(self.winws_exe):
             log(f"{EXE_NAME_WINWS1} disappeared: {self.winws_exe}", "ERROR")
             self._set_last_error(f"{EXE_NAME_WINWS1} не найден: {self.winws_exe}")
+            return False
+
+        if not self._run_preset_dry_run_locked(artifact):
             return False
 
         self._preset_file_path = preset_path
