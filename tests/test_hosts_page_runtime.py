@@ -4,6 +4,8 @@ import inspect
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 
 PROJECT_SRC = Path(__file__).resolve().parents[1] / "src"
@@ -86,6 +88,93 @@ class HostsPageRuntimeTests(unittest.TestCase):
             source = inspect.getsource(getattr(HostsPage, method_name))
             self.assertIn("_request_user_selection_save", source)
             self.assertNotIn("_controller.save_user_selection", source)
+
+    def test_user_selection_save_pending_restarts_after_event_loop_turn(self) -> None:
+        import hosts.ui.page as hosts_page
+        from hosts.ui.page import HostsPage
+
+        page = HostsPage.__new__(HostsPage)
+        page._cleanup_in_progress = False
+        page._selection_save_pending = {"service": "profile"}
+        page._request_user_selection_save = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(hosts_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            HostsPage._on_user_selection_save_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._request_user_selection_save.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._request_user_selection_save.assert_called_once_with({"service": "profile"})
+
+    def test_catalog_refresh_pending_restarts_after_event_loop_turn(self) -> None:
+        import hosts.ui.page as hosts_page
+        from hosts.ui.page import HostsPage
+
+        page = HostsPage.__new__(HostsPage)
+        page._cleanup_in_progress = False
+        page._catalog_refresh_pending_trigger = "watcher"
+        page._refresh_catalog_if_needed = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(hosts_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            HostsPage._on_catalog_refresh_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._refresh_catalog_if_needed.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._refresh_catalog_if_needed.assert_called_once_with("watcher")
+
+    def test_open_hosts_file_pending_restarts_after_event_loop_turn(self) -> None:
+        import hosts.ui.page as hosts_page
+        from hosts.ui.page import HostsPage
+
+        page = HostsPage.__new__(HostsPage)
+        page._cleanup_in_progress = False
+        page._open_file_pending = True
+        page._request_open_hosts_file = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(hosts_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            HostsPage._on_open_hosts_file_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._request_open_hosts_file.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._request_open_hosts_file.assert_called_once_with()
+
+    def test_hosts_state_pending_restarts_after_event_loop_turn(self) -> None:
+        import hosts.ui.page as hosts_page
+        from hosts.ui.page import HostsPage
+
+        page = HostsPage.__new__(HostsPage)
+        page._cleanup_in_progress = False
+        page._state_load_pending = {"show_access_errors": True, "update_status": True}
+        page._request_hosts_state_load = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(hosts_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            HostsPage._on_hosts_state_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._request_hosts_state_load.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._request_hosts_state_load.assert_called_once_with(
+            show_access_errors=True,
+            update_status=True,
+        )
 
     def test_catalog_refresh_signature_runs_through_worker(self) -> None:
         from hosts.page_controller import HostsPageController

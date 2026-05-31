@@ -3,7 +3,7 @@
 
 import time
 from string import Template
-from PyQt6.QtCore import Qt, QEvent
+from PyQt6.QtCore import Qt, QEvent, QTimer
 from PyQt6.QtWidgets import (
     QWidget, QLabel,
     QLayout
@@ -486,7 +486,18 @@ class HostsPage(BasePage):
         trigger = str(self._catalog_refresh_pending_trigger or "").strip()
         self._catalog_refresh_pending_trigger = ""
         if trigger:
-            self._refresh_catalog_if_needed(trigger)
+            self._schedule_catalog_refresh_start(trigger)
+
+    def _schedule_catalog_refresh_start(self, trigger: str) -> None:
+        clean_trigger = str(trigger or "").strip()
+        if not clean_trigger or self.__dict__.get("_cleanup_in_progress", False):
+            return
+        QTimer.singleShot(0, lambda value=clean_trigger: self._run_scheduled_catalog_refresh_start(value))
+
+    def _run_scheduled_catalog_refresh_start(self, trigger: str) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._refresh_catalog_if_needed(trigger)
 
     def _services_add_section_title(self, text: str) -> None:
         if self._services_layout is None:
@@ -920,7 +931,17 @@ class HostsPage(BasePage):
     def _on_open_hosts_file_worker_finished(self, _worker) -> None:
         if self._open_file_pending and not self._cleanup_in_progress:
             self._open_file_pending = False
-            self._request_open_hosts_file()
+            self._schedule_open_hosts_file_start()
+
+    def _schedule_open_hosts_file_start(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        QTimer.singleShot(0, self._run_scheduled_open_hosts_file_start)
+
+    def _run_scheduled_open_hosts_file_start(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._request_open_hosts_file()
 
     def _show_open_hosts_file_error(self, error: str) -> None:
         if InfoBar:
@@ -999,7 +1020,18 @@ class HostsPage(BasePage):
         pending = self._selection_save_pending
         self._selection_save_pending = None
         if pending is not None:
-            self._request_user_selection_save(pending)
+            self._schedule_user_selection_save_start(pending)
+
+    def _schedule_user_selection_save_start(self, selection: dict[str, str]) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        payload = dict(selection or {})
+        QTimer.singleShot(0, lambda queued=payload: self._run_scheduled_user_selection_save_start(queued))
+
+    def _run_scheduled_user_selection_save_start(self, selection: dict[str, str]) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._request_user_selection_save(selection)
 
     def _on_operation_complete(self, success: bool, message: str):
         if self._cleanup_in_progress:
@@ -1102,10 +1134,29 @@ class HostsPage(BasePage):
         if self._cleanup_in_progress:
             return
         if bool(pending.get("show_access_errors")) or bool(pending.get("update_status")):
-            self._request_hosts_state_load(
+            self._schedule_hosts_state_load_start(
                 show_access_errors=bool(pending.get("show_access_errors")),
                 update_status=bool(pending.get("update_status")),
             )
+
+    def _schedule_hosts_state_load_start(self, *, show_access_errors: bool, update_status: bool) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        QTimer.singleShot(
+            0,
+            lambda: self._run_scheduled_hosts_state_load_start(
+                show_access_errors=bool(show_access_errors),
+                update_status=bool(update_status),
+            ),
+        )
+
+    def _run_scheduled_hosts_state_load_start(self, *, show_access_errors: bool, update_status: bool) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._request_hosts_state_load(
+            show_access_errors=bool(show_access_errors),
+            update_status=bool(update_status),
+        )
 
     def _apply_hosts_runtime_state_to_ui(self, runtime_state, *, started_at: float | None = None) -> None:
         started_at = float(started_at or time.perf_counter())
