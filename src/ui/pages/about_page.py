@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QFrame, QSizePolicy, QLayout,
@@ -85,6 +85,7 @@ class AboutPage(BasePage):
         self._create_about_open_action_worker = create_open_action_worker
         self._about_open_runtime = OneShotWorkerRuntime()
         self._about_open_pending: list[tuple[str, object, str, str]] = []
+        self._about_open_start_scheduled = False
         self._support_icon_label: QLabel | None = None
         self._support_discussions_card = None
         self._support_telegram_card = None
@@ -588,7 +589,7 @@ class AboutPage(BasePage):
             str(error_default),
             str(raw_error_message or ""),
         )
-        if self._about_open_runtime.is_running():
+        if self._about_open_runtime.is_running() or self.__dict__.get("_about_open_start_scheduled", False):
             self.__dict__.setdefault("_about_open_pending", []).append(request)
             return
         self._start_about_open_action_worker(*request)
@@ -655,7 +656,20 @@ class AboutPage(BasePage):
         pending_actions = self.__dict__.setdefault("_about_open_pending", [])
         pending = pending_actions.pop(0) if pending_actions else None
         if pending is not None and not self._cleanup_in_progress:
-            self._start_about_open_action_worker(*pending)
+            self._schedule_about_open_action_worker_start(pending)
+
+    def _schedule_about_open_action_worker_start(self, request) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._about_open_start_scheduled = True
+        QTimer.singleShot(0, lambda value=request: self._run_scheduled_about_open_action_worker_start(value))
+
+    def _run_scheduled_about_open_action_worker_start(self, request) -> None:
+        self._about_open_start_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if request is not None:
+            self._start_about_open_action_worker(*request)
 
     def _show_about_open_error(self, error: str, *, error_default: str, raw_error_message: str) -> None:
         if not InfoBar:

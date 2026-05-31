@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import inspect
 import unittest
-from unittest.mock import Mock
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from app.feature_facades.external import ExternalActionsFeature
 from ui.page_composition import PAGE_DEPS_BUILDERS
@@ -68,7 +69,9 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
         )
         page._start_support_open_action_worker.assert_not_called()
 
-    def test_support_open_worker_finished_starts_next_queued_action(self) -> None:
+    def test_support_open_worker_finished_schedules_next_queued_action(self) -> None:
+        import ui.pages.support_page as support_page
+
         page = SupportPage.__new__(SupportPage)
         first_action = Mock()
         second_action = Mock()
@@ -77,8 +80,16 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
             ("discord", second_action, "discord.error", "discord {error}"),
         ]
         page._start_support_open_action_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
 
-        SupportPage._on_support_open_action_worker_finished(page, object())
+        with patch.object(support_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            SupportPage._on_support_open_action_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._start_support_open_action_worker.assert_not_called()
+
+        single_shot.call_args.args[1]()
 
         page._start_support_open_action_worker.assert_called_once_with(
             "telegram",
@@ -126,7 +137,9 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
         )
         page._start_about_open_action_worker.assert_not_called()
 
-    def test_about_open_worker_finished_starts_next_queued_action(self) -> None:
+    def test_about_open_worker_finished_schedules_next_queued_action(self) -> None:
+        import ui.pages.about_page as about_page
+
         page = AboutPage.__new__(AboutPage)
         page._cleanup_in_progress = False
         first_action = Mock()
@@ -136,8 +149,16 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
             ("github", second_action, "github {error}", "raw"),
         ]
         page._start_about_open_action_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
 
-        AboutPage._on_about_open_action_worker_finished(page, object())
+        with patch.object(about_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            AboutPage._on_about_open_action_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._start_about_open_action_worker.assert_not_called()
+
+        single_shot.call_args.args[1]()
 
         page._start_about_open_action_worker.assert_called_once_with(
             "telegram",

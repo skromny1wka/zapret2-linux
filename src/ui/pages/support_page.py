@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from PyQt6.QtCore import QTimer
 from qfluentwidgets import InfoBar, PrimaryPushSettingCard, PushSettingCard, SettingCardGroup
 
 from app.ui_texts import tr as tr_catalog
@@ -29,6 +30,7 @@ class SupportPage(BasePage):
         self._create_support_open_action_worker = create_open_action_worker
         self._support_open_runtime = OneShotWorkerRuntime()
         self._support_open_pending: list[tuple[str, object, str, str]] = []
+        self._support_open_start_scheduled = False
 
         self._support_card = None
         self._support_group = None
@@ -205,7 +207,7 @@ class SupportPage(BasePage):
         error_default: str,
     ) -> None:
         request = (str(action_name or "").strip(), action_fn, str(error_key), str(error_default))
-        if self._support_open_runtime.is_running():
+        if self._support_open_runtime.is_running() or self.__dict__.get("_support_open_start_scheduled", False):
             self.__dict__.setdefault("_support_open_pending", []).append(request)
             return
         self._start_support_open_action_worker(*request)
@@ -273,7 +275,16 @@ class SupportPage(BasePage):
         pending_actions = self.__dict__.setdefault("_support_open_pending", [])
         pending = pending_actions.pop(0) if pending_actions else None
         if pending is not None:
-            self._start_support_open_action_worker(*pending)
+            self._schedule_support_open_action_worker_start(pending)
+
+    def _schedule_support_open_action_worker_start(self, request) -> None:
+        self._support_open_start_scheduled = True
+        QTimer.singleShot(0, lambda value=request: self._run_scheduled_support_open_action_worker_start(value))
+
+    def _run_scheduled_support_open_action_worker_start(self, request) -> None:
+        self._support_open_start_scheduled = False
+        if request is not None:
+            self._start_support_open_action_worker(*request)
 
     def _show_support_open_error(self, error_key: str, error_default: str, error: str) -> None:
         if InfoBar is not None:
