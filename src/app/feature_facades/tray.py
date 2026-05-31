@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from PyQt6.QtCore import QTimer
+
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 
 
@@ -16,6 +18,7 @@ class TrayFeature:
     _tray_manager: Any = None
     _opacity_save_runtime: OneShotWorkerRuntime = field(default_factory=OneShotWorkerRuntime)
     _opacity_save_pending: int | None = None
+    _opacity_save_start_scheduled: bool = False
     _github_api_removal_toggle_runtime: OneShotWorkerRuntime = field(default_factory=OneShotWorkerRuntime)
     _discord_restart_toggle_runtime: OneShotWorkerRuntime = field(default_factory=OneShotWorkerRuntime)
 
@@ -242,7 +245,7 @@ class TrayFeature:
 
     def _request_window_opacity_save(self, value: int) -> None:
         normalized = max(0, min(100, int(value)))
-        if self._opacity_save_runtime.is_running():
+        if self._opacity_save_runtime.is_running() or self._opacity_save_start_scheduled:
             self._opacity_save_pending = normalized
             return
         self._start_window_opacity_save_worker(normalized)
@@ -254,6 +257,20 @@ class TrayFeature:
         )
 
     def _on_window_opacity_save_worker_finished(self, _worker) -> None:
+        pending = self._opacity_save_pending
+        self._opacity_save_pending = None
+        if pending is not None:
+            self._schedule_window_opacity_save_worker_start(int(pending))
+
+    def _schedule_window_opacity_save_worker_start(self, value: int) -> None:
+        self._opacity_save_pending = max(0, min(100, int(value)))
+        if self._opacity_save_start_scheduled:
+            return
+        self._opacity_save_start_scheduled = True
+        QTimer.singleShot(0, self._run_scheduled_window_opacity_save_worker_start)
+
+    def _run_scheduled_window_opacity_save_worker_start(self) -> None:
+        self._opacity_save_start_scheduled = False
         pending = self._opacity_save_pending
         self._opacity_save_pending = None
         if pending is not None:
