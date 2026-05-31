@@ -608,7 +608,18 @@ class UserPresetsPageBase(BasePage):
 
     def _on_preset_open_folder_worker_finished(self, worker) -> None:
         if self._preset_open_folder_pending:
-            self._start_preset_open_folder_worker()
+            self._schedule_preset_open_folder_worker_start()
+
+    def _schedule_preset_open_folder_worker_start(self) -> None:
+        try:
+            QTimer.singleShot(0, self._run_scheduled_preset_open_folder_worker_start)
+        except Exception:
+            self._run_scheduled_preset_open_folder_worker_start()
+
+    def _run_scheduled_preset_open_folder_worker_start(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._start_preset_open_folder_worker()
 
     def _apply_page_theme(self, tokens=None, force: bool = False) -> None:
         self._last_page_theme_key = apply_user_presets_page_theme(
@@ -1175,14 +1186,26 @@ class UserPresetsPageBase(BasePage):
     def _on_preset_folder_action_worker_finished(self, worker) -> None:
         if self._preset_folder_action_pending:
             pending = self._preset_folder_action_pending.pop(0)
-            self._request_preset_folder_action(
-                str(pending.get("action") or ""),
-                folder_key=str(pending.get("folder_key") or ""),
-                name=str(pending.get("name") or ""),
-                direction=int(pending.get("direction") or 0),
-                collapsed=bool(pending.get("collapsed")),
-                context_extra=dict(pending.get("context_extra") or {}),
-            )
+            self._schedule_preset_folder_action_start(pending)
+
+    def _schedule_preset_folder_action_start(self, pending: dict[str, object]) -> None:
+        queued = dict(pending or {})
+        try:
+            QTimer.singleShot(0, lambda: self._run_scheduled_preset_folder_action_start(queued))
+        except Exception:
+            self._run_scheduled_preset_folder_action_start(queued)
+
+    def _run_scheduled_preset_folder_action_start(self, pending: dict[str, object]) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._request_preset_folder_action(
+            str(pending.get("action") or ""),
+            folder_key=str(pending.get("folder_key") or ""),
+            name=str(pending.get("name") or ""),
+            direction=int(pending.get("direction") or 0),
+            collapsed=bool(pending.get("collapsed")),
+            context_extra=dict(pending.get("context_extra") or {}),
+        )
 
     def _on_toggle_pin_preset(self, name: str):
         self._request_preset_storage_action(
@@ -2113,7 +2136,19 @@ class UserPresetsPageBase(BasePage):
         pending_actions = self.__dict__.setdefault("_preset_link_action_pending", [])
         pending = str(pending_actions.pop(0) if pending_actions else "").strip()
         if pending and not self._cleanup_in_progress:
-            self._request_preset_link_action(pending)
+            self._schedule_preset_link_action_start(pending)
+
+    def _schedule_preset_link_action_start(self, action: str) -> None:
+        clean_action = str(action or "").strip()
+        try:
+            QTimer.singleShot(0, lambda: self._run_scheduled_preset_link_action_start(clean_action))
+        except Exception:
+            self._run_scheduled_preset_link_action_start(clean_action)
+
+    def _run_scheduled_preset_link_action_start(self, action: str) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._request_preset_link_action(str(action or "").strip())
 
     def _open_presets_info(self):
         self._request_preset_link_action("info")

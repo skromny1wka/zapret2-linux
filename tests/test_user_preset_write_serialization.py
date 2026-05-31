@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from presets.ui.common.user_presets_page import UserPresetsPageBase
 
@@ -157,7 +157,17 @@ class UserPresetWriteSerializationTests(unittest.TestCase):
         )
 
         page._preset_item_action_runtime._running = False
-        UserPresetsPageBase._on_preset_item_action_worker_finished(page, object())
+        callbacks = []
+        with patch(
+            "presets.ui.common.user_presets_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            UserPresetsPageBase._on_preset_item_action_worker_finished(page, object())
+
+        page.create_preset_activate_worker.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+
+        callbacks[0]()
 
         page.create_preset_activate_worker.assert_called_once_with(
             1,
@@ -189,7 +199,17 @@ class UserPresetWriteSerializationTests(unittest.TestCase):
         self.assertEqual(page._pending_preset_write_actions[0]["kind"], "edit")
 
         page._preset_activate_runtime._running = False
-        UserPresetsPageBase._on_preset_activate_worker_finished(page, object())
+        callbacks = []
+        with patch(
+            "presets.ui.common.user_presets_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            UserPresetsPageBase._on_preset_activate_worker_finished(page, object())
+
+        page.create_preset_edit_action_worker.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+
+        callbacks[0]()
 
         page.create_preset_edit_action_worker.assert_called_once_with(
             1,
@@ -225,7 +245,90 @@ class UserPresetWriteSerializationTests(unittest.TestCase):
         self.assertEqual(page._pending_preset_write_actions[0]["kind"], "bulk")
 
         page._preset_edit_action_runtime._running = False
-        UserPresetsPageBase._on_preset_edit_action_worker_finished(page, object())
+        callbacks = []
+        with patch(
+            "presets.ui.common.user_presets_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            UserPresetsPageBase._on_preset_edit_action_worker_finished(page, object())
+
+        page.create_preset_bulk_action_worker.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+
+        callbacks[0]()
+
+        page.create_preset_bulk_action_worker.assert_called_once_with(
+            1,
+            action="import",
+            file_path="C:/Temp/Preset.txt",
+        )
+
+    def test_legacy_pending_edit_action_restarts_later_after_worker_finished(self) -> None:
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_activate_runtime = _Runtime(running=False)
+        page._preset_item_action_runtime = _Runtime(running=False)
+        page._preset_bulk_action_runtime = _Runtime(running=False)
+        page._preset_edit_action_runtime = _Runtime(running=False)
+        page._preset_storage_action_runtime = _Runtime(running=False)
+        page._pending_preset_write_actions = []
+        page._preset_edit_action_pending = [
+            {
+                "action": "rename",
+                "name": "Old.txt",
+                "current_name": "Old.txt",
+                "new_name": "New.txt",
+                "from_current": False,
+            }
+        ]
+        page._preset_edit_action_request_id = 0
+        page.create_preset_edit_action_worker = Mock(return_value=_Worker())
+        callbacks = []
+
+        with patch(
+            "presets.ui.common.user_presets_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            UserPresetsPageBase._on_preset_edit_action_worker_finished(page, object())
+
+        page.create_preset_edit_action_worker.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+
+        callbacks[0]()
+
+        page.create_preset_edit_action_worker.assert_called_once_with(
+            1,
+            action="rename",
+            name="Old.txt",
+            current_name="Old.txt",
+            new_name="New.txt",
+            from_current=False,
+        )
+
+    def test_legacy_pending_bulk_action_restarts_later_after_worker_finished(self) -> None:
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_activate_runtime = _Runtime(running=False)
+        page._preset_item_action_runtime = _Runtime(running=False)
+        page._preset_bulk_action_runtime = _Runtime(running=False)
+        page._preset_edit_action_runtime = _Runtime(running=False)
+        page._preset_storage_action_runtime = _Runtime(running=False)
+        page._pending_preset_write_actions = []
+        page._preset_bulk_action_pending = [{"action": "import", "file_path": "C:/Temp/Preset.txt"}]
+        page._preset_bulk_action_request_id = 0
+        page._preset_bulk_action_kind = ""
+        page._bulk_reset_running = False
+        page.create_preset_bulk_action_worker = Mock(return_value=_Worker())
+        callbacks = []
+
+        with patch(
+            "presets.ui.common.user_presets_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            UserPresetsPageBase._on_preset_bulk_action_worker_finished(page, object())
+
+        page.create_preset_bulk_action_worker.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+
+        callbacks[0]()
 
         page.create_preset_bulk_action_worker.assert_called_once_with(
             1,

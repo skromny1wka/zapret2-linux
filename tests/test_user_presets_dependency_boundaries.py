@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 
 class UserPresetsDependencyBoundaryTests(unittest.TestCase):
@@ -216,11 +216,82 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
         page._preset_link_action_pending = ["info", "new_configs"]
         page.create_preset_link_action_worker = Mock(return_value=worker)
 
-        UserPresetsPageBase._on_preset_link_action_worker_finished(page, object())
+        callbacks = []
+        with patch(
+            "presets.ui.common.user_presets_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            UserPresetsPageBase._on_preset_link_action_worker_finished(page, object())
+
+        page.create_preset_link_action_worker.assert_not_called()
+        worker.start.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+
+        callbacks[0]()
 
         page.create_preset_link_action_worker.assert_called_once_with(1, action="info")
         worker.start.assert_called_once()
         self.assertEqual(page._preset_link_action_pending, ["new_configs"])
+
+    def test_user_presets_open_folder_pending_restarts_later_after_worker_finished(self) -> None:
+        from presets.ui.common.user_presets_page import UserPresetsPageBase
+
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._cleanup_in_progress = False
+        page._preset_open_folder_pending = True
+        page._start_preset_open_folder_worker = Mock()
+        callbacks = []
+
+        with patch(
+            "presets.ui.common.user_presets_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            UserPresetsPageBase._on_preset_open_folder_worker_finished(page, object())
+
+        page._start_preset_open_folder_worker.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+
+        callbacks[0]()
+
+        page._start_preset_open_folder_worker.assert_called_once_with()
+
+    def test_user_presets_folder_action_pending_restarts_later_after_worker_finished(self) -> None:
+        from presets.ui.common.user_presets_page import UserPresetsPageBase
+
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._cleanup_in_progress = False
+        page._preset_folder_action_pending = [
+            {
+                "action": "move",
+                "folder_key": "favorites",
+                "name": "Preset.txt",
+                "direction": 1,
+                "collapsed": False,
+                "context_extra": {"source": "menu"},
+            }
+        ]
+        page._request_preset_folder_action = Mock()
+        callbacks = []
+
+        with patch(
+            "presets.ui.common.user_presets_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            UserPresetsPageBase._on_preset_folder_action_worker_finished(page, object())
+
+        page._request_preset_folder_action.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+
+        callbacks[0]()
+
+        page._request_preset_folder_action.assert_called_once_with(
+            "move",
+            folder_key="favorites",
+            name="Preset.txt",
+            direction=1,
+            collapsed=False,
+            context_extra={"source": "menu"},
+        )
 
     def test_user_presets_runtime_actions_do_not_expose_mutating_preset_commands(self) -> None:
         from dataclasses import fields
