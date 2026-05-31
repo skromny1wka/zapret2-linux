@@ -1769,7 +1769,22 @@ class UserPresetsPageBase(BasePage):
         pending = self.__dict__.get("_pending_preset_activation")
         self._pending_preset_activation = None
         if pending:
-            self._start_preset_activation_worker(pending[0], pending[1])
+            self._schedule_pending_preset_activation_start(pending[0], pending[1])
+
+    def _schedule_pending_preset_activation_start(self, file_name: str, display_name: str) -> None:
+        try:
+            QTimer.singleShot(
+                0,
+                lambda: self._start_preset_activation_worker(
+                    str(file_name or ""),
+                    str(display_name or ""),
+                ),
+            )
+        except Exception:
+            self._start_preset_activation_worker(
+                str(file_name or ""),
+                str(display_name or ""),
+            )
 
     def _on_edit_preset(self, name: str, global_pos: QPoint | None = None):
         open_edit_preset_menu_action(
