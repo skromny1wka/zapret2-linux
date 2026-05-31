@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Callable
 import weakref
 
-from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtCore import QThread, QTimer, pyqtSignal
 
 from log.log import log
 from presets.icon_color import normalize_preset_icon_color
@@ -144,6 +144,8 @@ class UserPresetsRuntimeService:
         self._rows_plan_request_id = 0
         self._rows_plan_worker: UserPresetsRowsPlanWorker | None = None
         self._rows_plan_pending: tuple[dict[str, dict[str, object]], dict[str, Any] | None, float | None, object] | None = None
+        self._watched_preset_files_sync_scheduled = False
+        self._watched_preset_files_sync_pending: tuple[object, set[str] | None] | None = None
 
     def is_ui_dirty(self) -> bool:
         return bool(self._ui_dirty)
@@ -299,7 +301,7 @@ class UserPresetsRuntimeService:
         if had_cached_metadata and previous_metadata == metadata:
             return
         self._cached_presets_metadata[normalized_file_name] = metadata
-        self.sync_watched_preset_files(page)
+        self._schedule_watched_preset_files_sync(page)
         if page.isVisible():
             if self.try_apply_single_preset_metadata_update(
                 normalized_file_name,
@@ -560,6 +562,8 @@ class UserPresetsRuntimeService:
         self._metadata_load_pending_page = None
         self._single_metadata_pending.clear()
         self._rows_plan_pending = None
+        self._watched_preset_files_sync_scheduled = False
+        self._watched_preset_files_sync_pending = None
         for attr in ("_metadata_load_worker", "_single_metadata_worker", "_rows_plan_worker"):
             worker = getattr(self, attr, None)
             if worker is None:
@@ -645,6 +649,35 @@ class UserPresetsRuntimeService:
         except Exception as e:
             log(f"Ошибка синхронизации watcher файлов пресетов: {e}", "DEBUG")
 
+    def _schedule_watched_preset_files_sync(self, page=None, file_names: set[str] | None = None) -> None:
+        page = self._resolve_page(page)
+        normalized_file_names = (
+            {
+                str(file_name or "").strip()
+                for file_name in (file_names or set())
+                if str(file_name or "").strip()
+            }
+            if file_names is not None
+            else None
+        )
+        self._watched_preset_files_sync_pending = (page, normalized_file_names)
+        if self._watched_preset_files_sync_scheduled:
+            return
+        self._watched_preset_files_sync_scheduled = True
+        try:
+            QTimer.singleShot(0, self._run_scheduled_watched_preset_files_sync)
+        except Exception:
+            self._run_scheduled_watched_preset_files_sync()
+
+    def _run_scheduled_watched_preset_files_sync(self) -> None:
+        pending = self._watched_preset_files_sync_pending
+        self._watched_preset_files_sync_pending = None
+        self._watched_preset_files_sync_scheduled = False
+        if pending is None:
+            return
+        page, file_names = pending
+        self.sync_watched_preset_files(page, file_names)
+
     def load_presets(self, page=None) -> None:
         page = self._resolve_page(page)
         adapter = self._resolve_adapter()
@@ -686,7 +719,7 @@ class UserPresetsRuntimeService:
         adapter = self._resolve_adapter()
         self._cached_presets_metadata = dict(all_presets)
         self._cached_folder_state = dict(folder_state or {})
-        self.sync_watched_preset_files(page, set(all_presets.keys()))
+        self._schedule_watched_preset_files_sync(page, set(all_presets.keys()))
         if not page.isVisible():
             self._ui_dirty = True
             return
@@ -821,7 +854,7 @@ class UserPresetsRuntimeService:
         if model is None or not model.remove_preset(normalized_name):
             return False
 
-        self.sync_watched_preset_files(page, set(self._cached_presets_metadata.keys()))
+        self._schedule_watched_preset_files_sync(page, set(self._cached_presets_metadata.keys()))
         self._ui_dirty = not removed_metadata
         return True
 
@@ -857,7 +890,7 @@ class UserPresetsRuntimeService:
                 {"folder_key": folder_key, "order": None, "rating": 0},
             )
 
-        self.sync_watched_preset_files(page, set(self._cached_presets_metadata.keys()))
+        self._schedule_watched_preset_files_sync(page, set(self._cached_presets_metadata.keys()))
         self._request_single_metadata_refresh(normalized_file_name, page)
 
         if query and query not in normalized_display_name.lower():
@@ -915,7 +948,7 @@ class UserPresetsRuntimeService:
         metadata["file_name"] = new_file_name
         metadata["display_name"] = new_display_name or new_file_name
         self._cached_presets_metadata[new_file_name] = metadata
-        self.sync_watched_preset_files(page, set(self._cached_presets_metadata.keys()))
+        self._schedule_watched_preset_files_sync(page, set(self._cached_presets_metadata.keys()))
         self._ui_dirty = False
         return True
 

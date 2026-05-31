@@ -4,6 +4,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+from PyQt6.QtWidgets import QApplication
+
 
 class _Signal:
     def __init__(self) -> None:
@@ -42,6 +44,10 @@ class _MetadataWorker:
 
 
 class UserPresetsMetadataLoadQueueTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._app = QApplication.instance() or QApplication([])
+
     def setUp(self) -> None:
         _MetadataWorker.instances.clear()
 
@@ -117,6 +123,35 @@ class UserPresetsMetadataLoadQueueTests(unittest.TestCase):
         service._on_single_metadata_loaded(3, "Default.txt", ("Default.txt", dict(metadata)), page)
 
         self.assertEqual(service._cached_presets_metadata, {"Default.txt": metadata})
+
+    def test_metadata_loaded_defers_watcher_sync_after_rows_request(self) -> None:
+        from presets.user_presets_runtime_service import UserPresetsRuntimeAdapter, UserPresetsRuntimeService
+
+        page = SimpleNamespace(isVisible=lambda: True)
+        adapter = UserPresetsRuntimeAdapter(
+            bulk_reset_running=lambda: False,
+            read_single_metadata=lambda _name: None,
+            selected_source_file_name=lambda: "",
+            presets_dir=lambda: None,
+            cached_metadata=lambda: {},
+            load_all_metadata=lambda: {},
+            load_folder_state=lambda: {},
+            build_rows_plan=lambda _metadata, _folder_state: object(),
+            apply_rows_plan=lambda _plan, _started_at: None,
+            delete_preset_item_meta=lambda _name: None,
+        )
+        service = UserPresetsRuntimeService()
+        service.attach_page(page, adapter)
+        service._metadata_load_request_id = 7
+        calls: list[str] = []
+        service.sync_watched_preset_files = Mock(side_effect=lambda *_args, **_kwargs: calls.append("watcher"))
+        service._request_rows_plan_refresh = Mock(side_effect=lambda *_args, **_kwargs: calls.append("rows"))
+
+        service._on_metadata_loaded(7, {"Default.txt": {}}, {}, 0.0, page)
+
+        self.assertEqual(calls, ["rows"])
+        self._app.processEvents()
+        self.assertEqual(calls, ["rows", "watcher"])
 
 
 if __name__ == "__main__":
