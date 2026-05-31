@@ -51,10 +51,13 @@ class BlobsPage(BasePage):
         self._blobs_load_runtime = OneShotWorkerRuntime()
         self._blobs_load_pending = False
         self._blobs_load_pending_reload = False
+        self._blobs_load_start_scheduled = False
         self._blob_action_runtime = OneShotWorkerRuntime()
         self._blob_action_pending: list[dict[str, str]] = []
+        self._blob_action_start_scheduled = False
         self._blob_open_action_runtime = OneShotWorkerRuntime()
         self._blob_open_action_pending: list[str] = []
+        self._blob_open_action_start_scheduled = False
 
         self._build_ui()
         self._apply_page_theme(force=True)
@@ -173,7 +176,7 @@ class BlobsPage(BasePage):
             return
         if reload and hasattr(self, "reload_btn"):
             self.reload_btn.set_loading(True)
-        if self._blobs_load_runtime.is_running():
+        if self._blobs_load_runtime.is_running() or self.__dict__.get("_blobs_load_start_scheduled", False):
             self._blobs_load_pending = True
             self._blobs_load_pending_reload = bool(self._blobs_load_pending_reload) or bool(reload)
             return
@@ -235,7 +238,22 @@ class BlobsPage(BasePage):
         if hasattr(self, "reload_btn"):
             self.reload_btn.set_loading(False)
         if self._blobs_load_pending and not self._cleanup_in_progress:
-            self._start_blobs_load_worker(reload=bool(self._blobs_load_pending_reload))
+            reload = bool(self._blobs_load_pending_reload)
+            self._blobs_load_pending = False
+            self._blobs_load_pending_reload = False
+            self._schedule_blobs_load_worker_start(reload=reload)
+
+    def _schedule_blobs_load_worker_start(self, *, reload: bool) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._blobs_load_start_scheduled = True
+        QTimer.singleShot(0, lambda value=bool(reload): self._run_scheduled_blobs_load_worker_start(reload=value))
+
+    def _run_scheduled_blobs_load_worker_start(self, *, reload: bool) -> None:
+        self._blobs_load_start_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._start_blobs_load_worker(reload=bool(reload))
             
     def _filter_blobs(self, text: str):
         """Фильтрует блобы по тексту"""
@@ -308,7 +326,7 @@ class BlobsPage(BasePage):
             "value": str(value or ""),
             "description": str(description or ""),
         }
-        if self._blob_action_runtime.is_running():
+        if self._blob_action_runtime.is_running() or self.__dict__.get("_blob_action_start_scheduled", False):
             self._blob_action_pending.append(payload)
             return
         self._start_blob_action_worker(payload)
@@ -381,7 +399,20 @@ class BlobsPage(BasePage):
     def _on_blob_action_worker_finished(self, _worker) -> None:
         if self._blob_action_pending and not self._cleanup_in_progress:
             pending = self._blob_action_pending.pop(0)
-            self._start_blob_action_worker(pending)
+            self._schedule_blob_action_worker_start(pending)
+
+    def _schedule_blob_action_worker_start(self, payload: dict[str, str]) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        queued = dict(payload or {})
+        self._blob_action_start_scheduled = True
+        QTimer.singleShot(0, lambda value=queued: self._run_scheduled_blob_action_worker_start(value))
+
+    def _run_scheduled_blob_action_worker_start(self, payload: dict[str, str]) -> None:
+        self._blob_action_start_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._start_blob_action_worker(dict(payload or {}))
             
     def _reload_blobs(self):
         """Перезагружает блобы из settings.json."""
@@ -406,7 +437,7 @@ class BlobsPage(BasePage):
         action = str(action or "").strip()
         if not action:
             return
-        if self._blob_open_action_runtime.is_running():
+        if self._blob_open_action_runtime.is_running() or self.__dict__.get("_blob_open_action_start_scheduled", False):
             self._blob_open_action_pending.append(action)
             return
         self._start_blob_open_action_worker(action)
@@ -439,7 +470,20 @@ class BlobsPage(BasePage):
     def _on_blob_open_action_worker_finished(self, _worker) -> None:
         if self._blob_open_action_pending and not self._cleanup_in_progress:
             pending = self._blob_open_action_pending.pop(0)
-            self._start_blob_open_action_worker(pending)
+            self._schedule_blob_open_action_worker_start(pending)
+
+    def _schedule_blob_open_action_worker_start(self, action: str) -> None:
+        clean_action = str(action or "").strip()
+        if not clean_action or self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._blob_open_action_start_scheduled = True
+        QTimer.singleShot(0, lambda value=clean_action: self._run_scheduled_blob_open_action_worker_start(value))
+
+    def _run_scheduled_blob_open_action_worker_start(self, action: str) -> None:
+        self._blob_open_action_start_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._start_blob_open_action_worker(str(action or "").strip())
 
     def set_ui_language(self, language: str) -> None:
         super().set_ui_language(language)

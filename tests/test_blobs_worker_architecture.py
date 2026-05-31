@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import inspect
 import unittest
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from app.feature_facades.blobs import build_blobs_feature
+import blobs.ui.page as blobs_page
 from blobs.ui.page import BlobsPage
 import blobs.workers as blobs_workers
 
@@ -65,6 +68,62 @@ class BlobsWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("_blobs_load_runtime.stop", cleanup_source)
         self.assertIn("_blob_action_runtime.stop", cleanup_source)
         self.assertIn("_blob_open_action_runtime.stop", cleanup_source)
+
+    def test_blobs_load_pending_restarts_after_event_loop_turn(self) -> None:
+        page = BlobsPage.__new__(BlobsPage)
+        page._cleanup_in_progress = False
+        page._blobs_load_pending = True
+        page._blobs_load_pending_reload = True
+        page._start_blobs_load_worker = Mock()
+        page.reload_btn = SimpleNamespace(set_loading=Mock())
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(blobs_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
+            BlobsPage._on_blobs_load_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._start_blobs_load_worker.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._start_blobs_load_worker.assert_called_once_with(reload=True)
+
+    def test_blob_action_pending_restarts_after_event_loop_turn(self) -> None:
+        page = BlobsPage.__new__(BlobsPage)
+        page._cleanup_in_progress = False
+        page._blob_action_pending = [{"action": "delete", "name": "a.bin"}]
+        page._start_blob_action_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(blobs_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
+            BlobsPage._on_blob_action_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._start_blob_action_worker.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._start_blob_action_worker.assert_called_once_with({"action": "delete", "name": "a.bin"})
+
+    def test_blob_open_action_pending_restarts_after_event_loop_turn(self) -> None:
+        page = BlobsPage.__new__(BlobsPage)
+        page._cleanup_in_progress = False
+        page._blob_open_action_pending = ["blobs_json"]
+        page._start_blob_open_action_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(blobs_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
+            BlobsPage._on_blob_open_action_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._start_blob_open_action_worker.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._start_blob_open_action_worker.assert_called_once_with("blobs_json")
 
 
 if __name__ == "__main__":
