@@ -922,6 +922,7 @@ class ProfileSetupPageBase(BasePage):
         self._pending_user_profile_updates: list[dict[str, str]] = []
         self._user_profile_delete_runtime = OneShotWorkerRuntime()
         self._user_profile_delete_request_id = 0
+        self._pending_user_profile_deletes: list[str] = []
         self._strategy_apply_runtime = OneShotWorkerRuntime()
         self._strategy_apply_request_id = 0
         self._strategy_apply_runtime_strategy_id = ""
@@ -1592,7 +1593,12 @@ class ProfileSetupPageBase(BasePage):
             return
         runtime = self._worker_runtime("_user_profile_delete_runtime")
         if runtime.is_running():
+            self.__dict__.setdefault("_pending_user_profile_deletes", []).append(profile_id)
             return
+        self._start_user_profile_delete_worker(profile_id)
+
+    def _start_user_profile_delete_worker(self, profile_id: str) -> None:
+        runtime = self._worker_runtime("_user_profile_delete_runtime")
         self._user_profile_delete_request_id = int(getattr(self, "_user_profile_delete_request_id", 0) or 0) + 1
         request_id = self._user_profile_delete_request_id
         self._set_user_profile_buttons_enabled(False)
@@ -1624,7 +1630,8 @@ class ProfileSetupPageBase(BasePage):
     def _on_user_profile_delete_failed(self, request_id: int, error: str) -> None:
         if request_id != int(getattr(self, "_user_profile_delete_request_id", 0) or 0):
             return
-        self._set_user_profile_buttons_enabled(True)
+        if not self.__dict__.get("_pending_user_profile_deletes"):
+            self._set_user_profile_buttons_enabled(True)
         log(f"{self.__class__.__name__}: не удалось удалить пользовательский profile: {error}", "ERROR")
         InfoBar.error(
             title="Ошибка",
@@ -1633,6 +1640,11 @@ class ProfileSetupPageBase(BasePage):
         )
 
     def _on_user_profile_delete_worker_finished(self, _worker) -> None:
+        pending_deletes = self.__dict__.setdefault("_pending_user_profile_deletes", [])
+        pending = pending_deletes.pop(0) if pending_deletes else None
+        if pending:
+            self._start_user_profile_delete_worker(str(pending or ""))
+            return
         self._set_user_profile_buttons_enabled(True)
 
     def show_profile(self, profile_key: str) -> None:
@@ -3044,6 +3056,7 @@ class ProfileSetupPageBase(BasePage):
             runtime.cancel()
         self._strategy_apply_runtime_strategy_id = ""
         self._enabled_save_runtime_enabled = None
+        self.__dict__.setdefault("_pending_user_profile_deletes", []).clear()
         try:
             super().cleanup()
         except Exception:

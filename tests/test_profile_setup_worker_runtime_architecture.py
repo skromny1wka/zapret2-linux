@@ -24,6 +24,7 @@ class ProfileSetupWorkerRuntimeArchitectureTests(unittest.TestCase):
         user_update_request_source = inspect.getsource(ProfileSetupPageBase._request_user_profile_update)
         user_update_start_source = inspect.getsource(ProfileSetupPageBase._start_user_profile_update_worker)
         user_delete_source = inspect.getsource(ProfileSetupPageBase._request_user_profile_delete)
+        user_delete_start_source = inspect.getsource(ProfileSetupPageBase._start_user_profile_delete_worker)
         strategy_apply_request_source = inspect.getsource(ProfileSetupPageBase._request_strategy_apply)
         strategy_apply_start_source = inspect.getsource(ProfileSetupPageBase._start_strategy_apply_worker)
         strategy_feedback_request_source = inspect.getsource(ProfileSetupPageBase._request_strategy_feedback_save)
@@ -56,7 +57,7 @@ class ProfileSetupWorkerRuntimeArchitectureTests(unittest.TestCase):
             ("_raw_profile_save_runtime", raw_request_source + raw_start_source),
             ("_enabled_save_runtime", enabled_source + enabled_start_source),
             ("_user_profile_update_runtime", user_update_request_source + user_update_start_source),
-            ("_user_profile_delete_runtime", user_delete_source),
+            ("_user_profile_delete_runtime", user_delete_source + user_delete_start_source),
             ("_strategy_apply_runtime", strategy_apply_request_source + strategy_apply_start_source),
             ("_strategy_feedback_save_runtime", strategy_feedback_request_source + strategy_feedback_start_source),
         ):
