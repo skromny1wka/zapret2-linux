@@ -6,6 +6,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QApplication
 
 from log.log import log
+from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 
 
 
@@ -81,7 +82,7 @@ class WindowGeometryRuntime:
         self._last_persisted_geometry: tuple[int, int, int, int] | None = None
         self._last_persisted_maximized: bool | None = None
         self._pending_window_maximized_state: bool | None = None
-        self._geometry_save_worker = None
+        self._geometry_save_runtime = OneShotWorkerRuntime()
         self._geometry_save_pending: tuple[tuple[int, int, int, int] | None, bool] | None = None
         self._window_fsm_active = False
         self._window_fsm_target_mode: str | None = None
@@ -598,32 +599,29 @@ class WindowGeometryRuntime:
 
     def _stop_geometry_save_worker_for_sync(self) -> None:
         self._geometry_save_pending = None
-        worker = self.__dict__.get("_geometry_save_worker")
-        if worker is None:
+        runtime = self.__dict__.get("_geometry_save_runtime")
+        if runtime is None:
             return
-        try:
-            if worker.isRunning():
-                worker.quit()
-                worker.wait(1000)
-        except RuntimeError:
-            pass
-        except Exception as e:
-            log(f"Ошибка ожидания сохранения геометрии окна: {e}", "DEBUG")
-        self._geometry_save_worker = None
+        runtime.stop(
+            blocking=True,
+            wait_timeout_ms=1000,
+            log_fn=log,
+            warning_prefix="window geometry save worker",
+        )
+        runtime.cancel()
 
     def _request_geometry_save(self, *, geometry: tuple[int, int, int, int] | None, maximized: bool) -> None:
         payload = (geometry, bool(maximized))
-        worker = self.__dict__.get("_geometry_save_worker")
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    self._geometry_save_pending = self._merge_geometry_save_payload(
-                        self._geometry_save_pending,
-                        payload,
-                    )
-                    return
-            except RuntimeError:
-                self._geometry_save_worker = None
+        runtime = self.__dict__.get("_geometry_save_runtime")
+        if runtime is None:
+            runtime = OneShotWorkerRuntime()
+            self._geometry_save_runtime = runtime
+        if runtime.is_running():
+            self._geometry_save_pending = self._merge_geometry_save_payload(
+                self._geometry_save_pending,
+                payload,
+            )
+            return
         self._start_geometry_save_worker(payload)
 
     @staticmethod
@@ -637,16 +635,22 @@ class WindowGeometryRuntime:
 
     def _start_geometry_save_worker(self, payload) -> None:
         geometry, maximized = payload
-        worker = self._create_geometry_save_worker(
-            geometry=geometry,
-            maximized=bool(maximized),
-            parent=self.host,
+        runtime = self.__dict__.get("_geometry_save_runtime")
+        if runtime is None:
+            runtime = OneShotWorkerRuntime()
+            self._geometry_save_runtime = runtime
+        runtime.start_qthread_worker(
+            worker_factory=lambda _request_id: self._create_geometry_save_worker(
+                geometry=geometry,
+                maximized=bool(maximized),
+                parent=self.host,
+            ),
+            on_loaded=self._on_geometry_save_finished,
+            on_failed=lambda _request_id, error: log(f"Ошибка сохранения геометрии окна: {error}", "DEBUG"),
+            on_finished=self._on_geometry_save_worker_finished,
+            signal_includes_request_id=False,
+            loaded_signal_name="saved",
         )
-        self._geometry_save_worker = worker
-        worker.saved.connect(self._on_geometry_save_finished)
-        worker.failed.connect(lambda error: log(f"Ошибка сохранения геометрии окна: {error}", "DEBUG"))
-        worker.finished.connect(lambda w=worker: self._on_geometry_save_worker_finished(w))
-        worker.start()
 
     def _on_geometry_save_finished(self, geometry, maximized) -> None:
         self._last_persisted_maximized = bool(maximized)
@@ -654,13 +658,7 @@ class WindowGeometryRuntime:
         if geometry is not None:
             self._last_persisted_geometry = tuple(int(value) for value in geometry)
 
-    def _on_geometry_save_worker_finished(self, worker) -> None:
-        if self.__dict__.get("_geometry_save_worker") is worker:
-            self._geometry_save_worker = None
-        try:
-            worker.deleteLater()
-        except RuntimeError:
-            pass
+    def _on_geometry_save_worker_finished(self, _worker) -> None:
         pending = self._geometry_save_pending
         self._geometry_save_pending = None
         if pending is not None:
