@@ -488,20 +488,24 @@ class HostsPage(BasePage):
         if self._cleanup_in_progress:
             return
         trigger = str(self._catalog_refresh_pending_trigger or "").strip()
-        self._catalog_refresh_pending_trigger = ""
         if trigger:
-            self._schedule_catalog_refresh_start(trigger)
+            self._schedule_catalog_refresh_start()
 
-    def _schedule_catalog_refresh_start(self, trigger: str) -> None:
-        clean_trigger = str(trigger or "").strip()
-        if not clean_trigger or self.__dict__.get("_cleanup_in_progress", False):
+    def _schedule_catalog_refresh_start(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("_catalog_refresh_start_scheduled", False):
             return
         self._catalog_refresh_start_scheduled = True
-        QTimer.singleShot(0, lambda value=clean_trigger: self._run_scheduled_catalog_refresh_start(value))
+        QTimer.singleShot(0, self._run_scheduled_catalog_refresh_start)
 
-    def _run_scheduled_catalog_refresh_start(self, trigger: str) -> None:
+    def _run_scheduled_catalog_refresh_start(self) -> None:
         self._catalog_refresh_start_scheduled = False
         if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        trigger = str(self.__dict__.get("_catalog_refresh_pending_trigger") or "").strip()
+        self._catalog_refresh_pending_trigger = ""
+        if not trigger:
             return
         self._refresh_catalog_if_needed(trigger)
 
@@ -1026,20 +1030,24 @@ class HostsPage(BasePage):
         if self._cleanup_in_progress:
             return
         pending = self._selection_save_pending
-        self._selection_save_pending = None
         if pending is not None:
-            self._schedule_user_selection_save_start(pending)
+            self._schedule_user_selection_save_start()
 
-    def _schedule_user_selection_save_start(self, selection: dict[str, str]) -> None:
+    def _schedule_user_selection_save_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        payload = dict(selection or {})
+        if self.__dict__.get("_selection_save_start_scheduled", False):
+            return
         self._selection_save_start_scheduled = True
-        QTimer.singleShot(0, lambda queued=payload: self._run_scheduled_user_selection_save_start(queued))
+        QTimer.singleShot(0, self._run_scheduled_user_selection_save_start)
 
-    def _run_scheduled_user_selection_save_start(self, selection: dict[str, str]) -> None:
+    def _run_scheduled_user_selection_save_start(self) -> None:
         self._selection_save_start_scheduled = False
         if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        selection = self.__dict__.get("_selection_save_pending")
+        self._selection_save_pending = None
+        if selection is None:
             return
         self._request_user_selection_save(selection)
 
@@ -1140,34 +1148,32 @@ class HostsPage(BasePage):
 
     def _on_hosts_state_worker_finished(self, _worker) -> None:
         pending = dict(self._state_load_pending or {})
-        self._state_load_pending = {"show_access_errors": False, "update_status": False}
         if self._cleanup_in_progress:
             return
         if bool(pending.get("show_access_errors")) or bool(pending.get("update_status")):
-            self._schedule_hosts_state_load_start(
-                show_access_errors=bool(pending.get("show_access_errors")),
-                update_status=bool(pending.get("update_status")),
-            )
+            self._schedule_hosts_state_load_start()
 
-    def _schedule_hosts_state_load_start(self, *, show_access_errors: bool, update_status: bool) -> None:
+    def _schedule_hosts_state_load_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
+        if self.__dict__.get("_state_load_start_scheduled", False):
+            return
         self._state_load_start_scheduled = True
-        QTimer.singleShot(
-            0,
-            lambda: self._run_scheduled_hosts_state_load_start(
-                show_access_errors=bool(show_access_errors),
-                update_status=bool(update_status),
-            ),
-        )
+        QTimer.singleShot(0, self._run_scheduled_hosts_state_load_start)
 
-    def _run_scheduled_hosts_state_load_start(self, *, show_access_errors: bool, update_status: bool) -> None:
+    def _run_scheduled_hosts_state_load_start(self) -> None:
         self._state_load_start_scheduled = False
         if self.__dict__.get("_cleanup_in_progress", False):
             return
+        pending = dict(self.__dict__.get("_state_load_pending") or {})
+        self._state_load_pending = {"show_access_errors": False, "update_status": False}
+        show_access_errors = bool(pending.get("show_access_errors"))
+        update_status = bool(pending.get("update_status"))
+        if not show_access_errors and not update_status:
+            return
         self._request_hosts_state_load(
-            show_access_errors=bool(show_access_errors),
-            update_status=bool(update_status),
+            show_access_errors=show_access_errors,
+            update_status=update_status,
         )
 
     def _apply_hosts_runtime_state_to_ui(self, runtime_state, *, started_at: float | None = None) -> None:
