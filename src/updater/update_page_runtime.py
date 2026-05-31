@@ -133,6 +133,8 @@ class UpdatePageRuntime:
         self._cleanup_in_progress = False
         self._auto_check_save_pending: bool | None = None
         self._cache_invalidate_pending_context: str | None = None
+        self._auto_check_save_start_scheduled = False
+        self._cache_invalidate_start_scheduled = False
         self._auto_check_user_changed = False
         self._dpi_restart_after = ""
 
@@ -423,7 +425,7 @@ class UpdatePageRuntime:
             self._view.mark_update_download_failed(str(e)[:50])
 
     def _request_update_cache_invalidate(self, context: str) -> None:
-        if self._cache_invalidate_runtime.is_running():
+        if self._cache_invalidate_runtime.is_running() or self.__dict__.get("_cache_invalidate_start_scheduled", False):
             self._cache_invalidate_pending_context = str(context or "")
             return
         self._cache_invalidate_pending_context = None
@@ -464,7 +466,20 @@ class UpdatePageRuntime:
         pending = self._cache_invalidate_pending_context
         self._cache_invalidate_pending_context = None
         if pending:
-            self._request_update_cache_invalidate(pending)
+            self._schedule_update_cache_invalidate_start(pending)
+
+    def _schedule_update_cache_invalidate_start(self, context: str) -> None:
+        clean_context = str(context or "")
+        if not clean_context or self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._cache_invalidate_start_scheduled = True
+        QTimer.singleShot(0, lambda value=clean_context: self._run_scheduled_update_cache_invalidate_start(value))
+
+    def _run_scheduled_update_cache_invalidate_start(self, context: str) -> None:
+        self._cache_invalidate_start_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._request_update_cache_invalidate(context)
 
     def dismiss_update(self) -> None:
         version = self._resolve_dismissed_update_version()
@@ -486,7 +501,7 @@ class UpdatePageRuntime:
         log(f"Автопроверка при запуске: {'включена' if enabled else 'отключена'}", "🔄 UPDATE")
 
     def _request_auto_check_save(self, enabled: bool) -> None:
-        if self._auto_check_save_runtime.is_running():
+        if self._auto_check_save_runtime.is_running() or self.__dict__.get("_auto_check_save_start_scheduled", False):
             self._auto_check_save_pending = bool(enabled)
             return
         self._start_auto_check_save_worker(bool(enabled))
@@ -515,9 +530,22 @@ class UpdatePageRuntime:
         if pending is None:
             return
         if bool(pending) == bool(self._auto_check_enabled):
-            self._start_auto_check_save_worker(bool(pending))
+            self._auto_check_save_pending = None
+            self._schedule_auto_check_save_start(bool(pending))
         else:
             self._auto_check_save_pending = None
+
+    def _schedule_auto_check_save_start(self, enabled: bool) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._auto_check_save_start_scheduled = True
+        QTimer.singleShot(0, lambda value=bool(enabled): self._run_scheduled_auto_check_save_start(value))
+
+    def _run_scheduled_auto_check_save_start(self, enabled: bool) -> None:
+        self._auto_check_save_start_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._start_auto_check_save_worker(bool(enabled))
 
     def request_open_update_channel(self, channel: str) -> None:
         if self._update_channel_open_runtime.is_running():
@@ -768,6 +796,7 @@ class UpdatePageRuntime:
 
     def _teardown_auto_check_save_worker(self) -> None:
         self._auto_check_save_pending = None
+        self._auto_check_save_start_scheduled = False
         self._auto_check_save_runtime.stop(
             blocking=True,
             log_fn=log,
@@ -793,6 +822,7 @@ class UpdatePageRuntime:
 
     def _teardown_cache_invalidate_worker(self) -> None:
         self._cache_invalidate_pending_context = None
+        self._cache_invalidate_start_scheduled = False
         self._cache_invalidate_runtime.stop(
             blocking=True,
             log_fn=log,
