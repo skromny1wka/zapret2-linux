@@ -21,6 +21,9 @@ class ProfileSetupWorkerRuntimeArchitectureTests(unittest.TestCase):
         raw_start_source = inspect.getsource(ProfileSetupPageBase._start_raw_profile_save_worker)
         enabled_source = inspect.getsource(ProfileSetupPageBase._on_enabled_changed)
         enabled_start_source = inspect.getsource(ProfileSetupPageBase._start_enabled_save_worker)
+        user_update_request_source = inspect.getsource(ProfileSetupPageBase._request_user_profile_update)
+        user_update_start_source = inspect.getsource(ProfileSetupPageBase._start_user_profile_update_worker)
+        user_delete_source = inspect.getsource(ProfileSetupPageBase._request_user_profile_delete)
         cleanup_source = inspect.getsource(ProfileSetupPageBase.cleanup)
 
         expected_runtimes = (
@@ -31,6 +34,8 @@ class ProfileSetupWorkerRuntimeArchitectureTests(unittest.TestCase):
             "_settings_save_runtime",
             "_raw_profile_save_runtime",
             "_enabled_save_runtime",
+            "_user_profile_update_runtime",
+            "_user_profile_delete_runtime",
         )
         for attr in expected_runtimes:
             self.assertIn(f"{attr} = OneShotWorkerRuntime()", init_source)
@@ -44,6 +49,8 @@ class ProfileSetupWorkerRuntimeArchitectureTests(unittest.TestCase):
             ("_settings_save_runtime", settings_request_source + settings_start_source),
             ("_raw_profile_save_runtime", raw_request_source + raw_start_source),
             ("_enabled_save_runtime", enabled_source + enabled_start_source),
+            ("_user_profile_update_runtime", user_update_request_source + user_update_start_source),
+            ("_user_profile_delete_runtime", user_delete_source),
         ):
             self.assertIn(f'_worker_runtime("{attr}")', source)
             self.assertIn("start_qthread_worker", source)
@@ -57,6 +64,8 @@ class ProfileSetupWorkerRuntimeArchitectureTests(unittest.TestCase):
             "self._settings_save_worker",
             "self._raw_profile_save_worker",
             "self._enabled_save_worker",
+            "self._user_profile_update_worker",
+            "self._user_profile_delete_worker",
         ):
             self.assertNotIn(old_attr, init_source)
 

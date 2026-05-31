@@ -1702,10 +1702,10 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             "_settings_save_runtime",
             "_raw_profile_save_runtime",
             "_enabled_save_runtime",
+            "_user_profile_update_runtime",
+            "_user_profile_delete_runtime",
         )
         worker_attrs = (
-            "_user_profile_update_worker",
-            "_user_profile_delete_worker",
             "_strategy_apply_worker",
             "_strategy_feedback_save_worker",
         )
@@ -2623,11 +2623,24 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             def isRunning(self) -> bool:
                 return self._running
 
-        running_worker = _Worker(running=True)
         next_worker = _Worker(running=False)
+
+        class _Runtime:
+            def __init__(self) -> None:
+                self.running = True
+
+            def is_running(self) -> bool:
+                return self.running
+
+            def start_qthread_worker(self, *, worker_factory, **_kwargs):
+                worker = worker_factory(0)
+                worker.start()
+                return 0, worker
+
+        runtime = _Runtime()
         page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
         page._user_profile_update_request_id = 1
-        page._user_profile_update_worker = running_worker
+        page._user_profile_update_runtime = runtime
         page._pending_user_profile_update = None
         page._update_user_profile_button = Mock()
         page._delete_user_profile_button = Mock()
@@ -2652,7 +2665,8 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             },
         )
 
-        ProfileSetupPageBase._on_user_profile_update_worker_finished(page, running_worker)
+        runtime.running = False
+        ProfileSetupPageBase._on_user_profile_update_worker_finished(page, object())
 
         page.create_profile_user_update_worker.assert_called_once_with(
             2,
@@ -2679,6 +2693,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
                 self.failed = _Signal()
                 self.finished = _Signal()
                 self.start = Mock()
+                self.deleteLater = Mock()
 
             def isRunning(self) -> bool:
                 return False

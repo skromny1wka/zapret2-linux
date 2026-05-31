@@ -841,11 +841,11 @@ class ProfileSetupPageBase(BasePage):
         self._enabled_save_request_id = 0
         self._enabled_save_runtime_enabled: bool | None = None
         self._pending_enabled_save: bool | None = None
+        self._user_profile_update_runtime = OneShotWorkerRuntime()
         self._user_profile_update_request_id = 0
-        self._user_profile_update_worker = None
         self._pending_user_profile_update: dict[str, str] | None = None
+        self._user_profile_delete_runtime = OneShotWorkerRuntime()
         self._user_profile_delete_request_id = 0
-        self._user_profile_delete_worker = None
         self._strategy_apply_request_id = 0
         self._strategy_apply_worker = None
         self._strategy_apply_worker_strategy_id = ""
@@ -1391,19 +1391,15 @@ class ProfileSetupPageBase(BasePage):
         profile_id = str(profile_id or "").strip()
         if not profile_id:
             return
-        worker = self.__dict__.get("_user_profile_update_worker")
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    self._pending_user_profile_update = {
-                        "profile_id": profile_id,
-                        "name": str(name or ""),
-                        "protocol": str(protocol or ""),
-                        "ports": str(ports or ""),
-                    }
-                    return
-            except Exception:
-                return
+        runtime = self._worker_runtime("_user_profile_update_runtime")
+        if runtime.is_running():
+            self._pending_user_profile_update = {
+                "profile_id": profile_id,
+                "name": str(name or ""),
+                "protocol": str(protocol or ""),
+                "ports": str(ports or ""),
+            }
+            return
         self._start_user_profile_update_worker(
             profile_id,
             name=name,
@@ -1412,22 +1408,24 @@ class ProfileSetupPageBase(BasePage):
         )
 
     def _start_user_profile_update_worker(self, profile_id: str, *, name: str, protocol: str, ports: str) -> None:
+        runtime = self._worker_runtime("_user_profile_update_runtime")
         self._user_profile_update_request_id = int(getattr(self, "_user_profile_update_request_id", 0) or 0) + 1
         request_id = self._user_profile_update_request_id
         self._set_user_profile_buttons_enabled(False)
-        worker = self.create_profile_user_update_worker(
-            request_id,
-            profile_id=profile_id,
-            name=name,
-            protocol=protocol,
-            ports=ports,
-            parent=self,
+        runtime.start_qthread_worker(
+            worker_factory=lambda _runtime_request_id: self.create_profile_user_update_worker(
+                request_id,
+                profile_id=profile_id,
+                name=name,
+                protocol=protocol,
+                ports=ports,
+                parent=self,
+            ),
+            on_loaded=self._on_user_profile_update_finished,
+            on_failed=self._on_user_profile_update_failed,
+            on_finished=self._on_user_profile_update_worker_finished,
+            loaded_signal_name="updated",
         )
-        self._user_profile_update_worker = worker
-        worker.updated.connect(self._on_user_profile_update_finished)
-        worker.failed.connect(self._on_user_profile_update_failed)
-        worker.finished.connect(lambda w=worker: self._on_user_profile_update_worker_finished(w))
-        worker.start()
 
     def _on_user_profile_update_finished(
         self,
@@ -1471,10 +1469,7 @@ class ProfileSetupPageBase(BasePage):
             parent=self.window(),
         )
 
-    def _on_user_profile_update_worker_finished(self, worker) -> None:
-        if self.__dict__.get("_user_profile_update_worker") is worker:
-            self._user_profile_update_worker = None
-        worker.deleteLater()
+    def _on_user_profile_update_worker_finished(self, _worker) -> None:
         pending = self.__dict__.get("_pending_user_profile_update")
         self._pending_user_profile_update = None
         if pending:
@@ -1502,26 +1497,23 @@ class ProfileSetupPageBase(BasePage):
         profile_id = str(profile_id or "").strip()
         if not profile_id:
             return
-        worker = self.__dict__.get("_user_profile_delete_worker")
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    return
-            except Exception:
-                return
+        runtime = self._worker_runtime("_user_profile_delete_runtime")
+        if runtime.is_running():
+            return
         self._user_profile_delete_request_id = int(getattr(self, "_user_profile_delete_request_id", 0) or 0) + 1
         request_id = self._user_profile_delete_request_id
         self._set_user_profile_buttons_enabled(False)
-        worker = self.create_profile_user_delete_worker(
-            request_id,
-            profile_id=profile_id,
-            parent=self,
+        runtime.start_qthread_worker(
+            worker_factory=lambda _runtime_request_id: self.create_profile_user_delete_worker(
+                request_id,
+                profile_id=profile_id,
+                parent=self,
+            ),
+            on_loaded=self._on_user_profile_delete_finished,
+            on_failed=self._on_user_profile_delete_failed,
+            on_finished=self._on_user_profile_delete_worker_finished,
+            loaded_signal_name="deleted",
         )
-        self._user_profile_delete_worker = worker
-        worker.deleted.connect(self._on_user_profile_delete_finished)
-        worker.failed.connect(self._on_user_profile_delete_failed)
-        worker.finished.connect(lambda w=worker: self._on_user_profile_delete_worker_finished(w))
-        worker.start()
 
     def _on_user_profile_delete_finished(self, request_id: int, profile_id: str, changed: int) -> None:
         if request_id != int(getattr(self, "_user_profile_delete_request_id", 0) or 0):
@@ -1547,11 +1539,8 @@ class ProfileSetupPageBase(BasePage):
             parent=self.window(),
         )
 
-    def _on_user_profile_delete_worker_finished(self, worker) -> None:
-        if self.__dict__.get("_user_profile_delete_worker") is worker:
-            self._user_profile_delete_worker = None
-            self._set_user_profile_buttons_enabled(True)
-        worker.deleteLater()
+    def _on_user_profile_delete_worker_finished(self, _worker) -> None:
+        self._set_user_profile_buttons_enabled(True)
 
     def show_profile(self, profile_key: str) -> None:
         next_key = str(profile_key or "").strip()
@@ -2832,6 +2821,8 @@ class ProfileSetupPageBase(BasePage):
             ("_settings_save_runtime", "profile settings save worker"),
             ("_raw_profile_save_runtime", "profile raw text save worker"),
             ("_enabled_save_runtime", "profile enabled save worker"),
+            ("_user_profile_update_runtime", "profile user update worker"),
+            ("_user_profile_delete_runtime", "profile user delete worker"),
         ):
             runtime = self.__dict__.get(attr)
             if runtime is None:
@@ -2839,8 +2830,6 @@ class ProfileSetupPageBase(BasePage):
             runtime.stop(blocking=True, log_fn=log, warning_prefix=warning_prefix)
             runtime.cancel()
         for attr in (
-            "_user_profile_update_worker",
-            "_user_profile_delete_worker",
             "_strategy_apply_worker",
             "_strategy_feedback_save_worker",
         ):
