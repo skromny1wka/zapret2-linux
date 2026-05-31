@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from copy import deepcopy
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -30,7 +31,7 @@ from .list_file_editor import (
     validate_profile_list_file_text,
     write_profile_list_file_text,
 )
-from .models import EngineName, Preset, Profile
+from .models import EngineName, Preset, Profile, ProfileSegment
 from .normalizer import normalize_preset_profiles
 from .parser import parse_preset_text
 from .serializer import (
@@ -46,7 +47,7 @@ from .serializer import (
 )
 from .strategy_state import ProfileStrategyState, ProfileStrategyStateStore
 from .strategy_catalog import StrategyEntry, load_strategy_catalogs
-from .state import ProfileListFileEditorState, ProfileListItem, ProfileListPayload, ProfileSetupPayload
+from .state import ProfileListFileEditorState, ProfileListItem, ProfileListPayload, ProfileSetupPayload, ProfileStrategyBranch
 from .template_library import load_profile_template_library
 from .user_profiles import create_user_profile, delete_user_profile, update_user_profile
 from .editable_settings import (
@@ -395,6 +396,13 @@ class ProfilePresetService:
             user_template_key=getattr(source, "user_template_key", ""),
         )
         strategy_entries = dict(_basic_strategy_entries(profile, catalogs))
+        strategy_branches = _strategy_branches_for_profile(profile, strategy_entries)
+        current_branch = strategy_branches[0] if strategy_branches else None
+        current_strategy_id = (
+            str(current_branch.strategy_id or "").strip()
+            if current_branch is not None
+            else str(item.strategy_id or "").strip()
+        )
         editable = read_editable_profile_settings(profile)
         strategy_states = self._state_store.get_strategy_states(
             profile.persistent_key,
@@ -405,8 +413,14 @@ class ProfilePresetService:
             strategy_entries=strategy_entries,
             strategy_states=strategy_states,
             raw_profile_text=_profile_raw_text(profile),
-            raw_strategy_text="\n".join(getattr(profile.strategy, "strategy_lines", ()) or ()),
+            raw_strategy_text=(
+                current_branch.raw_strategy_text
+                if current_branch is not None
+                else "\n".join(getattr(profile.strategy, "strategy_lines", ()) or ())
+            ),
             match_summary=_match_summary(profile, list_type=item.list_type),
+            strategy_branches=strategy_branches,
+            current_strategy_branch_id=str(getattr(current_branch, "branch_id", "") or ""),
             editable_filter_kind=editable.filter_kind,
             editable_filter_value=editable.filter_value,
             editable_filter_enabled=editable.filter_editable,
@@ -414,7 +428,7 @@ class ProfilePresetService:
             editable_filter_kinds=_available_filter_kinds(editable, self._app_paths),
             in_range=editable.in_range,
             out_range=editable.out_range,
-            current_strategy_state=strategy_states.get(item.strategy_id, ProfileStrategyState()),
+            current_strategy_state=strategy_states.get(current_strategy_id, ProfileStrategyState()),
         )
         self._remember_profile_setup_payload(cache_key, payload)
         return payload
@@ -467,7 +481,7 @@ class ProfilePresetService:
             return resolved_key
         return None
 
-    def apply_strategy(self, profile_key: str, strategy_id: str) -> str | None:
+    def apply_strategy(self, profile_key: str, strategy_id: str, *, strategy_branch_id: str = "") -> str | None:
         strategy_id = str(strategy_id or "").strip()
         if not strategy_id or strategy_id in {"none", "custom"}:
             return None
@@ -481,6 +495,30 @@ class ProfilePresetService:
             return None
         entry = setup.strategy_entries.get(strategy_id)
         if entry is None:
+            return None
+        branch_id = str(strategy_branch_id or "").strip()
+        if not branch_id:
+            branch_id = str(getattr(setup, "current_strategy_branch_id", "") or "").strip()
+        strategy_branches = tuple(getattr(setup, "strategy_branches", ()) or ())
+        if branch_id and strategy_branches and setup.item.in_preset:
+            branch = next((item for item in strategy_branches if item.branch_id == branch_id), None)
+            if branch is None:
+                return None
+            if (
+                setup.item.in_preset
+                and setup.item.enabled
+                and str(branch.strategy_id or "").strip() == strategy_id
+            ):
+                return setup.item.key
+            preset, _manifest = self.load_selected_preset()
+            index = _profile_index_for_key(preset, profile_key)
+            if index is None:
+                return None
+            preset = _with_profile_strategy_branch_lines(preset, index, branch_id, entry.args.splitlines())
+            preset = with_profile_enabled(preset, index, True)
+            self.save_selected_preset(preset)
+            return preset.profiles[index].key if 0 <= index < len(preset.profiles) else None
+        if setup.item.in_preset and strategy_branches and len(strategy_branches) > 1:
             return None
         if (
             setup.item.in_preset
@@ -1067,7 +1105,8 @@ class ProfilePresetService:
         user_template_key: str = "",
     ) -> ProfileListItem:
         strategy_entries = _basic_strategy_entries(profile, catalogs)
-        strategy_id, strategy_name = _resolve_strategy(profile, strategy_entries)
+        strategy_branches = _strategy_branches_for_profile(profile, strategy_entries)
+        strategy_id, strategy_name = _profile_strategy_summary(profile, strategy_entries, strategy_branches)
         list_type = _visible_list_type(profile, self._app_paths)
         folder_key, folder_name, folder_order = profile_folder_for_profile(profile, folder_state)
         effective_strategy_id = strategy_id if in_preset and profile.enabled else "none"
@@ -1101,6 +1140,7 @@ class ProfilePresetService:
             group_collapsed=profile_folder_collapsed(folder_key, folder_state),
             user_profile_id=_user_profile_id_from_template_key(user_template_key),
             profile_name=profile.name,
+            strategy_branches=strategy_branches,
         )
 
     @lru_cache(maxsize=1)
@@ -1243,8 +1283,28 @@ def _basic_strategy_entries(profile: Profile, catalogs: dict[str, dict[str, Stra
     return dict(catalogs.get(_catalog_name_for_profile(profile)) or {})
 
 
+def _profile_strategy_summary(
+    profile: Profile,
+    entries: dict[str, StrategyEntry],
+    branches: tuple[ProfileStrategyBranch, ...],
+) -> tuple[str, str]:
+    if len(branches) <= 1:
+        return _resolve_strategy(profile, entries)
+    names = [str(branch.strategy_name or "").strip() for branch in branches if str(branch.strategy_name or "").strip()]
+    visible = names[:2]
+    suffix = f" +{len(names) - len(visible)}" if len(names) > len(visible) else ""
+    label = ", ".join(visible)
+    if label:
+        return "custom", f"{len(branches)} стратегии: {label}{suffix}"
+    return "custom", f"{len(branches)} стратегии"
+
+
 def _resolve_strategy(profile: Profile, entries: dict[str, StrategyEntry]) -> tuple[str, str]:
-    current = _strategy_identity_lines(profile, getattr(profile.strategy, "strategy_lines", ()) or ())
+    return _resolve_strategy_lines(profile, entries, getattr(profile.strategy, "strategy_lines", ()) or ())
+
+
+def _resolve_strategy_lines(profile: Profile, entries: dict[str, StrategyEntry], lines) -> tuple[str, str]:
+    current = _strategy_identity_lines(profile, lines)
     if not current:
         return "none", "Стратегия не выбрана"
     matches = [
@@ -1255,6 +1315,125 @@ def _resolve_strategy(profile: Profile, entries: dict[str, StrategyEntry]) -> tu
     if len(matches) == 1:
         return matches[0].strategy_id, matches[0].name
     return "custom", "custom"
+
+
+def _strategy_branches_for_profile(profile: Profile, entries: dict[str, StrategyEntry]) -> tuple[ProfileStrategyBranch, ...]:
+    if profile.engine != ENGINE_WINWS2:
+        return ()
+
+    payload = "all"
+    in_range = "x"
+    out_range = "a"
+    raw_lines: list[str] = []
+    branches: list[ProfileStrategyBranch] = []
+
+    def flush() -> None:
+        nonlocal raw_lines
+        if not raw_lines:
+            return
+        strategy_id, strategy_name = _resolve_strategy_lines(profile, entries, raw_lines)
+        scope_lines = _strategy_branch_scope_lines(payload=payload, in_range=in_range, out_range=out_range)
+        branches.append(
+            ProfileStrategyBranch(
+                branch_id=f"branch:{len(branches)}",
+                payload=payload,
+                in_range=in_range,
+                out_range=out_range,
+                strategy_id=strategy_id,
+                strategy_name=strategy_name,
+                raw_strategy_text="\n".join((*scope_lines, *raw_lines)).strip(),
+            )
+        )
+        raw_lines = []
+
+    for segment in tuple(getattr(profile, "segments", ()) or ()):
+        name = str(getattr(segment, "name", "") or "").strip().lower()
+        text = str(getattr(segment, "text", "") or "").strip()
+        if segment.kind == "strategy_filter":
+            flush()
+            value = str(getattr(segment, "value", "") or "").strip()
+            if name == "--payload":
+                payload = value or "all"
+            elif name == "--in-range":
+                in_range = value or "x"
+            elif name == "--out-range":
+                out_range = value or "a"
+            continue
+        if segment.kind == "strategy" and text:
+            raw_lines.append(text)
+
+    flush()
+    return tuple(branches)
+
+
+def _strategy_branch_scope_lines(*, payload: str, in_range: str, out_range: str) -> tuple[str, ...]:
+    lines: list[str] = []
+    if str(in_range or "x").strip() != "x":
+        lines.append(f"--in-range={str(in_range).strip()}")
+    if str(out_range or "a").strip() != "a":
+        lines.append(f"--out-range={str(out_range).strip()}")
+    if str(payload or "all").strip() != "all":
+        lines.append(f"--payload={str(payload).strip()}")
+    return tuple(lines)
+
+
+def _with_profile_strategy_branch_lines(
+    preset: Preset,
+    profile_index: int,
+    branch_id: str,
+    strategy_lines,
+) -> Preset:
+    updated = deepcopy(preset)
+    profile = updated.profiles[int(profile_index)]
+    groups = _strategy_branch_segment_groups(profile)
+    target = groups.get(str(branch_id or "").strip())
+    if not target:
+        return preset
+
+    normalized_lines = [str(line or "").strip() for line in strategy_lines or () if str(line or "").strip()]
+    replacement = [_strategy_segment(line) for line in normalized_lines]
+    start, end = target
+    profile.segments = [*profile.segments[:start], *replacement, *profile.segments[end + 1 :]]
+    return parse_preset_text(
+        serialize_preset(updated),
+        engine=updated.engine,
+        source_name=updated.source_name,
+    )
+
+
+def _strategy_branch_segment_groups(profile: Profile) -> dict[str, tuple[int, int]]:
+    groups: dict[str, tuple[int, int]] = {}
+    current: list[int] = []
+
+    def flush() -> None:
+        nonlocal current
+        if not current:
+            return
+        groups[f"branch:{len(groups)}"] = (current[0], current[-1])
+        current = []
+
+    for index, segment in enumerate(tuple(getattr(profile, "segments", ()) or ())):
+        if segment.kind == "strategy_filter":
+            flush()
+            continue
+        if segment.kind == "strategy":
+            current.append(index)
+
+    flush()
+    return groups
+
+
+def _strategy_segment(line: str) -> ProfileSegment:
+    name, value = _split_profile_option(line)
+    return ProfileSegment(kind="strategy", text=str(line or "").strip(), name=name, value=value)
+
+
+def _split_profile_option(line: str) -> tuple[str, str]:
+    text = str(line or "").strip()
+    if "=" not in text:
+        return text, ""
+    name, _sep, value = text.partition("=")
+    return name.strip(), value.strip()
 
 
 def _profile_status_name(*, in_preset: bool, enabled: bool, strategy_name: str) -> str:

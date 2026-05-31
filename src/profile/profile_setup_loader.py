@@ -558,20 +558,33 @@ class ProfileStrategyApplyWorker(QThread):
     applied = pyqtSignal(int, str, str, str, object)
     failed = pyqtSignal(int, str)
 
-    def __init__(self, request_id: int, apply_strategy, load_profile, profile_key: str, strategy_id: str, parent=None):
+    def __init__(
+        self,
+        request_id: int,
+        apply_strategy,
+        load_profile,
+        profile_key: str,
+        strategy_id: str,
+        strategy_branch_id: str = "",
+        parent=None,
+    ):
         super().__init__(parent)
         self._request_id = int(request_id)
         self._apply_strategy = apply_strategy
         self._load_profile = load_profile
         self._profile_key = str(profile_key or "").strip()
         self._strategy_id = str(strategy_id or "").strip()
+        self._strategy_branch_id = str(strategy_branch_id or "").strip()
 
     def run(self) -> None:
         try:
-            profile_key = self._apply_strategy(
-                profile_key=self._profile_key,
-                strategy_id=self._strategy_id,
-            )
+            kwargs = {
+                "profile_key": self._profile_key,
+                "strategy_id": self._strategy_id,
+            }
+            if self._strategy_branch_id:
+                kwargs["strategy_branch_id"] = self._strategy_branch_id
+            profile_key = self._apply_strategy(**kwargs)
         except Exception as exc:
             log(f"ProfileStrategyApplyWorker: не удалось применить готовую стратегию: {exc}", "ERROR")
             self.failed.emit(self._request_id, str(exc))

@@ -393,14 +393,20 @@ class ProfileFeature:
         *,
         profile_key: str,
         strategy_id: str,
+        strategy_branch_id: str = "",
         parent=None,
     ):
         from profile.profile_setup_loader import ProfileStrategyApplyWorker
 
         clean_launch_method = str(launch_method or "")
 
-        def _apply_strategy(*, profile_key: str, strategy_id: str):
-            return self.apply_strategy_to_profile(clean_launch_method, profile_key, strategy_id)
+        def _apply_strategy(*, profile_key: str, strategy_id: str, strategy_branch_id: str = ""):
+            return self.apply_strategy_to_profile(
+                clean_launch_method,
+                profile_key,
+                strategy_id,
+                strategy_branch_id=strategy_branch_id,
+            )
 
         def _load_profile_setup(profile_key: str):
             return self.get_profile_setup(clean_launch_method, profile_key)
@@ -411,6 +417,7 @@ class ProfileFeature:
             _load_profile_setup,
             profile_key,
             strategy_id,
+            strategy_branch_id,
             parent,
         )
 
@@ -468,8 +475,21 @@ class ProfileFeature:
             filter_value=filter_value,
         )
 
-    def apply_strategy_to_profile(self, launch_method: str, profile_key: str, strategy_id: str) -> str | None:
-        return self._commands().apply_strategy_to_profile(self, launch_method, profile_key, strategy_id)
+    def apply_strategy_to_profile(
+        self,
+        launch_method: str,
+        profile_key: str,
+        strategy_id: str,
+        *,
+        strategy_branch_id: str = "",
+    ) -> str | None:
+        return self._commands().apply_strategy_to_profile(
+            self,
+            launch_method,
+            profile_key,
+            strategy_id,
+            strategy_branch_id=strategy_branch_id,
+        )
 
     def set_profile_enabled(
         self,

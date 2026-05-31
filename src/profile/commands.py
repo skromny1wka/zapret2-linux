@@ -77,8 +77,19 @@ def get_profile_list_file_editor_state(
     )
 
 
-def apply_strategy_to_profile(profile_services, launch_method: str, profile_key: str, strategy_id: str) -> str | None:
-    return _profile_preset_service(profile_services, launch_method).apply_strategy(profile_key, strategy_id)
+def apply_strategy_to_profile(
+    profile_services,
+    launch_method: str,
+    profile_key: str,
+    strategy_id: str,
+    *,
+    strategy_branch_id: str = "",
+) -> str | None:
+    return _profile_preset_service(profile_services, launch_method).apply_strategy(
+        profile_key,
+        strategy_id,
+        strategy_branch_id=strategy_branch_id,
+    )
 
 
 def set_profile_enabled(

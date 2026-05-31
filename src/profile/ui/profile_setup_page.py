@@ -716,11 +716,12 @@ def _single_strategy_order_move(
 
 def _match_tab_text(payload) -> str:
     item = getattr(payload, "item", None)
-    strategy_id = str(getattr(item, "strategy_id", "") or "").strip()
-    strategy_name = str(getattr(item, "strategy_name", "") or "").strip()
+    branch = _current_strategy_branch(payload)
+    strategy_id = str(getattr(branch, "strategy_id", "") or getattr(item, "strategy_id", "") or "").strip()
+    strategy_name = str(getattr(branch, "strategy_name", "") or getattr(item, "strategy_name", "") or "").strip()
     strategy_entries = getattr(payload, "strategy_entries", {}) or {}
     entry = strategy_entries.get(strategy_id)
-    strategy_args = str(getattr(entry, "args", "") or getattr(payload, "raw_strategy_text", "") or "").strip()
+    strategy_args = str(getattr(payload, "raw_strategy_text", "") or getattr(entry, "args", "") or "").strip()
 
     if not strategy_name or strategy_id in {"", "none"}:
         strategy_name = "Стратегия не выбрана"
@@ -739,6 +740,81 @@ def _match_tab_text(payload) -> str:
         lines.append("=" * len(title))
         lines.append(text)
         lines.append("")
+    return "\n".join(lines).strip()
+
+
+def _current_strategy_branch(payload):
+    branches = tuple(getattr(payload, "strategy_branches", ()) or ())
+    if not branches:
+        return None
+    current_id = str(getattr(payload, "current_strategy_branch_id", "") or "").strip()
+    for branch in branches:
+        if str(getattr(branch, "branch_id", "") or "").strip() == current_id:
+            return branch
+    return branches[0]
+
+
+def _current_strategy_id(payload) -> str:
+    branch = _current_strategy_branch(payload)
+    if branch is not None:
+        return str(getattr(branch, "strategy_id", "") or "").strip()
+    item = getattr(payload, "item", None)
+    return str(getattr(item, "strategy_id", "") or "").strip()
+
+
+def _current_strategy_branch_id(payload) -> str:
+    branch = _current_strategy_branch(payload)
+    return str(getattr(branch, "branch_id", "") or "").strip() if branch is not None else ""
+
+
+def _payload_with_strategy_branch(payload, branch_id: str):
+    clean_branch_id = str(branch_id or "").strip()
+    branches = tuple(getattr(payload, "strategy_branches", ()) or ())
+    branch = next(
+        (
+            item
+            for item in branches
+            if str(getattr(item, "branch_id", "") or "").strip() == clean_branch_id
+        ),
+        None,
+    )
+    if branch is None:
+        return payload
+    states = getattr(payload, "strategy_states", {}) or {}
+    strategy_id = str(getattr(branch, "strategy_id", "") or "").strip()
+    return replace(
+        payload,
+        current_strategy_branch_id=clean_branch_id,
+        raw_strategy_text=str(getattr(branch, "raw_strategy_text", "") or ""),
+        current_strategy_state=states.get(strategy_id, ProfileStrategyState()),
+    )
+
+
+def _strategy_branch_label(branch) -> str:
+    payload = str(getattr(branch, "payload", "") or "all").strip() or "all"
+    in_range = str(getattr(branch, "in_range", "") or "x").strip() or "x"
+    out_range = str(getattr(branch, "out_range", "") or "a").strip() or "a"
+    strategy_name = str(getattr(branch, "strategy_name", "") or "Своя стратегия").strip()
+    parts = [f"payload: {payload}"]
+    if in_range != "x":
+        parts.append(f"in: {in_range}")
+    if out_range != "a":
+        parts.append(f"out: {out_range}")
+    return f"{' · '.join(parts)} — {strategy_name}"
+
+
+def _branch_raw_strategy_text(branch, strategy_args: str) -> str:
+    lines = []
+    in_range = str(getattr(branch, "in_range", "") or "x").strip() or "x"
+    out_range = str(getattr(branch, "out_range", "") or "a").strip() or "a"
+    payload = str(getattr(branch, "payload", "") or "all").strip() or "all"
+    if in_range != "x":
+        lines.append(f"--in-range={in_range}")
+    if out_range != "a":
+        lines.append(f"--out-range={out_range}")
+    if payload != "all":
+        lines.append(f"--payload={payload}")
+    lines.extend(line for line in str(strategy_args or "").splitlines() if line.strip())
     return "\n".join(lines).strip()
 
 
@@ -849,6 +925,7 @@ class ProfileSetupPageBase(BasePage):
         self._strategy_apply_runtime = OneShotWorkerRuntime()
         self._strategy_apply_request_id = 0
         self._strategy_apply_runtime_strategy_id = ""
+        self._strategy_apply_runtime_branch_id = ""
         self._pending_strategy_apply = None
         self._strategy_feedback_save_runtime = OneShotWorkerRuntime()
         self._strategy_feedback_save_request_id = 0
@@ -857,6 +934,8 @@ class ProfileSetupPageBase(BasePage):
         self._strategy_stack = None
         self._strategy_tabs = None
         self._strategy_list = None
+        self._strategy_branch_bar = None
+        self._strategy_branch_combo = None
         self._strategy_tab = None
         self._list_file_editor_placeholder = None
         self._match_tab_placeholder = None
@@ -1000,6 +1079,18 @@ class ProfileSetupPageBase(BasePage):
         set_segmented_current_item_if_changed(self._strategy_tabs, "strategies")
         self._sync_editor_tab_label(None)
         self.layout.addWidget(self._strategy_tabs)
+
+        self._strategy_branch_bar = QWidget(self)
+        branch_layout = QHBoxLayout(self._strategy_branch_bar)
+        branch_layout.setContentsMargins(0, 0, 0, 0)
+        branch_layout.setSpacing(8)
+        branch_layout.addWidget(BodyLabel("Ветка"))
+        self._strategy_branch_combo = ComboBox()
+        self._strategy_branch_combo.setMinimumWidth(260)
+        self._strategy_branch_combo.currentIndexChanged.connect(self._on_strategy_branch_changed)
+        branch_layout.addWidget(self._strategy_branch_combo, 1)
+        self._strategy_branch_bar.hide()
+        self.layout.addWidget(self._strategy_branch_bar)
 
         self._strategy_list = ProfileStrategyListWidget(self)
         self._strategy_list.strategy_activated.connect(self._on_strategy_list_activated)
@@ -1681,12 +1772,21 @@ class ProfileSetupPageBase(BasePage):
             parent=parent,
         )
 
-    def create_profile_strategy_apply_worker(self, request_id: int, *, profile_key: str, strategy_id: str, parent=None):
+    def create_profile_strategy_apply_worker(
+        self,
+        request_id: int,
+        *,
+        profile_key: str,
+        strategy_id: str,
+        strategy_branch_id: str = "",
+        parent=None,
+    ):
         return self._create_profile_strategy_apply_worker_fn(
             request_id,
             self.launch_method,
             profile_key=profile_key,
             strategy_id=strategy_id,
+            strategy_branch_id=strategy_branch_id,
             parent=parent,
         )
 
@@ -1780,11 +1880,12 @@ class ProfileSetupPageBase(BasePage):
             self._apply_editable_settings(payload)
             self._set_list_file_editor_available(_profile_has_list_file_editor(payload))
             self._sync_editor_tab_label(payload)
+            self._apply_strategy_branch_selector(payload)
 
             self._strategy_list.set_rows(
                 entries=payload.strategy_entries,
                 states=payload.strategy_states,
-                current_strategy_id=item.strategy_id or "none",
+                current_strategy_id=_current_strategy_id(payload) or "none",
             )
             set_widget_enabled_if_changed(self._strategy_list, not (item.in_preset and not item.enabled))
             self._list_file_dirty = True
@@ -1795,6 +1896,56 @@ class ProfileSetupPageBase(BasePage):
             self._rebuild_breadcrumb()
         finally:
             self._loading = False
+
+    def _apply_strategy_branch_selector(self, payload) -> None:
+        combo = self._strategy_branch_combo
+        bar = self._strategy_branch_bar
+        if combo is None or bar is None:
+            return
+        branches = tuple(getattr(payload, "strategy_branches", ()) or ())
+        visible = len(branches) > 1
+        set_widget_visible_if_changed(bar, visible)
+        if not visible:
+            return
+
+        current_id = _current_strategy_branch_id(payload) or str(getattr(branches[0], "branch_id", "") or "")
+        combo.blockSignals(True)
+        try:
+            combo.clear()
+            selected_index = 0
+            for index, branch in enumerate(branches):
+                branch_id = str(getattr(branch, "branch_id", "") or "").strip()
+                combo.addItem(_strategy_branch_label(branch), userData=branch_id)
+                if branch_id == current_id:
+                    selected_index = index
+            combo.setCurrentIndex(selected_index)
+        finally:
+            combo.blockSignals(False)
+
+    def _on_strategy_branch_changed(self, _index: int) -> None:
+        if self._loading or self._payload is None or self._strategy_branch_combo is None:
+            return
+        branch_id = str(self._strategy_branch_combo.itemData(self._strategy_branch_combo.currentIndex()) or "").strip()
+        if not branch_id:
+            return
+        branches = tuple(getattr(self._payload, "strategy_branches", ()) or ())
+        branch = next((item for item in branches if str(getattr(item, "branch_id", "") or "").strip() == branch_id), None)
+        if branch is None:
+            return
+        state = (getattr(self._payload, "strategy_states", {}) or {}).get(
+            str(getattr(branch, "strategy_id", "") or "").strip(),
+            ProfileStrategyState(),
+        )
+        self._payload = replace(
+            self._payload,
+            current_strategy_branch_id=branch_id,
+            raw_strategy_text=str(getattr(branch, "raw_strategy_text", "") or ""),
+            current_strategy_state=state,
+        )
+        self._strategy_list.set_current_strategy_id(str(getattr(branch, "strategy_id", "") or "none").strip() or "none")
+        self._apply_feedback_buttons(self._payload)
+        if self._match_tab_built:
+            self._apply_match_tab_payload()
 
     def _set_list_file_editor_available(self, available: bool) -> None:
         if self._strategy_tabs is None or self._strategy_stack is None:
@@ -2550,34 +2701,45 @@ class ProfileSetupPageBase(BasePage):
         item = getattr(getattr(self, "_payload", None), "item", None)
         if bool(getattr(item, "in_preset", False)) and not bool(getattr(item, "enabled", False)):
             return
-        if strategy_id == str(getattr(item, "strategy_id", "") or "").strip():
+        if strategy_id == _current_strategy_id(self._payload):
             return
         self._apply_strategy_locally(strategy_id)
         self._request_strategy_apply(strategy_id)
 
     def _request_strategy_apply(self, strategy_id: str) -> None:
         strategy_id = str(strategy_id or "").strip()
+        branch_id = _current_strategy_branch_id(self._payload)
         runtime = self._worker_runtime("_strategy_apply_runtime")
         if runtime.is_running():
-            if strategy_id != str(getattr(self, "_strategy_apply_runtime_strategy_id", "") or "").strip():
-                self._pending_strategy_apply = strategy_id
+            if (
+                strategy_id != str(getattr(self, "_strategy_apply_runtime_strategy_id", "") or "").strip()
+                or branch_id != str(getattr(self, "_strategy_apply_runtime_branch_id", "") or "").strip()
+            ):
+                self._pending_strategy_apply = (strategy_id, branch_id) if branch_id else strategy_id
             return
-        self._start_strategy_apply_worker(strategy_id)
+        self._start_strategy_apply_worker(strategy_id, strategy_branch_id=branch_id)
 
-    def _start_strategy_apply_worker(self, strategy_id: str) -> None:
+    def _start_strategy_apply_worker(self, strategy_id: str, *, strategy_branch_id: str = "") -> None:
         strategy_id = str(strategy_id or "").strip()
+        strategy_branch_id = str(strategy_branch_id or "").strip()
         if not strategy_id or not self._profile_key:
             return
         runtime = self._worker_runtime("_strategy_apply_runtime")
         self._strategy_apply_request_id = int(getattr(self, "_strategy_apply_request_id", 0) or 0) + 1
         request_id = self._strategy_apply_request_id
         self._strategy_apply_runtime_strategy_id = strategy_id
+        self._strategy_apply_runtime_branch_id = strategy_branch_id
+        worker_kwargs = {
+            "profile_key": self._profile_key,
+            "strategy_id": strategy_id,
+            "parent": self,
+        }
+        if strategy_branch_id:
+            worker_kwargs["strategy_branch_id"] = strategy_branch_id
         runtime.start_qthread_worker(
             worker_factory=lambda _runtime_request_id: self.create_profile_strategy_apply_worker(
                 request_id,
-                profile_key=self._profile_key,
-                strategy_id=strategy_id,
-                parent=self,
+                **worker_kwargs,
             ),
             on_loaded=self._on_strategy_apply_finished,
             on_failed=self._on_strategy_apply_failed,
@@ -2597,18 +2759,26 @@ class ProfileSetupPageBase(BasePage):
             return
         if str(requested_profile_key or "").strip() != str(self._profile_key or "").strip():
             return
-        pending = str(getattr(self, "_pending_strategy_apply", "") or "").strip()
-        if pending and pending != str(strategy_id or "").strip():
+        pending = getattr(self, "_pending_strategy_apply", None)
+        pending_strategy_id = ""
+        if isinstance(pending, tuple):
+            pending_strategy_id = str(pending[0] or "").strip()
+        else:
+            pending_strategy_id = str(pending or "").strip()
+        if pending_strategy_id and pending_strategy_id != str(strategy_id or "").strip():
             return
         previous_key = self._profile_key
         new_key = str(profile_key or "").strip()
         if new_key:
             self._profile_key = new_key
         item = getattr(getattr(self, "_payload", None), "item", None)
-        if self._profile_key == previous_key and strategy_id == str(getattr(item, "strategy_id", "") or "").strip():
+        if self._profile_key == previous_key and strategy_id == _current_strategy_id(self._payload):
             self._on_profile_changed_callback(self._profile_key, "strategy", item)
             return
         if payload is not None:
+            branch_id = str(getattr(self, "_strategy_apply_runtime_branch_id", "") or "").strip()
+            if branch_id:
+                payload = _payload_with_strategy_branch(payload, branch_id)
             self._payload = payload
             self._apply_payload(payload)
             self._on_profile_changed_callback(
@@ -2633,10 +2803,14 @@ class ProfileSetupPageBase(BasePage):
 
     def _on_strategy_apply_worker_finished(self, _worker) -> None:
         self._strategy_apply_runtime_strategy_id = ""
-        pending = str(getattr(self, "_pending_strategy_apply", "") or "").strip()
+        self._strategy_apply_runtime_branch_id = ""
+        pending = getattr(self, "_pending_strategy_apply", None)
         self._pending_strategy_apply = None
         if pending:
-            self._start_strategy_apply_worker(pending)
+            if isinstance(pending, tuple):
+                self._start_strategy_apply_worker(str(pending[0] or ""), strategy_branch_id=str(pending[1] or ""))
+            else:
+                self._start_strategy_apply_worker(str(pending or ""))
 
     def _apply_strategy_locally(self, strategy_id: str) -> bool:
         payload = self._payload
@@ -2650,6 +2824,44 @@ class ProfileSetupPageBase(BasePage):
             return False
 
         state = (getattr(payload, "strategy_states", {}) or {}).get(strategy_id, ProfileStrategyState())
+        branches = tuple(getattr(payload, "strategy_branches", ()) or ())
+        current_branch_id = _current_strategy_branch_id(payload)
+        if branches and current_branch_id:
+            entry_args = str(getattr(entry, "args", "") or "").strip()
+            next_raw_strategy_text = ""
+            updated_branches = tuple(
+                replace(
+                    branch,
+                    strategy_id=strategy_id,
+                    strategy_name=str(getattr(entry, "name", "") or strategy_id),
+                    raw_strategy_text=_branch_raw_strategy_text(branch, entry_args),
+                )
+                if str(getattr(branch, "branch_id", "") or "").strip() == current_branch_id
+                else branch
+                for branch in branches
+            )
+            selected_branch = next(
+                (
+                    branch
+                    for branch in updated_branches
+                    if str(getattr(branch, "branch_id", "") or "").strip() == current_branch_id
+                ),
+                None,
+            )
+            next_raw_strategy_text = str(getattr(selected_branch, "raw_strategy_text", "") or entry_args)
+            self._payload = replace(
+                payload,
+                strategy_branches=updated_branches,
+                raw_strategy_text=next_raw_strategy_text,
+                current_strategy_state=state,
+            )
+            self._strategy_list.set_current_strategy_id(strategy_id)
+            self._apply_strategy_branch_selector(self._payload)
+            self._apply_feedback_buttons(self._payload)
+            if self._match_tab_built:
+                self._apply_match_tab_payload()
+            return True
+
         updated_item = replace(
             item,
             strategy_id=strategy_id,
@@ -2697,7 +2909,7 @@ class ProfileSetupPageBase(BasePage):
         if not self._profile_key:
             return
         item = getattr(getattr(self, "_payload", None), "item", None)
-        strategy_id = str(getattr(item, "strategy_id", "") or "").strip()
+        strategy_id = _current_strategy_id(self._payload)
         if not strategy_id or strategy_id in {"none", "custom"}:
             return
         runtime = self._worker_runtime("_strategy_feedback_save_runtime")
@@ -2732,7 +2944,7 @@ class ProfileSetupPageBase(BasePage):
         if str(profile_key or "").strip() != str(self._profile_key or "").strip():
             return
         item = getattr(getattr(self, "_payload", None), "item", None)
-        current_strategy_id = str(getattr(item, "strategy_id", "") or "").strip()
+        current_strategy_id = _current_strategy_id(self._payload)
         if str(strategy_id or "").strip() != current_strategy_id:
             return
         next_state = state if isinstance(state, ProfileStrategyState) else ProfileStrategyState()
@@ -2834,7 +3046,7 @@ class ProfileSetupPageBase(BasePage):
         item = getattr(self._payload, "item", None)
         if item is None:
             return False
-        strategy_id = str(getattr(item, "strategy_id", "") or "").strip()
+        strategy_id = _current_strategy_id(self._payload)
         if not strategy_id or strategy_id in {"none", "custom"}:
             return False
         next_state = state if isinstance(state, ProfileStrategyState) else ProfileStrategyState()
