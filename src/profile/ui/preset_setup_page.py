@@ -132,6 +132,7 @@ class PresetSetupPageBase(BasePage):
         self._user_profile_update_runtime = OneShotWorkerRuntime()
         self._user_profile_delete_request_id = 0
         self._user_profile_delete_runtime = OneShotWorkerRuntime()
+        self._pending_user_profile_operations: list[dict[str, str]] = []
         self._profile_payload_loaded_once = False
         self._profile_payload_dirty = True
         self._profile_load_refresh_pending = False
@@ -713,6 +714,53 @@ class PresetSetupPageBase(BasePage):
                 return True
         return False
 
+    def _queue_user_profile_operation(
+        self,
+        action: str,
+        *,
+        profile_id: str = "",
+        name: str = "",
+        protocol: str = "",
+        ports: str = "",
+    ) -> None:
+        self.__dict__.setdefault("_pending_user_profile_operations", []).append(
+            {
+                "action": str(action or ""),
+                "profile_id": str(profile_id or ""),
+                "name": str(name or ""),
+                "protocol": str(protocol or ""),
+                "ports": str(ports or ""),
+            }
+        )
+
+    def _start_next_pending_user_profile_operation(self) -> bool:
+        if self._user_profile_operation_running():
+            return True
+        pending_operations = self.__dict__.setdefault("_pending_user_profile_operations", [])
+        pending = pending_operations.pop(0) if pending_operations else None
+        if not pending:
+            return False
+        action = str(pending.get("action") or "")
+        if action == "create":
+            self._request_user_profile_create(
+                name=str(pending.get("name") or ""),
+                protocol=str(pending.get("protocol") or ""),
+                ports=str(pending.get("ports") or ""),
+            )
+            return True
+        if action == "update":
+            self._request_user_profile_update(
+                str(pending.get("profile_id") or ""),
+                name=str(pending.get("name") or ""),
+                protocol=str(pending.get("protocol") or ""),
+                ports=str(pending.get("ports") or ""),
+            )
+            return True
+        if action == "delete":
+            self._request_user_profile_delete(str(pending.get("profile_id") or ""))
+            return True
+        return self._start_next_pending_user_profile_operation()
+
     def _create_user_profile_create_worker(self, request_id: int, *, name: str, protocol: str, ports: str):
         return self._create_user_profile_create_worker_fn(
             request_id,
@@ -752,6 +800,12 @@ class PresetSetupPageBase(BasePage):
 
     def _request_user_profile_create(self, *, name: str, protocol: str, ports: str) -> None:
         if self._user_profile_operation_running():
+            self._queue_user_profile_operation(
+                "create",
+                name=name,
+                protocol=protocol,
+                ports=ports,
+            )
             return
         self._user_profile_create_request_id = int(self.__dict__.get("_user_profile_create_request_id", 0) or 0) + 1
         request_id = self._user_profile_create_request_id
@@ -801,12 +855,23 @@ class PresetSetupPageBase(BasePage):
         InfoBar.error(title="Ошибка", content=str(error), parent=self.window())
 
     def _on_user_profile_create_worker_finished(self, worker) -> None:
+        if self._start_next_pending_user_profile_operation():
+            return
         if not self._user_profile_operation_running():
             self._set_user_profile_actions_enabled(True)
 
     def _request_user_profile_update(self, profile_id: str, *, name: str, protocol: str, ports: str) -> None:
         profile_id = str(profile_id or "").strip()
-        if not profile_id or self._user_profile_operation_running():
+        if not profile_id:
+            return
+        if self._user_profile_operation_running():
+            self._queue_user_profile_operation(
+                "update",
+                profile_id=profile_id,
+                name=name,
+                protocol=protocol,
+                ports=ports,
+            )
             return
         self._user_profile_update_request_id = int(self.__dict__.get("_user_profile_update_request_id", 0) or 0) + 1
         request_id = self._user_profile_update_request_id
@@ -863,12 +928,17 @@ class PresetSetupPageBase(BasePage):
         InfoBar.error(title="Ошибка", content=str(error), parent=self.window())
 
     def _on_user_profile_update_worker_finished(self, worker) -> None:
+        if self._start_next_pending_user_profile_operation():
+            return
         if not self._user_profile_operation_running():
             self._set_user_profile_actions_enabled(True)
 
     def _request_user_profile_delete(self, profile_id: str) -> None:
         profile_id = str(profile_id or "").strip()
-        if not profile_id or self._user_profile_operation_running():
+        if not profile_id:
+            return
+        if self._user_profile_operation_running():
+            self._queue_user_profile_operation("delete", profile_id=profile_id)
             return
         self._user_profile_delete_request_id = int(self.__dict__.get("_user_profile_delete_request_id", 0) or 0) + 1
         request_id = self._user_profile_delete_request_id
@@ -916,6 +986,8 @@ class PresetSetupPageBase(BasePage):
         InfoBar.error(title="Ошибка", content=str(error), parent=self.window())
 
     def _on_user_profile_delete_worker_finished(self, worker) -> None:
+        if self._start_next_pending_user_profile_operation():
+            return
         if not self._user_profile_operation_running():
             self._set_user_profile_actions_enabled(True)
 
@@ -1273,6 +1345,7 @@ class PresetSetupPageBase(BasePage):
         self._ui_state_store = None
         self.__dict__.setdefault("_pending_profile_context_actions", []).clear()
         self.__dict__.setdefault("_pending_profile_moves", []).clear()
+        self.__dict__.setdefault("_pending_user_profile_operations", []).clear()
         self._profile_folder_action_pending.clear()
         self.__dict__.setdefault("_profile_folder_action_refresh_by_request", {}).clear()
         self.__dict__.setdefault("_profile_context_action_enabled_by_request", {}).clear()
