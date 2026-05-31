@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+import subprocess
+import webbrowser
 from dataclasses import dataclass
 
 from telegram_proxy.actions import (
@@ -12,8 +15,6 @@ from telegram_proxy.actions import (
     build_diagnostics_start_plan,
     copy_text,
     ensure_telegram_hosts,
-    open_external_link,
-    open_log_file,
 )
 
 
@@ -103,6 +104,28 @@ def save_settings_action(
     if action_name == "upstream_mode":
         return telegram_proxy_settings.set_upstream_mode(enabled)
     raise ValueError(f"Неизвестная настройка Telegram Proxy: {action_name}")
+
+
+def open_log_file(path: str) -> TelegramProxyActionResult:
+    target = os.path.normpath(str(path or ""))
+    if os.path.exists(target):
+        try:
+            subprocess.Popen(["explorer", "/select,", target])
+            return TelegramProxyActionResult(True, "", "", "")
+        except Exception as e:
+            return TelegramProxyActionResult(False, f"Failed to open log file: {e}", "", "")
+    return TelegramProxyActionResult(False, f"Log file not found: {target}", "", "")
+
+
+def open_external_link(url: str, *, success_log: str, error_prefix: str) -> TelegramProxyActionResult:
+    target = str(url or "").strip()
+    if not target:
+        return TelegramProxyActionResult(False, f"{error_prefix}: empty url", "", "")
+    try:
+        webbrowser.open(target)
+        return TelegramProxyActionResult(True, success_log, "", "")
+    except Exception as e:
+        return TelegramProxyActionResult(False, f"{error_prefix}: {e}", "", "")
 
 
 def run_diagnostics(*, proxy_port: int, progress_callback=None) -> str:

@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import os
-import subprocess
-import webbrowser
 from dataclasses import dataclass
 
 
@@ -69,26 +66,6 @@ def copy_text(text: str, *, success_title: str, success_content: str, success_lo
         info_title=success_title,
         info_content=success_content,
     )
-
-def open_log_file(path: str) -> TelegramProxyActionResult:
-    target = os.path.normpath(str(path or ""))
-    if os.path.exists(target):
-        try:
-            subprocess.Popen(["explorer", "/select,", target])
-            return TelegramProxyActionResult(True, "", "", "")
-        except Exception as e:
-            return TelegramProxyActionResult(False, f"Failed to open log file: {e}", "", "")
-    return TelegramProxyActionResult(False, f"Log file not found: {target}", "", "")
-
-def open_external_link(url: str, *, success_log: str, error_prefix: str) -> TelegramProxyActionResult:
-    target = str(url or "").strip()
-    if not target:
-        return TelegramProxyActionResult(False, f"{error_prefix}: empty url", "", "")
-    try:
-        webbrowser.open(target)
-        return TelegramProxyActionResult(True, success_log, "", "")
-    except Exception as e:
-        return TelegramProxyActionResult(False, f"{error_prefix}: {e}", "", "")
 
 def ensure_telegram_hosts() -> TelegramProxyActionResult:
     try:
