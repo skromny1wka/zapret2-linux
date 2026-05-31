@@ -14,15 +14,17 @@ def show_page(window, page_name, *, allow_internal: bool = False) -> bool:
 
 def attach_window_notifications(window, features) -> None:
     t_notifications = _time.perf_counter()
+    external_actions = (
+        features.external_actions
+        if hasattr(features, "external_actions")
+        else _build_external_actions_feature()
+    )
     window.window_notification_center = WindowNotificationCenter(
         window,
         startup_state=window.startup_state,
         runtime_feature=features.runtime,
-        external_actions_feature=(
-            features.external_actions
-            if hasattr(features, "external_actions")
-            else None
-        ),
+        create_open_url_worker=external_actions.create_open_url_worker,
+        create_notification_action_worker=external_actions.create_notification_action_worker,
         show_tray_notification=features.tray.show_notification_if_available,
         show_page=lambda page_name, *, allow_internal=False: show_page(
             window,
@@ -44,6 +46,12 @@ def attach_window_notifications(window, features) -> None:
         "StartupWindowInitNotifications",
         f"{(_time.perf_counter() - t_notifications) * 1000:.0f}ms",
     )
+
+
+def _build_external_actions_feature():
+    from app.feature_facades.external import build_external_actions_feature
+
+    return build_external_actions_feature()
 
 
 __all__ = ["attach_window_notifications"]

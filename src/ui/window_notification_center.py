@@ -19,7 +19,8 @@ class WindowNotificationCenter(QObject):
         *,
         startup_state,
         runtime_feature,
-        external_actions_feature,
+        create_open_url_worker,
+        create_notification_action_worker,
         show_tray_notification,
         show_page,
         is_window_visible,
@@ -28,11 +29,8 @@ class WindowNotificationCenter(QObject):
         super().__init__(parent)
         self._parent = parent
         self._startup_state = startup_state
-        if external_actions_feature is None:
-            from app.feature_facades.external import build_external_actions_feature
-
-            external_actions_feature = build_external_actions_feature()
-        self._external_actions = external_actions_feature
+        self._create_open_url_worker = create_open_url_worker
+        self._create_notification_action_worker = create_notification_action_worker
         self._show_tray_notification = show_tray_notification
         self._show_page = show_page
         self._is_window_visible = is_window_visible
@@ -110,7 +108,7 @@ class WindowNotificationCenter(QObject):
             self.notify(payload)
 
     def create_open_url_worker(self, request_id: int, *, url: str):
-        return self._external_actions.create_open_url_worker(request_id, url=url, parent=self)
+        return self._create_open_url_worker(request_id, url=url, parent=self)
 
     def _request_external_open_url(self, url: str) -> None:
         target = str(url or "").strip()
@@ -163,7 +161,7 @@ class WindowNotificationCenter(QObject):
         )
 
     def create_notification_action_worker(self, request_id: int, *, action_name: str, action_fn):
-        return self._external_actions.create_notification_action_worker(
+        return self._create_notification_action_worker(
             request_id,
             action_name=action_name,
             action_fn=action_fn,

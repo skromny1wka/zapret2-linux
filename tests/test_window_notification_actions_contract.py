@@ -16,6 +16,7 @@ class WindowNotificationActionsContractTests(unittest.TestCase):
         handler_init_source = inspect.getsource(WindowNotificationActionHandler.__init__)
         handler_callback_source = inspect.getsource(WindowNotificationActionHandler.build_action_callback)
         center_source = inspect.getsource(WindowNotificationCenter)
+        center_init_source = inspect.getsource(WindowNotificationCenter.__init__)
         setup_source = inspect.getsource(window_notifications_setup.attach_window_notifications)
 
         self.assertIn("open_url", handler_init_source)
@@ -23,6 +24,9 @@ class WindowNotificationActionsContractTests(unittest.TestCase):
         self.assertNotIn("webbrowser.open", handler_callback_source)
         self.assertIn("_external_open_url_runtime", center_source)
         self.assertIn("create_open_url_worker", center_source)
+        self.assertIn("create_open_url_worker", center_init_source)
+        self.assertNotIn("external_actions_feature", center_init_source)
+        self.assertNotIn("self._external_actions", center_source)
         self.assertIn("features.external_actions", setup_source)
 
     def test_notification_system_actions_run_through_worker(self) -> None:
@@ -50,7 +54,8 @@ class WindowNotificationActionsContractTests(unittest.TestCase):
         self.assertIn("_notification_action_runtime", center_source)
         self.assertIn("create_notification_action_worker", center_source)
         self.assertIn("_run_notification_action_worker", center_source)
-        self.assertIn("self._external_actions.create_notification_action_worker", center_source)
+        self.assertIn("self._create_notification_action_worker", center_source)
+        self.assertNotIn("self._external_actions.create_notification_action_worker", center_source)
         self.assertIn("ExternalNotificationActionWorker", feature_source)
         self.assertNotIn("ui.window_notification_action_workers", center_source)
 
