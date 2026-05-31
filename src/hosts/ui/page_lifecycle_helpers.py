@@ -211,10 +211,6 @@ def cleanup_hosts_page(
     page,
     catalog_watch_timer,
     set_catalog_watch_timer_fn,
-    thread,
-    worker,
-    set_worker_fn,
-    set_thread_fn,
     log_fn,
 ) -> None:
     set_cleanup_in_progress_fn(True)
@@ -232,24 +228,3 @@ def cleanup_hosts_page(
         except Exception:
             pass
         set_catalog_watch_timer_fn(None)
-
-    if thread and thread.isRunning():
-        log_fn("Останавливаем hosts worker...", "DEBUG")
-        if worker is not None:
-            stop = getattr(worker, "stop", None)
-            if callable(stop):
-                try:
-                    stop()
-                except Exception:
-                    pass
-        thread.quit()
-        if not thread.wait(2000):
-            log_fn("⚠ Hosts worker не завершился, принудительно завершаем", "WARNING")
-            try:
-                thread.terminate()
-                thread.wait(500)
-            except Exception:
-                pass
-
-    set_worker_fn(None)
-    set_thread_fn(None)

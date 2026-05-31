@@ -93,13 +93,23 @@ class HostsPageRuntimeTests(unittest.TestCase):
 
         controller_source = inspect.getsource(HostsPageController)
         workflow_source = inspect.getsource(operation_workflow.start_hosts_operation)
+        page_init_source = inspect.getsource(HostsPage.__init__)
         run_source = inspect.getsource(HostsPage._run_operation)
+        cleanup_source = inspect.getsource(HostsPage.cleanup)
 
         self.assertIn("create_operation_worker", controller_source)
         self.assertIn("execute_hosts_operation_fn=self._hosts.execute_hosts_operation", controller_source)
+        self.assertIn("_operation_runtime = OneShotWorkerRuntime()", page_init_source)
+        self.assertIn("operation_runtime=self._operation_runtime", run_source)
+        self.assertIn("start_qobject_worker", workflow_source)
         self.assertIn("create_operation_worker_fn", workflow_source)
         self.assertIn("create_operation_worker_fn(", workflow_source)
         self.assertIn("create_operation_worker_fn=self._controller.create_operation_worker", run_source)
+        self.assertIn("_operation_runtime.stop", cleanup_source)
+        self.assertIn("_operation_runtime.cancel", cleanup_source)
+        self.assertNotIn("QThread", workflow_source)
+        self.assertNotIn("thread.start()", workflow_source)
+        self.assertNotIn("moveToThread", workflow_source)
         self.assertNotIn("execute_hosts_operation_fn=self._controller.execute_hosts_operation", run_source)
 
 

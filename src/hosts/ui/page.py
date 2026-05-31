@@ -147,8 +147,7 @@ class HostsPage(BasePage):
         self._catalog_dirty = False
         self._catalog_watch_timer = None
         self._host_window = None
-        self._worker = None
-        self._thread = None
+        self._operation_runtime = OneShotWorkerRuntime()
         self._services_catalog_runtime = OneShotWorkerRuntime()
         self._catalog_refresh_runtime = OneShotWorkerRuntime()
         self._catalog_refresh_pending_trigger = ""
@@ -943,6 +942,7 @@ class HostsPage(BasePage):
     def _run_operation(self, operation: str, payload=None):
         self._cleanup_in_progress = False
         runtime = start_hosts_operation(
+            operation_runtime=self._operation_runtime,
             hosts_runtime=self.hosts_runtime,
             applying=self._applying,
             operation=operation,
@@ -956,12 +956,9 @@ class HostsPage(BasePage):
             return
         self._applying = runtime["applying"]
         self._current_operation = runtime["current_operation"]
-        self._worker = runtime["worker"]
-        self._thread = runtime["thread"]
 
     def _on_hosts_thread_finished(self) -> None:
-        self._worker = None
-        self._thread = None
+        pass
 
     def _request_user_selection_save(self, selection: dict[str, str]) -> None:
         payload = dict(selection or {})
@@ -1007,8 +1004,6 @@ class HostsPage(BasePage):
     def _on_operation_complete(self, success: bool, message: str):
         if self._cleanup_in_progress:
             return
-        self._worker = None
-        self._thread = None
         state = complete_hosts_operation(
             current_operation=self._current_operation,
             success=success,
@@ -1163,12 +1158,14 @@ class HostsPage(BasePage):
                 page=self,
                 catalog_watch_timer=self._catalog_watch_timer,
                 set_catalog_watch_timer_fn=lambda value: setattr(self, "_catalog_watch_timer", value),
-                thread=self._thread,
-                worker=self._worker,
-                set_worker_fn=lambda value: setattr(self, "_worker", value),
-                set_thread_fn=lambda value: setattr(self, "_thread", value),
                 log_fn=log,
             )
+            self._operation_runtime.stop(
+                blocking=True,
+                log_fn=log,
+                warning_prefix="Hosts operation worker",
+            )
+            self._operation_runtime.cancel()
             self._stop_services_catalog_worker(blocking=True)
             self._catalog_refresh_runtime.stop(
                 blocking=True,

@@ -2,13 +2,12 @@
 
 from collections.abc import Callable
 
-from PyQt6.QtCore import QThread
-
 import hosts.page_plans as hosts_page_plans
 
 
 def start_hosts_operation(
     *,
+    operation_runtime,
     hosts_runtime,
     applying: bool,
     operation: str,
@@ -21,21 +20,16 @@ def start_hosts_operation(
     if not hosts_runtime or applying:
         return None
 
-    worker = create_operation_worker_fn(
-        hosts_runtime=hosts_runtime,
-        operation=operation,
-        payload=payload,
+    _request_id, worker, thread = operation_runtime.start_qobject_worker(
+        parent=parent,
+        worker_factory=lambda _request_id: create_operation_worker_fn(
+            hosts_runtime=hosts_runtime,
+            operation=operation,
+            payload=payload,
+        ),
+        bind_worker=lambda worker: worker.finished.connect(on_operation_complete),
+        on_finished=lambda _request_id, _thread: on_thread_finished(),
     )
-    thread = QThread(parent)
-
-    worker.moveToThread(thread)
-    thread.started.connect(worker.run)
-    worker.finished.connect(on_operation_complete)
-    worker.finished.connect(thread.quit)
-    worker.finished.connect(worker.deleteLater)
-    thread.finished.connect(on_thread_finished)
-    thread.finished.connect(thread.deleteLater)
-    thread.start()
 
     return {
         "applying": True,
