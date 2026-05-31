@@ -702,6 +702,17 @@ class ProfilePresetService:
         destination_folder_key = str(destination_folder_key or "").strip()
         if not destination_folder_key:
             destination_folder_key, _folder_name, _order = profile_folder_for_profile(destination.profile, folder_state)
+        current_ordered_keys = _profile_order_keys_for_folder(
+            sources,
+            folder_state,
+            destination_folder_key,
+        )
+        if _profile_key_is_immediately_before(
+            current_ordered_keys,
+            source.profile.persistent_key,
+            destination.profile.persistent_key,
+        ):
+            return source.key
         ordered_keys = _profile_order_keys_for_folder(
             sources,
             folder_state,
@@ -733,6 +744,17 @@ class ProfilePresetService:
         destination_folder_key = str(destination_folder_key or "").strip()
         if not destination_folder_key:
             destination_folder_key, _folder_name, _order = profile_folder_for_profile(destination.profile, folder_state)
+        current_ordered_keys = _profile_order_keys_for_folder(
+            sources,
+            folder_state,
+            destination_folder_key,
+        )
+        if _profile_key_is_immediately_before(
+            current_ordered_keys,
+            destination.profile.persistent_key,
+            source.profile.persistent_key,
+        ):
+            return source.key
         ordered_keys = _profile_order_keys_for_folder(
             sources,
             folder_state,
@@ -1193,6 +1215,17 @@ def _profile_order_keys_for_folder(sources, folder_state: dict[str, Any], folder
     if source and source not in keys:
         keys.append(source)
     return keys
+
+
+def _profile_key_is_immediately_before(keys: list[str], source_key: str, destination_key: str) -> bool:
+    source = str(source_key or "").strip()
+    destination = str(destination_key or "").strip()
+    if not source or not destination:
+        return False
+    try:
+        return int(keys.index(source)) + 1 == int(keys.index(destination))
+    except ValueError:
+        return False
 
 
 def _basic_strategy_entries(profile: Profile, catalogs: dict[str, dict[str, StrategyEntry]]) -> dict[str, StrategyEntry]:
