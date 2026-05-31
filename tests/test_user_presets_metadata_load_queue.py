@@ -43,6 +43,29 @@ class _MetadataWorker:
         self._running = False
 
 
+class _SingleMetadataWorker:
+    instances = []
+
+    def __init__(self, request_id, file_name, read_single_metadata, page) -> None:
+        self.request_id = request_id
+        self.file_name = file_name
+        self.read_single_metadata = read_single_metadata
+        self.page = page
+        self.loaded = _Signal()
+        self.failed = _Signal()
+        self.finished = _Signal()
+        self.start_calls = 0
+        self._running = False
+        self.__class__.instances.append(self)
+
+    def isRunning(self) -> bool:  # noqa: N802
+        return self._running
+
+    def start(self) -> None:
+        self.start_calls += 1
+        self._running = True
+
+
 class UserPresetsMetadataLoadQueueTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -50,6 +73,7 @@ class UserPresetsMetadataLoadQueueTests(unittest.TestCase):
 
     def setUp(self) -> None:
         _MetadataWorker.instances.clear()
+        _SingleMetadataWorker.instances.clear()
 
     def test_full_metadata_load_replays_latest_request_after_running_worker_finishes(self) -> None:
         from presets.user_presets_runtime_service import UserPresetsRuntimeAdapter, UserPresetsRuntimeService
@@ -194,6 +218,46 @@ class UserPresetsMetadataLoadQueueTests(unittest.TestCase):
         scheduled_callbacks[0]()
 
         service._request_single_metadata_refresh.assert_called_once_with("Default.txt", page)
+
+    def test_single_metadata_scheduled_restart_queues_next_file_without_immediate_worker(self) -> None:
+        from presets.user_presets_runtime_service import UserPresetsRuntimeAdapter, UserPresetsRuntimeService
+
+        page = SimpleNamespace(isVisible=lambda: True)
+        adapter = UserPresetsRuntimeAdapter(
+            bulk_reset_running=lambda: False,
+            read_single_metadata=lambda _name: None,
+            selected_source_file_name=lambda: "",
+            presets_dir=lambda: None,
+            cached_metadata=lambda: {},
+            load_all_metadata=lambda: {},
+            load_folder_state=lambda: {},
+            build_rows_plan=lambda _metadata, _folder_state: object(),
+            apply_rows_plan=lambda _plan, _started_at: None,
+        )
+        service = UserPresetsRuntimeService()
+        service.attach_page(page, adapter)
+        worker = SimpleNamespace(deleteLater=Mock())
+        service._single_metadata_worker = worker
+        service._single_metadata_pending = ["First.txt"]
+        scheduled_callbacks = []
+
+        with patch(
+            "presets.user_presets_runtime_service.UserPresetsSingleMetadataWorker",
+            _SingleMetadataWorker,
+        ), patch(
+            "presets.user_presets_runtime_service.QTimer.singleShot",
+            side_effect=lambda _delay, callback: scheduled_callbacks.append(callback),
+        ):
+            service._on_single_metadata_worker_finished(worker, page)
+            service._request_single_metadata_refresh("Second.txt", page)
+
+            self.assertEqual(_SingleMetadataWorker.instances, [])
+            self.assertEqual(service._single_metadata_pending, ["First.txt", "Second.txt"])
+
+            scheduled_callbacks[0]()
+
+        self.assertEqual([worker.file_name for worker in _SingleMetadataWorker.instances], ["First.txt"])
+        self.assertEqual(service._single_metadata_pending, ["Second.txt"])
 
     def test_rows_plan_pending_refresh_restarts_after_worker_signal_returns(self) -> None:
         from presets.user_presets_runtime_service import UserPresetsRuntimeAdapter, UserPresetsRuntimeService

@@ -140,6 +140,7 @@ class UserPresetsRuntimeService:
         self._single_metadata_request_id = 0
         self._single_metadata_worker: UserPresetsSingleMetadataWorker | None = None
         self._single_metadata_pending: list[str] = []
+        self._single_metadata_start_scheduled = False
         self._rows_plan_request_id = 0
         self._rows_plan_worker: UserPresetsRowsPlanWorker | None = None
         self._rows_plan_pending: tuple[dict[str, dict[str, object]], dict[str, Any] | None, float | None, object] | None = None
@@ -247,9 +248,9 @@ class UserPresetsRuntimeService:
             return
 
         worker = self._single_metadata_worker
-        if worker is not None:
+        if worker is not None or self.__dict__.get("_single_metadata_start_scheduled", False):
             try:
-                if worker.isRunning():
+                if worker is None or worker.isRunning():
                     if normalized_file_name not in self._single_metadata_pending:
                         self._single_metadata_pending.append(normalized_file_name)
                     return
@@ -329,14 +330,23 @@ class UserPresetsRuntimeService:
             self._single_metadata_worker = None
         worker.deleteLater()
         if self._single_metadata_pending:
-            pending_file_name = self._single_metadata_pending.pop(0)
-            self._schedule_single_metadata_refresh(pending_file_name, page)
+            self._schedule_single_metadata_refresh(page)
 
-    def _schedule_single_metadata_refresh(self, file_name: str, page=None) -> None:
+    def _schedule_single_metadata_refresh(self, page=None) -> None:
+        if self.__dict__.get("_single_metadata_start_scheduled", False):
+            return
+        self._single_metadata_start_scheduled = True
         try:
-            QTimer.singleShot(0, lambda p=page, n=file_name: self._request_single_metadata_refresh(n, p))
+            QTimer.singleShot(0, lambda p=page: self._run_scheduled_single_metadata_refresh(p))
         except Exception:
-            self._request_single_metadata_refresh(file_name, page)
+            self._run_scheduled_single_metadata_refresh(page)
+
+    def _run_scheduled_single_metadata_refresh(self, page=None) -> None:
+        self._single_metadata_start_scheduled = False
+        if not self._single_metadata_pending:
+            return
+        pending_file_name = self._single_metadata_pending.pop(0)
+        self._request_single_metadata_refresh(pending_file_name, page)
 
     def current_search_query(self, page=None) -> str:
         page = self._resolve_page(page)
@@ -568,6 +578,7 @@ class UserPresetsRuntimeService:
         self._rows_plan_request_id += 1
         self._metadata_load_pending_page = None
         self._single_metadata_pending.clear()
+        self._single_metadata_start_scheduled = False
         self._rows_plan_pending = None
         self._rows_plan_apply_scheduled = False
         self._pending_rows_plan_apply = None
