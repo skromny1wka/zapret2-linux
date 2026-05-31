@@ -25,6 +25,31 @@ class _PresetStore:
 
 
 class ProfileServiceApplyStrategyGuardTests(unittest.TestCase):
+    def test_save_selected_preset_skips_save_when_loaded_preset_is_unchanged(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            store = _PresetStore(
+                "\n".join(
+                    (
+                        "--name=Speedtest",
+                        "--filter-tcp=443,8080",
+                        "--hostlist=lists/speedtest.txt",
+                        "--lua-desync=pass",
+                        "",
+                    )
+                )
+            )
+            feature = SimpleNamespace(
+                _presets_feature=store,
+                _app_paths=AppPaths(user_root=root, local_root=root),
+            )
+
+            service = ProfilePresetService(feature, "zapret2_mode")
+            preset, _manifest = service.load_selected_preset()
+            service.save_selected_preset(preset)
+
+        self.assertEqual(store.save_count, 0)
+
     def test_set_profile_enabled_skips_save_when_state_is_unchanged(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

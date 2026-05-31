@@ -127,7 +127,11 @@ class ProfilePresetService:
         return snapshot.preset, snapshot.manifest
 
     def save_selected_preset(self, preset: Preset) -> None:
-        self._presets.save_selected_preset_source(self._launch_method, serialize_preset(preset))
+        source_text = serialize_preset(preset)
+        snapshot = self._selected_preset_snapshot
+        if snapshot is not None and serialize_preset(snapshot.preset) == source_text:
+            return
+        self._presets.save_selected_preset_source(self._launch_method, source_text)
         self._invalidate_selected_preset_snapshot()
 
     def list_profiles(self) -> ProfileListPayload:
