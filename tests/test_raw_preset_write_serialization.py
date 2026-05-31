@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from presets.ui.common.preset_subpage_base import PresetRawEditorPage
 
@@ -47,7 +47,18 @@ class RawPresetWriteSerializationTests(unittest.TestCase):
         )
 
         page._raw_activate_runtime.running = False
-        PresetRawEditorPage._on_preset_activation_worker_finished(page, object())
+        callbacks = []
+        with patch(
+            "presets.ui.common.preset_subpage_base.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            PresetRawEditorPage._on_preset_activation_worker_finished(page, object())
+
+        page.create_raw_preset_action_worker.assert_not_called()
+        self.assertEqual(page._raw_action_runtime.started, [])
+        self.assertEqual(len(callbacks), 1)
+
+        callbacks[0]()
 
         page.create_raw_preset_action_worker.assert_called_once_with(
             1,
@@ -79,7 +90,18 @@ class RawPresetWriteSerializationTests(unittest.TestCase):
         )
 
         page._raw_action_runtime.running = False
-        PresetRawEditorPage._on_raw_preset_action_worker_finished(page, object())
+        callbacks = []
+        with patch(
+            "presets.ui.common.preset_subpage_base.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            PresetRawEditorPage._on_raw_preset_action_worker_finished(page, object())
+
+        page.create_raw_preset_activate_worker.assert_not_called()
+        self.assertEqual(page._raw_activate_runtime.started, [])
+        self.assertEqual(len(callbacks), 1)
+
+        callbacks[0]()
 
         page.create_raw_preset_activate_worker.assert_called_once_with(1, "Next.txt", page)
         self.assertEqual(page._raw_activate_runtime.started, [worker])
@@ -119,8 +141,19 @@ class RawPresetWriteSerializationTests(unittest.TestCase):
         )
 
         page._raw_action_runtime.running = False
-        PresetRawEditorPage._on_raw_preset_action_worker_finished(page, object())
-        PresetRawEditorPage._on_raw_preset_action_worker_finished(page, object())
+        callbacks = []
+        with patch(
+            "presets.ui.common.preset_subpage_base.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            PresetRawEditorPage._on_raw_preset_action_worker_finished(page, object())
+            PresetRawEditorPage._on_raw_preset_action_worker_finished(page, object())
+
+        page.create_raw_preset_action_worker.assert_not_called()
+        self.assertEqual(page._raw_action_runtime.started, [])
+        self.assertEqual(len(callbacks), 1)
+
+        callbacks[0]()
 
         page.create_raw_preset_action_worker.assert_called_once_with(
             1,

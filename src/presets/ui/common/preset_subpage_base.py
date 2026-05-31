@@ -253,6 +253,7 @@ class PresetRawEditorPage(BasePage):
         self._raw_action_request_id = 0
         self._pending_raw_preset_actions: list[dict[str, object]] = []
         self._pending_raw_preset_write_operations: list[dict[str, object]] = []
+        self._raw_preset_write_operation_start_scheduled = False
         self._cleanup_in_progress = False
         self._ui_state_store = None
         self._ui_state_unsubscribe = None
@@ -350,6 +351,26 @@ class PresetRawEditorPage(BasePage):
             )
             return True
         return bool(self._start_next_raw_preset_write_operation())
+
+    def _schedule_next_raw_preset_write_operation_start(self) -> bool:
+        if self.__dict__.get("_cleanup_in_progress"):
+            return False
+        if self._raw_preset_write_is_running():
+            return True
+        if not self.__dict__.get("_pending_raw_preset_write_operations"):
+            return False
+        if self.__dict__.get("_raw_preset_write_operation_start_scheduled", False):
+            return True
+        self._raw_preset_write_operation_start_scheduled = True
+        try:
+            QTimer.singleShot(0, self._run_scheduled_raw_preset_write_operation_start)
+        except Exception:
+            self._run_scheduled_raw_preset_write_operation_start()
+        return True
+
+    def _run_scheduled_raw_preset_write_operation_start(self) -> None:
+        self._raw_preset_write_operation_start_scheduled = False
+        self._start_next_raw_preset_write_operation()
 
     def _default_title(self) -> str:
         return self._title
@@ -835,10 +856,10 @@ class PresetRawEditorPage(BasePage):
             if pending[1] is None:
                 self._schedule_pending_raw_preset_save(bool(pending[2]))
                 return
-            self._start_raw_preset_save_worker(
-                file_name=pending[0],
-                source_text=pending[1],
-                publish_content_changed=pending[2],
+            self._schedule_raw_preset_save_worker_start(
+                str(pending[0] or ""),
+                str(pending[1] or ""),
+                bool(pending[2]),
             )
             return
         callback = self._after_raw_preset_save
@@ -847,7 +868,29 @@ class PresetRawEditorPage(BasePage):
             callback()
             if self._raw_preset_write_is_running():
                 return
-        self._start_next_raw_preset_write_operation()
+        self._schedule_next_raw_preset_write_operation_start()
+
+    def _schedule_raw_preset_save_worker_start(
+        self,
+        file_name: str,
+        source_text: str,
+        publish_content_changed: bool,
+    ) -> None:
+        try:
+            QTimer.singleShot(
+                0,
+                lambda: self._start_raw_preset_save_worker(
+                    file_name=str(file_name or ""),
+                    source_text=str(source_text or ""),
+                    publish_content_changed=bool(publish_content_changed),
+                ),
+            )
+        except Exception:
+            self._start_raw_preset_save_worker(
+                file_name=str(file_name or ""),
+                source_text=str(source_text or ""),
+                publish_content_changed=bool(publish_content_changed),
+            )
 
     def _schedule_pending_raw_preset_save(self, publish_content_changed: bool) -> None:
         try:
@@ -1120,15 +1163,21 @@ class PresetRawEditorPage(BasePage):
         self._show_error(str(error))
 
     def _on_preset_activation_worker_finished(self, _worker) -> None:
-        if self._start_next_raw_preset_write_operation():
+        if self._schedule_next_raw_preset_write_operation_start():
             return
         pending = str(self.__dict__.get("_pending_raw_preset_activation") or "").strip()
         self._pending_raw_preset_activation = ""
         if pending and not bool(self.__dict__.get("_cleanup_in_progress", False)):
-            self._start_preset_activation_worker(pending)
+            self._schedule_preset_activation_worker_start(pending)
             return
         if self.activateButton is not None:
             set_enabled_if_changed(self.activateButton, True)
+
+    def _schedule_preset_activation_worker_start(self, file_name: str) -> None:
+        try:
+            QTimer.singleShot(0, lambda name=str(file_name or ""): self._start_preset_activation_worker(name))
+        except Exception:
+            self._start_preset_activation_worker(str(file_name or ""))
 
     def _request_raw_preset_action(self, action: str, **payload) -> None:
         if self._raw_preset_write_is_running():
@@ -1205,7 +1254,7 @@ class PresetRawEditorPage(BasePage):
         self._show_error(str(error))
 
     def _on_raw_preset_action_worker_finished(self, _worker) -> None:
-        if self._start_next_raw_preset_write_operation():
+        if self._schedule_next_raw_preset_write_operation_start():
             return
 
     def _activation_footer_text(self) -> str:
@@ -1392,6 +1441,7 @@ class PresetRawEditorPage(BasePage):
         self._raw_text_apply_scheduled = False
         self.__dict__.setdefault("_pending_raw_preset_write_operations", []).clear()
         self.__dict__.setdefault("_pending_raw_preset_actions", []).clear()
+        self._raw_preset_write_operation_start_scheduled = False
         self._pending_raw_preset_activation = ""
         self._stop_raw_worker_runtimes()
         unsubscribe = self._ui_state_unsubscribe

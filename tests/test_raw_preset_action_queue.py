@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 
 class _Runtime:
@@ -69,8 +69,19 @@ class RawPresetActionQueueTests(unittest.TestCase):
         ]
         page._cleanup_in_progress = False
         page.create_raw_preset_action_worker = Mock(return_value=worker)
+        callbacks = []
 
-        PresetRawEditorPage._on_raw_preset_action_worker_finished(page, object())
+        with patch(
+            "presets.ui.common.preset_subpage_base.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            PresetRawEditorPage._on_raw_preset_action_worker_finished(page, object())
+
+        page.create_raw_preset_action_worker.assert_not_called()
+        self.assertEqual(runtime.started, [])
+        self.assertEqual(len(callbacks), 1)
+
+        callbacks[0]()
 
         page.create_raw_preset_action_worker.assert_called_once_with(
             2,
