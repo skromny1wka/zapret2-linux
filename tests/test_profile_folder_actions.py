@@ -98,6 +98,16 @@ class ProfileFolderActionTests(unittest.TestCase):
                 ):
                     self.assertEqual(reset_profile_folders(), load_profile_folder_state())
 
+    def test_save_profile_folder_state_skips_settings_write_when_state_is_unchanged(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            with patch("settings.store.MAIN_DIRECTORY", str(Path(temp_dir))):
+                state = load_profile_folder_state()
+                with patch(
+                    "profile.folders.settings_store.set_folders_settings",
+                    side_effect=AssertionError("unchanged profile folder state must not write settings"),
+                ):
+                    self.assertEqual(save_profile_folder_state(state), state)
+
     def test_profile_folder_collapsed_skips_save_when_state_is_unchanged(self) -> None:
         with TemporaryDirectory() as temp_dir:
             with patch("settings.store.MAIN_DIRECTORY", str(Path(temp_dir))):

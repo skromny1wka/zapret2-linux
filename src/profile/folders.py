@@ -17,8 +17,13 @@ def load_profile_folder_state() -> dict[str, Any]:
 
 
 def save_profile_folder_state(state: dict[str, Any]) -> dict[str, Any]:
+    default_state = build_default_profile_folders()
+    next_state = normalize_folder_state(state, default_state)
     folders = settings_store.get_folders_settings()
-    folders["profiles"] = normalize_folder_state(state, build_default_profile_folders())
+    current_state = normalize_folder_state(folders.get("profiles"), default_state)
+    if current_state == next_state:
+        return current_state
+    folders["profiles"] = next_state
     return settings_store.set_folders_settings(folders)["profiles"]
 
 

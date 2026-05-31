@@ -19,11 +19,16 @@ def load_preset_folder_state(scope_key: str) -> dict[str, Any]:
 
 def save_preset_folder_state(scope_key: str, state: dict[str, Any]) -> dict[str, Any]:
     scope = _normalize_scope(scope_key)
+    default_state = build_default_preset_folders(scope)
+    next_state = normalize_folder_state(state, default_state)
     folders = settings_store.get_folders_settings()
     presets = folders.get("presets", {}) if isinstance(folders, dict) else {}
     if not isinstance(presets, dict):
         presets = {}
-    presets[scope] = normalize_folder_state(state, build_default_preset_folders(scope))
+    current_state = normalize_folder_state(presets.get(scope), default_state)
+    if current_state == next_state:
+        return current_state
+    presets[scope] = next_state
     folders["presets"] = presets
     return settings_store.set_folders_settings(folders)["presets"][scope]
 

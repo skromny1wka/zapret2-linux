@@ -21,6 +21,7 @@ from presets.folders import (
     rename_preset_folder,
     rename_preset_item_meta,
     reset_preset_folders,
+    save_preset_folder_state,
     set_preset_folder_collapsed,
     set_preset_rating,
     toggle_preset_pin,
@@ -136,6 +137,16 @@ class PresetFolderActionTests(unittest.TestCase):
                         reset_preset_folders(PRESETS_SCOPE_WINWS2),
                         load_preset_folder_state(PRESETS_SCOPE_WINWS2),
                     )
+
+    def test_save_preset_folder_state_skips_settings_write_when_state_is_unchanged(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            with patch("settings.store.MAIN_DIRECTORY", str(Path(temp_dir))):
+                state = load_preset_folder_state(PRESETS_SCOPE_WINWS2)
+                with patch(
+                    "presets.folders.settings_store.set_folders_settings",
+                    side_effect=AssertionError("unchanged preset folder state must not write settings"),
+                ):
+                    self.assertEqual(save_preset_folder_state(PRESETS_SCOPE_WINWS2, state), state)
 
     def test_rating_action_preserves_display_default_folder(self) -> None:
         with TemporaryDirectory() as temp_dir:
