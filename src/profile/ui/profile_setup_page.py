@@ -959,6 +959,7 @@ class ProfileSetupPageBase(BasePage):
         self._strategy_feedback_save_runtime = OneShotWorkerRuntime()
         self._strategy_feedback_save_request_id = 0
         self._pending_strategy_feedback_save = None
+        self._strategy_feedback_save_start_scheduled = False
         self._payload = None
         self._profile_setup_payload_apply_scheduled = False
         self._pending_profile_setup_payload_apply = None
@@ -3262,17 +3263,20 @@ class ProfileSetupPageBase(BasePage):
 
     def _request_strategy_feedback_save(self, request: dict) -> None:
         runtime = self._worker_runtime("_strategy_feedback_save_runtime")
-        if runtime.is_running():
-            pending = dict(self.__dict__.get("_pending_strategy_feedback_save") or {})
-            next_request = dict(request or {})
-            for key in ("rating", "favorite"):
-                if key in next_request and next_request.get(key) is not None:
-                    pending[key] = next_request.get(key)
-                elif key not in pending:
-                    pending[key] = next_request.get(key)
-            self._pending_strategy_feedback_save = pending
+        if runtime.is_running() or self.__dict__.get("_strategy_feedback_save_start_scheduled", False):
+            self._merge_pending_strategy_feedback_save(request)
             return
         self._start_strategy_feedback_save_worker(request)
+
+    def _merge_pending_strategy_feedback_save(self, request: dict) -> None:
+        pending = dict(self.__dict__.get("_pending_strategy_feedback_save") or {})
+        next_request = dict(request or {})
+        for key in ("rating", "favorite"):
+            if key in next_request and next_request.get(key) is not None:
+                pending[key] = next_request.get(key)
+            elif key not in pending:
+                pending[key] = next_request.get(key)
+        self._pending_strategy_feedback_save = pending
 
     def _start_strategy_feedback_save_worker(self, request: dict) -> None:
         if not self._profile_key:
@@ -3340,19 +3344,25 @@ class ProfileSetupPageBase(BasePage):
 
     def _on_strategy_feedback_save_worker_finished(self, _worker) -> None:
         pending = self.__dict__.get("_pending_strategy_feedback_save")
-        self._pending_strategy_feedback_save = None
         if pending:
-            self._schedule_strategy_feedback_save_worker_start(dict(pending))
+            self._schedule_strategy_feedback_save_worker_start()
 
-    def _schedule_strategy_feedback_save_worker_start(self, request: dict) -> None:
-        queued = dict(request or {})
+    def _schedule_strategy_feedback_save_worker_start(self) -> None:
+        if self.__dict__.get("_strategy_feedback_save_start_scheduled", False):
+            return
+        self._strategy_feedback_save_start_scheduled = True
         try:
-            QTimer.singleShot(0, lambda: self._run_scheduled_strategy_feedback_save_worker_start(queued))
+            QTimer.singleShot(0, self._run_scheduled_strategy_feedback_save_worker_start)
         except Exception:
-            self._run_scheduled_strategy_feedback_save_worker_start(queued)
+            self._run_scheduled_strategy_feedback_save_worker_start()
 
-    def _run_scheduled_strategy_feedback_save_worker_start(self, request: dict) -> None:
+    def _run_scheduled_strategy_feedback_save_worker_start(self) -> None:
+        self._strategy_feedback_save_start_scheduled = False
+        request = self.__dict__.get("_pending_strategy_feedback_save")
+        self._pending_strategy_feedback_save = None
         if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if not request:
             return
         self._start_strategy_feedback_save_worker(dict(request or {}))
 
@@ -3385,6 +3395,7 @@ class ProfileSetupPageBase(BasePage):
             setattr(self, attr, None)
         self._list_file_state_apply_scheduled = False
         self._list_file_validation_start_scheduled = False
+        self._strategy_feedback_save_start_scheduled = False
         self._profile_setup_payload_apply_scheduled = False
         self._profile_setup_write_operation_start_scheduled = False
         self._user_profile_write_operation_start_scheduled = False

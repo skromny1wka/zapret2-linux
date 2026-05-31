@@ -4681,6 +4681,47 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         )
         page._start_strategy_feedback_save_worker.assert_not_called()
 
+    def test_strategy_feedback_scheduled_restart_merges_latest_pending_request(self) -> None:
+        import profile.ui.profile_setup_page as profile_setup_page
+
+        class _Runtime:
+            def is_running(self) -> bool:
+                return False
+
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._strategy_feedback_save_runtime = _Runtime()
+        page._pending_strategy_feedback_save = {"rating": "work", "favorite": None}
+        page._start_strategy_feedback_save_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(profile_setup_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
+            ProfileSetupPageBase._on_strategy_feedback_save_worker_finished(page, object())
+            ProfileSetupPageBase._request_strategy_feedback_save(
+                page,
+                {"rating": None, "favorite": True},
+            )
+
+        page._start_strategy_feedback_save_worker.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._start_strategy_feedback_save_worker.assert_called_once_with(
+            {"rating": "work", "favorite": True}
+        )
+
+    def test_strategy_feedback_scheduled_restart_clears_pending_during_cleanup(self) -> None:
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._cleanup_in_progress = True
+        page._strategy_feedback_save_start_scheduled = True
+        page._pending_strategy_feedback_save = {"rating": "work", "favorite": True}
+        page._start_strategy_feedback_save_worker = Mock()
+
+        ProfileSetupPageBase._run_scheduled_strategy_feedback_save_worker_start(page)
+
+        self.assertFalse(page._strategy_feedback_save_start_scheduled)
+        self.assertIsNone(page._pending_strategy_feedback_save)
+        page._start_strategy_feedback_save_worker.assert_not_called()
+
     def test_strategy_feedback_finish_skips_duplicate_state(self) -> None:
         page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
         page._profile_key = "profile-1"
