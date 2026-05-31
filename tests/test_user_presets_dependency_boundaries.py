@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
@@ -188,6 +189,19 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
         self.assertEqual(page._preset_link_action_pending, ["info", "new_configs"])
         page.create_preset_link_action_worker.assert_not_called()
 
+    def test_user_presets_link_action_waits_while_restart_is_scheduled(self) -> None:
+        from presets.ui.common.user_presets_page import UserPresetsPageBase
+
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_link_action_start_scheduled = True
+        page._preset_link_action_pending = []
+        page._preset_link_action_runtime = SimpleNamespace(is_running=Mock(return_value=False), start_qthread_worker=Mock())
+
+        UserPresetsPageBase._request_preset_link_action(page, "info")
+
+        page._preset_link_action_runtime.start_qthread_worker.assert_not_called()
+        self.assertEqual(page._preset_link_action_pending, ["info"])
+
     def test_user_presets_link_worker_finished_starts_next_queued_action(self) -> None:
         from presets.ui.common.user_presets_page import UserPresetsPageBase
         from ui.one_shot_worker_runtime import OneShotWorkerRuntime
@@ -255,6 +269,20 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
 
         page._start_preset_open_folder_worker.assert_called_once_with()
 
+    def test_user_presets_open_folder_waits_while_restart_is_scheduled(self) -> None:
+        from presets.ui.common.user_presets_page import UserPresetsPageBase
+
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_open_folder_start_scheduled = True
+        page._preset_open_folder_pending = False
+        page._worker_runtime_is_running = Mock(return_value=False)
+        page._start_preset_open_folder_worker = Mock()
+
+        UserPresetsPageBase._request_preset_open_folder_action(page)
+
+        page._start_preset_open_folder_worker.assert_not_called()
+        self.assertTrue(page._preset_open_folder_pending)
+
     def test_user_presets_folder_action_pending_restarts_later_after_worker_finished(self) -> None:
         from presets.ui.common.user_presets_page import UserPresetsPageBase
 
@@ -291,6 +319,39 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
             direction=1,
             collapsed=False,
             context_extra={"source": "menu"},
+        )
+
+    def test_user_presets_folder_action_waits_while_restart_is_scheduled(self) -> None:
+        from presets.ui.common.user_presets_page import UserPresetsPageBase
+
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_folder_action_start_scheduled = True
+        page._preset_folder_action_pending = []
+        page._preset_folder_action_runtime = SimpleNamespace(is_running=Mock(return_value=False), start_qthread_worker=Mock())
+
+        UserPresetsPageBase._request_preset_folder_action(
+            page,
+            "move",
+            folder_key="favorites",
+            name="Preset.txt",
+            direction=1,
+            collapsed=False,
+            context_extra={"source": "menu"},
+        )
+
+        page._preset_folder_action_runtime.start_qthread_worker.assert_not_called()
+        self.assertEqual(
+            page._preset_folder_action_pending,
+            [
+                {
+                    "action": "move",
+                    "folder_key": "favorites",
+                    "name": "Preset.txt",
+                    "direction": 1,
+                    "collapsed": False,
+                    "context_extra": {"source": "menu"},
+                }
+            ],
         )
 
     def test_user_presets_runtime_actions_do_not_expose_mutating_preset_commands(self) -> None:

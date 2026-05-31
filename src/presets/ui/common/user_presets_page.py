@@ -189,13 +189,16 @@ class UserPresetsPageBase(BasePage):
         self._preset_folder_action_runtime = OneShotWorkerRuntime()
         self._preset_folder_action_request_id = 0
         self._preset_folder_action_pending: list[dict[str, object]] = []
+        self._preset_folder_action_start_scheduled = False
         self._preset_open_folder_runtime = OneShotWorkerRuntime()
         self._preset_open_folder_request_id = 0
         self._preset_open_folder_pending = False
+        self._preset_open_folder_start_scheduled = False
         self._preset_item_action_pending: list[dict[str, str]] = []
         self._preset_link_action_runtime = OneShotWorkerRuntime()
         self._preset_link_action_request_id = 0
         self._preset_link_action_pending: list[str] = []
+        self._preset_link_action_start_scheduled = False
         self._build_ui()
         self._after_ui_built()
         self.bind_ui_state_store(ui_state_store)
@@ -572,7 +575,10 @@ class UserPresetsPageBase(BasePage):
         )
 
     def _request_preset_open_folder_action(self) -> None:
-        if self._worker_runtime_is_running("_preset_open_folder_runtime"):
+        if (
+            self._worker_runtime_is_running("_preset_open_folder_runtime")
+            or self.__dict__.get("_preset_open_folder_start_scheduled", False)
+        ):
             self._preset_open_folder_pending = True
             return
         self._start_preset_open_folder_worker()
@@ -611,12 +617,14 @@ class UserPresetsPageBase(BasePage):
             self._schedule_preset_open_folder_worker_start()
 
     def _schedule_preset_open_folder_worker_start(self) -> None:
+        self._preset_open_folder_start_scheduled = True
         try:
             QTimer.singleShot(0, self._run_scheduled_preset_open_folder_worker_start)
         except Exception:
             self._run_scheduled_preset_open_folder_worker_start()
 
     def _run_scheduled_preset_open_folder_worker_start(self) -> None:
+        self._preset_open_folder_start_scheduled = False
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         self._start_preset_open_folder_worker()
@@ -1125,7 +1133,7 @@ class UserPresetsPageBase(BasePage):
         context_extra: dict | None = None,
     ) -> None:
         runtime = self._worker_runtime("_preset_folder_action_runtime")
-        if runtime.is_running():
+        if runtime.is_running() or self.__dict__.get("_preset_folder_action_start_scheduled", False):
             self._preset_folder_action_pending.append(
                 {
                     "action": str(action or ""),
@@ -1190,12 +1198,14 @@ class UserPresetsPageBase(BasePage):
 
     def _schedule_preset_folder_action_start(self, pending: dict[str, object]) -> None:
         queued = dict(pending or {})
+        self._preset_folder_action_start_scheduled = True
         try:
             QTimer.singleShot(0, lambda: self._run_scheduled_preset_folder_action_start(queued))
         except Exception:
             self._run_scheduled_preset_folder_action_start(queued)
 
     def _run_scheduled_preset_folder_action_start(self, pending: dict[str, object]) -> None:
+        self._preset_folder_action_start_scheduled = False
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         self._request_preset_folder_action(
@@ -2095,7 +2105,7 @@ class UserPresetsPageBase(BasePage):
         if not action:
             return
         runtime = self._worker_runtime("_preset_link_action_runtime")
-        if runtime.is_running():
+        if runtime.is_running() or self.__dict__.get("_preset_link_action_start_scheduled", False):
             self.__dict__.setdefault("_preset_link_action_pending", []).append(action)
             return
         self._preset_link_action_request_id = int(self.__dict__.get("_preset_link_action_request_id", 0) or 0) + 1
@@ -2140,12 +2150,14 @@ class UserPresetsPageBase(BasePage):
 
     def _schedule_preset_link_action_start(self, action: str) -> None:
         clean_action = str(action or "").strip()
+        self._preset_link_action_start_scheduled = True
         try:
             QTimer.singleShot(0, lambda: self._run_scheduled_preset_link_action_start(clean_action))
         except Exception:
             self._run_scheduled_preset_link_action_start(clean_action)
 
     def _run_scheduled_preset_link_action_start(self, action: str) -> None:
+        self._preset_link_action_start_scheduled = False
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         self._request_preset_link_action(str(action or "").strip())
@@ -2163,9 +2175,12 @@ class UserPresetsPageBase(BasePage):
         self.__dict__.setdefault("_pending_preset_storage_actions", []).clear()
         self.__dict__.setdefault("_pending_preset_write_actions", []).clear()
         self._preset_folder_action_pending.clear()
+        self._preset_folder_action_start_scheduled = False
         self._preset_open_folder_pending = False
+        self._preset_open_folder_start_scheduled = False
         self.__dict__.setdefault("_preset_item_action_pending", []).clear()
         self.__dict__.setdefault("_preset_link_action_pending", []).clear()
+        self._preset_link_action_start_scheduled = False
         self.__dict__.setdefault("_preset_bulk_action_pending", []).clear()
         self._preset_bulk_action_kind = ""
         self._bulk_reset_running = False
