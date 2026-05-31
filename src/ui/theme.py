@@ -4,7 +4,7 @@ import re
 import sys
 from collections import OrderedDict
 from dataclasses import dataclass
-from PyQt6.QtCore import QObject, pyqtSignal
+from PyQt6.QtCore import QObject, QTimer, pyqtSignal
 from PyQt6.QtGui import QPixmap, QColor, QIcon
 from config.config import THEME_FOLDER
 from log.log import log
@@ -1212,6 +1212,7 @@ class ThemeManager:
         self._active_theme_build_jobs: dict[int, OneShotWorkerRuntime] = {}
         self._theme_persist_runtime = OneShotWorkerRuntime()
         self._theme_persist_pending: str | None = None
+        self._theme_persist_start_scheduled = False
         
 
         # список тем — теперь пустой (тема определяется isDarkTheme() системно)
@@ -1244,6 +1245,7 @@ class ThemeManager:
                     pass
             self._cleanup_theme_build_thread()
             self._theme_persist_pending = None
+            self._theme_persist_start_scheduled = False
             self._theme_persist_runtime.stop(
                 blocking=True,
                 wait_timeout_ms=1000,
@@ -1462,7 +1464,10 @@ class ThemeManager:
 
     def _request_theme_persist(self, theme_name: str) -> None:
         clean = _normalize_theme_name(theme_name)
-        if self._theme_persist_runtime.is_running():
+        if (
+            self._theme_persist_runtime.is_running()
+            or bool(self.__dict__.get("_theme_persist_start_scheduled", False))
+        ):
             self._theme_persist_pending = clean
             return
         self._start_theme_persist_worker(clean)
@@ -1483,6 +1488,20 @@ class ThemeManager:
         pending = self._theme_persist_pending
         self._theme_persist_pending = None
         if pending and not self._cleanup_in_progress:
+            self._schedule_theme_persist_worker_start(pending)
+
+    def _schedule_theme_persist_worker_start(self, theme_name: str) -> None:
+        self._theme_persist_pending = _normalize_theme_name(theme_name)
+        if bool(self.__dict__.get("_theme_persist_start_scheduled", False)):
+            return
+        self._theme_persist_start_scheduled = True
+        QTimer.singleShot(0, self._run_scheduled_theme_persist_worker_start)
+
+    def _run_scheduled_theme_persist_worker_start(self) -> None:
+        self._theme_persist_start_scheduled = False
+        pending = self._theme_persist_pending
+        self._theme_persist_pending = None
+        if pending and not bool(self.__dict__.get("_cleanup_in_progress", False)):
             self._start_theme_persist_worker(pending)
 
     def _set_status(self, text):

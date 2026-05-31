@@ -4,6 +4,8 @@ import inspect
 import sys
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 
 PROJECT_SRC = Path(__file__).resolve().parents[1] / "src"
@@ -40,6 +42,26 @@ class ThemeManagerPersistenceTests(unittest.TestCase):
         self.assertNotIn("set_selected_theme(clean)", apply_source)
         self.assertIn("_theme_persist_pending", request_source)
         self.assertIn("_theme_persist_pending", finished_source)
+
+    def test_pending_theme_persist_restarts_after_event_loop_turn(self) -> None:
+        import ui.theme as theme
+
+        manager = theme.ThemeManager.__new__(theme.ThemeManager)
+        manager._theme_persist_pending = "dark"
+        manager._cleanup_in_progress = False
+        manager._start_theme_persist_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(theme, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            theme.ThemeManager._on_theme_persist_finished(manager, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        manager._start_theme_persist_worker.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        manager._start_theme_persist_worker.assert_called_once_with("dark")
 
     def test_theme_build_runs_through_runtime(self) -> None:
         import ui.one_shot_worker_runtime as one_shot_runtime
