@@ -100,15 +100,24 @@ def profile_folder_collapsed(folder_key: str, state: dict[str, Any] | None = Non
     return bool(folder.get("collapsed", False)) if isinstance(folder, dict) else False
 
 
-def set_profile_folder_order(profile_key: str, order: int | None) -> None:
+def set_profile_folder_order(profile_key: str, order: int | None) -> bool:
     key = str(profile_key or "").strip()
     if not key:
-        return
+        return False
+    next_order = None if order is None else max(0, int(order))
     state = load_profile_folder_state()
     items = state.setdefault("items", {})
-    meta = items.setdefault(key, {"folder_key": COMMON_FOLDER_KEY, "order": None, "rating": 0})
-    meta["order"] = None if order is None else max(0, int(order))
+    meta = items.get(key)
+    if not isinstance(meta, dict):
+        if next_order is None:
+            return False
+        meta = {"folder_key": COMMON_FOLDER_KEY, "order": None, "rating": 0}
+        items[key] = meta
+    if meta.get("order") == next_order:
+        return False
+    meta["order"] = next_order
     save_profile_folder_state(state)
+    return True
 
 
 def set_profile_folder(profile_key: str, folder_key: str) -> bool:
@@ -121,7 +130,16 @@ def set_profile_folder(profile_key: str, folder_key: str) -> bool:
     if not isinstance(folders, dict) or target_folder not in folders:
         return False
     items = state.setdefault("items", {})
-    meta = items.setdefault(key, {"folder_key": target_folder, "order": None, "rating": 0})
+    meta = items.get(key)
+    if not isinstance(meta, dict):
+        if target_folder == COMMON_FOLDER_KEY:
+            return False
+        meta = {"folder_key": target_folder, "order": None, "rating": 0}
+        items[key] = meta
+        save_profile_folder_state(state)
+        return True
+    if str(meta.get("folder_key") or COMMON_FOLDER_KEY) == target_folder:
+        return False
     meta["folder_key"] = target_folder
     save_profile_folder_state(state)
     return True

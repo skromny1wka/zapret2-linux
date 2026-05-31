@@ -146,7 +146,15 @@ class FolderLibraryStore:
             return False
         if folder not in self._state["folders"]:
             folder = COMMON_FOLDER_KEY
-        meta = self._state["items"].setdefault(key, {"folder_key": folder, "order": None, "rating": 0})
+        meta = self._state["items"].get(key)
+        if not isinstance(meta, dict):
+            if folder == COMMON_FOLDER_KEY:
+                return False
+            meta = {"folder_key": folder, "order": None, "rating": 0}
+            self._state["items"][key] = meta
+            return True
+        if str(meta.get("folder_key") or COMMON_FOLDER_KEY) == folder:
+            return False
         meta["folder_key"] = folder
         return True
 
@@ -154,24 +162,48 @@ class FolderLibraryStore:
         key = str(item_key or "").strip()
         if not key:
             return False
-        meta = self._state["items"].setdefault(key, {"folder_key": COMMON_FOLDER_KEY, "order": None, "rating": 0})
-        meta["order"] = None if order is None else max(0, int(order))
+        next_order = None if order is None else max(0, int(order))
+        meta = self._state["items"].get(key)
+        if not isinstance(meta, dict):
+            if next_order is None:
+                return False
+            meta = {"folder_key": COMMON_FOLDER_KEY, "order": None, "rating": 0}
+            self._state["items"][key] = meta
+        if meta.get("order") == next_order:
+            return False
+        meta["order"] = next_order
         return True
 
     def set_item_rating(self, item_key: str, rating: int) -> bool:
         key = str(item_key or "").strip()
         if not key:
             return False
-        meta = self._state["items"].setdefault(key, {"folder_key": COMMON_FOLDER_KEY, "order": None, "rating": 0})
-        meta["rating"] = max(0, min(10, int(rating or 0)))
+        next_rating = max(0, min(10, int(rating or 0)))
+        meta = self._state["items"].get(key)
+        if not isinstance(meta, dict):
+            if next_rating == 0:
+                return False
+            meta = {"folder_key": COMMON_FOLDER_KEY, "order": None, "rating": 0}
+            self._state["items"][key] = meta
+        if int(meta.get("rating", 0) or 0) == next_rating:
+            return False
+        meta["rating"] = next_rating
         return True
 
     def set_item_pinned(self, item_key: str, pinned: bool) -> bool:
         key = str(item_key or "").strip()
         if not key:
             return False
-        meta = self._state["items"].setdefault(key, {"folder_key": COMMON_FOLDER_KEY, "order": None, "rating": 0})
-        if pinned:
+        next_pinned = bool(pinned)
+        meta = self._state["items"].get(key)
+        if not isinstance(meta, dict):
+            if not next_pinned:
+                return False
+            meta = {"folder_key": COMMON_FOLDER_KEY, "order": None, "rating": 0}
+            self._state["items"][key] = meta
+        if bool(meta.get("pinned", False)) == next_pinned:
+            return False
+        if next_pinned:
             meta["pinned"] = True
         else:
             meta.pop("pinned", None)

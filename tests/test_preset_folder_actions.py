@@ -77,6 +77,20 @@ class PresetFolderActionTests(unittest.TestCase):
         self.assertEqual(meta["rating"], 8)
         self.assertTrue(meta["pinned"])
 
+    def test_duplicate_rating_and_pin_skip_folder_state_save(self) -> None:
+        from presets.folders import set_preset_pin
+
+        with TemporaryDirectory() as temp_dir:
+            with patch("settings.store.MAIN_DIRECTORY", str(Path(temp_dir))):
+                self.assertTrue(set_preset_rating(PRESETS_SCOPE_WINWS2, "ALL TCP & UDP v3.txt", 8))
+                self.assertTrue(set_preset_pin(PRESETS_SCOPE_WINWS2, "ALL TCP & UDP v3.txt", True))
+                with patch(
+                    "presets.folders.save_preset_folder_state",
+                    side_effect=AssertionError("unchanged preset item metadata must not be saved"),
+                ):
+                    self.assertFalse(set_preset_rating(PRESETS_SCOPE_WINWS2, "ALL TCP & UDP v3.txt", 8))
+                    self.assertFalse(set_preset_pin(PRESETS_SCOPE_WINWS2, "ALL TCP & UDP v3.txt", True))
+
     def test_rating_action_preserves_display_default_folder(self) -> None:
         with TemporaryDirectory() as temp_dir:
             with patch("settings.store.MAIN_DIRECTORY", str(Path(temp_dir))):

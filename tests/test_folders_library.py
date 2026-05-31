@@ -154,6 +154,32 @@ class FolderOrderingTests(unittest.TestCase):
 
 
 class FolderStoreTests(unittest.TestCase):
+    def test_item_metadata_setters_skip_unchanged_values(self) -> None:
+        state = build_default_preset_folders()
+        state["items"] = {
+            "custom.txt": {
+                "folder_key": COMMON_FOLDER_KEY,
+                "order": 2,
+                "rating": 7,
+                "pinned": True,
+            }
+        }
+        store = FolderLibraryStore(state)
+
+        self.assertFalse(store.set_item_folder("custom.txt", COMMON_FOLDER_KEY))
+        self.assertFalse(store.set_item_order("custom.txt", 2))
+        self.assertFalse(store.set_item_rating("custom.txt", 7))
+        self.assertFalse(store.set_item_pinned("custom.txt", True))
+
+    def test_default_item_metadata_does_not_create_empty_item(self) -> None:
+        store = FolderLibraryStore(build_default_preset_folders())
+
+        self.assertFalse(store.set_item_folder("custom.txt", COMMON_FOLDER_KEY))
+        self.assertFalse(store.set_item_order("custom.txt", None))
+        self.assertFalse(store.set_item_rating("custom.txt", 0))
+        self.assertFalse(store.set_item_pinned("custom.txt", False))
+        self.assertEqual(store.to_dict()["items"], {})
+
     def test_delete_folder_moves_items_to_common(self) -> None:
         store = FolderLibraryStore(build_default_preset_folders())
         folder_key = store.create_folder("Игры")
