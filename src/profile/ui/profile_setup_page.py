@@ -2283,7 +2283,6 @@ class ProfileSetupPageBase(BasePage):
             return
         text = self._list_file_text.toPlainText()
         self._list_file_text_snapshot = text
-        self._list_file_user_entries_count = _list_file_entries_count(text)
         self._request_list_file_validation({
             "kind": self._list_file_kind,
             "text": text,
@@ -2329,7 +2328,15 @@ class ProfileSetupPageBase(BasePage):
         current_text = str(self.__dict__.get("_list_file_text_snapshot", "") or "")
         if str(text or "") != current_text:
             return
-        invalid_lines = tuple(invalid_lines or ())
+        validation_result = invalid_lines
+        if isinstance(validation_result, dict):
+            invalid_lines = tuple(validation_result.get("invalid_lines") or ())
+            try:
+                self._list_file_user_entries_count = int(validation_result.get("entries_count") or 0)
+            except (TypeError, ValueError):
+                self._list_file_user_entries_count = 0
+        else:
+            invalid_lines = tuple(validation_result or ())
         self._render_list_file_validation(tuple(invalid_lines or ()))
         if self._list_file_save_button is not None:
             editable = self._list_file_text is not None and not self._list_file_text.isReadOnly()

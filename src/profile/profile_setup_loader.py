@@ -5,6 +5,10 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from log.log import log
 
 
+def _list_file_entries_count(text: str) -> int:
+    return sum(1 for line in str(text or "").splitlines() if line.strip())
+
+
 class ProfileSetupLoadWorker(QThread):
     loaded = pyqtSignal(int, object)
     failed = pyqtSignal(int, str)
@@ -77,11 +81,15 @@ class ProfileListFileValidationWorker(QThread):
                 kind=self._kind,
                 text=self._text,
             )
+            result = {
+                "invalid_lines": tuple(invalid_lines or ()),
+                "entries_count": _list_file_entries_count(self._text),
+            }
         except Exception as exc:
             log(f"ProfileListFileValidationWorker: не удалось проверить файл списка profile: {exc}", "ERROR")
             self.failed.emit(self._request_id, str(exc))
             return
-        self.validated.emit(self._request_id, self._kind, self._text, tuple(invalid_lines or ()))
+        self.validated.emit(self._request_id, self._kind, self._text, result)
 
 
 class ProfileListFileSaveWorker(QThread):

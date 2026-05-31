@@ -668,7 +668,7 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         self.assertEqual(page._list_file_validation_timer.start_calls, [180])
         page._request_list_file_validation.assert_not_called()
 
-    def test_scheduled_list_file_validation_reads_editor_once(self) -> None:
+    def test_scheduled_list_file_validation_does_not_count_entries_in_gui(self) -> None:
         from unittest.mock import Mock
 
         from profile.ui.profile_setup_page import ProfileSetupPageBase
@@ -685,11 +685,42 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
 
         self.assertEqual(page._list_file_text.plain_text_read_calls, ["user.example\nsecond.example"])
         self.assertEqual(page._list_file_text_snapshot, "user.example\nsecond.example")
-        self.assertEqual(page._list_file_user_entries_count, 2)
+        self.assertEqual(page._list_file_user_entries_count, 0)
         page._request_list_file_validation.assert_called_once_with({
             "kind": "hostlist",
             "text": "user.example\nsecond.example",
         })
+
+    def test_list_file_validation_result_updates_entries_count_from_worker(self) -> None:
+        from unittest.mock import Mock
+
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._list_file_validation_request_id = 7
+        page._pending_list_file_validation = None
+        page._list_file_kind = "hostlist"
+        page._list_file_text = _PlainTextWidget("user.example\nsecond.example", read_only=False)
+        page._list_file_save_button = _BoolWidget(enabled=False)
+        page._list_file_status_label = _TextWidget("")
+        page._list_file_text_snapshot = "user.example\nsecond.example"
+        page._list_file_user_entries_count = 0
+        page._list_file_base_entries_count = 1
+        page._render_list_file_validation = Mock()
+
+        ProfileSetupPageBase._on_list_file_validation_finished(
+            page,
+            7,
+            "hostlist",
+            "user.example\nsecond.example",
+            {"invalid_lines": (), "entries_count": 2},
+        )
+
+        self.assertEqual(page._list_file_user_entries_count, 2)
+        self.assertEqual(
+            page._list_file_status_label.text(),
+            "Записей всего: 3 • ваших: 2 • есть несохранённые изменения",
+        )
 
     def test_list_file_save_uses_cached_text_snapshot(self) -> None:
         from unittest.mock import Mock

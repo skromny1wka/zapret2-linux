@@ -3789,7 +3789,15 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             kind="hostlist",
             text="ok.example\nbad domain",
         )
-        self.assertEqual(validated, [(4, "hostlist", "ok.example\nbad domain", ((2, "bad domain"),))])
+        self.assertEqual(
+            validated,
+            [(
+                4,
+                "hostlist",
+                "ok.example\nbad domain",
+                {"invalid_lines": ((2, "bad domain"),), "entries_count": 2},
+            )],
+        )
 
     def test_profile_setup_page_renames_editor_tab_for_exclusion_profiles(self) -> None:
         regular_payload = SimpleNamespace(
