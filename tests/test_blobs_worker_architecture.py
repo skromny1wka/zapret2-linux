@@ -9,6 +9,19 @@ import blobs.workers as blobs_workers
 
 
 class BlobsWorkerArchitectureTests(unittest.TestCase):
+    def test_blobs_feature_does_not_expose_heavy_direct_actions(self) -> None:
+        feature = build_blobs_feature()
+
+        for attr_name in (
+            "get_blobs_info",
+            "save_user_blob",
+            "delete_user_blob",
+            "reload_blobs",
+            "open_bin_folder",
+            "open_blobs_json",
+        ):
+            self.assertFalse(hasattr(feature, attr_name), attr_name)
+
     def test_blobs_workers_receive_commands_from_feature(self) -> None:
         feature_source = inspect.getsource(build_blobs_feature)
         worker_source = "\n".join(
