@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from core.paths import AppPaths
 from profile.service import ProfilePresetService
+from profile.strategy_state import ProfileStrategyState
 
 
 class _PresetStore:
@@ -277,6 +278,41 @@ class ProfileServiceApplyStrategyGuardTests(unittest.TestCase):
                     moved = service.move_profile_after(source.key, destination.key)
 
         self.assertEqual(moved, source.key)
+
+    def test_set_strategy_state_skips_cache_invalidation_when_state_is_unchanged(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            store = _PresetStore(
+                "\n".join(
+                    (
+                        "--name=Speedtest",
+                        "--filter-tcp=443,8080",
+                        "--hostlist=lists/speedtest.txt",
+                        "--lua-desync=fake",
+                        "",
+                    )
+                )
+            )
+            feature = SimpleNamespace(
+                _presets_feature=store,
+                _app_paths=AppPaths(user_root=root, local_root=root),
+            )
+            service = ProfilePresetService(feature, "zapret2_mode")
+            service._state_store = SimpleNamespace(
+                get_strategy_state=lambda _profile_key, _strategy_id: ProfileStrategyState(rating="work", favorite=True),
+                set_strategy_state=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                    AssertionError("unchanged strategy state must not be written")
+                ),
+            )
+
+            with patch.object(
+                service,
+                "_invalidate_profile_list_snapshot",
+                side_effect=AssertionError("unchanged strategy state must not invalidate list cache"),
+            ):
+                state = service.set_strategy_state("profile:0", "tls_fake", rating="work", favorite=True)
+
+        self.assertEqual(state, ProfileStrategyState(rating="work", favorite=True))
 
     def test_apply_strategy_skips_save_when_profile_already_uses_strategy(self) -> None:
         with TemporaryDirectory() as temp_dir:

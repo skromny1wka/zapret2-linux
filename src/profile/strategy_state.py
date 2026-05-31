@@ -60,6 +60,14 @@ class ProfileStrategyStateStore:
             raise ValueError("strategy id is required")
 
         data = self._read()
+        current_state = _state_from_row(_strategy_row(data, clean_profile_key, clean_strategy_id))
+        next_state = ProfileStrategyState(
+            rating=_normalize_rating(rating) if rating is not None else current_state.rating,
+            favorite=bool(favorite) if favorite is not None else current_state.favorite,
+        )
+        if next_state == current_state:
+            return current_state
+
         profiles = data.setdefault("profiles", {})
         if not isinstance(profiles, dict):
             profiles = {}

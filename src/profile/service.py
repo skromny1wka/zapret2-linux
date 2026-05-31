@@ -536,6 +536,13 @@ class ProfilePresetService:
         strategy_id = str(strategy_id or "").strip()
         if not persistent_key or strategy_id in {"", "none", "custom"}:
             return None
+        current_state = self._state_store.get_strategy_state(persistent_key, strategy_id)
+        next_state = ProfileStrategyState(
+            rating=str(rating or "").strip().lower() if rating is not None else current_state.rating,
+            favorite=bool(favorite) if favorite is not None else current_state.favorite,
+        )
+        if not clear and next_state == current_state:
+            return current_state
         if clear:
             self._state_store.clear_strategy_state(persistent_key, strategy_id)
             self._invalidate_profile_list_snapshot()
