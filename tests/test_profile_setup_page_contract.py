@@ -4269,6 +4269,88 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._apply_match_tab_payload.assert_not_called()
         page._rebuild_breadcrumb.assert_not_called()
 
+    def test_strategy_branch_selector_updates_labels_without_rebuilding_combo(self) -> None:
+        class _Bar:
+            def __init__(self) -> None:
+                self._visible = True
+
+            def isVisible(self) -> bool:  # noqa: N802
+                return self._visible
+
+            def setVisible(self, visible: bool) -> None:  # noqa: N802
+                self._visible = bool(visible)
+
+        class _Combo:
+            def __init__(self) -> None:
+                self.rows: list[tuple[str, str]] = []
+                self.current_index = 0
+                self.clear_calls = 0
+                self.add_calls = 0
+                self.text_updates: list[tuple[int, str]] = []
+
+            def blockSignals(self, _blocked: bool) -> None:  # noqa: N802
+                pass
+
+            def clear(self) -> None:
+                self.clear_calls += 1
+                self.rows.clear()
+
+            def addItem(self, text: str, userData: str = "") -> None:  # noqa: N802
+                self.add_calls += 1
+                self.rows.append((str(text), str(userData)))
+
+            def count(self) -> int:
+                return len(self.rows)
+
+            def itemData(self, index: int):
+                return self.rows[index][1]
+
+            def itemText(self, index: int) -> str:  # noqa: N802
+                return self.rows[index][0]
+
+            def setItemText(self, index: int, text: str) -> None:  # noqa: N802
+                self.text_updates.append((index, str(text)))
+                self.rows[index] = (str(text), self.rows[index][1])
+
+            def currentIndex(self) -> int:  # noqa: N802
+                return self.current_index
+
+            def setCurrentIndex(self, index: int) -> None:  # noqa: N802
+                self.current_index = int(index)
+
+        def _payload(first_name: str):
+            return SimpleNamespace(
+                current_strategy_branch_id="branch:1",
+                strategy_branches=(
+                    SimpleNamespace(
+                        branch_id="branch:1",
+                        payload="tls",
+                        in_range="",
+                        out_range="",
+                        strategy_name=first_name,
+                    ),
+                    SimpleNamespace(
+                        branch_id="branch:2",
+                        payload="http",
+                        in_range="",
+                        out_range="",
+                        strategy_name="HTTP fake",
+                    ),
+                ),
+            )
+
+        combo = _Combo()
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._strategy_branch_combo = combo
+        page._strategy_branch_bar = _Bar()
+
+        ProfileSetupPageBase._apply_strategy_branch_selector(page, _payload("Old TLS"))
+        ProfileSetupPageBase._apply_strategy_branch_selector(page, _payload("New TLS"))
+
+        self.assertEqual(combo.clear_calls, 1)
+        self.assertEqual(combo.add_calls, 2)
+        self.assertEqual(combo.text_updates, [(0, "payload: tls — New TLS")])
+
     def test_strategy_apply_worker_emits_new_profile_key(self) -> None:
         apply_strategy = Mock(return_value="profile-1")
         load_profile = Mock()

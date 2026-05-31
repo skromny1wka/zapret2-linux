@@ -803,6 +803,27 @@ def _strategy_branch_label(branch) -> str:
     return f"{' · '.join(parts)} — {strategy_name}"
 
 
+def _update_strategy_branch_combo_in_place(
+    combo,
+    rows: tuple[tuple[str, str], ...] | list[tuple[str, str]],
+    selected_index: int,
+) -> bool:
+    try:
+        if int(combo.count()) != len(rows):
+            return False
+        for index, (branch_id, _label) in enumerate(rows):
+            if str(combo.itemData(index) or "").strip() != str(branch_id or "").strip():
+                return False
+        for index, (_branch_id, label) in enumerate(rows):
+            if str(combo.itemText(index) or "") != str(label or ""):
+                combo.setItemText(index, str(label or ""))
+        if int(combo.currentIndex()) != int(selected_index):
+            combo.setCurrentIndex(int(selected_index))
+        return True
+    except Exception:
+        return False
+
+
 def _branch_raw_strategy_text(branch, strategy_args: str) -> str:
     lines = []
     in_range = str(getattr(branch, "in_range", "") or "x").strip() or "x"
@@ -1993,15 +2014,20 @@ class ProfileSetupPageBase(BasePage):
             return
 
         current_id = _current_strategy_branch_id(payload) or str(getattr(branches[0], "branch_id", "") or "")
+        branch_rows: list[tuple[str, str]] = []
+        selected_index = 0
+        for index, branch in enumerate(branches):
+            branch_id = str(getattr(branch, "branch_id", "") or "").strip()
+            branch_rows.append((branch_id, _strategy_branch_label(branch)))
+            if branch_id == current_id:
+                selected_index = index
         combo.blockSignals(True)
         try:
+            if _update_strategy_branch_combo_in_place(combo, branch_rows, selected_index):
+                return
             combo.clear()
-            selected_index = 0
-            for index, branch in enumerate(branches):
-                branch_id = str(getattr(branch, "branch_id", "") or "").strip()
-                combo.addItem(_strategy_branch_label(branch), userData=branch_id)
-                if branch_id == current_id:
-                    selected_index = index
+            for branch_id, label in branch_rows:
+                combo.addItem(label, userData=branch_id)
             combo.setCurrentIndex(selected_index)
         finally:
             combo.blockSignals(False)
