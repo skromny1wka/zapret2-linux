@@ -179,6 +179,15 @@ def build_user_presets_page_kwargs(
     ui_state_store,
 ) -> dict:
     method = ZAPRET2_MODE if page_name == PageName.ZAPRET2_USER_PRESETS else ZAPRET1_MODE
+
+    def _create_preset_link_action_worker(request_id: int, *, action: str, parent=None):
+        return presets_feature.create_preset_link_action_worker(
+            request_id,
+            open_url=external_actions_feature.open_url,
+            action=action,
+            parent=parent,
+        )
+
     return {
         "preset_runtime_actions": UserPresetsRuntimeActions(
             get_selected_source_preset_file_name=presets_feature.get_selected_source_preset_file_name,
@@ -196,7 +205,7 @@ def build_user_presets_page_kwargs(
         "create_preset_bulk_action_worker": presets_feature.create_preset_bulk_action_worker,
         "create_preset_activate_worker": presets_feature.create_preset_activate_worker,
         "create_preset_item_action_worker": presets_feature.create_preset_item_action_worker,
-        "create_preset_link_action_worker": presets_feature.create_preset_link_action_worker,
+        "create_preset_link_action_worker": _create_preset_link_action_worker,
         "create_preset_folder_action_worker": presets_feature.create_preset_folder_action_worker,
         "create_preset_storage_action_worker": presets_feature.create_preset_storage_action_worker,
         "load_preset_folder_state": presets_feature.load_preset_folder_state,
@@ -206,7 +215,6 @@ def build_user_presets_page_kwargs(
             preset_name,
             allow_internal=True,
         ),
-        "open_url": external_actions_feature.open_url,
         "ui_state_store": ui_state_store,
     }
 

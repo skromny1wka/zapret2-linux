@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 
 class UserPresetsDependencyBoundaryTests(unittest.TestCase):
-    def test_user_presets_page_receives_open_url_callable_for_link_worker_factory(self) -> None:
+    def test_user_presets_page_receives_link_worker_factory_without_open_url_callable(self) -> None:
         from app.page_names import PageName
         from presets.ui.common.user_presets_page import UserPresetsPageBase
         from ui.page_deps.presets import build_user_presets_page_kwargs
@@ -15,23 +15,36 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
         page_source = inspect.getsource(UserPresetsPageBase)
         runtime_source = inspect.getsource(UserPresetsPageBase._build_page_runtime)
 
-        self.assertIn("open_url", init_source)
+        self.assertNotIn("open_url", init_source)
+        self.assertNotIn("self._open_url", page_source)
         self.assertNotIn("external_actions_feature", init_source)
         self.assertNotIn("self._external_actions", page_source)
         self.assertNotIn("open_url=self._open_url", runtime_source)
-        self.assertIn("open_url=self._open_url", inspect.getsource(UserPresetsPageBase.create_preset_link_action_worker))
+        self.assertNotIn(
+            "open_url=self._open_url",
+            inspect.getsource(UserPresetsPageBase.create_preset_link_action_worker),
+        )
 
         external_actions = Mock()
+        presets = Mock()
         kwargs = build_user_presets_page_kwargs(
             page_name=PageName.ZAPRET2_USER_PRESETS,
-            presets_feature=Mock(),
+            presets_feature=presets,
             external_actions_feature=external_actions,
             open_preset_raw_editor=Mock(),
             ui_state_store=Mock(),
         )
 
-        self.assertIs(kwargs["open_url"], external_actions.open_url)
+        self.assertNotIn("open_url", kwargs)
         self.assertNotIn("external_actions_feature", kwargs)
+        parent = object()
+        kwargs["create_preset_link_action_worker"](7, action="info", parent=parent)
+        presets.create_preset_link_action_worker.assert_called_once_with(
+            7,
+            open_url=external_actions.open_url,
+            action="info",
+            parent=parent,
+        )
 
     def test_user_presets_page_receives_concrete_preset_actions_instead_of_feature(self) -> None:
         from app.page_names import PageName
@@ -95,10 +108,8 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
             kwargs["create_preset_item_action_worker"],
             presets.create_preset_item_action_worker,
         )
-        self.assertIs(
-            kwargs["create_preset_link_action_worker"],
-            presets.create_preset_link_action_worker,
-        )
+        self.assertTrue(callable(kwargs["create_preset_link_action_worker"]))
+        self.assertNotIn("open_url", kwargs)
         self.assertIs(
             kwargs["create_preset_folder_action_worker"],
             presets.create_preset_folder_action_worker,

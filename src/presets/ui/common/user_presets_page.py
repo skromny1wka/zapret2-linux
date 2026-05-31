@@ -119,7 +119,6 @@ class UserPresetsPageBase(BasePage):
         load_preset_folder_state,
         delete_preset_item_meta,
         open_preset_raw_editor,
-        open_url,
         ui_state_store,
     ):
         self._config = self.page_config
@@ -141,7 +140,6 @@ class UserPresetsPageBase(BasePage):
         self._create_preset_storage_action_worker_fn = create_preset_storage_action_worker
         self._load_preset_folder_state_fn = load_preset_folder_state
         self._delete_preset_item_meta_fn = delete_preset_item_meta
-        self._open_url = open_url
         self._open_preset_raw_editor_callback = open_preset_raw_editor
         self._page_api = self._build_page_runtime().build_page_api()
         self._runtime_service = self._build_runtime_service()
@@ -2052,7 +2050,6 @@ class UserPresetsPageBase(BasePage):
     def create_preset_link_action_worker(self, request_id: int, *, action: str):
         return self._create_preset_link_action_worker_fn(
             request_id,
-            open_url=self._open_url,
             action=action,
             parent=self,
         )
