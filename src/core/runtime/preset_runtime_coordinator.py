@@ -153,15 +153,6 @@ class PresetRuntimeCoordinator(QObject):
         old_path = self._active_preset_file_path
         self.setup_active_preset_file_watcher()
         new_path = str(self._get_active_preset_path() or "").strip()
-        if new_path:
-            self._publish_active_preset_content_changed(new_path)
-
-        if not self._same_path(old_path, new_path):
-            log(
-                f"Активный preset сохранён в новом source-файле: {new_path or updated_file_name}",
-                "INFO",
-            )
-
         fingerprint = self._build_preset_content_apply_fingerprint(
             method,
             updated_file_name,
@@ -173,6 +164,15 @@ class PresetRuntimeCoordinator(QObject):
                 "DEBUG",
             )
             return
+
+        if new_path:
+            self._publish_active_preset_content_changed(new_path)
+
+        if not self._same_path(old_path, new_path):
+            log(
+                f"Активный preset сохранён в новом source-файле: {new_path or updated_file_name}",
+                "INFO",
+            )
 
         if self._request_preset_content_apply(method, "preset_content_changed", updated_file_name):
             self._last_preset_content_apply_fingerprint = fingerprint

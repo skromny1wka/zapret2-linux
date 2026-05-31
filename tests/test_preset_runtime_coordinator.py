@@ -108,7 +108,7 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
                 (ZAPRET2_MODE, "preset_content_changed", "Default v5.txt"),
             ],
         )
-        self.assertEqual(ui_state.content_revision, 3)
+        self.assertEqual(ui_state.content_revision, 2)
 
     def test_preset_content_fingerprint_does_not_read_file_body_in_qt_handler(self) -> None:
         from core.runtime.preset_runtime_coordinator import PresetRuntimeCoordinator
