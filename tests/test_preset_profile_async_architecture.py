@@ -59,6 +59,7 @@ import blockcheck.ui.helpers as blockcheck_ui_helpers
 from app.feature_facades.blockcheck import BlockcheckFeature
 from updater.ui.page import ServersPage
 import donater.pairing_workflow as premium_pairing_workflow
+import donater.ui.pairing_workflow as premium_ui_pairing_workflow
 import donater.ui.page_plans as premium_page_plans
 from donater.ui.page import PremiumPage
 import donater.ui.page_lifecycle as premium_page_lifecycle
@@ -1940,6 +1941,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("premium_feature=self", feature_source)
         self.assertNotIn("self._premium", inspect.getsource(device_info_worker.PremiumDeviceInfoLoadWorker))
         self.assertIn("read_device_info_snapshot", worker_source)
+        self.assertFalse(hasattr(premium_ui_pairing_workflow, "update_device_info_labels"))
 
     def test_premium_click_actions_initialize_checker_through_worker(self) -> None:
         create_source = inspect.getsource(PremiumPage._create_pair_code)

@@ -9,37 +9,6 @@ from PyQt6.QtWidgets import QApplication
 import donater.ui.page_plans as premium_page_plans
 
 
-def update_device_info_labels(
-    *,
-    premium_feature,
-    tr: Callable[[str, str], str],
-    device_id_label,
-    saved_key_label,
-    last_check_label,
-    on_error: Callable[[Exception], None] | None = None,
-    current_time: int | None = None,
-) -> None:
-    if not premium_feature.is_checker_ready():
-        return
-
-    try:
-        snapshot = premium_feature.read_device_info_snapshot(current_time=current_time)
-        if not snapshot:
-            return
-        apply_device_info_snapshot_labels(
-            snapshot=snapshot,
-            tr=tr,
-            device_id_label=device_id_label,
-            saved_key_label=saved_key_label,
-            last_check_label=last_check_label,
-        )
-        return snapshot
-    except Exception as exc:
-        if on_error is not None:
-            on_error(exc)
-    return None
-
-
 def apply_device_info_snapshot_labels(
     *,
     snapshot,
