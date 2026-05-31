@@ -2732,7 +2732,18 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         )
 
         runtime.running = False
-        ProfileSetupPageBase._on_user_profile_update_worker_finished(page, object())
+        callbacks = []
+        with patch(
+            "profile.ui.profile_setup_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            ProfileSetupPageBase._on_user_profile_update_worker_finished(page, object())
+
+        page.create_profile_user_update_worker.assert_not_called()
+        next_worker.start.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+
+        callbacks[0]()
 
         page.create_profile_user_update_worker.assert_called_once_with(
             2,
@@ -2754,6 +2765,22 @@ class ProfileSetupPageContractTests(unittest.TestCase):
                 }
             ],
         )
+
+    def test_profile_setup_user_profile_queue_restarts_after_worker_signal_returns(self) -> None:
+        update_finished = inspect.getsource(ProfileSetupPageBase._on_user_profile_update_worker_finished)
+        delete_finished = inspect.getsource(ProfileSetupPageBase._on_user_profile_delete_worker_finished)
+        schedule_source = inspect.getsource(
+            ProfileSetupPageBase._schedule_next_pending_user_profile_write_operation_start
+        )
+        run_source = inspect.getsource(ProfileSetupPageBase._run_scheduled_user_profile_write_operation_start)
+
+        for source in (update_finished, delete_finished):
+            self.assertIn("_schedule_next_pending_user_profile_write_operation_start", source)
+            self.assertNotIn("_start_next_pending_user_profile_write_operation()", source)
+
+        self.assertIn("QTimer.singleShot", schedule_source)
+        self.assertIn("_run_scheduled_user_profile_write_operation_start", schedule_source)
+        self.assertIn("_start_next_pending_user_profile_write_operation", run_source)
 
     def test_user_profile_delete_starts_worker_without_deleting_in_gui_thread(self) -> None:
         class _Signal:

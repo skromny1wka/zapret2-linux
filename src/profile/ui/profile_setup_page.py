@@ -947,6 +947,7 @@ class ProfileSetupPageBase(BasePage):
         self._user_profile_delete_request_id = 0
         self._pending_user_profile_deletes: list[str] = []
         self._pending_user_profile_operations: list[dict[str, str]] = []
+        self._user_profile_write_operation_start_scheduled = False
         self._strategy_apply_runtime = OneShotWorkerRuntime()
         self._strategy_apply_request_id = 0
         self._strategy_apply_runtime_strategy_id = ""
@@ -1688,6 +1689,34 @@ class ProfileSetupPageBase(BasePage):
             }
         return None
 
+    def _has_pending_user_profile_write_operation(self) -> bool:
+        return any(
+            self.__dict__.get(attr)
+            for attr in (
+                "_pending_user_profile_operations",
+                "_pending_user_profile_updates",
+                "_pending_user_profile_deletes",
+            )
+        )
+
+    def _schedule_next_pending_user_profile_write_operation_start(self) -> bool:
+        if self._user_profile_write_operation_running():
+            return True
+        if not self._has_pending_user_profile_write_operation():
+            return False
+        if self.__dict__.get("_user_profile_write_operation_start_scheduled", False):
+            return True
+        self._user_profile_write_operation_start_scheduled = True
+        try:
+            QTimer.singleShot(0, self._run_scheduled_user_profile_write_operation_start)
+        except Exception:
+            self._run_scheduled_user_profile_write_operation_start()
+        return True
+
+    def _run_scheduled_user_profile_write_operation_start(self) -> None:
+        self._user_profile_write_operation_start_scheduled = False
+        self._start_next_pending_user_profile_write_operation()
+
     def _start_next_pending_user_profile_write_operation(self) -> bool:
         if self._user_profile_write_operation_running():
             return True
@@ -1770,7 +1799,7 @@ class ProfileSetupPageBase(BasePage):
         )
 
     def _on_user_profile_update_worker_finished(self, _worker) -> None:
-        if self._start_next_pending_user_profile_write_operation():
+        if self._schedule_next_pending_user_profile_write_operation_start():
             return
         self._set_user_profile_buttons_enabled(True)
 
@@ -1838,7 +1867,7 @@ class ProfileSetupPageBase(BasePage):
         )
 
     def _on_user_profile_delete_worker_finished(self, _worker) -> None:
-        if self._start_next_pending_user_profile_write_operation():
+        if self._schedule_next_pending_user_profile_write_operation_start():
             return
         self._set_user_profile_buttons_enabled(True)
 
@@ -3295,6 +3324,7 @@ class ProfileSetupPageBase(BasePage):
             setattr(self, attr, None)
         self._list_file_state_apply_scheduled = False
         self._profile_setup_payload_apply_scheduled = False
+        self._user_profile_write_operation_start_scheduled = False
         self.__dict__.setdefault("_pending_profile_setup_write_operations", []).clear()
         self.__dict__.setdefault("_pending_user_profile_updates", []).clear()
         for attr in (
