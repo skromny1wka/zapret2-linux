@@ -323,6 +323,24 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         fallback_branch = plan_source.split("effective_folder_state", 1)[1]
         self.assertNotIn("load_preset_folder_state", fallback_branch)
 
+    def test_user_presets_rows_plan_apply_is_deferred_after_worker_signal(self) -> None:
+        service = UserPresetsRuntimeService.__new__(UserPresetsRuntimeService)
+        service._rows_plan_request_id = 3
+        page = SimpleNamespace()
+        adapter = SimpleNamespace(apply_rows_plan=Mock())
+        service._resolve_page = Mock(return_value=page)
+        service._resolve_adapter = Mock(return_value=adapter)
+
+        with patch("presets.user_presets_runtime_service.QTimer.singleShot") as single_shot:
+            UserPresetsRuntimeService._on_rows_plan_loaded(service, 3, "plan", 12.5, page)
+
+        adapter.apply_rows_plan.assert_not_called()
+        single_shot.assert_called_once()
+
+        UserPresetsRuntimeService._run_scheduled_rows_plan_apply(service)
+
+        adapter.apply_rows_plan.assert_called_once_with("plan", 12.5)
+
     def test_user_presets_active_marker_uses_model_signals_without_full_viewport_update(self) -> None:
         source = inspect.getsource(UserPresetsRuntimeService.apply_active_preset_marker_for_file)
 

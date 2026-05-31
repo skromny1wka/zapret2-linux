@@ -144,6 +144,8 @@ class UserPresetsRuntimeService:
         self._rows_plan_request_id = 0
         self._rows_plan_worker: UserPresetsRowsPlanWorker | None = None
         self._rows_plan_pending: tuple[dict[str, dict[str, object]], dict[str, Any] | None, float | None, object] | None = None
+        self._rows_plan_apply_scheduled = False
+        self._pending_rows_plan_apply: tuple[object, float | None, object] | None = None
         self._watched_preset_files_sync_scheduled = False
         self._watched_preset_files_sync_pending: tuple[object, set[str] | None] | None = None
 
@@ -562,6 +564,8 @@ class UserPresetsRuntimeService:
         self._metadata_load_pending_page = None
         self._single_metadata_pending.clear()
         self._rows_plan_pending = None
+        self._rows_plan_apply_scheduled = False
+        self._pending_rows_plan_apply = None
         self._watched_preset_files_sync_scheduled = False
         self._watched_preset_files_sync_pending = None
         for attr in ("_metadata_load_worker", "_single_metadata_worker", "_rows_plan_worker"):
@@ -812,6 +816,26 @@ class UserPresetsRuntimeService:
     def _on_rows_plan_loaded(self, request_id: int, plan, started_at: float | None, page=None) -> None:
         if request_id != self._rows_plan_request_id:
             return
+        page = self._resolve_page(page)
+        self._schedule_rows_plan_apply(plan, started_at, page)
+
+    def _schedule_rows_plan_apply(self, plan, started_at: float | None, page=None) -> None:
+        self._pending_rows_plan_apply = (plan, started_at, page)
+        if self.__dict__.get("_rows_plan_apply_scheduled", False):
+            return
+        self._rows_plan_apply_scheduled = True
+        try:
+            QTimer.singleShot(0, self._run_scheduled_rows_plan_apply)
+        except Exception:
+            self._run_scheduled_rows_plan_apply()
+
+    def _run_scheduled_rows_plan_apply(self) -> None:
+        pending = self.__dict__.get("_pending_rows_plan_apply")
+        self._pending_rows_plan_apply = None
+        self._rows_plan_apply_scheduled = False
+        if pending is None:
+            return
+        plan, started_at, page = pending
         _ = self._resolve_page(page)
         adapter = self._resolve_adapter()
         if callable(adapter.apply_rows_plan):
