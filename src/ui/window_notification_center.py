@@ -7,7 +7,7 @@ from PyQt6.QtCore import Q_ARG, QMetaObject, QObject, Qt, QTimer, pyqtSlot
 from app_notifications import advisory_notification, normalize_notification_payload, notification_action
 from log.log import global_logger, log
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
-from ui.window_notification_actions import WindowNotificationActionHandler
+from ui.window_notification_actions import WindowNotificationActionHandler, WindowNotificationRuntimeActions
 
 
 class WindowNotificationCenter(QObject):
@@ -18,7 +18,7 @@ class WindowNotificationCenter(QObject):
         parent,
         *,
         startup_state,
-        runtime_feature,
+        runtime_actions: WindowNotificationRuntimeActions,
         create_open_url_worker,
         create_notification_action_worker,
         show_tray_notification,
@@ -29,6 +29,7 @@ class WindowNotificationCenter(QObject):
         super().__init__(parent)
         self._parent = parent
         self._startup_state = startup_state
+        self._runtime_actions = runtime_actions
         self._create_open_url_worker = create_open_url_worker
         self._create_notification_action_worker = create_notification_action_worker
         self._show_tray_notification = show_tray_notification
@@ -47,7 +48,7 @@ class WindowNotificationCenter(QObject):
         self._recent_signatures: dict[str, float] = {}
         self._action_handler = WindowNotificationActionHandler(
             notify=self.notify,
-            runtime_feature=runtime_feature,
+            runtime_actions=runtime_actions,
             show_page=self._show_page,
             open_url=self._request_external_open_url,
             request_disable_proxy=self._request_disable_proxy,
@@ -195,7 +196,7 @@ class WindowNotificationCenter(QObject):
             return
         self._request_notification_action(
             "windivert_autofix",
-            lambda: self._runtime.execute_windivert_autofix(value),
+            lambda: self._runtime_actions.execute_windivert_autofix(value),
             bar=bar,
             context={"action": value},
         )
@@ -203,7 +204,7 @@ class WindowNotificationCenter(QObject):
     def _request_launch_conflict_action(self, request_id: int, close_conflicts: bool, bar=None) -> None:
         self._request_notification_action(
             "launch_conflict_resume",
-            lambda: self._runtime.prepare_launch_conflict_resolution(
+            lambda: self._runtime_actions.prepare_launch_conflict_resolution(
                 int(request_id or 0),
                 close_conflicts=bool(close_conflicts),
             ),
@@ -410,7 +411,7 @@ class WindowNotificationCenter(QObject):
         if ok:
             self._close_bar(bar)
             try:
-                self._runtime.continue_start_after_conflict_resolution(request_id)
+                self._runtime_actions.continue_start_after_conflict_resolution(request_id)
             except Exception as exc:
                 log(f"Не удалось продолжить запуск после конфликта: {exc}", "DEBUG")
                 self._notify_launch_conflict_action_error()

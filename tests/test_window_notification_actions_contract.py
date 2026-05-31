@@ -70,6 +70,22 @@ class WindowNotificationActionsContractTests(unittest.TestCase):
         self.assertIn("launch_conflict_resume", center_source)
         self.assertIn("_notification_action_runtime", center_source)
 
+    def test_notification_runtime_actions_are_narrow_instead_of_full_runtime_feature(self) -> None:
+        handler_init_source = inspect.getsource(WindowNotificationActionHandler.__init__)
+        handler_source = inspect.getsource(WindowNotificationActionHandler)
+        center_init_source = inspect.getsource(WindowNotificationCenter.__init__)
+        center_source = inspect.getsource(WindowNotificationCenter)
+        setup_source = inspect.getsource(window_notifications_setup.attach_window_notifications)
+
+        self.assertNotIn("runtime_feature", handler_init_source)
+        self.assertNotIn("self._runtime =", handler_source)
+        self.assertIn("runtime_actions", handler_init_source)
+        self.assertIn("self._runtime_actions", handler_source)
+        self.assertNotIn("runtime_feature", inspect.signature(WindowNotificationCenter.__init__).parameters)
+        self.assertNotIn("self._runtime =", center_source)
+        self.assertIn("runtime_actions", inspect.signature(WindowNotificationCenter.__init__).parameters)
+        self.assertIn("WindowNotificationRuntimeActions", setup_source)
+
     def test_launch_conflict_prepare_does_not_start_dpi_from_worker_step(self) -> None:
         runtime_owner = SimpleNamespace(
             _pending_conflict_request_id=7,

@@ -4,6 +4,7 @@ import time as _time
 
 from main.runtime_state import log_startup_metric as emit_startup_metric
 from ui.window_notification_center import WindowNotificationCenter
+from ui.window_notification_actions import WindowNotificationRuntimeActions
 
 
 def show_page(window, page_name, *, allow_internal: bool = False) -> bool:
@@ -22,7 +23,13 @@ def attach_window_notifications(window, features) -> None:
     window.window_notification_center = WindowNotificationCenter(
         window,
         startup_state=window.startup_state,
-        runtime_feature=features.runtime,
+        runtime_actions=WindowNotificationRuntimeActions(
+            is_available=features.runtime.is_available,
+            cancel_start_after_conflict_prompt=features.runtime.cancel_start_after_conflict_prompt,
+            execute_windivert_autofix=features.runtime.execute_windivert_autofix,
+            prepare_launch_conflict_resolution=features.runtime.prepare_launch_conflict_resolution,
+            continue_start_after_conflict_resolution=features.runtime.continue_start_after_conflict_resolution,
+        ),
         create_open_url_worker=external_actions.create_open_url_worker,
         create_notification_action_worker=external_actions.create_notification_action_worker,
         show_tray_notification=features.tray.show_notification_if_available,

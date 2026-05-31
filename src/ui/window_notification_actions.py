@@ -1,11 +1,21 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Callable
 
 from PyQt6.QtWidgets import QApplication
 
 from app_notifications import advisory_notification
 from log.log import log
+
+
+@dataclass(frozen=True, slots=True)
+class WindowNotificationRuntimeActions:
+    is_available: Callable[[], bool]
+    cancel_start_after_conflict_prompt: Callable[[int], object]
+    execute_windivert_autofix: Callable[[str], tuple[bool, str]]
+    prepare_launch_conflict_resolution: Callable[..., tuple[bool, str]]
+    continue_start_after_conflict_resolution: Callable[[int], object]
 
 
 class WindowNotificationActionHandler:
@@ -15,7 +25,7 @@ class WindowNotificationActionHandler:
         self,
         *,
         notify: Callable[[dict | None], None],
-        runtime_feature,
+        runtime_actions: WindowNotificationRuntimeActions,
         show_page,
         open_url: Callable[[str], None],
         request_disable_proxy: Callable[[object | None], None],
@@ -25,7 +35,7 @@ class WindowNotificationActionHandler:
         request_launch_conflict_action: Callable[[int, bool, object | None], None],
     ) -> None:
         self._notify = notify
-        self._runtime = runtime_feature
+        self._runtime_actions = runtime_actions
         self._show_page = show_page
         self._open_url = open_url
         self._request_disable_proxy = request_disable_proxy
@@ -119,8 +129,7 @@ class WindowNotificationActionHandler:
             )
 
     def _run_launch_conflict_action(self, *, request_id: int, close_conflicts: bool, bar=None) -> None:
-        runtime = self._runtime
-        if not runtime.is_available():
+        if not self._runtime_actions.is_available():
             self._notify(
                 advisory_notification(
                     level="warning",
@@ -138,14 +147,13 @@ class WindowNotificationActionHandler:
         self._request_launch_conflict_action(int(request_id or 0), bool(close_conflicts), bar)
 
     def _cancel_launch_conflict_action(self, *, request_id: int, bar=None) -> None:
-        runtime = self._runtime
-        if not runtime.is_available():
+        if not self._runtime_actions.is_available():
             return
 
         self._close_bar(bar)
 
         try:
-            runtime.cancel_start_after_conflict_prompt(int(request_id or 0))
+            self._runtime_actions.cancel_start_after_conflict_prompt(int(request_id or 0))
         except Exception as e:
             log(f"Не удалось отменить запуск после предупреждения о конфликтах: {e}", "DEBUG")
 
