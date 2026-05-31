@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import Mock
 
 from profile.ui.profile_setup_page import ProfileSetupPageBase
+from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 
 
 class _Signal:
@@ -30,7 +31,8 @@ class ProfileListFileLoadQueueTests(unittest.TestCase):
         page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
         page._editor_tab_built = True
         page._profile_key = "profile-1"
-        page._list_file_load_worker = _Worker(running=True)
+        page._list_file_load_runtime = OneShotWorkerRuntime()
+        page._list_file_load_runtime.worker = _Worker(running=True)
         page._pending_list_file_load = False
 
         ProfileSetupPageBase._request_list_file_editor_state(page)
@@ -43,7 +45,9 @@ class ProfileListFileLoadQueueTests(unittest.TestCase):
         next_worker = _Worker(running=False)
         page._editor_tab_built = True
         page._profile_key = "profile-1"
-        page._list_file_load_worker = old_worker
+        page._list_file_load_runtime = OneShotWorkerRuntime()
+        page._list_file_load_runtime.worker = old_worker
+        page._list_file_load_runtime.request_id = 0
         page._pending_list_file_load = True
         page._list_file_load_request_id = 0
         page._list_file_status_label = None

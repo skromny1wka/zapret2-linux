@@ -922,6 +922,8 @@ class ProfileSetupPageBase(BasePage):
         self._list_file_load_runtime = OneShotWorkerRuntime()
         self._list_file_load_request_id = 0
         self._pending_list_file_load = False
+        self._list_file_state_apply_scheduled = False
+        self._pending_list_file_state_apply = None
         self._list_file_save_runtime = OneShotWorkerRuntime()
         self._list_file_save_request_id = 0
         self._pending_list_file_save: tuple[str, str] | None = None
@@ -1380,6 +1382,24 @@ class ProfileSetupPageBase(BasePage):
         if request_id != self._list_file_load_request_id:
             return
         self._list_file_dirty = False
+        self._schedule_list_file_editor_state_apply(state)
+
+    def _schedule_list_file_editor_state_apply(self, state) -> None:
+        self._pending_list_file_state_apply = state
+        if self.__dict__.get("_list_file_state_apply_scheduled", False):
+            return
+        self._list_file_state_apply_scheduled = True
+        try:
+            QTimer.singleShot(0, self._run_scheduled_list_file_editor_state_apply)
+        except Exception:
+            self._run_scheduled_list_file_editor_state_apply()
+
+    def _run_scheduled_list_file_editor_state_apply(self) -> None:
+        state = self.__dict__.get("_pending_list_file_state_apply")
+        self._pending_list_file_state_apply = None
+        self._list_file_state_apply_scheduled = False
+        if state is None or self.__dict__.get("_cleanup_in_progress"):
+            return
         self._apply_list_file_editor_state(state)
 
     def _on_list_file_editor_state_failed(self, request_id: int, error: str) -> None:
@@ -3218,6 +3238,7 @@ class ProfileSetupPageBase(BasePage):
                 pass
         for attr in (
             "_pending_list_file_load",
+            "_pending_list_file_state_apply",
             "_pending_list_file_save",
             "_pending_list_file_validation",
             "_pending_settings_save",
@@ -3228,6 +3249,7 @@ class ProfileSetupPageBase(BasePage):
             "_pending_profile_setup_payload_apply",
         ):
             setattr(self, attr, None)
+        self._list_file_state_apply_scheduled = False
         self._profile_setup_payload_apply_scheduled = False
         self.__dict__.setdefault("_pending_profile_setup_write_operations", []).clear()
         self.__dict__.setdefault("_pending_user_profile_updates", []).clear()

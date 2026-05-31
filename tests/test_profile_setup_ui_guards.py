@@ -545,6 +545,43 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         self.assertEqual(page._list_file_text.read_only_calls, [])
         self.assertEqual(page._list_file_status_label.calls, [])
 
+    def test_list_file_editor_state_apply_is_deferred_after_worker_signal(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        state = SimpleNamespace(
+            kind="hostlist",
+            display_path="lists/youtube.txt",
+            text="example.com",
+            base_text="base.example",
+            user_text="user.example",
+            editable=True,
+            error_text="",
+            invalid_lines=(),
+        )
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._list_file_load_request_id = 9
+        page._cleanup_in_progress = False
+        page._list_file_dirty = True
+        page._apply_list_file_editor_state = Mock()
+        callbacks = []
+
+        with patch(
+            "profile.ui.profile_setup_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            ProfileSetupPageBase._on_list_file_editor_state_loaded(page, 9, state)
+
+        page._apply_list_file_editor_state.assert_not_called()
+        self.assertFalse(page._list_file_dirty)
+        self.assertEqual(len(callbacks), 1)
+
+        callbacks[0]()
+
+        page._apply_list_file_editor_state.assert_called_once_with(state)
+
     def test_list_file_validation_skips_duplicate_status_updates(self) -> None:
         from unittest.mock import Mock
 
