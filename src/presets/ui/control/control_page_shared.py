@@ -282,7 +282,7 @@ class ControlPageActionMixin:
     def _request_program_settings_save(self, action: str, enabled: bool) -> None:
         runtime = self._refresh_runtime
         if runtime.program_settings_save_runtime.is_running():
-            runtime.program_settings_save_pending = (action, bool(enabled))
+            runtime.program_settings_save_pending.append((action, bool(enabled)))
             return
 
         runtime.program_settings_save_runtime.start_qthread_worker(
@@ -357,9 +357,9 @@ class ControlPageActionMixin:
     def _on_program_settings_save_worker_finished(self, _worker) -> None:
         runtime = self._refresh_runtime
         pending = runtime.program_settings_save_pending
-        runtime.program_settings_save_pending = None
-        if pending is not None and not bool(getattr(self, "_cleanup_in_progress", False)):
-            self._request_program_settings_save(str(pending[0]), bool(pending[1]))
+        if pending and not bool(getattr(self, "_cleanup_in_progress", False)):
+            next_save = pending.pop(0)
+            self._request_program_settings_save(str(next_save[0]), bool(next_save[1]))
 
 
 def bind_control_ui_state_store(
@@ -421,6 +421,6 @@ def cleanup_control_page_subscriptions(owner) -> None:
         runtime.program_settings_load_runtime.stop(warning_prefix="Program settings load worker")
         runtime.program_settings_load_runtime.cancel()
 
-        runtime.program_settings_save_pending = None
+        runtime.program_settings_save_pending.clear()
         runtime.program_settings_save_runtime.stop(warning_prefix="Program settings save worker")
         runtime.program_settings_save_runtime.cancel()

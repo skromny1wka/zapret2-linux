@@ -18,7 +18,7 @@ class ModeControlRefreshRuntime:
         self.program_settings_load_runtime = OneShotWorkerRuntime()
         self.program_settings_load_pending = False
         self.program_settings_save_runtime = OneShotWorkerRuntime()
-        self.program_settings_save_pending = None
+        self.program_settings_save_pending: list[tuple[str, bool]] = []
 
     def has_pending_refresh(self) -> bool:
         return bool(self.additional_settings_dirty)
