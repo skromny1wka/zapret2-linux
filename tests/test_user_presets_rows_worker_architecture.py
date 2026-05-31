@@ -23,10 +23,14 @@ class UserPresetsRowsWorkerArchitectureTests(unittest.TestCase):
 
         self.assertTrue(hasattr(runtime_service, "UserPresetsRowsPlanWorker"))
         worker_source = inspect.getsource(runtime_service.UserPresetsRowsPlanWorker.run)
-        apply_source = inspect.getsource(runtime_service.UserPresetsRuntimeService._on_rows_plan_loaded)
+        loaded_source = inspect.getsource(runtime_service.UserPresetsRuntimeService._on_rows_plan_loaded)
+        apply_source = inspect.getsource(runtime_service.UserPresetsRuntimeService._run_scheduled_rows_plan_apply)
 
         self.assertIn("_build_rows_plan", worker_source)
+        self.assertIn("_schedule_rows_plan_apply", loaded_source)
         self.assertIn("adapter.apply_rows_plan", apply_source)
+        self.assertNotIn("adapter.apply_rows_plan", loaded_source)
+        self.assertNotIn("build_preset_rows_plan", loaded_source)
         self.assertNotIn("build_preset_rows_plan", apply_source)
 
     def test_rows_plan_worker_resolves_active_preset_inside_worker(self) -> None:
