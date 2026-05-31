@@ -167,6 +167,69 @@ class RawPresetWriteSerializationTests(unittest.TestCase):
             ],
         )
 
+    def test_raw_preset_action_waits_while_save_runs(self) -> None:
+        page = PresetRawEditorPage.__new__(PresetRawEditorPage)
+        page._raw_save_runtime = _Runtime(running=True)
+        page._raw_action_runtime = _Runtime(running=False)
+        page._raw_activate_runtime = _Runtime(running=False)
+        page._pending_raw_preset_write_operations = []
+        page.create_raw_preset_action_worker = Mock()
+
+        PresetRawEditorPage._request_raw_preset_action(
+            page,
+            "rename",
+            file_name="Default.txt",
+            new_name="Default copy.txt",
+        )
+
+        page.create_raw_preset_action_worker.assert_not_called()
+        self.assertEqual(
+            page._pending_raw_preset_write_operations,
+            [
+                {
+                    "kind": "action",
+                    "action": "rename",
+                    "payload": {
+                        "file_name": "Default.txt",
+                        "new_name": "Default copy.txt",
+                    },
+                }
+            ],
+        )
+
+    def test_raw_preset_save_waits_while_action_runs(self) -> None:
+        page = PresetRawEditorPage.__new__(PresetRawEditorPage)
+        page._raw_save_runtime = _Runtime(running=False)
+        page._raw_action_runtime = _Runtime(running=True)
+        page._raw_activate_runtime = _Runtime(running=False)
+        page._pending_raw_preset_save = None
+        page._pending_raw_preset_write_operations = []
+        page._raw_save_request_id = 0
+        page._set_footer = Mock()
+        page.create_raw_preset_save_worker = Mock()
+
+        self.assertTrue(
+            PresetRawEditorPage._request_raw_preset_save(
+                page,
+                file_name="Default.txt",
+                source_text="--new\n",
+                publish_content_changed=True,
+            )
+        )
+
+        page.create_raw_preset_save_worker.assert_not_called()
+        self.assertEqual(
+            page._pending_raw_preset_write_operations,
+            [
+                {
+                    "kind": "save",
+                    "file_name": "Default.txt",
+                    "source_text": "--new\n",
+                    "publish_content_changed": True,
+                }
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

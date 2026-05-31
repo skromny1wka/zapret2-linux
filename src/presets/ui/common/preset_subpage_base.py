@@ -298,7 +298,7 @@ class PresetRawEditorPage(BasePage):
         return bool(runtime.is_running())
 
     def _raw_preset_write_is_running(self) -> bool:
-        for attr in ("_raw_activate_runtime", "_raw_action_runtime"):
+        for attr in ("_raw_save_runtime", "_raw_activate_runtime", "_raw_action_runtime"):
             runtime = self.__dict__.get(attr)
             if runtime is not None and runtime.is_running():
                 return True
@@ -331,6 +331,13 @@ class PresetRawEditorPage(BasePage):
         if kind == "activate":
             self._pending_raw_preset_activation = ""
             self._start_preset_activation_worker(str(operation.get("file_name") or ""))
+            return True
+        if kind == "save":
+            self._start_raw_preset_save_worker(
+                file_name=str(operation.get("file_name") or ""),
+                source_text=str(operation.get("source_text") or ""),
+                publish_content_changed=bool(operation.get("publish_content_changed")),
+            )
             return True
         if kind == "action":
             action = str(operation.get("action") or "")
@@ -728,6 +735,16 @@ class PresetRawEditorPage(BasePage):
                 bool(publish_content_changed or (pending[2] if pending else False)),
             )
             return True
+        if self._raw_preset_write_is_running():
+            self._queue_raw_preset_write_operation(
+                {
+                    "kind": "save",
+                    "file_name": str(file_name or "").strip(),
+                    "source_text": "" if source_text is None else str(source_text or ""),
+                    "publish_content_changed": bool(publish_content_changed),
+                }
+            )
+            return True
         self._start_raw_preset_save_worker(
             file_name=file_name,
             source_text=source_text,
@@ -808,6 +825,9 @@ class PresetRawEditorPage(BasePage):
         self._after_raw_preset_save = None
         if callback is not None and self._raw_save_succeeded and not self._cleanup_in_progress:
             callback()
+            if self._raw_preset_write_is_running():
+                return
+        self._start_next_raw_preset_write_operation()
 
     def _commit_pending_content_change(self) -> None:
         if self._cleanup_in_progress or not self._content_publish_pending:
