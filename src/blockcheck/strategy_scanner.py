@@ -143,9 +143,9 @@ class StrategyScanner:
         scan_protocol: str = _PROTOCOL_TCP_HTTPS,
         udp_games_scope: str = _UDP_GAMES_SCOPE_ALL,
         *,
-        runtime_feature,
+        shutdown_sync,
     ):
-        self._runtime_feature = runtime_feature
+        self._shutdown_sync = shutdown_sync
         self._scan_protocol = self._normalize_scan_protocol(scan_protocol)
         self._udp_games_scope = self._normalize_udp_games_scope(udp_games_scope)
         if self._scan_protocol != _PROTOCOL_UDP_GAMES:
@@ -1609,7 +1609,7 @@ class StrategyScanner:
 
         if not killed_cleanly:
             try:
-                self._runtime_feature.shutdown_sync(reason="blockcheck_kill_failed", include_cleanup=True)
+                self._shutdown_sync(reason="blockcheck_kill_failed", include_cleanup=True)
             except Exception as e:
                 logger.debug("runtime shutdown after failed strategy kill failed: %s", e)
 
@@ -1624,7 +1624,7 @@ class StrategyScanner:
         errors = []
 
         try:
-            result = self._runtime_feature.shutdown_sync(reason="blockcheck_pre_scan", include_cleanup=True)
+            result = self._shutdown_sync(reason="blockcheck_pre_scan", include_cleanup=True)
             if result.still_running:
                 errors.append("runtime still running after canonical shutdown")
         except Exception as e:
@@ -1645,7 +1645,7 @@ class StrategyScanner:
         errors = []
 
         try:
-            result = self._runtime_feature.shutdown_sync(
+            result = self._shutdown_sync(
                 reason="blockcheck_post_scan",
                 include_cleanup=True,
             )

@@ -185,7 +185,7 @@ def build_blockcheck_page_kwargs(
     def _create_strategy_scan_worker(**kwargs):
         return blockcheck_feature.create_strategy_scan_worker(
             **kwargs,
-            runtime_feature=runtime_feature,
+            shutdown_sync=runtime_feature.shutdown_sync,
         )
 
     return {

@@ -2774,7 +2774,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         kwargs["create_strategy_scan_worker"](target="example.org", mode="quick", parent=object())
         blockcheck_feature.create_strategy_scan_worker.assert_called_once()
         _, call_kwargs = blockcheck_feature.create_strategy_scan_worker.call_args
-        self.assertIs(call_kwargs["runtime_feature"], runtime_feature)
+        self.assertIs(call_kwargs["shutdown_sync"], runtime_feature.shutdown_sync)
 
     def test_blockcheck_support_bundle_prepares_through_worker(self) -> None:
         blockcheck_workers = importlib.import_module("blockcheck.workers")

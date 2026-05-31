@@ -26,7 +26,7 @@ class StrategyScanWorker(QObject):
         scan_protocol: str = "tcp_https",
         udp_games_scope: str = "all",
         *,
-        runtime_feature,
+        shutdown_sync: Callable[..., object],
         start_run_log: Callable[..., object],
         append_run_log: Callable[[object, str], None],
         parent=None,
@@ -36,7 +36,7 @@ class StrategyScanWorker(QObject):
         self._mode = mode
         self._scan_protocol = scan_protocol
         self._udp_games_scope = udp_games_scope
-        self._runtime_feature = runtime_feature
+        self._shutdown_sync = shutdown_sync
         self._start_run_log_action = start_run_log
         self._append_run_log_action = append_run_log
         try:
@@ -70,7 +70,7 @@ class StrategyScanWorker(QObject):
                 callback=self,
                 scan_protocol=self._scan_protocol,
                 udp_games_scope=self._udp_games_scope,
-                runtime_feature=self._runtime_feature,
+                shutdown_sync=self._shutdown_sync,
             )
             report = self._scanner.run()
             self._drain_pending_log_messages()

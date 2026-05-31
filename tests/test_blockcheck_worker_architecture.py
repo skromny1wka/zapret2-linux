@@ -73,6 +73,25 @@ class BlockcheckWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("_append_run_log_action", worker_source)
         self.assertNotIn("blockcheck.commands", worker_source)
 
+    def test_strategy_scan_worker_receives_runtime_shutdown_callable_not_full_runtime_feature(self) -> None:
+        from blockcheck.strategy_scanner import StrategyScanner
+
+        feature_source = inspect.getsource(BlockcheckFeature.create_strategy_scan_worker)
+        command_factory_source = inspect.getsource(blockcheck_commands.create_strategy_scan_worker)
+        worker_signature = inspect.signature(strategy_scan_worker.StrategyScanWorker.__init__)
+        scanner_signature = inspect.signature(StrategyScanner.__init__)
+        worker_source = inspect.getsource(strategy_scan_worker.StrategyScanWorker)
+        scanner_source = inspect.getsource(StrategyScanner)
+
+        self.assertNotIn("runtime_feature", worker_signature.parameters)
+        self.assertNotIn("runtime_feature", scanner_signature.parameters)
+        self.assertNotIn("_runtime_feature", worker_source)
+        self.assertNotIn("_runtime_feature", scanner_source)
+        self.assertIn("shutdown_sync", worker_signature.parameters)
+        self.assertIn("shutdown_sync", scanner_signature.parameters)
+        self.assertIn("shutdown_sync=shutdown_sync", feature_source)
+        self.assertIn("shutdown_sync=shutdown_sync", command_factory_source)
+
 
 if __name__ == "__main__":
     unittest.main()

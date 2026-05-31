@@ -27,7 +27,7 @@ def create_strategy_scan_worker(
     start_index: int = 0,
     scan_protocol: str = "tcp_https",
     udp_games_scope: str = "all",
-    runtime_feature,
+    shutdown_sync,
     parent=None,
 ):
     from blockcheck.strategy_scan_worker import StrategyScanWorker
@@ -38,7 +38,7 @@ def create_strategy_scan_worker(
         start_index=start_index,
         scan_protocol=scan_protocol,
         udp_games_scope=udp_games_scope,
-        runtime_feature=runtime_feature,
+        shutdown_sync=shutdown_sync,
         start_run_log=start_strategy_scan_run_log,
         append_run_log=append_strategy_scan_run_log,
         parent=parent,

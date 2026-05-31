@@ -11,9 +11,7 @@ class BlockcheckStrategyScannerCleanupTests(unittest.TestCase):
         from blockcheck.strategy_scanner import StrategyScanner
 
         scanner = object.__new__(StrategyScanner)
-        scanner._runtime_feature = SimpleNamespace(
-            shutdown_sync=Mock(return_value=SimpleNamespace(still_running=False))
-        )
+        scanner._shutdown_sync = Mock(return_value=SimpleNamespace(still_running=False))
         scanner._kill_current_process = Mock()
         scanner._cleanup_temp_files = Mock()
         scanner._cb = SimpleNamespace(on_log=Mock())
@@ -21,7 +19,7 @@ class BlockcheckStrategyScannerCleanupTests(unittest.TestCase):
         scanner._post_scan_cleanup()
 
         scanner._kill_current_process.assert_called_once_with()
-        scanner._runtime_feature.shutdown_sync.assert_called_once_with(
+        scanner._shutdown_sync.assert_called_once_with(
             reason="blockcheck_post_scan",
             include_cleanup=True,
         )
@@ -40,9 +38,7 @@ class BlockcheckStrategyScannerCleanupTests(unittest.TestCase):
         scanner = object.__new__(StrategyScanner)
         scanner._process = proc
         scanner._process_lock = nullcontext()
-        scanner._runtime_feature = SimpleNamespace(
-            shutdown_sync=Mock(return_value=SimpleNamespace(still_running=False))
-        )
+        scanner._shutdown_sync = Mock(return_value=SimpleNamespace(still_running=False))
 
         with patch.object(strategy_scanner, "standard_windivert_cleanup_runtime") as standard_cleanup:
             scanner._kill_current_process()

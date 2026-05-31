@@ -30,10 +30,11 @@ class BlockcheckFeature:
             **kwargs,
         )
 
-    def create_strategy_scan_worker(self, **kwargs):
+    def create_strategy_scan_worker(self, *, shutdown_sync, **kwargs):
         from blockcheck.strategy_scan_worker import StrategyScanWorker
 
         return StrategyScanWorker(
+            shutdown_sync=shutdown_sync,
             start_run_log=self.start_strategy_scan_run_log,
             append_run_log=self.append_strategy_scan_run_log,
             **kwargs,
