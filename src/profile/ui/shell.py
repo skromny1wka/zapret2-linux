@@ -51,7 +51,7 @@ def build_profile_shell(
             return f"{toolbar_key_prefix}.{name}"
         return f"page.winws2_pages.toolbar.{name}"
 
-    add_section_title(text_key=toolbar_title_key)
+    _ = add_section_title
     toolbar_actions_bar = PresetsToolbarLayout(content_parent)
 
     add_profile_btn = toolbar_actions_bar.create_primary_tool_button(
