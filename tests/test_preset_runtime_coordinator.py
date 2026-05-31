@@ -171,6 +171,47 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
         self._app.processEvents()
         self.assertEqual(watcher_calls, ["watcher"])
 
+    def test_rapid_preset_switches_coalesce_deferred_ui_work(self) -> None:
+        from core.runtime.preset_runtime_coordinator import PresetRuntimeCoordinator
+        from settings.mode import ZAPRET2_MODE
+
+        class _UiState:
+            def __init__(self) -> None:
+                self.active_revision = 0
+
+            def bump_active_preset_revision(self) -> None:
+                self.active_revision += 1
+
+        ui_state = _UiState()
+        watcher_calls: list[str] = []
+        switch_calls: list[tuple[str, str, str]] = []
+        coordinator = PresetRuntimeCoordinator(
+            presets_feature=SimpleNamespace(),
+            ui_state_store=ui_state,
+            get_launch_method=lambda: ZAPRET2_MODE,
+            get_active_preset_path=lambda: "",
+            refresh_after_switch=lambda: None,
+            request_selected_source_preset_apply=lambda method, reason, file_name: switch_calls.append(
+                (method, reason, file_name)
+            )
+            or True,
+            request_preset_content_apply=lambda *_args: True,
+        )
+        coordinator.setup_active_preset_file_watcher = lambda: watcher_calls.append("watcher")
+
+        coordinator.handle_preset_switched(ZAPRET2_MODE, "Default v1.txt")
+        coordinator.handle_preset_switched(ZAPRET2_MODE, "Default v2.txt")
+        coordinator.handle_preset_switched(ZAPRET2_MODE, "Default v3.txt")
+
+        self.assertEqual(watcher_calls, [])
+        self.assertEqual(ui_state.active_revision, 0)
+
+        self._app.processEvents()
+
+        self.assertEqual(watcher_calls, ["watcher"])
+        self.assertEqual(ui_state.active_revision, 1)
+        self.assertEqual(switch_calls, [(ZAPRET2_MODE, "preset_switched", "Default v3.txt")])
+
     def test_get_selected_source_path_does_not_build_launch_snapshot(self) -> None:
         import inspect
 
@@ -328,7 +369,10 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
         self.assertEqual(notified, [])
 
     def test_raw_editor_can_save_active_preset_without_publishing_until_commit(self) -> None:
-        from presets.raw_preset_editor_workflow import RawPresetEditorController
+        from presets.raw_preset_editor_workflow import (
+            publish_raw_preset_content_changed,
+            save_raw_preset_text,
+        )
         from settings.mode import ZAPRET2_MODE
 
         save_calls: list[tuple[str, str, str, bool]] = []
@@ -355,29 +399,19 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
                 publish_calls.append((launch_method, file_name))
 
         feature = _PresetsFeature()
-        controller = RawPresetEditorController(
-            save_preset_source_by_file_name=feature.save_preset_source_by_file_name,
-            get_preset_source_path_by_file_name=feature.get_preset_source_path_by_file_name,
-            get_preset_manifest_by_file_name=Mock(),
-            open_preset_source_file=Mock(),
-            rename_preset_by_file_name=Mock(),
-            duplicate_preset_by_file_name=Mock(),
-            export_preset_plain_text=Mock(),
-            reset_preset_to_builtin_by_file_name=Mock(),
-            delete_preset_by_file_name=Mock(),
-            get_selected_source_preset_manifest=Mock(return_value=None),
-            get_selected_source_preset_file_name=Mock(return_value=""),
-            activate_preset_file=Mock(),
-            publish_preset_content_changed=feature.publish_preset_content_changed,
-            launch_method=ZAPRET2_MODE,
-        )
 
-        controller.save_text(
+        save_raw_preset_text(
+            presets_feature=feature,
+            launch_method=ZAPRET2_MODE,
             file_name="Default v5.txt",
             source_text="--new\n--filter-tcp=80\n",
             publish_content_changed=False,
         )
-        controller.publish_content_changed("Default v5.txt")
+        publish_raw_preset_content_changed(
+            presets_feature=feature,
+            launch_method=ZAPRET2_MODE,
+            file_name="Default v5.txt",
+        )
 
         self.assertEqual(
             save_calls,

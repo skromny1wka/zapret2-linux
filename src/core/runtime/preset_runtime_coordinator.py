@@ -55,6 +55,8 @@ class PresetRuntimeCoordinator(QObject):
         self._pending_preset_apply: PendingPresetApply | None = None
         self._last_preset_content_apply_fingerprint: str = ""
         self._last_active_preset_key: tuple[str, str] | None = None
+        self._active_preset_revision_publish_pending = False
+        self._active_preset_file_watcher_setup_pending = False
 
     def setup_active_preset_file_watcher(self) -> None:
         watched_path = self._get_active_preset_path()
@@ -248,10 +250,18 @@ class PresetRuntimeCoordinator(QObject):
 
     def _publish_active_preset_revision_deferred(self) -> None:
         """Будит UI-подписчиков после завершения текущего клика."""
+        if self._active_preset_revision_publish_pending:
+            return
+        self._active_preset_revision_publish_pending = True
         try:
-            QTimer.singleShot(0, self._publish_active_preset_revision_now)
+            QTimer.singleShot(0, self._publish_pending_active_preset_revision)
         except Exception:
+            self._active_preset_revision_publish_pending = False
             self._publish_active_preset_revision_now()
+
+    def _publish_pending_active_preset_revision(self) -> None:
+        self._active_preset_revision_publish_pending = False
+        self._publish_active_preset_revision_now()
 
     def _publish_active_preset_revision_now(self) -> None:
         try:
@@ -263,10 +273,18 @@ class PresetRuntimeCoordinator(QObject):
 
     def _schedule_active_preset_file_watcher_setup(self) -> None:
         """Перевешивает watcher после текущего GUI-события, не внутри клика."""
+        if self._active_preset_file_watcher_setup_pending:
+            return
+        self._active_preset_file_watcher_setup_pending = True
         try:
-            QTimer.singleShot(0, self.setup_active_preset_file_watcher)
+            QTimer.singleShot(0, self._setup_pending_active_preset_file_watcher)
         except Exception:
+            self._active_preset_file_watcher_setup_pending = False
             self.setup_active_preset_file_watcher()
+
+    def _setup_pending_active_preset_file_watcher(self) -> None:
+        self._active_preset_file_watcher_setup_pending = False
+        self.setup_active_preset_file_watcher()
 
     def _is_selected_source_preset(self, launch_method: str, preset_file_name: str) -> bool:
         try:
