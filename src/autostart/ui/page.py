@@ -1,7 +1,7 @@
 # autostart/ui/page.py
 """Страница настроек автозапуска"""
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 )
@@ -222,8 +222,10 @@ class AutostartPage(BasePage):
         self._ui_state_unsubscribe = None
         self._autostart_action_runtime = OneShotWorkerRuntime()
         self._autostart_action_pending: list[tuple[str, bool | None, str | None]] = []
+        self._autostart_action_start_scheduled = False
         self._mode_load_runtime = OneShotWorkerRuntime()
         self._mode_load_pending = False
+        self._mode_load_start_scheduled = False
         self._last_status_render_key: tuple[bool, str, str] | None = None
 
         self._build_ui()
@@ -294,7 +296,7 @@ class AutostartPage(BasePage):
         strategy_name=None,
     ) -> None:
         payload = (str(action or "").strip(), enabled, strategy_name)
-        if self._autostart_action_runtime.is_running():
+        if self._autostart_action_runtime.is_running() or self.__dict__.get("_autostart_action_start_scheduled", False):
             self._autostart_action_pending.append(payload)
             return
         self._start_autostart_action_worker(payload)
@@ -381,7 +383,19 @@ class AutostartPage(BasePage):
     def _on_autostart_action_worker_finished(self, _worker) -> None:
         if self._autostart_action_pending and not self._cleanup_in_progress:
             pending = self._autostart_action_pending.pop(0)
-            self._start_autostart_action_worker(pending)
+            self._schedule_autostart_action_worker_start(pending)
+
+    def _schedule_autostart_action_worker_start(self, payload: tuple[str, bool | None, str | None]) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._autostart_action_start_scheduled = True
+        QTimer.singleShot(0, lambda queued=payload: self._run_scheduled_autostart_action_worker_start(queued))
+
+    def _run_scheduled_autostart_action_worker_start(self, payload: tuple[str, bool | None, str | None]) -> None:
+        self._autostart_action_start_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._start_autostart_action_worker(payload)
 
     def _on_ui_state_changed(self, state: AppUiState, changed_fields: frozenset[str]) -> None:
         changed = set(changed_fields or ())
@@ -538,7 +552,7 @@ class AutostartPage(BasePage):
     def _request_mode_load(self) -> None:
         if self._cleanup_in_progress:
             return
-        if self._mode_load_runtime.is_running():
+        if self._mode_load_runtime.is_running() or self.__dict__.get("_mode_load_start_scheduled", False):
             self._mode_load_pending = True
             return
         self._start_mode_load_worker()
@@ -571,7 +585,20 @@ class AutostartPage(BasePage):
 
     def _on_mode_load_worker_finished(self, _worker) -> None:
         if self._mode_load_pending and not self._cleanup_in_progress:
-            self._start_mode_load_worker()
+            self._mode_load_pending = False
+            self._schedule_mode_load_worker_start()
+
+    def _schedule_mode_load_worker_start(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._mode_load_start_scheduled = True
+        QTimer.singleShot(0, self._run_scheduled_mode_load_worker_start)
+
+    def _run_scheduled_mode_load_worker_start(self) -> None:
+        self._mode_load_start_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._start_mode_load_worker()
 
     def _apply_loaded_mode(self, method: str) -> None:
         try:

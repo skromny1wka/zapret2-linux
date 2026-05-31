@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import inspect
 import unittest
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 from app.feature_facades.autostart import build_autostart_feature
 import autostart.workers as autostart_workers
+import autostart.ui.page as autostart_page
 from autostart.ui.page import AutostartPage
 
 
@@ -48,6 +51,42 @@ class AutostartWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("_mode_load_runtime.stop", cleanup_source)
         self.assertNotIn("worker.start()", action_start_source)
         self.assertNotIn("worker.start()", mode_start_source)
+
+    def test_autostart_action_pending_restarts_after_event_loop_turn(self) -> None:
+        page = AutostartPage.__new__(AutostartPage)
+        page._cleanup_in_progress = False
+        page._autostart_action_pending = [("enable", True, "Strategy")]
+        page._start_autostart_action_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(autostart_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            AutostartPage._on_autostart_action_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._start_autostart_action_worker.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._start_autostart_action_worker.assert_called_once_with(("enable", True, "Strategy"))
+
+    def test_mode_load_pending_restarts_after_event_loop_turn(self) -> None:
+        page = AutostartPage.__new__(AutostartPage)
+        page._cleanup_in_progress = False
+        page._mode_load_pending = True
+        page._start_mode_load_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(autostart_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            AutostartPage._on_mode_load_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._start_mode_load_worker.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._start_mode_load_worker.assert_called_once_with()
 
 
 if __name__ == "__main__":
