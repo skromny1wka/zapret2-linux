@@ -289,6 +289,27 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
         self.assertNotIn("self._controller", action_init)
         self.assertNotIn("self._controller.", action_run)
 
+    def test_whitelist_snapshot_pending_refresh_restarts_after_event_loop_turn(self) -> None:
+        import orchestra.ui.whitelist_page as whitelist_page
+        from orchestra.ui.whitelist_page import OrchestraWhitelistPage
+
+        page = OrchestraWhitelistPage.__new__(OrchestraWhitelistPage)
+        page._cleanup_in_progress = False
+        page._snapshot_refresh_pending = True
+        page._start_snapshot_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(whitelist_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            OrchestraWhitelistPage._on_snapshot_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._start_snapshot_worker.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._start_snapshot_worker.assert_called_once_with(refresh=True)
+
 
 if __name__ == "__main__":
     unittest.main()

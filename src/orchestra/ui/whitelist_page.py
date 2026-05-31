@@ -3,7 +3,7 @@
 Страница управления белым списком оркестратора (whitelist)
 Домены из этого списка НЕ обрабатываются оркестратором.
 """
-from PyQt6.QtCore import Qt, QSize, QEvent
+from PyQt6.QtCore import Qt, QSize, QEvent, QTimer
 from PyQt6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QLabel,
     QWidget, QFrame,
@@ -160,6 +160,7 @@ class OrchestraWhitelistPage(BasePage):
         self._last_snapshot_revision = None
         self._snapshot_runtime = OneShotWorkerRuntime()
         self._snapshot_refresh_pending = False
+        self._snapshot_refresh_start_scheduled = False
         self._action_runtime = OneShotWorkerRuntime()
 
         self._setup_ui()
@@ -404,7 +405,7 @@ class OrchestraWhitelistPage(BasePage):
         )
 
     def _start_snapshot_worker(self, *, refresh: bool) -> None:
-        if self._snapshot_runtime.is_running():
+        if self._snapshot_runtime.is_running() or self.__dict__.get("_snapshot_refresh_start_scheduled", False):
             if refresh:
                 self._snapshot_refresh_pending = True
             return
@@ -439,9 +440,24 @@ class OrchestraWhitelistPage(BasePage):
     def _on_snapshot_finished(self, _worker) -> None:
         if self._snapshot_refresh_pending and not bool(getattr(self, "_cleanup_in_progress", False)):
             self._snapshot_refresh_pending = False
-            self._start_snapshot_worker(refresh=True)
+            self._schedule_snapshot_refresh_start()
             return
         self._snapshot_refresh_pending = False
+
+    def _schedule_snapshot_refresh_start(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("_snapshot_refresh_start_scheduled", False):
+            self._snapshot_refresh_pending = True
+            return
+        self._snapshot_refresh_start_scheduled = True
+        QTimer.singleShot(0, self._run_scheduled_snapshot_refresh_start)
+
+    def _run_scheduled_snapshot_refresh_start(self) -> None:
+        self._snapshot_refresh_start_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._start_snapshot_worker(refresh=True)
 
     def _refresh_data(self):
         """Явно перечитывает whitelist из канонического runtime service."""
@@ -697,6 +713,8 @@ class OrchestraWhitelistPage(BasePage):
 
     def cleanup(self) -> None:
         super().cleanup()
+        self._snapshot_refresh_pending = False
+        self._snapshot_refresh_start_scheduled = False
         self._snapshot_runtime.stop(
             blocking=False,
             log_fn=log,
