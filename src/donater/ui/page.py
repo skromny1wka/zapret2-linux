@@ -30,7 +30,6 @@ from donater.pairing_workflow import (
 )
 from donater.premium_page_tasks import (
     is_premium_task_running,
-    start_premium_worker_task,
 )
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from donater.ui.page_lifecycle import (
@@ -117,6 +116,7 @@ class PremiumPage(BasePage):
         self._device_info_runtime = OneShotWorkerRuntime()
         self._device_info_pending = False
         self._reset_storage_runtime = OneShotWorkerRuntime()
+        self._premium_action_runtime = OneShotWorkerRuntime()
 
         self._build_ui()
         self.bind_subscription_state_store(deps.subscription_state_store)
@@ -843,12 +843,15 @@ class PremiumPage(BasePage):
         )
 
     def _start_worker_thread(self, task_callable, result_handler, error_handler) -> None:
-        self.current_thread = start_premium_worker_task(
-            premium_feature=self._premium,
-            task_callable=task_callable,
-            result_handler=result_handler,
-            error_handler=error_handler,
-            finished_handler=self._on_worker_thread_finished,
+        self._premium_action_runtime.start_qthread_worker(
+            worker_factory=lambda _request_id: self._premium.create_premium_worker_thread(task_callable),
+            on_loaded=lambda _request_id, result: result_handler(result),
+            on_failed=lambda _request_id, error: error_handler(error),
+            on_finished=lambda _worker: self._on_worker_thread_finished(),
+            bind_worker=lambda worker: setattr(self, "current_thread", worker),
+            signal_includes_request_id=False,
+            loaded_signal_name="result_ready",
+            failed_signal_name="error_occurred",
         )
 
     def _on_worker_thread_finished(self) -> None:

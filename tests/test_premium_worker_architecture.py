@@ -6,8 +6,10 @@ import unittest
 from app.feature_facades.premium import PremiumFeature
 import donater.commands as premium_commands
 import donater.open_bot_worker as open_bot_worker
+import donater.premium_page_tasks as premium_page_tasks
 import donater.subscription_manager as subscription_manager
 import donater.subscription_worker as subscription_worker
+from donater.ui.page import PremiumPage
 
 
 class PremiumWorkerArchitectureTests(unittest.TestCase):
@@ -38,6 +40,18 @@ class PremiumWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("_get_premium_checker", worker_source)
         self.assertIn("_check_device_activation", worker_source)
         self.assertNotIn("import donater.commands", worker_source)
+
+    def test_premium_page_action_tasks_use_shared_worker_runtime(self) -> None:
+        page_init_source = inspect.getsource(PremiumPage.__init__)
+        start_source = inspect.getsource(PremiumPage._start_worker_thread)
+        page_source = inspect.getsource(PremiumPage)
+
+        self.assertIn("_premium_action_runtime = OneShotWorkerRuntime()", page_init_source)
+        self.assertIn("_premium_action_runtime.start_qthread_worker", start_source)
+        self.assertIn("loaded_signal_name=\"result_ready\"", start_source)
+        self.assertIn("failed_signal_name=\"error_occurred\"", start_source)
+        self.assertNotIn("start_premium_worker_task", page_source)
+        self.assertFalse(hasattr(premium_page_tasks, "start_premium_worker_task"))
 
 
 if __name__ == "__main__":
