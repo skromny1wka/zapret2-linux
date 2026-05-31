@@ -1,7 +1,7 @@
 # settings/dpi/page.py
 """Страница настроек DPI"""
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame
 
 from ui.pages.base_page import BasePage
@@ -103,8 +103,10 @@ class DpiSettingsPage(BasePage):
         self._settings_loaded = False
         self._dpi_settings_runtime = OneShotWorkerRuntime()
         self._dpi_settings_pending: list[tuple[str, str]] = []
+        self._dpi_settings_start_scheduled = False
         self._orchestra_settings_save_runtime = OneShotWorkerRuntime()
         self._orchestra_settings_save_pending: list[tuple[str, object]] = []
+        self._orchestra_settings_save_start_scheduled = False
         self._build_ui()
 
     def _tr(self, key: str, default: str, **kwargs) -> str:
@@ -317,7 +319,7 @@ class DpiSettingsPage(BasePage):
 
     def _request_dpi_settings_action(self, action: str, method: str = "") -> None:
         payload = (str(action or "").strip(), str(method or "").strip())
-        if self._dpi_settings_runtime.is_running():
+        if self._dpi_settings_runtime.is_running() or self.__dict__.get("_dpi_settings_start_scheduled", False):
             self._dpi_settings_pending.append(payload)
             self._coalesce_dpi_settings_pending()
             return
@@ -387,7 +389,20 @@ class DpiSettingsPage(BasePage):
     def _on_dpi_settings_worker_finished(self, _worker) -> None:
         if self._dpi_settings_pending and not self._cleanup_in_progress:
             pending = self._dpi_settings_pending.pop(0)
-            self._start_dpi_settings_worker(pending)
+            self._schedule_dpi_settings_worker_start(pending)
+
+    def _schedule_dpi_settings_worker_start(self, payload: tuple[str, str]) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        queued = (str(payload[0] if payload else ""), str(payload[1] if payload else ""))
+        self._dpi_settings_start_scheduled = True
+        QTimer.singleShot(0, lambda value=queued: self._run_scheduled_dpi_settings_worker_start(value))
+
+    def _run_scheduled_dpi_settings_worker_start(self, payload: tuple[str, str]) -> None:
+        self._dpi_settings_start_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._start_dpi_settings_worker(payload)
 
     def _apply_dpi_initial_state(self, initial, orchestra_settings=None) -> None:
         try:
@@ -485,7 +500,10 @@ class DpiSettingsPage(BasePage):
 
     def _request_orchestra_setting_save(self, key: str, value) -> None:
         payload = (str(key or "").strip(), value)
-        if self._orchestra_settings_save_runtime.is_running():
+        if (
+            self._orchestra_settings_save_runtime.is_running()
+            or self.__dict__.get("_orchestra_settings_save_start_scheduled", False)
+        ):
             self._orchestra_settings_save_pending.append(payload)
             self._coalesce_orchestra_settings_save_pending()
             return
@@ -532,7 +550,20 @@ class DpiSettingsPage(BasePage):
     def _on_orchestra_setting_save_worker_finished(self, _worker) -> None:
         if self._orchestra_settings_save_pending and not self._cleanup_in_progress:
             pending = self._orchestra_settings_save_pending.pop(0)
-            self._start_orchestra_setting_save_worker(pending)
+            self._schedule_orchestra_setting_save_worker_start(pending)
+
+    def _schedule_orchestra_setting_save_worker_start(self, payload: tuple[str, object]) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        queued = (str(payload[0] if payload else ""), payload[1] if payload else None)
+        self._orchestra_settings_save_start_scheduled = True
+        QTimer.singleShot(0, lambda value=queued: self._run_scheduled_orchestra_setting_save_worker_start(value))
+
+    def _run_scheduled_orchestra_setting_save_worker_start(self, payload: tuple[str, object]) -> None:
+        self._orchestra_settings_save_start_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._start_orchestra_setting_save_worker(payload)
     
     def _update_filters_visibility(self, method: str | None = None):
         """Обновляет видимость фильтров и секций"""
