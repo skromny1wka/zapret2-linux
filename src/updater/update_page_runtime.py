@@ -2,7 +2,7 @@ import time
 from dataclasses import dataclass
 from typing import Protocol
 
-from PyQt6.QtCore import QThread, QTimer
+from PyQt6.QtCore import QTimer
 
 from config.build_info import CHANNEL
 from config.config import CHANNEL_DEV, CHANNEL_STABLE
@@ -128,8 +128,7 @@ class UpdatePageRuntime:
         self._auto_check_save_runtime = OneShotWorkerRuntime()
         self._update_channel_open_runtime = OneShotWorkerRuntime()
         self._cache_invalidate_runtime = OneShotWorkerRuntime()
-        self._update_thread = None
-        self._update_worker = None
+        self._update_install_runtime = OneShotWorkerRuntime()
         self._cleanup_in_progress = False
         self._auto_check_save_pending: bool | None = None
         self._cache_invalidate_pending_context: str | None = None
@@ -181,7 +180,7 @@ class UpdatePageRuntime:
                 "_bind_server_worker_signals",
                 "_bind_version_worker_signals",
                 "_bind_update_worker_signals",
-                "_handle_update_thread_finished",
+                "_handle_update_install_finished",
                 "_teardown_server_worker",
                 "_teardown_server_retry_without_dpi_worker",
                 "_teardown_version_worker",
@@ -224,8 +223,7 @@ class UpdatePageRuntime:
                 "_auto_check_load_runtime",
                 "_update_channel_open_runtime",
                 "_cache_invalidate_runtime",
-                "_update_thread",
-                "_update_worker",
+                "_update_install_runtime",
             ),
             pure_helper_methods=(
                 "_resolve_idle_view_decision",
@@ -261,7 +259,7 @@ class UpdatePageRuntime:
             download_orchestration_candidates=(
                 "install_update",
                 "_bind_update_worker_signals",
-                "_handle_update_thread_finished",
+                "_handle_update_install_finished",
                 "_on_download_failed",
             ),
             check_orchestration_candidates=(
@@ -412,11 +410,12 @@ class UpdatePageRuntime:
         self._view.set_update_check_enabled(False)
 
         try:
-            update_thread, update_worker = self._create_update_worker_runtime()
-            self._update_thread = update_thread
-            self._update_worker = update_worker
-            self._bind_update_worker_signals(update_thread, update_worker)
-            update_thread.start()
+            self._update_install_runtime.start_qobject_worker(
+                parent=self._view.window(),
+                worker_factory=lambda _request_id: self._create_update_worker_runtime(),
+                bind_worker=self._bind_update_worker_signals,
+                on_finished=self._handle_update_install_finished,
+            )
         except Exception as e:
             log(f"Ошибка при запуске обновления: {e}", "❌ ERROR")
             self._teardown_update_runtime()
@@ -702,16 +701,13 @@ class UpdatePageRuntime:
 
         return VersionCheckWorker()
 
-    def _create_update_worker_runtime(self) -> tuple[QThread, object]:
+    def _create_update_worker_runtime(self):
         parent_window = self._view.window()
-        update_thread = QThread(parent_window)
-        update_worker = self._updater_feature.create_update_install_worker(
+        return self._updater_feature.create_update_install_worker(
             parent_window=parent_window,
             is_any_running=self._runtime_feature.is_any_running,
             shutdown_sync=self._runtime_feature.shutdown_sync,
         )
-        update_worker.moveToThread(update_thread)
-        return update_thread, update_worker
 
     def _bind_server_worker_signals(self, worker) -> None:
         worker.server_checked.connect(self._on_server_checked)
@@ -721,13 +717,7 @@ class UpdatePageRuntime:
         worker.version_found.connect(self._on_version_found)
         worker.complete.connect(self._on_versions_complete)
 
-    def _bind_update_worker_signals(self, thread: QThread, worker) -> None:
-        thread.started.connect(worker.run)
-        worker.finished.connect(thread.quit)
-        worker.finished.connect(worker.deleteLater)
-        thread.finished.connect(thread.deleteLater)
-        thread.finished.connect(self._handle_update_thread_finished)
-
+    def _bind_update_worker_signals(self, worker) -> None:
         worker.progress_bytes.connect(
             lambda p, d, t: self._view.update_download_progress(p, d, t)
         )
@@ -737,7 +727,7 @@ class UpdatePageRuntime:
         worker.dpi_restart_needed.connect(self._restart_dpi_after_update)
         worker.progress.connect(lambda message: log(f"{message}", "🔁 UPDATE"))
 
-    def _handle_update_thread_finished(self) -> None:
+    def _handle_update_install_finished(self, _request_id: int, _thread) -> None:
         if self._cleanup_in_progress:
             return
         self._teardown_update_runtime()
@@ -810,28 +800,18 @@ class UpdatePageRuntime:
         self._cache_invalidate_runtime.cancel()
 
     def _teardown_update_runtime(self, *, wait_for_finish: bool = False) -> None:
-        thread = self._update_thread
-        worker = self._update_worker
         try:
-            if worker is not None:
-                stop = getattr(worker, "stop", None)
-                if callable(stop):
-                    try:
-                        stop()
-                    except Exception as e:
-                        log(f"Ошибка остановки update_worker: {e}", "DEBUG")
-            if wait_for_finish and thread is not None and thread.isRunning():
-                log("Останавливаем update_thread...", "DEBUG")
-                thread.quit()
-                if not thread.wait(2000):
-                    log("⚠ update_thread не завершился, принудительно завершаем", "WARNING")
-                    thread.terminate()
-                    thread.wait(500)
+            if wait_for_finish and self._update_install_runtime.is_running():
+                log("Останавливаем update_worker...", "DEBUG")
+            self._update_install_runtime.stop(
+                blocking=wait_for_finish,
+                log_fn=log,
+                warning_prefix="update_worker",
+            )
+            self._update_install_runtime.cancel()
         except Exception as e:
             log(f"Ошибка при очистке update runtime: {e}", "DEBUG")
         finally:
-            self._update_thread = None
-            self._update_worker = None
             self._reset_download_state()
             if not self._cleanup_in_progress:
                 self._view.set_update_check_enabled(True)
