@@ -126,6 +126,7 @@ class PresetSetupPageBase(BasePage):
         self._profile_folder_action_request_id = 0
         self._profile_folder_action_runtime = OneShotWorkerRuntime()
         self._profile_folder_action_pending: list[dict[str, object]] = []
+        self._profile_folder_action_start_scheduled = False
         self._profile_folder_action_refresh_by_request: dict[int, bool] = {}
         self._user_profile_create_request_id = 0
         self._user_profile_create_runtime = OneShotWorkerRuntime()
@@ -1404,7 +1405,7 @@ class PresetSetupPageBase(BasePage):
         context_extra: dict | None = None,
     ) -> None:
         runtime = self._worker_runtime("_profile_folder_action_runtime")
-        if runtime.is_running():
+        if runtime.is_running() or self.__dict__.get("_profile_folder_action_start_scheduled", False):
             self._profile_folder_action_pending.append(
                 {
                     "action": str(action or ""),
@@ -1485,12 +1486,19 @@ class PresetSetupPageBase(BasePage):
             self._schedule_profile_folder_action_start(pending)
 
     def _schedule_profile_folder_action_start(self, pending: dict[str, object]) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("_profile_folder_action_start_scheduled", False):
+            self._profile_folder_action_pending.append(dict(pending or {}))
+            return
+        self._profile_folder_action_start_scheduled = True
         try:
             QTimer.singleShot(0, lambda p=dict(pending or {}): self._run_scheduled_profile_folder_action_start(p))
         except Exception:
             self._run_scheduled_profile_folder_action_start(dict(pending or {}))
 
     def _run_scheduled_profile_folder_action_start(self, pending: dict[str, object]) -> None:
+        self._profile_folder_action_start_scheduled = False
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         self._request_profile_folder_action(
@@ -1551,6 +1559,7 @@ class PresetSetupPageBase(BasePage):
         self._pending_profile_payload_apply = None
         self._profile_payload_apply_scheduled = False
         self._profile_folder_action_pending.clear()
+        self._profile_folder_action_start_scheduled = False
         self.__dict__.setdefault("_profile_folder_action_refresh_by_request", {}).clear()
         self.__dict__.setdefault("_profile_context_action_enabled_by_request", {}).clear()
         for attr, label in (

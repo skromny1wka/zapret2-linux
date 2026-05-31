@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock
 
@@ -276,6 +277,41 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
             "_user_profile_delete_worker =",
         ):
             self.assertNotIn(attr, page_source)
+
+    def test_profile_folder_action_waits_while_restart_is_scheduled(self) -> None:
+        from profile.ui.preset_setup_page import PresetSetupPageBase
+
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._profile_folder_action_start_scheduled = True
+        page._profile_folder_action_pending = []
+        page._profile_folder_action_runtime = SimpleNamespace(is_running=Mock(return_value=False), start_qthread_worker=Mock())
+
+        PresetSetupPageBase._request_profile_folder_action(
+            page,
+            "move",
+            folder_key="favorites",
+            name="Profile",
+            direction=1,
+            collapsed=False,
+            refresh=True,
+            context_extra={"source": "menu"},
+        )
+
+        page._profile_folder_action_runtime.start_qthread_worker.assert_not_called()
+        self.assertEqual(
+            page._profile_folder_action_pending,
+            [
+                {
+                    "action": "move",
+                    "folder_key": "favorites",
+                    "name": "Profile",
+                    "direction": 1,
+                    "collapsed": False,
+                    "refresh": True,
+                    "context_extra": {"source": "menu"},
+                }
+            ],
+        )
 
 
 if __name__ == "__main__":
