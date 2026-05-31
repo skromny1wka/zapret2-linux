@@ -532,6 +532,27 @@ class BlockcheckPage(BasePage):
             return
         self._apply_pending_diagnostics_start_focus()
 
+    def handle_page_command(self, command: str, payload: dict) -> bool:
+        _ = payload
+        normalized = str(command or "").strip().lower()
+        if normalized == "stop_runtime_conflicting_checks":
+            return self.request_runtime_conflicting_stop()
+        return False
+
+    def request_runtime_conflicting_stop(self) -> bool:
+        """Останавливает проверки BlockCheck перед ручным запуском основного DPI."""
+        stopped = False
+        if self._worker and self._worker.is_running:
+            self._on_stop()
+            stopped = True
+
+        strategy_page = self._strategy_tab_page
+        request_stop = getattr(strategy_page, "request_runtime_conflicting_stop", None)
+        if callable(request_stop):
+            stopped = bool(request_stop()) or stopped
+
+        return stopped
+
     def _switch_tab(self, index: int) -> None:
         """Switch between BlockCheck, strategy scan and diagnostics tabs."""
         started_at = time.perf_counter()

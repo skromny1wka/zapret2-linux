@@ -1,5 +1,6 @@
 import inspect
 import unittest
+from unittest.mock import Mock
 
 from blockcheck import page_run_workflow
 from blockcheck.ui.page import BlockcheckPage
@@ -30,6 +31,21 @@ class BlockcheckRunRuntimeArchitectureTest(unittest.TestCase):
         self.assertIn("callable", is_running_source)
         self.assertIn("callable", stop_source)
         self.assertIn("*_args", qthread_start_source)
+
+    def test_runtime_conflicting_command_stops_strategy_scan_tab(self) -> None:
+        page = BlockcheckPage.__new__(BlockcheckPage)
+        page._worker = None
+        page._strategy_tab_page = Mock()
+        page._strategy_tab_page.request_runtime_conflicting_stop.return_value = True
+
+        stopped = BlockcheckPage.handle_page_command(
+            page,
+            "stop_runtime_conflicting_checks",
+            {"source": "dpi_start"},
+        )
+
+        self.assertTrue(stopped)
+        page._strategy_tab_page.request_runtime_conflicting_stop.assert_called_once_with()
 
 
 if __name__ == "__main__":

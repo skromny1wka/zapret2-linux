@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 RUNTIME_START_RETRY_MS = 250
 RUNTIME_START_MAX_RETRIES = 24
+RUNTIME_START_CONFLICT_STOP_MAX_RETRIES = 240
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,6 +28,12 @@ class ControlPageActionMixin:
     """Общие действия для страниц управления."""
 
     def _start_dpi(self) -> None:
+        if self._request_runtime_conflicting_checks_stop():
+            self._queue_runtime_start_retry(
+                "Останавливаем подбор стратегии перед запуском Zapret...",
+                reason="conflict_stop",
+            )
+            return
         if not self._runtime_start_available():
             self._queue_runtime_start_retry()
             return
@@ -41,16 +48,38 @@ class ControlPageActionMixin:
                 return False
         return False
 
-    def _queue_runtime_start_retry(self) -> None:
+    def _request_runtime_conflicting_checks_stop(self) -> bool:
+        try:
+            window_getter = getattr(self, "window", None)
+            window = window_getter() if callable(window_getter) else None
+            if window is None:
+                return False
+            from app.page_names import PageName
+            from ui.window_adapter import send_page_command
+
+            return bool(
+                send_page_command(
+                    window,
+                    PageName.BLOCKCHECK,
+                    "stop_runtime_conflicting_checks",
+                    {"source": "dpi_start"},
+                    ensure=False,
+                )
+            )
+        except Exception:
+            return False
+
+    def _queue_runtime_start_retry(self, message: str = "Подготовка запуска...", *, reason: str = "runtime") -> None:
         if bool(getattr(self, "_runtime_start_retry_pending", False)):
             return
         self._runtime_start_retry_pending = True
         self._runtime_start_retry_count = 0
-        self._show_runtime_preparing_state()
+        self._runtime_start_retry_reason = str(reason or "runtime")
+        self._show_runtime_preparing_state(message)
         QTimer.singleShot(RUNTIME_START_RETRY_MS, self._retry_start_dpi_after_runtime_ready)
 
-    def _show_runtime_preparing_state(self) -> None:
-        message = "Подготовка запуска..."
+    def _show_runtime_preparing_state(self, message: str = "Подготовка запуска...") -> None:
+        message = str(message or "").strip() or "Подготовка запуска..."
         set_loading = getattr(self, "set_loading", None)
         if callable(set_loading):
             set_loading(True, message)
@@ -61,6 +90,21 @@ class ControlPageActionMixin:
     def _retry_start_dpi_after_runtime_ready(self) -> None:
         if bool(getattr(self, "_cleanup_in_progress", False)):
             self._runtime_start_retry_pending = False
+            return
+
+        if self._request_runtime_conflicting_checks_stop():
+            retries = int(getattr(self, "_runtime_start_retry_count", 0)) + 1
+            self._runtime_start_retry_count = retries
+            if retries >= RUNTIME_START_CONFLICT_STOP_MAX_RETRIES:
+                self._runtime_start_retry_pending = False
+                set_loading = getattr(self, "set_loading", None)
+                if callable(set_loading):
+                    set_loading(False, "")
+                set_status = getattr(self, "_set_status", None)
+                if callable(set_status):
+                    set_status("Подбор стратегии ещё останавливается. Дождитесь остановки и запустите Zapret снова.")
+                return
+            QTimer.singleShot(RUNTIME_START_RETRY_MS, self._retry_start_dpi_after_runtime_ready)
             return
 
         if self._runtime_start_available():

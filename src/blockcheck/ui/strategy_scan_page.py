@@ -531,6 +531,13 @@ class StrategyScanPage(BasePage):
             tr_catalog("page.blockcheck_public.stopping", default="Остановка...")
         )
 
+    def request_runtime_conflicting_stop(self) -> bool:
+        """Останавливает подбор перед ручным запуском основного DPI."""
+        if not (self._worker and self._worker.is_running):
+            return False
+        self._on_stop()
+        return True
+
     def _force_stop(self, expected_worker=None):
         apply_force_stop_status(
             worker=self._worker,

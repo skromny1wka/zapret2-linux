@@ -1,5 +1,6 @@
 import inspect
 import unittest
+from unittest.mock import Mock
 
 from blockcheck import strategy_scan_run_workflow
 from blockcheck.ui.strategy_scan_page import StrategyScanPage
@@ -17,6 +18,16 @@ class StrategyScanRunRuntimeArchitectureTest(unittest.TestCase):
         self.assertIn("_strategy_scan_run_runtime.stop", cleanup_source)
         self.assertIn("run_runtime.start_qthread_worker", workflow_source)
         self.assertNotIn("worker.start()", workflow_source)
+
+    def test_runtime_conflicting_stop_uses_strategy_scan_stop_path(self) -> None:
+        page = StrategyScanPage.__new__(StrategyScanPage)
+        page._worker = Mock(is_running=True)
+        page._on_stop = Mock()
+
+        stopped = StrategyScanPage.request_runtime_conflicting_stop(page)
+
+        self.assertTrue(stopped)
+        page._on_stop.assert_called_once_with()
 
 
 if __name__ == "__main__":
