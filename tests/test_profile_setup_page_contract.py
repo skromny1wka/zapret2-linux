@@ -4630,6 +4630,32 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertEqual(page._enabled_checkbox.enabled_calls, [True])
         page._enabled_checkbox.setChecked.assert_not_called()
 
+    def test_loaded_profile_setup_payload_apply_is_deferred_after_worker_signal(self) -> None:
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._setup_load_request_id = 7
+        page._cleanup_in_progress = False
+        page._payload = None
+        page._apply_payload = Mock()
+        payload = SimpleNamespace(
+            item=SimpleNamespace(enabled=True),
+            match_summary="TCP 443",
+        )
+        callbacks = []
+
+        with patch(
+            "profile.ui.profile_setup_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            ProfileSetupPageBase._on_profile_setup_payload_loaded(page, 7, payload)
+
+        page._apply_payload.assert_not_called()
+        self.assertIs(page._payload, payload)
+        self.assertEqual(len(callbacks), 1)
+
+        callbacks[0]()
+
+        page._apply_payload.assert_called_once_with(payload)
+
     def test_strategy_feedback_worker_emits_state(self) -> None:
         state = ProfileStrategyState(rating="work", favorite=True)
         save_feedback = Mock(return_value=state)

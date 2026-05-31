@@ -955,6 +955,8 @@ class ProfileSetupPageBase(BasePage):
         self._strategy_feedback_save_request_id = 0
         self._pending_strategy_feedback_save = None
         self._payload = None
+        self._profile_setup_payload_apply_scheduled = False
+        self._pending_profile_setup_payload_apply = None
         self._strategy_stack = None
         self._strategy_tabs = None
         self._strategy_list = None
@@ -2014,6 +2016,24 @@ class ProfileSetupPageBase(BasePage):
             self._restore_loaded_payload_header(payload)
             return
         self._payload = payload
+        self._schedule_profile_setup_payload_apply(payload)
+
+    def _schedule_profile_setup_payload_apply(self, payload) -> None:
+        self._pending_profile_setup_payload_apply = payload
+        if self.__dict__.get("_profile_setup_payload_apply_scheduled", False):
+            return
+        self._profile_setup_payload_apply_scheduled = True
+        try:
+            QTimer.singleShot(0, self._run_scheduled_profile_setup_payload_apply)
+        except Exception:
+            self._run_scheduled_profile_setup_payload_apply()
+
+    def _run_scheduled_profile_setup_payload_apply(self) -> None:
+        payload = self.__dict__.get("_pending_profile_setup_payload_apply")
+        self._pending_profile_setup_payload_apply = None
+        self._profile_setup_payload_apply_scheduled = False
+        if payload is None or self.__dict__.get("_cleanup_in_progress"):
+            return
         self._apply_payload(payload)
 
     def _on_profile_setup_payload_failed(self, request_id: int, error: str) -> None:
@@ -3205,8 +3225,10 @@ class ProfileSetupPageBase(BasePage):
             "_pending_enabled_save",
             "_pending_strategy_apply",
             "_pending_strategy_feedback_save",
+            "_pending_profile_setup_payload_apply",
         ):
             setattr(self, attr, None)
+        self._profile_setup_payload_apply_scheduled = False
         self.__dict__.setdefault("_pending_profile_setup_write_operations", []).clear()
         self.__dict__.setdefault("_pending_user_profile_updates", []).clear()
         for attr in (
