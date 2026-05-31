@@ -198,7 +198,7 @@ class UserPresetsPageBase(BasePage):
         self._preset_item_action_pending: list[dict[str, str]] = []
         self._preset_link_action_runtime = OneShotWorkerRuntime()
         self._preset_link_action_request_id = 0
-        self._preset_link_action_pending = ""
+        self._preset_link_action_pending: list[str] = []
         self._build_ui()
         self._after_ui_built()
         self.bind_ui_state_store(ui_state_store)
@@ -1727,7 +1727,7 @@ class UserPresetsPageBase(BasePage):
             return
         runtime = self._worker_runtime("_preset_link_action_runtime")
         if runtime.is_running():
-            self._preset_link_action_pending = action
+            self.__dict__.setdefault("_preset_link_action_pending", []).append(action)
             return
         self._preset_link_action_request_id = int(self.__dict__.get("_preset_link_action_request_id", 0) or 0) + 1
         request_id = self._preset_link_action_request_id
@@ -1764,8 +1764,8 @@ class UserPresetsPageBase(BasePage):
         )
 
     def _on_preset_link_action_worker_finished(self, worker) -> None:
-        pending = str(self.__dict__.get("_preset_link_action_pending") or "").strip()
-        self._preset_link_action_pending = ""
+        pending_actions = self.__dict__.setdefault("_preset_link_action_pending", [])
+        pending = str(pending_actions.pop(0) if pending_actions else "").strip()
         if pending and not self._cleanup_in_progress:
             self._request_preset_link_action(pending)
 
@@ -1783,7 +1783,7 @@ class UserPresetsPageBase(BasePage):
         self._preset_folder_action_pending.clear()
         self._preset_open_folder_pending = False
         self.__dict__.setdefault("_preset_item_action_pending", []).clear()
-        self._preset_link_action_pending = ""
+        self.__dict__.setdefault("_preset_link_action_pending", []).clear()
         self.__dict__.setdefault("_preset_bulk_action_pending", []).clear()
         self._preset_bulk_action_kind = ""
         self._bulk_reset_running = False

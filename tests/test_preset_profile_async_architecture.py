@@ -1124,7 +1124,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         page._pending_preset_activation = ("next.txt", "Next")
         page._preset_folder_action_pending = [{"action": "load_state"}]
         page._preset_open_folder_pending = True
-        page._preset_link_action_pending = "info"
+        page._preset_link_action_pending = ["info"]
         page._preset_bulk_action_kind = "reset_all"
         page._bulk_reset_running = True
         page._layout_resync_timer = _Timer()
@@ -1144,7 +1144,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIsNone(page._pending_preset_activation)
         self.assertEqual(page._preset_folder_action_pending, [])
         self.assertFalse(page._preset_open_folder_pending)
-        self.assertEqual(page._preset_link_action_pending, "")
+        self.assertEqual(page._preset_link_action_pending, [])
         self.assertEqual(page._preset_bulk_action_kind, "")
         self.assertFalse(page._bulk_reset_running)
         page._runtime_service.stop_watching_presets.assert_called_once()

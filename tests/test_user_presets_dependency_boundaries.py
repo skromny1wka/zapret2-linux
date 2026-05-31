@@ -155,6 +155,58 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
         ):
             self.assertNotIn(attr, page_source)
 
+    def test_user_presets_link_actions_queue_while_worker_runs(self) -> None:
+        from presets.ui.common.user_presets_page import UserPresetsPageBase
+
+        class _Runtime:
+            def is_running(self) -> bool:
+                return True
+
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_link_action_runtime = _Runtime()
+        page._preset_link_action_pending = []
+        page.create_preset_link_action_worker = Mock()
+
+        UserPresetsPageBase._request_preset_link_action(page, "info")
+        UserPresetsPageBase._request_preset_link_action(page, "new_configs")
+
+        self.assertEqual(page._preset_link_action_pending, ["info", "new_configs"])
+        page.create_preset_link_action_worker.assert_not_called()
+
+    def test_user_presets_link_worker_finished_starts_next_queued_action(self) -> None:
+        from presets.ui.common.user_presets_page import UserPresetsPageBase
+        from ui.one_shot_worker_runtime import OneShotWorkerRuntime
+
+        class _Signal:
+            def connect(self, _callback) -> None:
+                return None
+
+        class _Worker:
+            completed = _Signal()
+            failed = _Signal()
+            finished = _Signal()
+
+            def __init__(self) -> None:
+                self.start = Mock()
+                self.deleteLater = Mock()
+
+            def isRunning(self) -> bool:
+                return False
+
+        worker = _Worker()
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._cleanup_in_progress = False
+        page._preset_link_action_runtime = OneShotWorkerRuntime()
+        page._preset_link_action_request_id = 0
+        page._preset_link_action_pending = ["info", "new_configs"]
+        page.create_preset_link_action_worker = Mock(return_value=worker)
+
+        UserPresetsPageBase._on_preset_link_action_worker_finished(page, object())
+
+        page.create_preset_link_action_worker.assert_called_once_with(1, action="info")
+        worker.start.assert_called_once()
+        self.assertEqual(page._preset_link_action_pending, ["new_configs"])
+
     def test_user_presets_runtime_actions_do_not_expose_mutating_preset_commands(self) -> None:
         from dataclasses import fields
 
