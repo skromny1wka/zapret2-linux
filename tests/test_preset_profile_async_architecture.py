@@ -4171,6 +4171,33 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_dpi_settings_runtime", page_source)
         self.assertNotIn("worker.start()", start_source)
 
+    def test_dpi_settings_page_receives_runtime_actions_not_full_runtime_feature(self) -> None:
+        from app.page_names import PageName
+        from ui.page_deps.system import build_dpi_settings_page_kwargs
+
+        init_source = inspect.getsource(DpiSettingsPage.__init__)
+        page_source = inspect.getsource(DpiSettingsPage)
+        runtime = Mock()
+
+        kwargs = build_dpi_settings_page_kwargs(
+            page_name=PageName.DPI_SETTINGS,
+            dpi_settings_feature=Mock(),
+            orchestra_feature=Mock(),
+            runtime_feature=runtime,
+            set_status=Mock(),
+            after_launch_method_changed=Mock(),
+        )
+
+        self.assertNotIn("runtime_feature", init_source)
+        self.assertNotIn("self._runtime =", page_source)
+        self.assertIn("runtime_actions", init_source)
+        self.assertIn("self._runtime_actions", page_source)
+        self.assertNotIn("runtime_feature", kwargs)
+        self.assertIs(
+            kwargs["runtime_actions"].handle_launch_method_changed,
+            runtime.handle_launch_method_changed,
+        )
+
     def test_dpi_orchestra_settings_save_runs_through_worker(self) -> None:
         spec = importlib.util.find_spec("orchestra.settings_worker")
         self.assertIsNotNone(spec)

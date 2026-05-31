@@ -5,6 +5,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame
 
 from ui.pages.base_page import BasePage
+from ui.page_deps.types import DpiRuntimeActions
 from settings.mode import (
     ENGINE_WINWS1,
     ENGINE_WINWS2,
@@ -70,7 +71,7 @@ class DpiSettingsPage(BasePage):
         *,
         dpi_settings_feature,
         orchestra_feature,
-        runtime_feature,
+        runtime_actions: DpiRuntimeActions,
         set_status,
         after_launch_method_changed,
     ):
@@ -83,7 +84,7 @@ class DpiSettingsPage(BasePage):
         )
         self._dpi_settings = dpi_settings_feature
         self._orchestra = orchestra_feature
-        self._runtime = runtime_feature
+        self._runtime_actions = runtime_actions
         self._set_status = set_status
         self._after_launch_method_changed = after_launch_method_changed
         self._method_card = None
@@ -370,7 +371,7 @@ class DpiSettingsPage(BasePage):
             orchestra_settings = result.get("orchestra_settings")
             if visibility.show_orchestra_settings and orchestra_settings is not None:
                 self._load_orchestra_settings(orchestra_settings)
-            self._runtime.handle_launch_method_changed(next_method, set_status=self._set_status)
+            self._runtime_actions.handle_launch_method_changed(next_method, set_status=self._set_status)
             self._after_launch_method_changed(next_method)
 
     def _on_dpi_settings_worker_failed(self, request_id: int, action: str, error: str) -> None:

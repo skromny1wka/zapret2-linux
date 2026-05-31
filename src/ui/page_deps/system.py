@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.page_names import PageName
-from ui.page_deps.types import DnsPageDeps, HostsPageDeps, PremiumPageDeps
+from ui.page_deps.types import DnsPageDeps, DpiRuntimeActions, HostsPageDeps, PremiumPageDeps
 
 
 def build_dpi_settings_page_kwargs(
@@ -17,7 +17,9 @@ def build_dpi_settings_page_kwargs(
     return {
         "dpi_settings_feature": dpi_settings_feature,
         "orchestra_feature": orchestra_feature,
-        "runtime_feature": runtime_feature,
+        "runtime_actions": DpiRuntimeActions(
+            handle_launch_method_changed=runtime_feature.handle_launch_method_changed,
+        ),
         "set_status": set_status,
         "after_launch_method_changed": after_launch_method_changed,
     }

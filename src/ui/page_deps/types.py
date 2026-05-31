@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,7 +20,13 @@ class PremiumPageDeps:
     subscription_state_store: object
 
 
+@dataclass(frozen=True, slots=True)
+class DpiRuntimeActions:
+    handle_launch_method_changed: Callable[..., object]
+
+
 __all__ = [
+    "DpiRuntimeActions",
     "DnsPageDeps",
     "HostsPageDeps",
     "PremiumPageDeps",
