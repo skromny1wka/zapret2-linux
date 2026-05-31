@@ -97,8 +97,10 @@ class OrchestraPage(BasePage):
         self._log_history_pending = False
         self._log_history_action_runtime = OneShotWorkerRuntime()
         self._log_history_action_pending = []
+        self._log_history_action_start_scheduled = False
         self._log_context_action_runtime = OneShotWorkerRuntime()
         self._log_context_action_pending = []
+        self._log_context_action_start_scheduled = False
         self._clear_learned_reset_timer = QTimer(self)
         self._clear_learned_reset_timer.setSingleShot(True)
         self._clear_learned_reset_timer.timeout.connect(self._reset_clear_learned_button)
@@ -672,7 +674,10 @@ class OrchestraPage(BasePage):
         if normalized_action in {"view", "delete"} and not normalized_log_id:
             return
         payload = (normalized_action, normalized_log_id)
-        if self._log_history_action_runtime.is_running():
+        if (
+            self._log_history_action_runtime.is_running()
+            or self.__dict__.get("_log_history_action_start_scheduled", False)
+        ):
             self._log_history_action_pending.append(payload)
             return
         self._start_log_history_action_worker(payload)
@@ -723,7 +728,21 @@ class OrchestraPage(BasePage):
     def _on_log_history_action_worker_finished(self, _worker) -> None:
         if self._log_history_action_pending and not self._cleanup_in_progress:
             pending = self._log_history_action_pending.pop(0)
-            self._start_log_history_action_worker(pending)
+            self._schedule_log_history_action_worker_start(pending)
+
+    def _schedule_log_history_action_worker_start(self, payload) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        action, log_id = payload
+        queued = (str(action or "").strip(), str(log_id or "").strip())
+        self._log_history_action_start_scheduled = True
+        QTimer.singleShot(0, lambda value=queued: self._run_scheduled_log_history_action_worker_start(value))
+
+    def _run_scheduled_log_history_action_worker_start(self, payload) -> None:
+        self._log_history_action_start_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._start_log_history_action_worker(payload)
 
     def _view_log_history(self):
         """Просматривает выбранный лог из истории"""
@@ -859,7 +878,10 @@ class OrchestraPage(BasePage):
         )
         if not payload[0] or not payload[1]:
             return
-        if self._log_context_action_runtime.is_running():
+        if (
+            self._log_context_action_runtime.is_running()
+            or self.__dict__.get("_log_context_action_start_scheduled", False)
+        ):
             self._log_context_action_pending.append(payload)
             return
         self._start_log_context_action_worker(payload)
@@ -902,7 +924,26 @@ class OrchestraPage(BasePage):
     def _on_log_context_action_worker_finished(self, _worker) -> None:
         if self._log_context_action_pending and not self._cleanup_in_progress:
             pending = self._log_context_action_pending.pop(0)
-            self._start_log_context_action_worker(pending)
+            self._schedule_log_context_action_worker_start(pending)
+
+    def _schedule_log_context_action_worker_start(self, payload) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        action, domain, strategy, protocol = payload
+        queued = (
+            str(action or "").strip(),
+            str(domain or "").strip(),
+            int(strategy or 0),
+            str(protocol or "").strip(),
+        )
+        self._log_context_action_start_scheduled = True
+        QTimer.singleShot(0, lambda value=queued: self._run_scheduled_log_context_action_worker_start(value))
+
+    def _run_scheduled_log_context_action_worker_start(self, payload) -> None:
+        self._log_context_action_start_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._start_log_context_action_worker(payload)
 
     def _lock_strategy_from_log(self, domain: str, strategy: int, protocol: str):
         """Залочивает стратегию из контекстного меню лога"""

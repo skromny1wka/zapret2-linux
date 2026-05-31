@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import inspect
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 from unittest.mock import Mock
 
 
@@ -98,6 +100,27 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("create_log_history_action_worker", controller_source)
         self.assertIn("run_log_history_action", controller_source)
 
+    def test_orchestra_log_history_pending_action_restarts_after_event_loop_turn(self) -> None:
+        import orchestra.ui.page as orchestra_page
+        from orchestra.ui.page import OrchestraPage
+
+        page = OrchestraPage.__new__(OrchestraPage)
+        page._cleanup_in_progress = False
+        page._log_history_action_pending = [("delete", "log-1")]
+        page._start_log_history_action_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(orchestra_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            OrchestraPage._on_log_history_action_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._start_log_history_action_worker.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._start_log_history_action_worker.assert_called_once_with(("delete", "log-1"))
+
     def test_orchestra_log_context_actions_run_through_worker(self) -> None:
         import orchestra.ui.page_log_context_workflow as log_context_workflow
         from orchestra.page_controller import OrchestraPageController
@@ -126,6 +149,27 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("_log_context_action_pending", request_source)
         self.assertIn("create_log_context_action_worker", controller_source)
         self.assertIn("run_log_context_action", controller_source)
+
+    def test_orchestra_log_context_pending_action_restarts_after_event_loop_turn(self) -> None:
+        import orchestra.ui.page as orchestra_page
+        from orchestra.ui.page import OrchestraPage
+
+        page = OrchestraPage.__new__(OrchestraPage)
+        page._cleanup_in_progress = False
+        page._log_context_action_pending = [("lock", "example.com", 7, "tcp")]
+        page._start_log_context_action_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(orchestra_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            OrchestraPage._on_log_context_action_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._start_log_context_action_worker.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._start_log_context_action_worker.assert_called_once_with(("lock", "example.com", 7, "tcp"))
 
     def test_orchestra_main_page_does_not_read_learned_data_in_ui_thread(self) -> None:
         from orchestra.ui.page import OrchestraPage
