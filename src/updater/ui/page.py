@@ -12,6 +12,7 @@ from ui.fluent_widgets import SettingsCard
 from ui.theme import get_theme_tokens
 from app.ui_texts import tr as tr_catalog
 from updater.update_page_runtime import UpdatePageRuntime
+from ui.page_deps.types import UpdateRuntimeActions
 from updater.server_status_table_state import ServerStatusTableState
 from updater.ui.main_build import (
     build_servers_header_widgets,
@@ -52,7 +53,7 @@ class ServersPage(BasePage):
         self,
         parent=None,
         *,
-        runtime_feature,
+        runtime_actions: UpdateRuntimeActions,
         updater_feature,
         open_about,
         create_changelog_link_open_worker,
@@ -69,7 +70,7 @@ class ServersPage(BasePage):
         self._server_table_state = ServerStatusTableState()
         self._update_runtime = UpdatePageRuntime(
             self,
-            runtime_feature=runtime_feature,
+            runtime_actions=runtime_actions,
             updater_feature=updater_feature,
         )
         self._create_changelog_link_open_worker = create_changelog_link_open_worker

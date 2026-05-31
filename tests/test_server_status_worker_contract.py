@@ -65,7 +65,39 @@ class ServerStatusWorkerContractTests(unittest.TestCase):
 
 
 class UpdatePageRuntimeServerRecoveryTests(unittest.TestCase):
+    def test_page_runtime_receives_runtime_actions_instead_of_full_runtime_feature(self) -> None:
+        from app.page_names import PageName
+        from ui.page_deps.system import build_servers_page_kwargs
+        from updater.update_page_runtime import UpdatePageRuntime
+        from updater.ui.page import ServersPage
+
+        runtime_feature = SimpleNamespace(
+            is_any_running=Mock(),
+            shutdown_sync=Mock(),
+            is_available=Mock(),
+            restart=Mock(),
+        )
+
+        kwargs = build_servers_page_kwargs(
+            page_name=PageName.SERVERS,
+            runtime_feature=runtime_feature,
+            updater_feature=Mock(),
+            external_actions_feature=Mock(),
+            show_page=Mock(),
+        )
+
+        self.assertNotIn("runtime_feature", inspect.signature(ServersPage.__init__).parameters)
+        self.assertNotIn("runtime_feature", inspect.signature(UpdatePageRuntime.__init__).parameters)
+        self.assertNotIn("_runtime_feature", inspect.getsource(UpdatePageRuntime))
+        self.assertIn("runtime_actions", kwargs)
+        self.assertNotIn("runtime_feature", kwargs)
+        self.assertIs(kwargs["runtime_actions"].is_any_running, runtime_feature.is_any_running)
+        self.assertIs(kwargs["runtime_actions"].shutdown_sync, runtime_feature.shutdown_sync)
+        self.assertIs(kwargs["runtime_actions"].is_available, runtime_feature.is_available)
+        self.assertIs(kwargs["runtime_actions"].restart, runtime_feature.restart)
+
     def _make_runtime(self):
+        from ui.page_deps.types import UpdateRuntimeActions
         from updater.update_page_runtime import UpdatePageRuntime
 
         view = SimpleNamespace(
@@ -101,7 +133,12 @@ class UpdatePageRuntimeServerRecoveryTests(unittest.TestCase):
         )
         runtime = UpdatePageRuntime(
             view,
-            runtime_feature=runtime_feature,
+            runtime_actions=UpdateRuntimeActions(
+                is_any_running=runtime_feature.is_any_running,
+                shutdown_sync=runtime_feature.shutdown_sync,
+                is_available=runtime_feature.is_available,
+                restart=runtime_feature.restart,
+            ),
             updater_feature=SimpleNamespace(),
         )
         return runtime, view, runtime_feature

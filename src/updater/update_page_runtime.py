@@ -7,6 +7,7 @@ from PyQt6.QtCore import QTimer
 from config.build_info import CHANNEL
 from config.config import CHANNEL_DEV, CHANNEL_STABLE
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
+from ui.page_deps.types import UpdateRuntimeActions
 
 from log.log import log
 
@@ -115,9 +116,9 @@ class UpdatePageRuntime:
     View остаётся экраном и получает уже готовые команды отображения.
     """
 
-    def __init__(self, view: UpdatePageView, *, runtime_feature, updater_feature) -> None:
+    def __init__(self, view: UpdatePageView, *, runtime_actions: UpdateRuntimeActions, updater_feature) -> None:
         self._view = view
-        self._runtime_feature = runtime_feature
+        self._runtime_actions = runtime_actions
         self._updater_feature = updater_feature
 
         self._server_worker_runtime = OneShotWorkerRuntime()
@@ -682,16 +683,16 @@ class UpdatePageRuntime:
     def create_server_retry_without_dpi_worker(self, request_id: int):
         return self._updater_feature.create_server_retry_without_dpi_worker(
             request_id,
-            is_any_running=self._runtime_feature.is_any_running,
-            shutdown_sync=self._runtime_feature.shutdown_sync,
+            is_any_running=self._runtime_actions.is_any_running,
+            shutdown_sync=self._runtime_actions.shutdown_sync,
             parent=self._view.window(),
         )
 
     def create_dpi_restart_worker(self, request_id: int, *, context: str):
         return self._updater_feature.create_dpi_restart_worker(
             request_id,
-            is_available=self._runtime_feature.is_available,
-            restart=self._runtime_feature.restart,
+            is_available=self._runtime_actions.is_available,
+            restart=self._runtime_actions.restart,
             context=context,
             parent=self._view.window(),
         )
@@ -705,8 +706,8 @@ class UpdatePageRuntime:
         parent_window = self._view.window()
         return self._updater_feature.create_update_install_worker(
             parent_window=parent_window,
-            is_any_running=self._runtime_feature.is_any_running,
-            shutdown_sync=self._runtime_feature.shutdown_sync,
+            is_any_running=self._runtime_actions.is_any_running,
+            shutdown_sync=self._runtime_actions.shutdown_sync,
         )
 
     def _bind_server_worker_signals(self, worker) -> None:

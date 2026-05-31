@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 from app.page_names import PageName
-from ui.page_deps.types import DnsPageDeps, DpiRuntimeActions, HostsPageDeps, PremiumPageDeps
+from ui.page_deps.types import (
+    DnsPageDeps,
+    DpiRuntimeActions,
+    HostsPageDeps,
+    PremiumPageDeps,
+    UpdateRuntimeActions,
+)
 
 
 def build_dpi_settings_page_kwargs(
@@ -154,7 +160,12 @@ def build_servers_page_kwargs(
         )
 
     return {
-        "runtime_feature": runtime_feature,
+        "runtime_actions": UpdateRuntimeActions(
+            is_any_running=runtime_feature.is_any_running,
+            shutdown_sync=runtime_feature.shutdown_sync,
+            is_available=runtime_feature.is_available,
+            restart=runtime_feature.restart,
+        ),
         "updater_feature": updater_feature,
         "open_about": lambda: show_page(PageName.ABOUT),
         "create_changelog_link_open_worker": _create_changelog_link_open_worker,

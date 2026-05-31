@@ -25,9 +25,18 @@ class DpiRuntimeActions:
     handle_launch_method_changed: Callable[..., object]
 
 
+@dataclass(frozen=True, slots=True)
+class UpdateRuntimeActions:
+    is_any_running: Callable[..., bool]
+    shutdown_sync: Callable[..., object]
+    is_available: Callable[..., bool]
+    restart: Callable[..., object]
+
+
 __all__ = [
     "DpiRuntimeActions",
     "DnsPageDeps",
     "HostsPageDeps",
     "PremiumPageDeps",
+    "UpdateRuntimeActions",
 ]
