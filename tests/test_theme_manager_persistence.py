@@ -30,13 +30,36 @@ class ThemeManagerPersistenceTests(unittest.TestCase):
         self.assertIn("create_theme_persist_worker", feature_source)
         self.assertIn("save_selected_theme=self.save_selected_theme", feature_source)
         self.assertIn("create_theme_persist_worker", manager_init_source)
+        self.assertIn("_theme_persist_runtime = OneShotWorkerRuntime()", manager_init_source)
         self.assertIn("_create_theme_persist_worker", start_source)
+        self.assertIn("start_qthread_worker", start_source)
         self.assertNotIn("ThemePersistWorker(", start_source)
+        self.assertNotIn("worker.start()", start_source)
         self.assertNotIn("settings_store", worker_source)
         self.assertIn("_request_theme_persist", apply_source)
         self.assertNotIn("set_selected_theme(clean)", apply_source)
         self.assertIn("_theme_persist_pending", request_source)
         self.assertIn("_theme_persist_pending", finished_source)
+
+    def test_theme_build_runs_through_runtime(self) -> None:
+        import ui.one_shot_worker_runtime as one_shot_runtime
+        import ui.theme as theme
+
+        manager_init_source = inspect.getsource(theme.ThemeManager.__init__)
+        apply_source = inspect.getsource(theme.ThemeManager.apply_theme_async)
+        cleanup_source = inspect.getsource(theme.ThemeManager.cleanup)
+        runtime_source = inspect.getsource(one_shot_runtime.OneShotWorkerRuntime.start_qobject_worker)
+
+        self.assertIn("OneShotWorkerRuntime", manager_init_source)
+        self.assertIn("_active_theme_build_jobs", manager_init_source)
+        self.assertIn("start_qobject_worker", apply_source)
+        self.assertIn('failed_signal_name="error"', apply_source)
+        self.assertIn("theme build worker", cleanup_source)
+        self.assertNotIn("QThread", apply_source)
+        self.assertNotIn("moveToThread", apply_source)
+        self.assertNotIn("thread.start()", apply_source)
+        self.assertIn("failed_signal.connect(thread.quit)", runtime_source)
+        self.assertIn("failed_signal.connect(worker.deleteLater)", runtime_source)
 
 
 if __name__ == "__main__":

@@ -4,13 +4,14 @@ import re
 import sys
 from collections import OrderedDict
 from dataclasses import dataclass
-from PyQt6.QtCore import QThread, QObject, pyqtSignal
+from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtGui import QPixmap, QColor, QIcon
 from config.config import THEME_FOLDER
 from log.log import log
 
 from typing import Optional
 import time
+from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 
 
 _THEME_SWITCH_METRICS_ACTIVE: dict[str, object] | None = None
@@ -1205,14 +1206,11 @@ class ThemeManager:
         self._create_theme_persist_worker = create_theme_persist_worker
         self._cleanup_in_progress = False
 
-        # Потоки для асинхронной генерации CSS темы
-        self._theme_build_thread: Optional[QThread] = None
-        self._theme_build_worker: Optional[ThemeBuildWorker] = None
         self._theme_request_seq = 0
         self._latest_theme_request_id = 0
         self._latest_requested_theme: str | None = None
-        self._active_theme_build_jobs: dict[int, tuple[QThread, ThemeBuildWorker]] = {}
-        self._theme_persist_worker = None
+        self._active_theme_build_jobs: dict[int, OneShotWorkerRuntime] = {}
+        self._theme_persist_runtime = OneShotWorkerRuntime()
         self._theme_persist_pending: str | None = None
         
 
@@ -1233,28 +1231,26 @@ class ThemeManager:
         try:
             self._cleanup_in_progress = True
 
-            # Останавливаем фоновые задачи сборки тем (если остались)
-            for _, (thread, _) in list(self._active_theme_build_jobs.items()):
+            for _, runtime in list(self._active_theme_build_jobs.items()):
                 try:
-                    if thread.isRunning():
-                        thread.quit()
-                        if not thread.wait(1000):
-                            log("Принудительное завершение потока сборки темы", "WARNING")
-                            thread.terminate()
-                            thread.wait(500)
+                    runtime.stop(
+                        blocking=True,
+                        wait_timeout_ms=1000,
+                        log_fn=log,
+                        warning_prefix="theme build worker",
+                    )
+                    runtime.cancel()
                 except RuntimeError:
                     pass
             self._cleanup_theme_build_thread()
             self._theme_persist_pending = None
-            persist_worker = self._theme_persist_worker
-            if persist_worker is not None:
-                try:
-                    if persist_worker.isRunning():
-                        persist_worker.quit()
-                        persist_worker.wait(1000)
-                except RuntimeError:
-                    pass
-                self._theme_persist_worker = None
+            self._theme_persist_runtime.stop(
+                blocking=True,
+                wait_timeout_ms=1000,
+                log_fn=log,
+                warning_prefix="theme persist worker",
+            )
+            self._theme_persist_runtime.cancel()
                     
             log("ThemeManager очищен", "DEBUG")
             
@@ -1310,34 +1306,30 @@ class ThemeManager:
                 "DEBUG",
             )
 
-            thread = QThread(self.widget)
-            worker = ThemeBuildWorker(theme_name=clean)
-            worker.moveToThread(thread)
+            runtime = OneShotWorkerRuntime()
+            self._active_theme_build_jobs[request_id] = runtime
 
-            thread.started.connect(worker.run)
-            worker.finished.connect(
-                lambda final_css, built_theme, rid=request_id, data=request_data:
-                self._on_theme_css_ready(final_css, built_theme, rid, data)
-            )
-            worker.error.connect(
-                lambda error, rid=request_id, data=request_data:
-                self._on_theme_build_error(error, rid, data)
-            )
-            if progress_callback:
-                worker.progress.connect(
-                    lambda status, rid=request_id, cb=progress_callback:
-                    (rid == self._latest_theme_request_id) and cb(status)
+            def bind_worker(worker):
+                worker.finished.connect(
+                    lambda final_css, built_theme, rid=request_id, data=request_data:
+                    self._on_theme_css_ready(final_css, built_theme, rid, data)
                 )
+                if progress_callback:
+                    worker.progress.connect(
+                        lambda status, rid=request_id, cb=progress_callback:
+                        (rid == self._latest_theme_request_id) and cb(status)
+                    )
 
-            # Важно: завершаем поток и при успехе, и при ошибке.
-            worker.finished.connect(thread.quit)
-            worker.error.connect(thread.quit)
-            thread.finished.connect(lambda rid=request_id: self._cleanup_theme_build_thread(rid))
-
-            self._active_theme_build_jobs[request_id] = (thread, worker)
-            self._theme_build_thread = thread
-            self._theme_build_worker = worker
-            thread.start()
+            runtime.start_qobject_worker(
+                parent=self.widget,
+                worker_factory=lambda _request_id: ThemeBuildWorker(theme_name=clean),
+                bind_worker=bind_worker,
+                on_failed=lambda _request_id, error, rid=request_id, data=request_data:
+                self._on_theme_build_error(error, rid, data),
+                on_finished=lambda _request_id, _thread, rid=request_id:
+                self._cleanup_theme_build_thread(rid),
+                failed_signal_name="error",
+            )
 
         except Exception as e:
             log(f"Ошибка запуска асинхронного применения темы: {e}", "❌ ERROR")
@@ -1434,26 +1426,10 @@ class ThemeManager:
                 job = self._active_theme_build_jobs.pop(rid, None)
                 if not job:
                     continue
-                thread, worker = job
-                try:
-                    worker.deleteLater()
-                except RuntimeError:
-                    pass
-                try:
-                    thread.deleteLater()
-                except RuntimeError:
-                    pass
-
-            latest_job = self._active_theme_build_jobs.get(self._latest_theme_request_id)
-            if latest_job:
-                self._theme_build_thread, self._theme_build_worker = latest_job
-            else:
-                self._theme_build_thread = None
-                self._theme_build_worker = None
+                job.cancel()
 
         except RuntimeError:
-            self._theme_build_worker = None
-            self._theme_build_thread = None
+            self._active_theme_build_jobs.clear()
     
     def _apply_css_only(self, final_css: str, theme_name: str, persist: bool):
         """Sync qfluentwidgets theme state without a main-window stylesheet.
@@ -1486,31 +1462,24 @@ class ThemeManager:
 
     def _request_theme_persist(self, theme_name: str) -> None:
         clean = _normalize_theme_name(theme_name)
-        worker = self._theme_persist_worker
-        if worker is not None:
-            try:
-                if worker.isRunning():
-                    self._theme_persist_pending = clean
-                    return
-            except RuntimeError:
-                self._theme_persist_worker = None
+        if self._theme_persist_runtime.is_running():
+            self._theme_persist_pending = clean
+            return
         self._start_theme_persist_worker(clean)
 
     def _start_theme_persist_worker(self, theme_name: str) -> None:
-        worker = self._create_theme_persist_worker(theme_name, parent=self.widget)
-        self._theme_persist_worker = worker
-        worker.saved.connect(lambda saved_theme, _ok: log(f"💾 Тема сохранена: '{saved_theme}'", "DEBUG"))
-        worker.failed.connect(lambda saved_theme, error: log(f"Не удалось сохранить тему '{saved_theme}': {error}", "WARNING"))
-        worker.finished.connect(lambda w=worker: self._on_theme_persist_finished(w))
-        worker.start()
+        def bind_worker(worker) -> None:
+            worker.saved.connect(lambda saved_theme, _ok: log(f"💾 Тема сохранена: '{saved_theme}'", "DEBUG"))
+            worker.failed.connect(lambda saved_theme, error: log(f"Не удалось сохранить тему '{saved_theme}': {error}", "WARNING"))
 
-    def _on_theme_persist_finished(self, worker) -> None:
-        if self._theme_persist_worker is worker:
-            self._theme_persist_worker = None
-        try:
-            worker.deleteLater()
-        except RuntimeError:
-            pass
+        self._theme_persist_runtime.start_qthread_worker(
+            worker_factory=lambda _request_id: self._create_theme_persist_worker(theme_name, parent=self.widget),
+            bind_worker=bind_worker,
+            on_finished=self._on_theme_persist_finished,
+            signal_includes_request_id=False,
+        )
+
+    def _on_theme_persist_finished(self, _worker) -> None:
         pending = self._theme_persist_pending
         self._theme_persist_pending = None
         if pending and not self._cleanup_in_progress:

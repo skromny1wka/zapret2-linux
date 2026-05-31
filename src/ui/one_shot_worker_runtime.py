@@ -48,6 +48,7 @@ class OneShotWorkerRuntime:
         on_finished: Callable | None = None,
         bind_worker: Callable[[object], None] | None = None,
         run_method_name: str = "run",
+        failed_signal_name: str = "failed",
     ) -> tuple[int, object, QThread]:
         request_id = self.next_request_id()
         thread = QThread(parent)
@@ -58,9 +59,13 @@ class OneShotWorkerRuntime:
         thread.started.connect(run_method)
         if on_loaded is not None and hasattr(worker, "loaded"):
             worker.loaded.connect(lambda *args, req=request_id: on_loaded(req, *args))
-        if on_failed is not None and hasattr(worker, "failed"):
-            worker.failed.connect(lambda *args, req=request_id: on_failed(req, *args))
+        failed_signal = getattr(worker, failed_signal_name, None)
+        if on_failed is not None and failed_signal is not None:
+            failed_signal.connect(lambda *args, req=request_id: on_failed(req, *args))
         worker.finished.connect(thread.quit)
+        if failed_signal is not None:
+            failed_signal.connect(thread.quit)
+            failed_signal.connect(worker.deleteLater)
         worker.finished.connect(worker.deleteLater)
         thread.finished.connect(lambda req=request_id, th=thread: self._finish_qobject_worker(req, th, on_finished))
         thread.finished.connect(thread.deleteLater)
