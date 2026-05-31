@@ -100,6 +100,15 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("create_log_context_action_worker", controller_source)
         self.assertIn("run_log_context_action", controller_source)
 
+    def test_orchestra_main_page_does_not_read_learned_data_in_ui_thread(self) -> None:
+        from orchestra.ui.page import OrchestraPage
+
+        learned_source = inspect.getsource(OrchestraPage._update_learned_domains)
+
+        self.assertNotIn("build_learned_data_plan_from_runner", learned_source)
+        self.assertNotIn("get_learned_data", learned_source)
+        self.assertNotIn("_get_runner", learned_source)
+
     def test_ratings_worker_receives_loader_function(self) -> None:
         from orchestra.ratings_worker import OrchestraRatingsStateLoadWorker
 

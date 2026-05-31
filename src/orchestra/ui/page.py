@@ -484,15 +484,8 @@ class OrchestraPage(BasePage):
         )
 
     def _update_learned_domains(self):
-        """Обновляет данные обученных доменов из settings.json через runner."""
-        if self._cleanup_in_progress:
-            return
-        try:
-            runner = self._get_runner()
-            plan = orchestra_page_runtime.build_learned_data_plan_from_runner(runner)
-            self._update_domains(plan.data)
-        except Exception as e:
-            log(f"Ошибка чтения обученных доменов: {e}", "DEBUG")
+        """Данные обучения больше не читаются на главной странице Orchestra."""
+        return
 
     def _update_domains(self, _data: dict):
         """Данные обученных доменов теперь отображаются на вкладке Залоченное"""
