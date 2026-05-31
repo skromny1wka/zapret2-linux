@@ -1384,6 +1384,56 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn('context["folder_state"]', worker_source)
         self.assertIn("update_cached_folder_state", finished_source)
 
+    def test_user_presets_queued_write_action_restarts_after_worker_signal(self) -> None:
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_write_action_running = Mock(return_value=False)
+        page._pending_preset_write_actions = [
+            {
+                "kind": "storage",
+                "action": "rating",
+                "name": "Default.txt",
+                "display_name": "Default",
+                "rating": 5,
+                "direction": 0,
+                "cached_metadata": None,
+                "source_kind": "",
+                "source_id": "",
+                "destination_kind": "",
+                "destination_id": "",
+                "destination_folder_key": "",
+                "file_name": "",
+                "file_path": "",
+            }
+        ]
+        page._pending_preset_storage_actions = [{"action": "rating"}]
+        page._start_preset_storage_action_worker = Mock()
+        callbacks = []
+
+        with patch(
+            "presets.ui.common.user_presets_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            self.assertTrue(UserPresetsPageBase._start_next_preset_write_action(page))
+
+        page._start_preset_storage_action_worker.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+
+        callbacks[0]()
+
+        page._start_preset_storage_action_worker.assert_called_once_with(
+            "rating",
+            name="Default.txt",
+            display_name="Default",
+            rating=5,
+            direction=0,
+            cached_metadata=None,
+            source_kind="",
+            source_id="",
+            destination_kind="",
+            destination_id="",
+            destination_folder_key="",
+        )
+
     def test_user_presets_folder_actions_run_through_worker(self) -> None:
         toggle_source = inspect.getsource(UserPresetsPageBase._on_toggle_folder)
         menu_source = inspect.getsource(UserPresetsPageBase._show_folder_menu)

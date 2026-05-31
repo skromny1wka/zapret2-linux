@@ -1526,6 +1526,22 @@ class UserPresetsPageBase(BasePage):
         pending = self._pop_next_preset_write_action()
         if not pending:
             return False
+        self._schedule_preset_write_action_start(pending)
+        return True
+
+    def _schedule_preset_write_action_start(self, operation: dict[str, object]) -> None:
+        queued = dict(operation or {})
+        try:
+            QTimer.singleShot(0, lambda: self._run_preset_write_action(queued))
+        except Exception:
+            self._run_preset_write_action(queued)
+
+    def _run_preset_write_action(self, pending: dict[str, object]) -> bool:
+        if self.__dict__.get("_cleanup_in_progress"):
+            return False
+        if self._preset_write_action_running():
+            self.__dict__.setdefault("_pending_preset_write_actions", []).insert(0, dict(pending or {}))
+            return False
         if pending.get("kind") == "storage":
             self._start_preset_storage_action_worker(
                 str(pending.get("action") or ""),
@@ -1570,7 +1586,7 @@ class UserPresetsPageBase(BasePage):
                 from_current=bool(pending.get("from_current")),
             )
             return True
-        return self._start_next_preset_write_action()
+        return False
 
     def _start_preset_storage_action_worker(
         self,
