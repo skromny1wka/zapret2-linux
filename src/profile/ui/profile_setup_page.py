@@ -2338,7 +2338,6 @@ class ProfileSetupPageBase(BasePage):
         profile_key = str(profile_key or "").strip()
         if not profile_key:
             return
-        runtime = self._worker_runtime("_list_file_save_runtime")
         text = str(text or "")
         if self._profile_setup_write_is_running():
             self._pending_list_file_save = (profile_key, text)
@@ -2637,7 +2636,6 @@ class ProfileSetupPageBase(BasePage):
 
     def _request_settings_save(self, request: dict) -> None:
         request = dict(request)
-        runtime = self._worker_runtime("_settings_save_runtime")
         if self._profile_setup_write_is_running():
             if self.__dict__.get("_pending_settings_save") == dict(request):
                 return
@@ -2707,7 +2705,6 @@ class ProfileSetupPageBase(BasePage):
         profile_key = str(profile_key or "").strip()
         if not profile_key:
             return
-        runtime = self._worker_runtime("_raw_profile_save_runtime")
         raw_text = str(raw_text or "")
         if self._profile_setup_write_is_running():
             self._pending_raw_profile_save = (profile_key, raw_text)
@@ -2904,7 +2901,6 @@ class ProfileSetupPageBase(BasePage):
     def _request_strategy_apply(self, strategy_id: str) -> None:
         strategy_id = str(strategy_id or "").strip()
         branch_id = _current_strategy_branch_id(self._payload)
-        runtime = self._worker_runtime("_strategy_apply_runtime")
         if self._profile_setup_write_is_running():
             if (
                 strategy_id != str(getattr(self, "_strategy_apply_runtime_strategy_id", "") or "").strip()
