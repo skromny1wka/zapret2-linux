@@ -122,6 +122,7 @@ class NetworkPage(BasePage):
         self._connectivity_test_runtime = OneShotWorkerRuntime()
         self._force_dns_action_runtime = OneShotWorkerRuntime()
         self._force_dns_action_pending: list[dict[str, object]] = []
+        self._scheduled_force_dns_action_request = None
         self._force_dns_action_start_scheduled = False
         self._dns_flush_cache_runtime = OneShotWorkerRuntime()
         self._dns_flush_cache_pending = False
@@ -902,7 +903,14 @@ class NetworkPage(BasePage):
             "action": str(action or "").strip(),
             "enabled": enabled,
         }
-        if self._force_dns_action_runtime.is_running() or self.__dict__.get("_force_dns_action_start_scheduled", False):
+        scheduled = self.__dict__.get("_scheduled_force_dns_action_request")
+        if self.__dict__.get("_force_dns_action_start_scheduled", False):
+            if isinstance(scheduled, dict) and scheduled.get("action") == payload.get("action"):
+                self._scheduled_force_dns_action_request = dict(payload)
+            else:
+                self._force_dns_action_pending.append(payload)
+            return
+        if self._force_dns_action_runtime.is_running():
             self._force_dns_action_pending.append(payload)
             return
         self._start_force_dns_action_worker(payload)
@@ -1035,12 +1043,17 @@ class NetworkPage(BasePage):
     def _schedule_force_dns_action_worker_start(self, payload: dict[str, object]) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        queued = dict(payload or {})
+        self._scheduled_force_dns_action_request = dict(payload or {})
+        if self.__dict__.get("_force_dns_action_start_scheduled", False):
+            return
         self._force_dns_action_start_scheduled = True
-        QTimer.singleShot(0, lambda value=queued: self._run_scheduled_force_dns_action_worker_start(value))
+        QTimer.singleShot(0, self._run_scheduled_force_dns_action_worker_start)
 
-    def _run_scheduled_force_dns_action_worker_start(self, payload: dict[str, object]) -> None:
+    def _run_scheduled_force_dns_action_worker_start(self, payload: dict[str, object] | None = None) -> None:
         self._force_dns_action_start_scheduled = False
+        if payload is None:
+            payload = self.__dict__.get("_scheduled_force_dns_action_request")
+        self._scheduled_force_dns_action_request = None
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         self._start_force_dns_action_worker(dict(payload or {}))
@@ -1360,6 +1373,7 @@ class NetworkPage(BasePage):
         except Exception:
             pass
         self._force_dns_action_pending.clear()
+        self._scheduled_force_dns_action_request = None
         self._force_dns_action_start_scheduled = False
         self._dns_flush_cache_pending = False
         self._dns_flush_cache_start_scheduled = False
