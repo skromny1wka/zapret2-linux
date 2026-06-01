@@ -65,6 +65,40 @@ class RawPresetActivationQueueTests(unittest.TestCase):
         self.assertEqual(runtime.started, [worker])
         self.assertEqual(page._pending_raw_preset_activation, "")
 
+    def test_scheduled_pending_activation_keeps_latest_file_before_worker_starts(self) -> None:
+        from presets.ui.common.preset_subpage_base import PresetRawEditorPage
+
+        runtime = _Runtime(running=False)
+        worker = object()
+        page = PresetRawEditorPage.__new__(PresetRawEditorPage)
+        page._raw_activate_runtime = runtime
+        page._raw_save_runtime = _Runtime(running=False)
+        page._raw_action_runtime = _Runtime(running=False)
+        page._raw_activate_request_id = 1
+        page._preset_file_name = "Latest.txt"
+        page._pending_raw_preset_activation = "Old.txt"
+        page._pending_raw_preset_write_operations = []
+        page._cleanup_in_progress = False
+        page.activateButton = None
+        page.create_raw_preset_activate_worker = Mock(return_value=worker)
+        callbacks = []
+
+        with patch(
+            "presets.ui.common.preset_subpage_base.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            PresetRawEditorPage._on_preset_activation_worker_finished(page, object())
+            PresetRawEditorPage._request_preset_activation(page)
+
+        page.create_raw_preset_activate_worker.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+
+        callbacks[0]()
+
+        page.create_raw_preset_activate_worker.assert_called_once_with(2, "Latest.txt", page)
+        self.assertEqual(runtime.started, [worker])
+        self.assertEqual(page._pending_raw_preset_activation, "")
+
 
 if __name__ == "__main__":
     unittest.main()
