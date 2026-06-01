@@ -1120,6 +1120,9 @@ class NetworkPage(BasePage):
     def _schedule_dns_flush_cache_worker_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
+        if self.__dict__.get("_dns_flush_cache_start_scheduled", False):
+            self._dns_flush_cache_pending = True
+            return
         self._dns_flush_cache_start_scheduled = True
         QTimer.singleShot(0, self._run_scheduled_dns_flush_cache_worker_start)
 

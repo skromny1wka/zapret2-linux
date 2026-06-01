@@ -232,6 +232,26 @@ class DnsWorkerArchitectureTests(unittest.TestCase):
 
         page._start_dns_flush_cache_worker.assert_called_once_with()
 
+    def test_dns_flush_cache_scheduled_start_queues_next_flush(self) -> None:
+        page = NetworkPage.__new__(NetworkPage)
+        page._cleanup_in_progress = False
+        page._dns_flush_cache_start_scheduled = False
+        page._dns_flush_cache_pending = False
+        page._start_dns_flush_cache_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(network_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
+            NetworkPage._schedule_dns_flush_cache_worker_start(page)
+            NetworkPage._schedule_dns_flush_cache_worker_start(page)
+
+        single_shot.assert_called_once()
+        self.assertTrue(page._dns_flush_cache_pending)
+
+        single_shot.call_args.args[1]()
+
+        page._start_dns_flush_cache_worker.assert_called_once_with()
+        self.assertTrue(page._dns_flush_cache_pending)
+
     def test_network_page_load_and_connectivity_use_feature_worker_runtime(self) -> None:
         feature_source = inspect.getsource(build_dns_feature)
         page_source = inspect.getsource(NetworkPage)
