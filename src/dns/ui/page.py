@@ -949,11 +949,14 @@ class NetworkPage(BasePage):
         self._start_force_dns_action_worker(payload)
 
     def _queue_force_dns_action(self, payload: dict[str, object]) -> None:
-        action = str(payload.get("action") or "")
+        queued = dict(payload or {})
+        action = str(queued.get("action") or "")
         pending = self.__dict__.setdefault("_force_dns_action_pending", [])
         if action == "toggle":
             pending[:] = [item for item in pending if str(item.get("action") or "") != "toggle"]
-        pending.append(dict(payload or {}))
+        elif queued in pending:
+            return
+        pending.append(queued)
 
     def _start_force_dns_action_worker(self, payload: dict[str, object]) -> None:
         self._force_dns_action_runtime.start_qthread_worker(

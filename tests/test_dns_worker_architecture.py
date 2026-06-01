@@ -265,6 +265,27 @@ class DnsWorkerArchitectureTests(unittest.TestCase):
         page._start_force_dns_action_worker.assert_not_called()
         self.assertEqual(page._force_dns_action_pending, [{"action": "toggle", "enabled": False}])
 
+    def test_force_dns_running_reset_dhcp_is_queued_once(self) -> None:
+        class _Runtime:
+            def is_running(self) -> bool:
+                return True
+
+        page = NetworkPage.__new__(NetworkPage)
+        page._cleanup_in_progress = False
+        page._force_dns_action_runtime = _Runtime()
+        page._force_dns_action_pending = []
+        page._force_dns_action_start_scheduled = False
+        page._start_force_dns_action_worker = Mock()
+
+        NetworkPage._request_force_dns_action(page, "reset_dhcp")
+        NetworkPage._request_force_dns_action(page, "reset_dhcp")
+
+        page._start_force_dns_action_worker.assert_not_called()
+        self.assertEqual(
+            page._force_dns_action_pending,
+            [{"action": "reset_dhcp", "enabled": None}],
+        )
+
     def test_dns_flush_cache_pending_restarts_after_event_loop_turn(self) -> None:
         page = NetworkPage.__new__(NetworkPage)
         page._cleanup_in_progress = False
