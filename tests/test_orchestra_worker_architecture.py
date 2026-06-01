@@ -243,6 +243,44 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
         page._start_log_context_action_worker.assert_called_once_with(("lock", "old.com", 7, "tcp"))
         self.assertEqual(page._log_context_action_pending, [("lock", "new.com", 8, "udp")])
 
+    def test_orchestra_clear_learned_request_queues_while_worker_runs(self) -> None:
+        from orchestra.ui.page import OrchestraPage
+
+        page = OrchestraPage.__new__(OrchestraPage)
+        page._cleanup_in_progress = False
+        page._clear_learned_pending_worker = False
+        page._clear_learned_start_scheduled = False
+        page._clear_learned_runtime = SimpleNamespace(is_running=Mock(return_value=True))
+        page._start_clear_learned_worker = Mock()
+
+        OrchestraPage._request_clear_learned_worker(page)
+
+        page._start_clear_learned_worker.assert_not_called()
+        self.assertTrue(page._clear_learned_pending_worker)
+
+    def test_orchestra_clear_learned_pending_restarts_after_event_loop_turn(self) -> None:
+        import orchestra.ui.page as orchestra_page
+        from orchestra.ui.page import OrchestraPage
+
+        page = OrchestraPage.__new__(OrchestraPage)
+        page._cleanup_in_progress = False
+        page._clear_learned_pending_worker = True
+        page._clear_learned_start_scheduled = False
+        page._start_clear_learned_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(orchestra_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            OrchestraPage._on_clear_learned_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._start_clear_learned_worker.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._start_clear_learned_worker.assert_called_once_with()
+        self.assertFalse(page._clear_learned_pending_worker)
+
     def test_orchestra_main_page_does_not_read_learned_data_in_ui_thread(self) -> None:
         from orchestra.ui.page import OrchestraPage
 

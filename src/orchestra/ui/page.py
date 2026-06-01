@@ -93,6 +93,8 @@ class OrchestraPage(BasePage):
         self._clear_learned_pending = False
         self._cleanup_in_progress = False
         self._clear_learned_runtime = OneShotWorkerRuntime()
+        self._clear_learned_pending_worker = False
+        self._clear_learned_start_scheduled = False
         self._log_history_runtime = OneShotWorkerRuntime()
         self._log_history_pending = False
         self._log_history_start_scheduled = False
@@ -382,15 +384,29 @@ class OrchestraPage(BasePage):
         if self._cleanup_in_progress:
             return
         log("Запрошена очистка данных обучения", "INFO")
-        self._start_clear_learned_worker()
+        self._request_clear_learned_worker()
 
     def create_clear_learned_worker(self, request_id: int):
         return self._orchestra.create_clear_learned_worker(request_id, self)
 
-    def _start_clear_learned_worker(self) -> None:
-        if self._clear_learned_runtime.is_running():
+    def _request_clear_learned_worker(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
             return
-        self._clear_learned_runtime.start_qthread_worker(
+        runtime = self.__dict__.get("_clear_learned_runtime")
+        if (
+            (runtime is not None and runtime.is_running())
+            or self.__dict__.get("_clear_learned_start_scheduled", False)
+        ):
+            self._clear_learned_pending_worker = True
+            return
+        self._start_clear_learned_worker()
+
+    def _start_clear_learned_worker(self) -> None:
+        self._clear_learned_pending_worker = False
+        runtime = self.__dict__.get("_clear_learned_runtime")
+        if runtime is None or runtime.is_running():
+            return
+        runtime.start_qthread_worker(
             worker_factory=lambda request_id: self.create_clear_learned_worker(request_id),
             on_loaded=self._on_clear_learned_worker_loaded,
             on_failed=self._on_clear_learned_worker_failed,
@@ -419,8 +435,31 @@ class OrchestraPage(BasePage):
         log(f"Не удалось сбросить данные обучения: {error}", "WARNING")
 
     def _on_clear_learned_worker_finished(self, worker) -> None:
-        if self._clear_learned_runtime.worker is worker:
-            self._clear_learned_runtime.worker = None
+        if self.__dict__.get("_clear_learned_pending_worker", False) and not self.__dict__.get(
+            "_cleanup_in_progress",
+            False,
+        ):
+            self._schedule_clear_learned_worker_start()
+
+    def _schedule_clear_learned_worker_start(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("_clear_learned_start_scheduled", False):
+            self._clear_learned_pending_worker = True
+            return
+        self._clear_learned_start_scheduled = True
+        try:
+            QTimer.singleShot(0, self._run_scheduled_clear_learned_worker_start)
+        except Exception:
+            self._run_scheduled_clear_learned_worker_start()
+
+    def _run_scheduled_clear_learned_worker_start(self) -> None:
+        self._clear_learned_start_scheduled = False
+        pending = bool(self.__dict__.get("_clear_learned_pending_worker", False))
+        self._clear_learned_pending_worker = False
+        if not pending or self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._start_clear_learned_worker()
 
     def _update_all(self):
         """Обновляет статус, данные обучения, историю и whitelist"""
@@ -784,6 +823,8 @@ class OrchestraPage(BasePage):
     def cleanup(self) -> None:
         self._cleanup_in_progress = True
         self._clear_learned_pending = False
+        self._clear_learned_pending_worker = False
+        self._clear_learned_start_scheduled = False
         self.stop_monitoring()
         self._clear_learned_reset_timer.stop()
         self._clear_learned_runtime.stop(
