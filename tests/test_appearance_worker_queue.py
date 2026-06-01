@@ -218,6 +218,20 @@ class AppearanceWorkerQueueTests(unittest.TestCase):
         page._windows_accent_load_runtime.start_qthread_worker.assert_called_once()
         self.assertTrue(page._windows_accent_load_pending)
 
+    def test_windows_accent_result_ignored_when_new_load_is_pending(self) -> None:
+        from ui.pages.appearance_page import AppearancePage
+
+        page = AppearancePage.__new__(AppearancePage)
+        page._cleanup_in_progress = False
+        page._windows_accent_load_runtime = Mock()
+        page._windows_accent_load_runtime.is_current.return_value = True
+        page._windows_accent_load_pending = True
+        page._apply_windows_accent = Mock()
+
+        AppearancePage._on_windows_accent_loaded(page, 11, SimpleNamespace(hex_color="#111111"))
+
+        page._apply_windows_accent.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

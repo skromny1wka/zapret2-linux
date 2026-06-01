@@ -1293,6 +1293,8 @@ class AppearancePage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
+        if self.__dict__.get("_windows_accent_load_pending", False):
+            return
         self._apply_windows_accent(plan)
 
     def _on_windows_accent_failed(self, request_id: int, error: str) -> None:
