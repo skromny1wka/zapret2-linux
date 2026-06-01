@@ -65,6 +65,9 @@ class _SingleMetadataWorker:
         self.start_calls += 1
         self._running = True
 
+    def deleteLater(self) -> None:  # noqa: N802
+        self._running = False
+
 
 class _RowsPlanWorker:
     instances = []
@@ -104,6 +107,9 @@ class _RowsPlanWorker:
     def start(self) -> None:
         self.start_calls += 1
         self._running = True
+
+    def deleteLater(self) -> None:  # noqa: N802
+        self._running = False
 
 
 class UserPresetsMetadataLoadQueueTests(unittest.TestCase):

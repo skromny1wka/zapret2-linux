@@ -5,6 +5,22 @@ import unittest
 
 
 class UserPresetsRowsWorkerArchitectureTests(unittest.TestCase):
+    def test_runtime_starts_metadata_workers_through_shared_runtime(self) -> None:
+        import presets.user_presets_runtime_service as runtime_service
+
+        service_source = inspect.getsource(runtime_service.UserPresetsRuntimeService)
+        start_sources = "\n".join(
+            (
+                inspect.getsource(runtime_service.UserPresetsRuntimeService._request_single_metadata_refresh),
+                inspect.getsource(runtime_service.UserPresetsRuntimeService.load_presets),
+                inspect.getsource(runtime_service.UserPresetsRuntimeService._request_rows_plan_refresh),
+            )
+        )
+
+        self.assertIn("OneShotWorkerRuntime", service_source)
+        self.assertIn("start_qthread_worker", start_sources)
+        self.assertNotIn("worker.start()", start_sources)
+
     def test_runtime_refresh_requests_rows_plan_worker_instead_of_building_rows_in_gui(self) -> None:
         from presets.user_presets_runtime_service import UserPresetsRuntimeService
 

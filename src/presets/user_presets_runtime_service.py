@@ -9,6 +9,7 @@ from PyQt6.QtCore import QThread, QTimer, pyqtSignal
 
 from log.log import log
 from presets.icon_color import normalize_preset_icon_color
+from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 
 
 @dataclass(slots=True)
@@ -135,14 +136,17 @@ class UserPresetsRuntimeService:
         self._attached_page_ref = None
         self._attached_adapter: UserPresetsRuntimeAdapter | None = None
         self._metadata_load_request_id = 0
+        self._metadata_load_runtime = OneShotWorkerRuntime()
         self._metadata_load_worker: UserPresetsMetadataLoadWorker | None = None
         self._metadata_load_pending_page = None
         self._metadata_load_start_scheduled = False
         self._single_metadata_request_id = 0
+        self._single_metadata_runtime = OneShotWorkerRuntime()
         self._single_metadata_worker: UserPresetsSingleMetadataWorker | None = None
         self._single_metadata_pending: list[str] = []
         self._single_metadata_start_scheduled = False
         self._rows_plan_request_id = 0
+        self._rows_plan_runtime = OneShotWorkerRuntime()
         self._rows_plan_worker: UserPresetsRowsPlanWorker | None = None
         self._rows_plan_pending: tuple[dict[str, dict[str, object]], dict[str, Any] | None, float | None, object] | None = None
         self._rows_plan_start_scheduled = False
@@ -193,6 +197,22 @@ class UserPresetsRuntimeService:
         if attached is not None:
             return attached
         raise RuntimeError("user presets runtime adapter is not attached")
+
+    def _worker_runtime_is_running(self, runtime_attr: str, worker_attr: str) -> bool:
+        runtime = getattr(self, runtime_attr, None)
+        if runtime is not None:
+            try:
+                if runtime.is_running():
+                    return True
+            except Exception:
+                pass
+        worker = getattr(self, worker_attr, None)
+        if worker is None:
+            return False
+        try:
+            return bool(worker.isRunning())
+        except Exception:
+            return False
 
     def attach_page(self, page, adapter: UserPresetsRuntimeAdapter) -> None:
         current_page = None
@@ -249,43 +269,44 @@ class UserPresetsRuntimeService:
         if not normalized_file_name:
             return
 
-        worker = self._single_metadata_worker
-        if worker is not None or self.__dict__.get("_single_metadata_start_scheduled", False):
-            try:
-                if worker is None or worker.isRunning():
-                    if normalized_file_name not in self._single_metadata_pending:
-                        self._single_metadata_pending.append(normalized_file_name)
-                    return
-            except Exception:
-                return
+        if (
+            self._worker_runtime_is_running("_single_metadata_runtime", "_single_metadata_worker")
+            or self.__dict__.get("_single_metadata_start_scheduled", False)
+        ):
+            if normalized_file_name not in self._single_metadata_pending:
+                self._single_metadata_pending.append(normalized_file_name)
+            return
 
-        self._single_metadata_request_id += 1
-        request_id = self._single_metadata_request_id
-        worker = UserPresetsSingleMetadataWorker(
-            request_id,
-            normalized_file_name,
-            adapter.read_single_metadata,
-            page,
+        def bind_worker(worker) -> None:
+            worker.loaded.connect(
+                lambda rid, changed_file_name, refreshed, p=page: self._on_single_metadata_loaded(
+                    rid,
+                    changed_file_name,
+                    refreshed,
+                    p,
+                )
+            )
+            worker.failed.connect(
+                lambda rid, changed_file_name, error, p=page: self._on_single_metadata_failed(
+                    rid,
+                    changed_file_name,
+                    error,
+                    p,
+                )
+            )
+
+        request_id, worker = self._single_metadata_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: UserPresetsSingleMetadataWorker(
+                request_id,
+                normalized_file_name,
+                adapter.read_single_metadata,
+                page,
+            ),
+            bind_worker=bind_worker,
+            on_finished=lambda worker, p=page: self._on_single_metadata_worker_finished(worker, p),
         )
+        self._single_metadata_request_id = request_id
         self._single_metadata_worker = worker
-        worker.loaded.connect(
-            lambda rid, changed_file_name, refreshed, p=page: self._on_single_metadata_loaded(
-                rid,
-                changed_file_name,
-                refreshed,
-                p,
-            )
-        )
-        worker.failed.connect(
-            lambda rid, changed_file_name, error, p=page: self._on_single_metadata_failed(
-                rid,
-                changed_file_name,
-                error,
-                p,
-            )
-        )
-        worker.finished.connect(lambda w=worker, p=page: self._on_single_metadata_worker_finished(w, p))
-        worker.start()
 
     def _on_single_metadata_loaded(self, request_id: int, file_name: str, refreshed, page=None) -> None:
         if request_id != self._single_metadata_request_id:
@@ -597,6 +618,10 @@ class UserPresetsRuntimeService:
             except Exception:
                 pass
             setattr(self, attr, None)
+        for attr in ("_metadata_load_runtime", "_single_metadata_runtime", "_rows_plan_runtime"):
+            runtime = getattr(self, attr, None)
+            if runtime is not None:
+                runtime.cancel()
 
     def on_presets_dir_changed(self, path: str, page=None) -> None:
         page = self._resolve_page(page)
@@ -712,9 +737,8 @@ class UserPresetsRuntimeService:
     def load_presets(self, page=None) -> None:
         page = self._resolve_page(page)
         adapter = self._resolve_adapter()
-        worker = self._metadata_load_worker
         if (
-            (worker is not None and worker.isRunning())
+            self._worker_runtime_is_running("_metadata_load_runtime", "_metadata_load_worker")
             or self.__dict__.get("_metadata_load_start_scheduled", False)
         ):
             self._metadata_load_pending_page = page
@@ -722,22 +746,31 @@ class UserPresetsRuntimeService:
             return
 
         self._ui_dirty = False
-        self._metadata_load_request_id += 1
-        request_id = self._metadata_load_request_id
-        worker = UserPresetsMetadataLoadWorker(request_id, adapter.load_all_metadata, adapter.load_folder_state, page)
-        self._metadata_load_worker = worker
-        worker.loaded.connect(
-            lambda rid, all_presets, folder_state, started_at, p=page: self._on_metadata_loaded(
-                rid,
-                all_presets,
-                folder_state,
-                started_at,
-                p,
+
+        def bind_worker(worker) -> None:
+            worker.loaded.connect(
+                lambda rid, all_presets, folder_state, started_at, p=page: self._on_metadata_loaded(
+                    rid,
+                    all_presets,
+                    folder_state,
+                    started_at,
+                    p,
+                )
             )
+            worker.failed.connect(lambda rid, error, p=page: self._on_metadata_failed(rid, error, p))
+
+        request_id, worker = self._metadata_load_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: UserPresetsMetadataLoadWorker(
+                request_id,
+                adapter.load_all_metadata,
+                adapter.load_folder_state,
+                page,
+            ),
+            bind_worker=bind_worker,
+            on_finished=self._on_metadata_worker_finished,
         )
-        worker.failed.connect(lambda rid, error, p=page: self._on_metadata_failed(rid, error, p))
-        worker.finished.connect(lambda w=worker: self._on_metadata_worker_finished(w))
-        worker.start()
+        self._metadata_load_request_id = request_id
+        self._metadata_load_worker = worker
 
     def _on_metadata_loaded(
         self,
@@ -831,33 +864,34 @@ class UserPresetsRuntimeService:
         adapter = self._resolve_adapter()
         build_rows_plan = adapter.build_rows_plan
 
-        worker = self._rows_plan_worker
-        if worker is not None or self.__dict__.get("_rows_plan_start_scheduled", False):
-            try:
-                if worker is None or worker.isRunning():
-                    self._rows_plan_pending = (dict(all_presets or {}), dict(folder_state or {}), started_at, page)
-                    return
-            except Exception:
-                return
+        if (
+            self._worker_runtime_is_running("_rows_plan_runtime", "_rows_plan_worker")
+            or self.__dict__.get("_rows_plan_start_scheduled", False)
+        ):
+            self._rows_plan_pending = (dict(all_presets or {}), dict(folder_state or {}), started_at, page)
+            return
 
-        self._rows_plan_request_id += 1
-        request_id = self._rows_plan_request_id
-        worker = UserPresetsRowsPlanWorker(
-            request_id,
-            build_rows_plan,
-            all_presets=all_presets,
-            query=self.current_search_query(page),
-            selected_source_file_name=adapter.selected_source_file_name,
-            language=str(getattr(page, "_ui_language", "") or ""),
-            folder_state=folder_state,
-            started_at=started_at,
-            parent=page,
+        def bind_worker(worker) -> None:
+            worker.loaded.connect(lambda rid, plan, started, p=page: self._on_rows_plan_loaded(rid, plan, started, p))
+            worker.failed.connect(lambda rid, error, p=page: self._on_rows_plan_failed(rid, error, p))
+
+        request_id, worker = self._rows_plan_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: UserPresetsRowsPlanWorker(
+                request_id,
+                build_rows_plan,
+                all_presets=all_presets,
+                query=self.current_search_query(page),
+                selected_source_file_name=adapter.selected_source_file_name,
+                language=str(getattr(page, "_ui_language", "") or ""),
+                folder_state=folder_state,
+                started_at=started_at,
+                parent=page,
+            ),
+            bind_worker=bind_worker,
+            on_finished=self._on_rows_plan_worker_finished,
         )
+        self._rows_plan_request_id = request_id
         self._rows_plan_worker = worker
-        worker.loaded.connect(lambda rid, plan, started, p=page: self._on_rows_plan_loaded(rid, plan, started, p))
-        worker.failed.connect(lambda rid, error, p=page: self._on_rows_plan_failed(rid, error, p))
-        worker.finished.connect(lambda w=worker: self._on_rows_plan_worker_finished(w))
-        worker.start()
 
     def _on_rows_plan_loaded(self, request_id: int, plan, started_at: float | None, page=None) -> None:
         if request_id != self._rows_plan_request_id:
