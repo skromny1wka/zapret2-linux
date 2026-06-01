@@ -2215,7 +2215,7 @@ class UserPresetsPageBase(BasePage):
             return
         runtime = self._worker_runtime("_preset_link_action_runtime")
         if runtime.is_running() or self.__dict__.get("_preset_link_action_start_scheduled", False):
-            self.__dict__.setdefault("_preset_link_action_pending", []).append(action)
+            self._queue_preset_link_action(action)
             return
         self._preset_link_action_request_id = int(self.__dict__.get("_preset_link_action_request_id", 0) or 0) + 1
         request_id = self._preset_link_action_request_id
@@ -2229,6 +2229,15 @@ class UserPresetsPageBase(BasePage):
             bind_worker=_bind_worker,
             on_finished=self._on_preset_link_action_worker_finished,
         )
+
+    def _queue_preset_link_action(self, action: str) -> None:
+        clean_action = str(action or "").strip()
+        if not clean_action:
+            return
+        pending = self.__dict__.setdefault("_preset_link_action_pending", [])
+        if clean_action in pending:
+            return
+        pending.append(clean_action)
 
     def _on_preset_link_action_finished(self, request_id: int, _action: str, result, _context) -> None:
         if request_id != int(getattr(self, "_preset_link_action_request_id", 0) or 0):
@@ -2262,8 +2271,7 @@ class UserPresetsPageBase(BasePage):
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         if self.__dict__.get("_preset_link_action_start_scheduled", False):
-            if clean_action:
-                self.__dict__.setdefault("_preset_link_action_pending", []).append(clean_action)
+            self._queue_preset_link_action(clean_action)
             return
         self._preset_link_action_start_scheduled = True
         try:

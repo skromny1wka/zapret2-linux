@@ -189,6 +189,25 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
         self.assertEqual(page._preset_link_action_pending, ["info", "new_configs"])
         page.create_preset_link_action_worker.assert_not_called()
 
+    def test_duplicate_user_presets_link_action_is_queued_once(self) -> None:
+        from presets.ui.common.user_presets_page import UserPresetsPageBase
+
+        class _Runtime:
+            def is_running(self) -> bool:
+                return True
+
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_link_action_runtime = _Runtime()
+        page._preset_link_action_start_scheduled = False
+        page._preset_link_action_pending = []
+        page.create_preset_link_action_worker = Mock()
+
+        UserPresetsPageBase._request_preset_link_action(page, "info")
+        UserPresetsPageBase._request_preset_link_action(page, "info")
+
+        self.assertEqual(page._preset_link_action_pending, ["info"])
+        page.create_preset_link_action_worker.assert_not_called()
+
     def test_user_presets_link_action_waits_while_restart_is_scheduled(self) -> None:
         from presets.ui.common.user_presets_page import UserPresetsPageBase
 
