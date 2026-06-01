@@ -283,6 +283,8 @@ class ProfileOrderPageBase(BasePage):
             cleanup_in_progress=bool(self.__dict__.get("_cleanup_in_progress", False)),
         ):
             return
+        if self.__dict__.get("_pending_profile_order_moves"):
+            return
         if result and self._apply_profile_order_move_locally(
             action,
             source_profile_key,

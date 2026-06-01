@@ -485,6 +485,34 @@ class ProfileOrderPageTests(unittest.TestCase):
             ],
         )
 
+    def test_order_page_ignores_move_result_when_new_move_is_pending(self) -> None:
+        from profile.ui.profile_order_page import ProfileOrderPageBase
+
+        page = ProfileOrderPageBase.__new__(ProfileOrderPageBase)
+        page._cleanup_in_progress = False
+        page._order_move_runtime = SimpleNamespace(is_current=Mock(return_value=True))
+        page._pending_profile_order_moves = [
+            {
+                "action": "end",
+                "source_profile_key": "profile-c",
+                "destination_profile_key": "",
+            }
+        ]
+        page._apply_profile_order_move_locally = Mock()
+        page._reload_order_profiles = Mock()
+
+        ProfileOrderPageBase._on_profile_order_moved(
+            page,
+            4,
+            "after",
+            "profile-a",
+            "profile-b",
+            True,
+        )
+
+        page._apply_profile_order_move_locally.assert_not_called()
+        page._reload_order_profiles.assert_not_called()
+
     def test_profile_order_move_waits_while_restart_is_scheduled(self) -> None:
         from profile.ui.profile_order_page import ProfileOrderPageBase
         from ui.one_shot_worker_runtime import OneShotWorkerRuntime
