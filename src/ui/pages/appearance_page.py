@@ -139,6 +139,9 @@ class AppearancePage(BasePage):
         self._appearance_save_pending: list[dict[str, object]] = []
         self._appearance_save_start_scheduled = False
         self._initial_state_load_runtime = OneShotWorkerRuntime()
+        self._initial_state_load_pending = False
+        self._initial_state_load_pending_force = False
+        self._initial_state_load_start_scheduled = False
         self._rkn_background_options_runtime = OneShotWorkerRuntime()
         self._rkn_background_options_pending = False
         self._rkn_background_options_start_scheduled = False
@@ -688,8 +691,18 @@ class AppearancePage(BasePage):
             return
         if not force and self._initial_state_plan is not None:
             return
-        if self._initial_state_load_runtime.is_running():
+        if (
+            self._initial_state_load_runtime.is_running()
+            or self.__dict__.get("_initial_state_load_start_scheduled", False)
+        ):
+            self._initial_state_load_pending = True
+            self._initial_state_load_pending_force = (
+                bool(self.__dict__.get("_initial_state_load_pending_force", False))
+                or bool(force)
+            )
             return
+        self._initial_state_load_pending = False
+        self._initial_state_load_pending_force = False
         self._start_initial_state_load_worker()
 
     def _start_initial_state_load_worker(self) -> None:
@@ -725,7 +738,27 @@ class AppearancePage(BasePage):
             self._schedule_lower_sections_build()
 
     def _on_initial_state_worker_finished(self, _worker) -> None:
-        return
+        if self.__dict__.get("_initial_state_load_pending", False) and not self._cleanup_in_progress:
+            self._schedule_initial_state_load_worker_start()
+
+    def _schedule_initial_state_load_worker_start(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("_initial_state_load_start_scheduled", False):
+            self._initial_state_load_pending = True
+            return
+        self._initial_state_load_start_scheduled = True
+        QTimer.singleShot(0, self._run_scheduled_initial_state_load_worker_start)
+
+    def _run_scheduled_initial_state_load_worker_start(self) -> None:
+        self._initial_state_load_start_scheduled = False
+        pending = bool(self.__dict__.get("_initial_state_load_pending", False))
+        force = bool(self.__dict__.get("_initial_state_load_pending_force", False))
+        self._initial_state_load_pending = False
+        self._initial_state_load_pending_force = False
+        if self.__dict__.get("_cleanup_in_progress", False) or not pending:
+            return
+        self._request_initial_state_load(force=force)
 
     def _request_appearance_save(self, action: str, value=None, **context_extra) -> None:
         payload = {
@@ -1455,6 +1488,9 @@ class AppearancePage(BasePage):
 
         self._appearance_save_pending.clear()
         self._appearance_save_start_scheduled = False
+        self._initial_state_load_pending = False
+        self._initial_state_load_pending_force = False
+        self._initial_state_load_start_scheduled = False
         self._windows_accent_load_pending = False
         self._windows_accent_load_start_scheduled = False
         self._rkn_background_options_start_scheduled = False
