@@ -354,6 +354,27 @@ class HostsPageRuntimeTests(unittest.TestCase):
             update_status=True,
         )
 
+    def test_hosts_state_result_ignored_when_new_state_load_is_pending(self) -> None:
+        from hosts.ui.page import HostsPage
+
+        page = HostsPage.__new__(HostsPage)
+        page._cleanup_in_progress = False
+        page._state_load_runtime = Mock()
+        page._state_load_runtime.is_current.return_value = True
+        page._state_load_pending = {"show_access_errors": False, "update_status": True}
+        page._state_load_request_context = {"show_access_errors": True, "update_status": True}
+        page._runtime_cache = SimpleNamespace(runtime_state="old", active_domains={"old.example"})
+        page._apply_hosts_access_state = Mock()
+        page._apply_hosts_runtime_state_to_ui = Mock()
+        runtime_state = SimpleNamespace(active_domains={"new.example"})
+
+        HostsPage._on_hosts_state_loaded(page, 7, runtime_state)
+
+        self.assertEqual(page._runtime_cache.runtime_state, "old")
+        self.assertEqual(page._runtime_cache.active_domains, {"old.example"})
+        page._apply_hosts_access_state.assert_not_called()
+        page._apply_hosts_runtime_state_to_ui.assert_not_called()
+
     def test_hosts_state_request_waits_while_restart_is_scheduled(self) -> None:
         from hosts.ui.page import HostsPage
 

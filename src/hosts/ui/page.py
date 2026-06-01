@@ -1183,6 +1183,9 @@ class HostsPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
+        pending = dict(self.__dict__.get("_state_load_pending") or {})
+        if bool(pending.get("show_access_errors")) or bool(pending.get("update_status")):
+            return
         self._runtime_cache.runtime_state = runtime_state
         self._runtime_cache.active_domains = set(getattr(runtime_state, "active_domains", frozenset()) or frozenset())
         context = dict(self._state_load_request_context or {})
