@@ -820,6 +820,9 @@ class PresetSetupPageBase(BasePage):
     def _on_profile_context_action_finished(self, request_id: int, action: str, profile_key: str, result) -> None:
         if request_id != int(getattr(self, "_profile_context_action_request_id", 0) or 0):
             return
+        if self._has_pending_profile_preset_write_operation():
+            self.__dict__.get("_profile_context_action_enabled_by_request", {}).pop(request_id, None)
+            return
         if action == "set_enabled":
             target_key = _profile_context_action_result_key(result) or str(profile_key or "").strip()
             target_item = _profile_context_action_result_item(result)
