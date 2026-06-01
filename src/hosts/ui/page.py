@@ -284,6 +284,8 @@ class HostsPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
+        if self.__dict__.get("_selection_load_pending", False):
+            return
         log(f"Hosts: ошибка загрузки выбора профилей: {error}", "ERROR")
         show_access_errors = bool(self._selection_load_show_access_errors)
         self._selection_load_show_access_errors = False
@@ -987,12 +989,16 @@ class HostsPage(BasePage):
     def _on_open_hosts_file_finished(self, request_id: int, result) -> None:
         if not self._open_file_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
             return
+        if self.__dict__.get("_open_file_pending", False):
+            return
         if result.success:
             return
         self._show_open_hosts_file_error(str(getattr(result, "message", "") or getattr(result, "error", "")))
 
     def _on_open_hosts_file_failed(self, request_id: int, error: str) -> None:
         if not self._open_file_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
+            return
+        if self.__dict__.get("_open_file_pending", False):
             return
         self._show_open_hosts_file_error(str(error))
 

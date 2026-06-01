@@ -203,6 +203,24 @@ class HostsPageRuntimeTests(unittest.TestCase):
         self.assertTrue(page._selection_load_show_access_errors)
         page._finish_runtime_init_after_selection.assert_not_called()
 
+    def test_user_selection_load_error_ignored_when_new_load_is_pending(self) -> None:
+        from hosts.ui.page import HostsPage
+
+        page = HostsPage.__new__(HostsPage)
+        page._cleanup_in_progress = False
+        page._selection_load_runtime = Mock()
+        page._selection_load_runtime.is_current.return_value = True
+        page._selection_load_pending = True
+        page._selection_load_show_access_errors = True
+        page._service_dns_selection = {"service": "old"}
+        page._finish_runtime_init_after_selection = Mock()
+
+        HostsPage._on_user_selection_load_failed(page, 8, "stale error")
+
+        self.assertEqual(page._service_dns_selection, {"service": "old"})
+        self.assertTrue(page._selection_load_show_access_errors)
+        page._finish_runtime_init_after_selection.assert_not_called()
+
     def test_catalog_refresh_pending_restarts_after_event_loop_turn(self) -> None:
         import hosts.ui.page as hosts_page
         from hosts.ui.page import HostsPage
@@ -338,6 +356,35 @@ class HostsPageRuntimeTests(unittest.TestCase):
         single_shot.call_args.args[1]()
 
         page._request_open_hosts_file.assert_called_once_with()
+
+    def test_open_hosts_file_result_ignored_when_new_open_is_pending(self) -> None:
+        from hosts.ui.page import HostsPage
+
+        page = HostsPage.__new__(HostsPage)
+        page._cleanup_in_progress = False
+        page._open_file_pending = True
+        page._open_file_runtime = Mock()
+        page._open_file_runtime.is_current.return_value = True
+        page._show_open_hosts_file_error = Mock()
+        result = SimpleNamespace(success=False, message="stale error", error="")
+
+        HostsPage._on_open_hosts_file_finished(page, 5, result)
+
+        page._show_open_hosts_file_error.assert_not_called()
+
+    def test_open_hosts_file_failure_ignored_when_new_open_is_pending(self) -> None:
+        from hosts.ui.page import HostsPage
+
+        page = HostsPage.__new__(HostsPage)
+        page._cleanup_in_progress = False
+        page._open_file_pending = True
+        page._open_file_runtime = Mock()
+        page._open_file_runtime.is_current.return_value = True
+        page._show_open_hosts_file_error = Mock()
+
+        HostsPage._on_open_hosts_file_failed(page, 5, "stale error")
+
+        page._show_open_hosts_file_error.assert_not_called()
 
     def test_restore_permissions_pending_restarts_after_event_loop_turn(self) -> None:
         import hosts.ui.page as hosts_page
