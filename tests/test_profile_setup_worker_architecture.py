@@ -313,6 +313,47 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
             ],
         )
 
+    def test_profile_context_action_waits_while_next_write_start_is_scheduled(self) -> None:
+        from profile.ui.preset_setup_page import PresetSetupPageBase
+
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._profile_preset_write_operation_start_scheduled = True
+        page._profile_context_action_runtime = SimpleNamespace(
+            is_running=Mock(return_value=False),
+            start_qthread_worker=Mock(),
+        )
+        page._profile_move_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+        page._user_profile_create_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+        page._user_profile_update_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+        page._user_profile_delete_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+        page._pending_profile_preset_write_operations = []
+        page._pending_profile_context_actions = []
+        page._pending_profile_moves = []
+        page._pending_user_profile_operations = []
+
+        PresetSetupPageBase._request_profile_context_action(
+            page,
+            "enable",
+            "profile-1",
+            enabled=True,
+        )
+
+        page._profile_context_action_runtime.start_qthread_worker.assert_not_called()
+        self.assertEqual(
+            page._pending_profile_preset_write_operations,
+            [
+                {
+                    "kind": "context",
+                    "action": "enable",
+                    "profile_key": "profile-1",
+                    "enabled": True,
+                    "source_profile_key": "",
+                    "destination_profile_key": "",
+                    "destination_group_key": "",
+                }
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

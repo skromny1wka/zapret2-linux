@@ -530,6 +530,8 @@ class PresetSetupPageBase(BasePage):
         self._start_profile_context_action_worker(str(action or ""), profile_key, enabled=enabled)
 
     def _profile_preset_write_operation_running(self) -> bool:
+        if self.__dict__.get("_profile_preset_write_operation_start_scheduled", False):
+            return True
         return (
             self._worker_runtime("_profile_context_action_runtime").is_running()
             or self._worker_runtime("_profile_move_runtime").is_running()
