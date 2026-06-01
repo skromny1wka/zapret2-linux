@@ -2582,6 +2582,8 @@ class ProfileSetupPageBase(BasePage):
     def _on_list_file_save_finished(self, request_id: int, state, payload=None) -> None:
         if request_id != self._list_file_save_request_id:
             return
+        if self.__dict__.get("_pending_list_file_save"):
+            return
         if state is not None:
             self._apply_list_file_editor_state(state)
         if self._list_file_status_label is not None:
