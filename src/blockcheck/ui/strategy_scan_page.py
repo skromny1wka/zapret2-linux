@@ -107,6 +107,8 @@ class StrategyScanPage(BasePage):
         self._cleanup_in_progress = False
         self._strategy_scan_run_runtime = OneShotWorkerRuntime()
         self._strategy_apply_runtime = OneShotWorkerRuntime()
+        self._strategy_apply_pending = None
+        self._strategy_apply_start_scheduled = False
         self._support_prepare_runtime = OneShotWorkerRuntime()
         self._support_prepare_pending = None
         self._support_prepare_start_scheduled = False
@@ -769,14 +771,24 @@ class StrategyScanPage(BasePage):
         )
 
     def _request_strategy_apply(self, strategy_args: str, strategy_name: str) -> None:
-        if self._strategy_apply_runtime.is_running():
+        payload = {
+            "strategy_args": str(strategy_args or ""),
+            "strategy_name": str(strategy_name or ""),
+        }
+        if (
+            self._strategy_apply_runtime.is_running()
+            or self.__dict__.get("_strategy_apply_start_scheduled", False)
+        ):
+            self._strategy_apply_pending = dict(payload)
             return
+        self._start_strategy_apply_worker(payload)
 
+    def _start_strategy_apply_worker(self, payload: dict) -> None:
         def worker_factory(request_id: int):
             return self.create_strategy_apply_worker(
                 request_id,
-                strategy_args=strategy_args,
-                strategy_name=strategy_name,
+                strategy_args=str(payload.get("strategy_args") or ""),
+                strategy_name=str(payload.get("strategy_name") or ""),
             )
 
         def bind_worker(worker) -> None:
@@ -786,6 +798,7 @@ class StrategyScanPage(BasePage):
         self._strategy_apply_runtime.start_qthread_worker(
             worker_factory=worker_factory,
             bind_worker=bind_worker,
+            on_finished=self._on_strategy_apply_runtime_finished,
         )
 
     def _on_strategy_apply_finished(self, request_id: int, result) -> None:
@@ -818,6 +831,28 @@ class StrategyScanPage(BasePage):
             )
         except Exception:
             pass
+
+    def _on_strategy_apply_runtime_finished(self, _worker) -> None:
+        pending = self.__dict__.get("_strategy_apply_pending")
+        if pending is not None and not self._cleanup_in_progress:
+            self._schedule_strategy_apply_worker_start(dict(pending or {}))
+
+    def _schedule_strategy_apply_worker_start(self, payload: dict) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._strategy_apply_pending = dict(payload or {})
+        if self.__dict__.get("_strategy_apply_start_scheduled", False):
+            return
+        self._strategy_apply_start_scheduled = True
+        QTimer.singleShot(0, self._run_scheduled_strategy_apply_worker_start)
+
+    def _run_scheduled_strategy_apply_worker_start(self) -> None:
+        self._strategy_apply_start_scheduled = False
+        pending = self.__dict__.get("_strategy_apply_pending")
+        self._strategy_apply_pending = None
+        if pending is None or self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._start_strategy_apply_worker(dict(pending or {}))
 
     # ------------------------------------------------------------------
     # UI helpers
@@ -1006,6 +1041,8 @@ class StrategyScanPage(BasePage):
             warning_prefix="strategy scan apply worker",
         )
         self._strategy_apply_runtime.cancel()
+        self._strategy_apply_pending = None
+        self._strategy_apply_start_scheduled = False
         self._support_prepare_runtime.stop(
             blocking=False,
             warning_prefix="strategy scan support prepare worker",
