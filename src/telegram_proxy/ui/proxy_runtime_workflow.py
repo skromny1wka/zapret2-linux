@@ -49,6 +49,7 @@ def restart_proxy_if_running(
     set_restarting,
     status_label,
     create_stop_runtime_worker,
+    on_finished=None,
 ) -> None:
     plan = telegram_proxy_page_runtime.build_restart_plan(
         running=bool(manager.is_running),
@@ -70,6 +71,7 @@ def restart_proxy_if_running(
             "_finish_restart",
             QtNS.ConnectionType.QueuedConnection,
         ),
+        on_finished=on_finished,
         signal_includes_request_id=False,
         loaded_signal_name="stopped",
     )

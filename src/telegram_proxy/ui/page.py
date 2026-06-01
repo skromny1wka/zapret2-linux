@@ -122,6 +122,8 @@ class TelegramProxyPage(BasePage):
         self._proxy_start_runtime = OneShotWorkerRuntime()
         self._proxy_stop_runtime = OneShotWorkerRuntime()
         self._restart_stop_runtime = OneShotWorkerRuntime()
+        self._restart_stop_pending = False
+        self._restart_stop_start_scheduled = False
         self._relay_check_runtime = OneShotWorkerRuntime()
         self._relay_check_pending = False
         self._relay_check_start_scheduled = False
@@ -864,6 +866,14 @@ class TelegramProxyPage(BasePage):
         )
 
     def _restart_if_running(self):
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if (
+            self._restart_stop_runtime.is_running()
+            or self.__dict__.get("_restart_stop_start_scheduled", False)
+        ):
+            self._restart_stop_pending = True
+            return
         mgr = self._proxy_manager()
         restart_proxy_if_running(
             page=self,
@@ -872,6 +882,7 @@ class TelegramProxyPage(BasePage):
             set_restarting=lambda value: setattr(self, "_restarting", value),
             status_label=self._status_label,
             create_stop_runtime_worker=self._telegram_proxy.create_stop_runtime_worker,
+            on_finished=self._on_restart_stop_worker_finished,
         )
 
     @pyqtSlot()
@@ -882,6 +893,30 @@ class TelegramProxyPage(BasePage):
             return
         self._restarting = False
         self._start_proxy()
+
+    def _on_restart_stop_worker_finished(self, _worker) -> None:
+        if self.__dict__.get("_restart_stop_pending", False) and not self.__dict__.get(
+            "_cleanup_in_progress",
+            False,
+        ):
+            self._schedule_restart_stop_worker_start()
+
+    def _schedule_restart_stop_worker_start(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("_restart_stop_start_scheduled", False):
+            self._restart_stop_pending = True
+            return
+        self._restart_stop_start_scheduled = True
+        QTimer.singleShot(0, self._run_scheduled_restart_stop_worker_start)
+
+    def _run_scheduled_restart_stop_worker_start(self) -> None:
+        self._restart_stop_start_scheduled = False
+        pending = bool(self.__dict__.get("_restart_stop_pending", False))
+        self._restart_stop_pending = False
+        if not pending or self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._restart_if_running()
 
     def _schedule_upstream_restart(self):
         """Debounced proxy restart for SpinBox valueChanged signals."""
@@ -1567,6 +1602,8 @@ class TelegramProxyPage(BasePage):
             warning_prefix="telegram proxy restart stop worker",
         )
         self._restart_stop_runtime.cancel()
+        self._restart_stop_pending = False
+        self._restart_stop_start_scheduled = False
         self._relay_check_runtime.stop(
             blocking=False,
             log_fn=log,

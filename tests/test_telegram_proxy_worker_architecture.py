@@ -58,6 +58,10 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
             inspect.signature(proxy_runtime_workflow.restart_proxy_if_running).parameters,
         )
         self.assertIn(
+            "on_finished",
+            inspect.signature(proxy_runtime_workflow.restart_proxy_if_running).parameters,
+        )
+        self.assertIn(
             "create_start_worker",
             inspect.signature(proxy_runtime_workflow.start_proxy_runtime).parameters,
         )
