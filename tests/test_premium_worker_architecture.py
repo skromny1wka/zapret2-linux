@@ -43,6 +43,19 @@ class PremiumWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("_check_device_activation", worker_source)
         self.assertNotIn("import donater.commands", worker_source)
 
+    def test_subscription_manager_uses_shared_worker_runtime(self) -> None:
+        manager_init_source = inspect.getsource(subscription_manager.SubscriptionManager.__init__)
+        manager_start_source = inspect.getsource(subscription_manager.SubscriptionManager.initialize_async)
+        manager_cleanup_source = inspect.getsource(subscription_manager.SubscriptionManager.cleanup)
+
+        self.assertIn("_subscription_runtime = OneShotWorkerRuntime()", manager_init_source)
+        self.assertIn("_subscription_runtime.start_qobject_worker", manager_start_source)
+        self.assertIn("bind_worker=", manager_start_source)
+        self.assertIn("_subscription_runtime.stop", manager_cleanup_source)
+        self.assertNotIn("QThread(", manager_start_source)
+        self.assertNotIn("moveToThread", manager_start_source)
+        self.assertNotIn("self._subscription_thread.start()", manager_start_source)
+
     def test_premium_page_action_tasks_use_shared_worker_runtime(self) -> None:
         page_init_source = inspect.getsource(PremiumPage.__init__)
         start_source = inspect.getsource(PremiumPage._start_worker_thread)

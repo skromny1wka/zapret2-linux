@@ -1,7 +1,6 @@
 from collections.abc import Callable
-from typing import Optional
 
-from PyQt6.QtCore import QThread, QObject
+from PyQt6.QtCore import QObject
 from donater.state import premium_state_from_activation_info
 from donater.subscription_ui import (
     apply_subscription_progress_to_ui,
@@ -13,6 +12,7 @@ from donater.subscription_ui import (
 )
 from donater.subscription_worker import SubscriptionInitWorker
 from log.log import log
+from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 
 
 
@@ -31,66 +31,45 @@ class SubscriptionManager:
         self.ui_actions = ui_actions
         self._get_premium_checker = get_premium_checker
         self._check_device_activation = check_device_activation
-        self._subscription_thread: Optional[QThread] = None
-        self._subscription_worker: Optional[QObject] = None
+        self._subscription_runtime = OneShotWorkerRuntime()
+        self._subscription_worker: QObject | None = None
         self._cleanup_in_progress = False
-
-    @staticmethod
-    def _shutdown_thread(thread: Optional[QThread], *, wait_timeout_ms: int = 2000) -> Optional[QThread]:
-        if thread is None:
-            return None
-        try:
-            if thread.isRunning():
-                thread.quit()
-                if not thread.wait(wait_timeout_ms):
-                    log("⚠ Поток подписки не завершился, принудительно завершаем", "WARNING")
-                    thread.terminate()
-                    thread.wait(500)
-        except RuntimeError:
-            return None
-        except Exception as e:
-            log(f"Ошибка остановки потока подписки: {e}", "DEBUG")
-        return None
 
     def initialize_async(self):
         """Асинхронно запускает первичную проверку подписки."""
         self._cleanup_in_progress = False
-        if self._subscription_thread is not None:
-            try:
-                if self._subscription_thread.isRunning():
-                    log("Инициализация подписки уже выполняется, повторный запуск пропущен", "DEBUG")
-                    return
-            except RuntimeError:
-                self._subscription_thread = None
-                self._subscription_worker = None
+        if self._subscription_runtime.is_running():
+            log("Инициализация подписки уже выполняется, повторный запуск пропущен", "DEBUG")
+            return
 
         apply_subscription_starting_to_ui(set_status=self.ui_actions.set_status)
 
-        self._subscription_thread = QThread(self.thread_parent)
-        self._subscription_worker = SubscriptionInitWorker(
-            get_premium_checker=self._get_premium_checker,
-            check_device_activation=self._check_device_activation,
-        )
-        self._subscription_worker.moveToThread(self._subscription_thread)
-
-        def _cleanup_subscription_objects():
-            self._subscription_worker = None
-            self._subscription_thread = None
-
-        self._subscription_thread.started.connect(self._subscription_worker.run)
-        self._subscription_worker.progress.connect(
-            lambda message, actions=self.ui_actions: apply_subscription_progress_to_ui(
-                set_status=actions.set_status,
-                message=message,
+        def _create_worker(_request_id: int):
+            return SubscriptionInitWorker(
+                get_premium_checker=self._get_premium_checker,
+                check_device_activation=self._check_device_activation,
             )
-        )
-        self._subscription_worker.finished.connect(self._on_subscription_ready)
-        self._subscription_worker.finished.connect(self._subscription_thread.quit)
-        self._subscription_worker.finished.connect(self._subscription_worker.deleteLater)
-        self._subscription_thread.finished.connect(self._subscription_thread.deleteLater)
-        self._subscription_thread.finished.connect(_cleanup_subscription_objects)
 
-        self._subscription_thread.start()
+        def _bind_worker(worker: QObject) -> None:
+            self._subscription_worker = worker
+            worker.progress.connect(
+                lambda message, actions=self.ui_actions: apply_subscription_progress_to_ui(
+                    set_status=actions.set_status,
+                    message=message,
+                )
+            )
+            worker.finished.connect(self._on_subscription_ready)
+
+        def _cleanup_subscription_objects(request_id: int, _thread) -> None:
+            if self._subscription_runtime.is_current(request_id):
+                self._subscription_worker = None
+
+        self._subscription_runtime.start_qobject_worker(
+            parent=self.thread_parent,
+            worker_factory=_create_worker,
+            bind_worker=_bind_worker,
+            on_finished=_cleanup_subscription_objects,
+        )
 
     def _on_subscription_ready(self, activation_info, success):
         """Обрабатывает результат фоновой проверки подписки."""
@@ -134,5 +113,10 @@ class SubscriptionManager:
     def cleanup(self) -> None:
         """Останавливает фоновые потоки менеджера подписки при закрытии приложения."""
         self._cleanup_in_progress = True
-        self._subscription_thread = self._shutdown_thread(self._subscription_thread)
+        self._subscription_runtime.stop(
+            blocking=True,
+            log_fn=log,
+            warning_prefix="Поток подписки",
+        )
+        self._subscription_runtime.cancel()
         self._subscription_worker = None
