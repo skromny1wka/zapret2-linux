@@ -1332,6 +1332,8 @@ class PresetSetupPageBase(BasePage):
     ) -> None:
         if request_id != int(getattr(self, "_profile_move_request_id", 0) or 0):
             return
+        if self._has_pending_profile_preset_write_operation():
+            return
         if result and self._apply_profile_move_locally(
             action,
             source_profile_key,

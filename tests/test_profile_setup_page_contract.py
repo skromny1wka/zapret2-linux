@@ -1841,6 +1841,48 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         )
         self.assertEqual(moved, [(9, "before", "profile-1", "profile-2", "youtube", "profile-1")])
 
+    def test_profile_move_result_ignored_when_new_action_is_pending(self) -> None:
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._profile_move_request_id = 4
+        page._profile_payload_dirty = False
+        page._pending_profile_preset_write_operations = [
+            {
+                "kind": "move",
+                "action": "after",
+                "profile_key": "profile-1",
+                "enabled": None,
+                "source_profile_key": "profile-1",
+                "destination_profile_key": "profile-3",
+                "destination_group_key": "youtube",
+            }
+        ]
+        page._pending_profile_context_actions = []
+        page._pending_profile_moves = [
+            {
+                "action": "after",
+                "source_profile_key": "profile-1",
+                "destination_profile_key": "profile-3",
+                "destination_group_key": "youtube",
+            }
+        ]
+        page._pending_user_profile_operations = []
+        page._apply_profile_move_locally = Mock(return_value=True)
+        page.refresh_from_preset_switch = Mock()
+
+        PresetSetupPageBase._on_profile_move_finished(
+            page,
+            4,
+            "before",
+            "profile-1",
+            "profile-2",
+            "youtube",
+            True,
+        )
+
+        page._apply_profile_move_locally.assert_not_called()
+        page.refresh_from_preset_switch.assert_not_called()
+        self.assertFalse(page._profile_payload_dirty)
+
     def test_profile_context_actions_refresh_current_list_through_worker(self) -> None:
         enable_handler = inspect.getsource(PresetSetupPageBase._set_profile_enabled_from_menu)
         duplicate_handler = inspect.getsource(PresetSetupPageBase._duplicate_profile_from_menu)
