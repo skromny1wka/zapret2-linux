@@ -139,6 +139,8 @@ class TelegramProxyPage(BasePage):
         self._log_line_pending: list[str] = []
         self._log_line_start_scheduled = False
         self._auto_deeplink_runtime = OneShotWorkerRuntime()
+        self._auto_deeplink_pending = False
+        self._auto_deeplink_start_scheduled = False
         self._settings_save_pending: list[dict[str, object]] = []
         self._settings_save_start_scheduled = False
         self._settings_save_restart_pending = ""
@@ -600,9 +602,16 @@ class TelegramProxyPage(BasePage):
         return self._telegram_proxy.create_auto_deeplink_worker(request_id, parent=self)
 
     def _request_auto_deeplink_check(self) -> None:
-        if self._auto_deeplink_runtime.is_running():
+        if (
+            self._auto_deeplink_runtime.is_running()
+            or self.__dict__.get("_auto_deeplink_start_scheduled", False)
+        ):
+            self._auto_deeplink_pending = True
             return
+        self._start_auto_deeplink_worker()
 
+    def _start_auto_deeplink_worker(self) -> None:
+        self._auto_deeplink_pending = False
         def bind_worker(worker) -> None:
             worker.completed.connect(self._on_auto_deeplink_checked)
             worker.failed.connect(self._on_auto_deeplink_failed)
@@ -610,6 +619,7 @@ class TelegramProxyPage(BasePage):
         self._auto_deeplink_runtime.start_qthread_worker(
             worker_factory=self.create_auto_deeplink_worker,
             bind_worker=bind_worker,
+            on_finished=self._on_auto_deeplink_worker_finished,
         )
 
     def _on_auto_deeplink_checked(self, request_id: int, should_open: bool) -> None:
@@ -630,6 +640,30 @@ class TelegramProxyPage(BasePage):
         ):
             return
         log(f"Telegram Proxy auto deeplink check failed: {error}", "WARNING")
+
+    def _on_auto_deeplink_worker_finished(self, _worker) -> None:
+        if self.__dict__.get("_auto_deeplink_pending", False) and not self.__dict__.get(
+            "_cleanup_in_progress",
+            False,
+        ):
+            self._schedule_auto_deeplink_worker_start()
+
+    def _schedule_auto_deeplink_worker_start(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("_auto_deeplink_start_scheduled", False):
+            self._auto_deeplink_pending = True
+            return
+        self._auto_deeplink_start_scheduled = True
+        QTimer.singleShot(0, self._run_scheduled_auto_deeplink_worker_start)
+
+    def _run_scheduled_auto_deeplink_worker_start(self) -> None:
+        self._auto_deeplink_start_scheduled = False
+        pending = bool(self.__dict__.get("_auto_deeplink_pending", False))
+        self._auto_deeplink_pending = False
+        if not pending or self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._start_auto_deeplink_worker()
 
     # -- Log display (throttled via QTimer, no trimming) --
 
@@ -1487,6 +1521,8 @@ class TelegramProxyPage(BasePage):
             warning_prefix="telegram proxy auto deeplink worker",
         )
         self._auto_deeplink_runtime.cancel()
+        self._auto_deeplink_pending = False
+        self._auto_deeplink_start_scheduled = False
         self._log_line_runtime.stop(
             blocking=False,
             log_fn=log,

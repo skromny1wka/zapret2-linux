@@ -117,6 +117,57 @@ class TelegramProxyWorkerQueueTests(unittest.TestCase):
         page._start_ensure_hosts_worker.assert_called_once_with()
         self.assertFalse(page._ensure_hosts_pending)
 
+    def test_auto_deeplink_request_queues_while_worker_runs(self) -> None:
+        page = TelegramProxyPage.__new__(TelegramProxyPage)
+        page._auto_deeplink_runtime = SimpleNamespace(is_running=Mock(return_value=True), start_qthread_worker=Mock())
+        page._auto_deeplink_pending = False
+        page._auto_deeplink_start_scheduled = False
+
+        TelegramProxyPage._request_auto_deeplink_check(page)
+
+        page._auto_deeplink_runtime.start_qthread_worker.assert_not_called()
+        self.assertTrue(page._auto_deeplink_pending)
+
+    def test_auto_deeplink_pending_restarts_after_event_loop_turn(self) -> None:
+        page = TelegramProxyPage.__new__(TelegramProxyPage)
+        page._cleanup_in_progress = False
+        page._auto_deeplink_pending = True
+        page._auto_deeplink_start_scheduled = False
+        page._start_auto_deeplink_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(telegram_proxy_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            TelegramProxyPage._on_auto_deeplink_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._start_auto_deeplink_worker.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._start_auto_deeplink_worker.assert_called_once_with()
+        self.assertFalse(page._auto_deeplink_pending)
+
+    def test_scheduled_auto_deeplink_start_coalesces_duplicate_request(self) -> None:
+        page = TelegramProxyPage.__new__(TelegramProxyPage)
+        page._cleanup_in_progress = False
+        page._auto_deeplink_start_scheduled = False
+        page._auto_deeplink_pending = False
+        page._start_auto_deeplink_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(telegram_proxy_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            TelegramProxyPage._schedule_auto_deeplink_worker_start(page)
+            TelegramProxyPage._schedule_auto_deeplink_worker_start(page)
+
+        single_shot.assert_called_once()
+        self.assertTrue(page._auto_deeplink_pending)
+
+        single_shot.call_args.args[1]()
+
+        page._start_auto_deeplink_worker.assert_called_once_with()
+        self.assertFalse(page._auto_deeplink_pending)
+
 
 if __name__ == "__main__":
     unittest.main()
