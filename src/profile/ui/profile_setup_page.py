@@ -3072,6 +3072,8 @@ class ProfileSetupPageBase(BasePage):
     def _on_enabled_save_finished(self, request_id: int, profile_key: str, enabled: bool, payload=None) -> None:
         if request_id != self._enabled_save_request_id:
             return
+        if self.__dict__.get("_pending_enabled_save") is not None:
+            return
         old_key = str(self._profile_key or "").strip()
         new_key = str(profile_key or "").strip()
         if payload is not None:

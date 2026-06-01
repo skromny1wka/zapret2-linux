@@ -3508,6 +3508,25 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._apply_payload.assert_called_once_with(payload)
         page._on_profile_changed_callback.assert_called_once_with("profile-2", "enabled", item)
 
+    def test_enabled_save_finish_ignores_result_when_new_toggle_is_pending(self) -> None:
+        item = SimpleNamespace(key="profile-2")
+        payload = SimpleNamespace(item=item)
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._enabled_save_request_id = 9
+        page._profile_key = "profile-1"
+        page._pending_enabled_save = False
+        page._payload = None
+        page._schedule_profile_setup_payload_apply = Mock()
+        page.reload_current_profile = Mock()
+        page._on_profile_changed_callback = Mock()
+
+        ProfileSetupPageBase._on_enabled_save_finished(page, 9, "profile-2", True, payload)
+
+        self.assertEqual(page._profile_key, "profile-1")
+        page.reload_current_profile.assert_not_called()
+        page._schedule_profile_setup_payload_apply.assert_not_called()
+        page._on_profile_changed_callback.assert_not_called()
+
     def test_enabled_save_finish_skips_duplicate_payload(self) -> None:
         item = SimpleNamespace(key="profile-1")
         payload = SimpleNamespace(item=item)
