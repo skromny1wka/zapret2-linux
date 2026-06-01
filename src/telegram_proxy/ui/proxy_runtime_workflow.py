@@ -90,6 +90,7 @@ def start_proxy_runtime(
     status_label,
     append_log_line,
     create_start_worker,
+    on_finished=None,
 ) -> None:
     plan = telegram_proxy_page_runtime.build_start_plan(
         starting=bool(starting),
@@ -120,6 +121,7 @@ def start_proxy_runtime(
             parent=page,
         ),
         on_loaded=lambda _request_id, ok: _finish_proxy_start_worker(page, ok),
+        on_finished=on_finished,
         signal_includes_request_id=False,
         loaded_signal_name="completed",
     )
@@ -237,7 +239,7 @@ def apply_relay_result(
         )
 
 
-def stop_proxy_runtime(*, page, manager, create_stop_runtime_worker) -> None:
+def stop_proxy_runtime(*, page, manager, create_stop_runtime_worker, on_finished=None) -> None:
     runtime = _page_runtime(page, "_proxy_stop_runtime")
     if runtime.is_running():
         return
@@ -253,6 +255,7 @@ def stop_proxy_runtime(*, page, manager, create_stop_runtime_worker) -> None:
             "_finish_stop_proxy",
             QtNS.ConnectionType.QueuedConnection,
         ),
+        on_finished=on_finished,
         signal_includes_request_id=False,
         loaded_signal_name="stopped",
     )

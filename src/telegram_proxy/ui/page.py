@@ -120,7 +120,11 @@ class TelegramProxyPage(BasePage):
         self._upstream_restart_timer = None
         self._diag_runtime = OneShotWorkerRuntime()
         self._proxy_start_runtime = OneShotWorkerRuntime()
+        self._proxy_start_pending = False
+        self._proxy_start_start_scheduled = False
         self._proxy_stop_runtime = OneShotWorkerRuntime()
+        self._proxy_stop_pending = False
+        self._proxy_stop_start_scheduled = False
         self._restart_stop_runtime = OneShotWorkerRuntime()
         self._restart_stop_pending = False
         self._restart_stop_start_scheduled = False
@@ -1043,6 +1047,24 @@ class TelegramProxyPage(BasePage):
 
     @pyqtSlot()
     def _start_proxy(self):
+        self._request_proxy_start()
+
+    def _request_proxy_start(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        runtime = self.__dict__.get("_proxy_start_runtime")
+        if (
+            (runtime is not None and runtime.is_running())
+            or self.__dict__.get("_proxy_start_start_scheduled", False)
+        ):
+            self._proxy_start_pending = True
+            return
+        self._start_proxy_worker()
+
+    def _start_proxy_worker(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._proxy_start_pending = False
         mgr = self._proxy_manager()
         start_proxy_runtime(
             page=self,
@@ -1056,6 +1078,7 @@ class TelegramProxyPage(BasePage):
             status_label=self._status_label,
             append_log_line=self._append_log_line,
             create_start_worker=self._telegram_proxy.create_start_worker,
+            on_finished=self._on_proxy_start_worker_finished,
         )
 
     @pyqtSlot()
@@ -1073,6 +1096,33 @@ class TelegramProxyPage(BasePage):
                 enabled=bool(value),
             ),
         )
+
+    def _on_proxy_start_worker_finished(self, _worker) -> None:
+        if self.__dict__.get("_proxy_start_pending", False) and not self.__dict__.get(
+            "_cleanup_in_progress",
+            False,
+        ):
+            self._schedule_proxy_start_worker_start()
+
+    def _schedule_proxy_start_worker_start(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("_proxy_start_start_scheduled", False):
+            self._proxy_start_pending = True
+            return
+        self._proxy_start_start_scheduled = True
+        try:
+            QTimer.singleShot(0, self._run_scheduled_proxy_start_worker_start)
+        except Exception:
+            self._run_scheduled_proxy_start_worker_start()
+
+    def _run_scheduled_proxy_start_worker_start(self) -> None:
+        self._proxy_start_start_scheduled = False
+        pending = bool(self.__dict__.get("_proxy_start_pending", False))
+        self._proxy_start_pending = False
+        if not pending or self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._start_proxy_worker()
 
     def _check_relay_after_start(self):
         if self._cleanup_in_progress:
@@ -1137,11 +1187,32 @@ class TelegramProxyPage(BasePage):
         )
 
     def _stop_proxy(self):
+        self._request_proxy_stop()
+
+    def _request_proxy_stop(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        runtime = self.__dict__.get("_proxy_stop_runtime")
+        if (
+            (runtime is not None and runtime.is_running())
+            or self.__dict__.get("_proxy_stop_start_scheduled", False)
+        ):
+            self._proxy_stop_pending = True
+            return
+        self._start_proxy_stop_worker()
+
+    def _start_proxy_stop_worker(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._proxy_stop_pending = False
         mgr = self._proxy_manager()
+        if not bool(getattr(mgr, "is_running", False)):
+            return
         stop_proxy_runtime(
             page=self,
             manager=mgr,
             create_stop_runtime_worker=self._telegram_proxy.create_stop_runtime_worker,
+            on_finished=self._on_proxy_stop_worker_finished,
         )
 
     @pyqtSlot()
@@ -1149,6 +1220,33 @@ class TelegramProxyPage(BasePage):
         if self._cleanup_in_progress:
             return
         self._request_settings_save("proxy_enabled", enabled=False)
+
+    def _on_proxy_stop_worker_finished(self, _worker) -> None:
+        if self.__dict__.get("_proxy_stop_pending", False) and not self.__dict__.get(
+            "_cleanup_in_progress",
+            False,
+        ):
+            self._schedule_proxy_stop_worker_start()
+
+    def _schedule_proxy_stop_worker_start(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("_proxy_stop_start_scheduled", False):
+            self._proxy_stop_pending = True
+            return
+        self._proxy_stop_start_scheduled = True
+        try:
+            QTimer.singleShot(0, self._run_scheduled_proxy_stop_worker_start)
+        except Exception:
+            self._run_scheduled_proxy_stop_worker_start()
+
+    def _run_scheduled_proxy_stop_worker_start(self) -> None:
+        self._proxy_stop_start_scheduled = False
+        pending = bool(self.__dict__.get("_proxy_stop_pending", False))
+        self._proxy_stop_pending = False
+        if not pending or self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._start_proxy_stop_worker()
 
     def _on_status_changed(self, running: bool):
         mgr = self._proxy_manager()
@@ -1590,12 +1688,16 @@ class TelegramProxyPage(BasePage):
             warning_prefix="telegram proxy start worker",
         )
         self._proxy_start_runtime.cancel()
+        self._proxy_start_pending = False
+        self._proxy_start_start_scheduled = False
         self._proxy_stop_runtime.stop(
             blocking=False,
             log_fn=log,
             warning_prefix="telegram proxy stop worker",
         )
         self._proxy_stop_runtime.cancel()
+        self._proxy_stop_pending = False
+        self._proxy_stop_start_scheduled = False
         self._restart_stop_runtime.stop(
             blocking=False,
             log_fn=log,

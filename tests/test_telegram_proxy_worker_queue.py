@@ -200,6 +200,72 @@ class TelegramProxyWorkerQueueTests(unittest.TestCase):
         page._restart_if_running.assert_called_once_with()
         self.assertFalse(page._restart_stop_pending)
 
+    def test_proxy_start_request_queues_while_start_worker_runs(self) -> None:
+        page = TelegramProxyPage.__new__(TelegramProxyPage)
+        page._cleanup_in_progress = False
+        page._proxy_start_pending = False
+        page._proxy_start_start_scheduled = False
+        page._proxy_start_runtime = SimpleNamespace(is_running=Mock(return_value=True))
+        page._start_proxy_worker = Mock()
+
+        TelegramProxyPage._request_proxy_start(page)
+
+        page._start_proxy_worker.assert_not_called()
+        self.assertTrue(page._proxy_start_pending)
+
+    def test_proxy_start_pending_restarts_after_event_loop_turn(self) -> None:
+        page = TelegramProxyPage.__new__(TelegramProxyPage)
+        page._cleanup_in_progress = False
+        page._proxy_start_pending = True
+        page._proxy_start_start_scheduled = False
+        page._start_proxy_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(telegram_proxy_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            TelegramProxyPage._on_proxy_start_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._start_proxy_worker.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._start_proxy_worker.assert_called_once_with()
+        self.assertFalse(page._proxy_start_pending)
+
+    def test_proxy_stop_request_queues_while_stop_worker_runs(self) -> None:
+        page = TelegramProxyPage.__new__(TelegramProxyPage)
+        page._cleanup_in_progress = False
+        page._proxy_stop_pending = False
+        page._proxy_stop_start_scheduled = False
+        page._proxy_stop_runtime = SimpleNamespace(is_running=Mock(return_value=True))
+        page._start_proxy_stop_worker = Mock()
+
+        TelegramProxyPage._request_proxy_stop(page)
+
+        page._start_proxy_stop_worker.assert_not_called()
+        self.assertTrue(page._proxy_stop_pending)
+
+    def test_proxy_stop_pending_restarts_after_event_loop_turn(self) -> None:
+        page = TelegramProxyPage.__new__(TelegramProxyPage)
+        page._cleanup_in_progress = False
+        page._proxy_stop_pending = True
+        page._proxy_stop_start_scheduled = False
+        page._start_proxy_stop_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(telegram_proxy_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            TelegramProxyPage._on_proxy_stop_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._start_proxy_stop_worker.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._start_proxy_stop_worker.assert_called_once_with()
+        self.assertFalse(page._proxy_stop_pending)
+
 
 if __name__ == "__main__":
     unittest.main()
