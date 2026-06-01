@@ -335,6 +335,8 @@ class UpdatePageRuntime:
             return
         if self._auto_check_user_changed:
             return
+        if self.__dict__.get("_auto_check_load_pending", False):
+            return
         self._auto_check_enabled = bool(enabled)
         self._view.set_auto_check_toggle_checked(bool(enabled))
         idle_decision = self._resolve_idle_view_decision()

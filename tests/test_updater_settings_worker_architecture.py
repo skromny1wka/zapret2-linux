@@ -61,6 +61,23 @@ class UpdaterSettingsWorkerArchitectureTests(unittest.TestCase):
         runtime._request_auto_check_load.assert_called_once_with()
         self.assertFalse(runtime._auto_check_load_pending)
 
+    def test_auto_check_load_result_ignored_when_new_load_is_pending(self) -> None:
+        runtime = update_page_runtime.UpdatePageRuntime.__new__(update_page_runtime.UpdatePageRuntime)
+        runtime._cleanup_in_progress = False
+        runtime._auto_check_user_changed = False
+        runtime._auto_check_load_pending = True
+        runtime._auto_check_load_runtime = Mock()
+        runtime._auto_check_load_runtime.is_current.return_value = True
+        runtime._view = Mock()
+        runtime._resolve_idle_view_decision = Mock()
+        runtime.apply_idle_view_state = Mock()
+
+        update_page_runtime.UpdatePageRuntime._on_auto_check_load_finished(runtime, 12, True)
+
+        runtime._view.set_auto_check_toggle_checked.assert_not_called()
+        runtime._resolve_idle_view_decision.assert_not_called()
+        runtime.apply_idle_view_state.assert_not_called()
+
     def test_channel_open_worker_receives_feature_action_callable(self) -> None:
         feature_source = inspect.getsource(UpdaterFeature)
         worker_source = inspect.getsource(settings_workers.UpdaterChannelOpenWorker)
