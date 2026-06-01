@@ -1838,6 +1838,8 @@ class ProfileSetupPageBase(BasePage):
     ) -> None:
         if request_id != int(getattr(self, "_user_profile_update_request_id", 0) or 0):
             return
+        if self.__dict__.get("_pending_user_profile_operations") or self.__dict__.get("_pending_user_profile_updates"):
+            return
         if str(profile_id or "").strip() != self._current_user_profile_id():
             return
         InfoBar.success(
