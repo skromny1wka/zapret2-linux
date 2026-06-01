@@ -164,6 +164,8 @@ class HostsPage(BasePage):
         self._open_file_pending = False
         self._open_file_start_scheduled = False
         self._permission_restore_runtime = OneShotWorkerRuntime()
+        self._permission_restore_pending = False
+        self._permission_restore_start_scheduled = False
         self._applying = False
         self._cleanup_in_progress = False
         self._runtime_cache = create_runtime_cache()
@@ -620,8 +622,13 @@ class HostsPage(BasePage):
         return self._hosts.create_permission_restore_worker(request_id, self)
 
     def _request_restore_hosts_permissions(self) -> None:
-        if self._permission_restore_runtime.is_running():
+        if (
+            self._permission_restore_runtime.is_running()
+            or self.__dict__.get("_permission_restore_start_scheduled", False)
+        ):
+            self._permission_restore_pending = True
             return
+        self._permission_restore_pending = False
         self._permission_restore_runtime.start_qthread_worker(
             worker_factory=lambda request_id: self.create_permission_restore_worker(request_id),
             on_loaded=self._on_restore_hosts_permissions_finished,
@@ -655,7 +662,27 @@ class HostsPage(BasePage):
         self._show_error(str(error or ""))
 
     def _on_restore_hosts_permissions_worker_finished(self, _worker) -> None:
-        pass
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("_permission_restore_pending", False):
+            self._schedule_permission_restore_start()
+
+    def _schedule_permission_restore_start(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("_permission_restore_start_scheduled", False):
+            return
+        self._permission_restore_start_scheduled = True
+        QTimer.singleShot(0, self._run_scheduled_permission_restore_start)
+
+    def _run_scheduled_permission_restore_start(self) -> None:
+        self._permission_restore_start_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if not self.__dict__.get("_permission_restore_pending", False):
+            return
+        self._permission_restore_pending = False
+        self._request_restore_hosts_permissions()
 
     def _check_hosts_access(self):
         """Проверяет доступ к hosts файлу при загрузке страницы"""
@@ -1265,5 +1292,7 @@ class HostsPage(BasePage):
                 log_fn=log,
                 warning_prefix="Hosts permission restore worker",
             )
+            self._permission_restore_pending = False
+            self._permission_restore_start_scheduled = False
         except Exception as e:
             log(f"Ошибка при очистке hosts_page: {e}", "DEBUG")
