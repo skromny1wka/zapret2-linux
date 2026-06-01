@@ -445,6 +445,46 @@ class ProfileOrderPageTests(unittest.TestCase):
             ],
         )
 
+    def test_order_page_replaces_pending_move_for_same_profile(self) -> None:
+        from profile.ui.profile_order_page import ProfileOrderPageBase
+        from ui.one_shot_worker_runtime import OneShotWorkerRuntime
+
+        class _RunningWorker:
+            def isRunning(self) -> bool:
+                return True
+
+        page = ProfileOrderPageBase.__new__(ProfileOrderPageBase)
+        page._cleanup_in_progress = False
+        page._order_move_runtime = OneShotWorkerRuntime()
+        page._order_move_runtime.worker = _RunningWorker()
+        page._pending_profile_order_moves = []
+        page._create_profile_order_move_worker = Mock()
+
+        ProfileOrderPageBase._request_profile_order_move(
+            page,
+            "before",
+            "profile-a",
+            destination_profile_key="profile-b",
+        )
+        ProfileOrderPageBase._request_profile_order_move(
+            page,
+            "after",
+            "profile-a",
+            destination_profile_key="profile-c",
+        )
+
+        page._create_profile_order_move_worker.assert_not_called()
+        self.assertEqual(
+            page._pending_profile_order_moves,
+            [
+                {
+                    "action": "after",
+                    "source_profile_key": "profile-a",
+                    "destination_profile_key": "profile-c",
+                },
+            ],
+        )
+
     def test_profile_order_move_waits_while_restart_is_scheduled(self) -> None:
         from profile.ui.profile_order_page import ProfileOrderPageBase
         from ui.one_shot_worker_runtime import OneShotWorkerRuntime

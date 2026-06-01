@@ -193,18 +193,40 @@ class ProfileOrderPageBase(BasePage):
         if not source_profile_key:
             return
         if self._order_move_runtime.is_running() or self.__dict__.get("_order_move_start_scheduled", False):
-            self.__dict__.setdefault("_pending_profile_order_moves", []).append(
-                {
-                    "action": str(action or ""),
-                    "source_profile_key": source_profile_key,
-                    "destination_profile_key": str(destination_profile_key or ""),
-                }
+            self._queue_profile_order_move(
+                action,
+                source_profile_key,
+                destination_profile_key=destination_profile_key,
             )
             return
         self._start_profile_order_move_worker(
             action,
             source_profile_key,
             destination_profile_key=destination_profile_key,
+        )
+
+    def _queue_profile_order_move(
+        self,
+        action: str,
+        source_profile_key: str,
+        *,
+        destination_profile_key: str = "",
+    ) -> None:
+        source = str(source_profile_key or "").strip()
+        if not source:
+            return
+        pending_moves = self.__dict__.setdefault("_pending_profile_order_moves", [])
+        pending_moves[:] = [
+            pending
+            for pending in pending_moves
+            if str(pending.get("source_profile_key") or "").strip() != source
+        ]
+        pending_moves.append(
+            {
+                "action": str(action or ""),
+                "source_profile_key": source,
+                "destination_profile_key": str(destination_profile_key or ""),
+            }
         )
 
     def _start_profile_order_move_worker(
