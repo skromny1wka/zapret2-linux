@@ -235,15 +235,14 @@ def build_orchestra_settings_page_kwargs(*, page_name: PageName, orchestra_featu
         LockedStrategiesController,
         WhitelistController,
     )
-    from orchestra.ratings_controller import OrchestraRatingsController
 
     return {
         "controllers": {
             "locked": LockedStrategiesController(orchestra_feature),
             "blocked": BlockedStrategiesController(orchestra_feature),
             "whitelist": WhitelistController(orchestra_feature),
-            "ratings": OrchestraRatingsController(orchestra_feature),
         },
+        "orchestra_feature": orchestra_feature,
     }
 
 

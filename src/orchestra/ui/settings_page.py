@@ -25,15 +25,15 @@ class OrchestraSettingsPage(QWidget):
     ]
     TAB_LABELS = ["Залоченные", "Заблокированные", "Белый список", "Рейтинги"]
 
-    def __init__(self, parent=None, *, controllers):
+    def __init__(self, parent=None, *, controllers, orchestra_feature):
         super().__init__(parent)
         self.setObjectName("OrchestraSettingsPage")
         self._ui_language = self._resolve_ui_language()
+        self._orchestra = orchestra_feature
 
         self._locked_controller = controllers["locked"]
         self._blocked_controller = controllers["blocked"]
         self._whitelist_controller = controllers["whitelist"]
-        self._ratings_controller = controllers["ratings"]
         self.locked_page = None
         self.blocked_page = None
         self.whitelist_page = None
@@ -112,7 +112,7 @@ class OrchestraSettingsPage(QWidget):
         else:
             from orchestra.ui.ratings_page import OrchestraRatingsPage
 
-            page = OrchestraRatingsPage(self, controller=self._ratings_controller)
+            page = OrchestraRatingsPage(self, orchestra_feature=self._orchestra)
             self.ratings_page = page
 
         set_lang = getattr(page, "set_ui_language", None)

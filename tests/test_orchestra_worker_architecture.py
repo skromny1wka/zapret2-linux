@@ -264,6 +264,29 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("self._load_state()", run_source)
         self.assertNotIn("self._controller.load_state", run_source)
 
+    def test_ratings_page_uses_feature_without_controller_wrapper(self) -> None:
+        from app.feature_facades.orchestra import OrchestraFeature
+        from orchestra.ui.ratings_page import OrchestraRatingsPage
+        from orchestra.ui.settings_page import OrchestraSettingsPage
+        from ui.page_deps.system import build_orchestra_settings_page_kwargs
+
+        init_source = inspect.getsource(OrchestraRatingsPage.__init__)
+        start_source = inspect.getsource(OrchestraRatingsPage._start_ratings_state_worker)
+        settings_init_source = inspect.getsource(OrchestraSettingsPage.__init__)
+        ensure_source = inspect.getsource(OrchestraSettingsPage._ensure_tab_page)
+        deps_source = inspect.getsource(build_orchestra_settings_page_kwargs)
+        feature_source = inspect.getsource(OrchestraFeature)
+
+        self.assertIn("orchestra_feature", init_source)
+        self.assertIn("self._orchestra = orchestra_feature", init_source)
+        self.assertNotIn("self._controller", init_source + start_source)
+        self.assertIn("self._orchestra.create_ratings_state_load_worker", start_source)
+        self.assertIn("self._orchestra = orchestra_feature", settings_init_source)
+        self.assertIn("orchestra_feature=self._orchestra", ensure_source)
+        self.assertNotIn("OrchestraRatingsController", deps_source)
+        self.assertNotIn('"ratings"', deps_source)
+        self.assertIn("create_ratings_state_load_worker", feature_source)
+
     def test_managed_workers_receive_action_functions(self) -> None:
         from orchestra.managed_lists_workers import (
             OrchestraManagedActionWorker,

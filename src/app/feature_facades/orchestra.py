@@ -5,6 +5,7 @@ from typing import Any
 
 import orchestra.log_context_actions as orchestra_log_context_actions
 import orchestra.log_history_workflow as orchestra_log_history_workflow
+from orchestra.ratings_workflow import load_orchestra_ratings_state
 
 
 @dataclass(slots=True, init=False)
@@ -191,6 +192,14 @@ class OrchestraFeature:
             run_action=self.run_log_context_action,
             parent=parent,
         )
+
+    def load_ratings_state(self):
+        return load_orchestra_ratings_state(self.runner)
+
+    def create_ratings_state_load_worker(self, request_id: int, parent=None):
+        from orchestra.ratings_worker import OrchestraRatingsStateLoadWorker
+
+        return OrchestraRatingsStateLoadWorker(request_id, self.load_ratings_state, parent)
 
     def set_setting(self, key: str, value, *, runner=None) -> None:
         from settings.dpi.public import set_orchestra_setting

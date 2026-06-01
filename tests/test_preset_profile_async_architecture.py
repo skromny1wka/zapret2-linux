@@ -77,7 +77,6 @@ from orchestra.ui.ratings_page import OrchestraRatingsPage
 from orchestra.ui.settings_page import OrchestraSettingsPage
 from orchestra.ui.whitelist_page import OrchestraWhitelistPage
 import orchestra.managed_lists_controller as orchestra_managed_lists_controller
-import orchestra.ratings_controller as orchestra_ratings_controller
 import app.feature_facades.orchestra as orchestra_feature_facade
 import dns.page_diagnostics_warning_workflow as dns_diag_workflow
 import dns.page_load_workflow as dns_load_workflow
@@ -3696,7 +3695,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         blocked_reload_source = inspect.getsource(OrchestraBlockedPage._reload_from_settings)
         ratings_refresh_source = inspect.getsource(OrchestraRatingsPage._refresh_data)
         managed_controller_source = inspect.getsource(orchestra_managed_lists_controller)
-        ratings_controller_source = inspect.getsource(orchestra_ratings_controller)
+        orchestra_feature_source = inspect.getsource(orchestra_feature_facade.OrchestraFeature)
 
         self.assertIn("_start_snapshot_worker", locked_reload_source)
         self.assertIn("_start_snapshot_worker", blocked_reload_source)
@@ -3705,7 +3704,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn(".reload_snapshot(", blocked_reload_source)
         self.assertNotIn(".load_state(", ratings_refresh_source)
         self.assertIn("create_snapshot_load_worker", managed_controller_source)
-        self.assertIn("create_state_load_worker", ratings_controller_source)
+        self.assertIn("create_ratings_state_load_worker", orchestra_feature_source)
 
     def test_control_top_summary_loads_preset_and_profile_count_through_worker(self) -> None:
         winws1_refresh_source = inspect.getsource(Zapret1ModeControlPage._refresh_top_summary)

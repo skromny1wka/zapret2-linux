@@ -31,7 +31,7 @@ from orchestra.ratings_workflow import (
 class OrchestraRatingsPage(BasePage):
     """Страница истории стратегий с рейтингами"""
 
-    def __init__(self, parent=None, *, controller):
+    def __init__(self, parent=None, *, orchestra_feature):
         super().__init__(
             "История стратегий (рейтинги)",
             "Рейтинг = успехи / (успехи + провалы). При UNLOCK выбирается лучшая стратегия из истории.",
@@ -40,7 +40,7 @@ class OrchestraRatingsPage(BasePage):
             subtitle_key="page.orchestra.ratings.subtitle",
         )
         self.setObjectName("orchestraRatingsPage")
-        self._controller = controller
+        self._orchestra = orchestra_feature
         self._refresh_loading = False
         self._has_loaded_once = False
         self._no_runner = False
@@ -158,7 +158,7 @@ class OrchestraRatingsPage(BasePage):
 
     def _start_ratings_state_worker(self) -> None:
         self._ratings_state_runtime.start_qthread_worker(
-            worker_factory=lambda request_id: self._controller.create_state_load_worker(request_id, self),
+            worker_factory=lambda request_id: self._orchestra.create_ratings_state_load_worker(request_id, self),
             on_loaded=self._on_ratings_state_loaded,
             on_failed=self._on_ratings_state_failed,
             on_finished=self._on_ratings_state_worker_finished,
