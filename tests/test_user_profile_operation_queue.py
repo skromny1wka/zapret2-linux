@@ -72,6 +72,56 @@ class UserProfileOperationQueueTests(unittest.TestCase):
             ],
         )
 
+    def test_user_profile_update_queue_keeps_latest_update_for_same_profile(self) -> None:
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._user_profile_create_runtime = _Runtime(running=True)
+        page._user_profile_update_runtime = _Runtime(running=False)
+        page._user_profile_delete_runtime = _Runtime(running=False)
+        page._pending_profile_preset_write_operations = []
+        page._pending_user_profile_operations = []
+
+        PresetSetupPageBase._request_user_profile_update(
+            page,
+            "user-1",
+            name="Old",
+            protocol="tcp",
+            ports="443",
+        )
+        PresetSetupPageBase._request_user_profile_update(
+            page,
+            "user-1",
+            name="Latest",
+            protocol="udp",
+            ports="443,500",
+        )
+
+        self.assertEqual(
+            page._pending_user_profile_operations,
+            [
+                {
+                    "action": "update",
+                    "profile_id": "user-1",
+                    "name": "Latest",
+                    "protocol": "udp",
+                    "ports": "443,500",
+                }
+            ],
+        )
+        self.assertEqual(
+            [
+                (
+                    operation["kind"],
+                    operation["action"],
+                    operation["profile_id"],
+                    operation["name"],
+                    operation["protocol"],
+                    operation["ports"],
+                )
+                for operation in page._pending_profile_preset_write_operations
+            ],
+            [("user_profile", "update", "user-1", "Latest", "udp", "443,500")],
+        )
+
     def test_user_profile_worker_finished_starts_next_pending_operation(self) -> None:
         page = PresetSetupPageBase.__new__(PresetSetupPageBase)
         page._cleanup_in_progress = False
