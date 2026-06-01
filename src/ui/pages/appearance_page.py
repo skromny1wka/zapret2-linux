@@ -994,6 +994,9 @@ class AppearancePage(BasePage):
     def _schedule_rkn_background_options_load_worker_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
+        if self.__dict__.get("_rkn_background_options_start_scheduled", False):
+            self._rkn_background_options_pending = True
+            return
         self._rkn_background_options_start_scheduled = True
         QTimer.singleShot(0, self._run_scheduled_rkn_background_options_load_worker_start)
 

@@ -77,6 +77,29 @@ class AppearanceWorkerQueueTests(unittest.TestCase):
 
         page._start_rkn_background_options_load_worker.assert_called_once_with()
 
+    def test_rkn_background_options_scheduled_start_queues_next_load(self) -> None:
+        import ui.pages.appearance_page as appearance_page
+        from ui.pages.appearance_page import AppearancePage
+
+        page = AppearancePage.__new__(AppearancePage)
+        page._cleanup_in_progress = False
+        page._rkn_background_options_start_scheduled = False
+        page._rkn_background_options_pending = False
+        page._start_rkn_background_options_load_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(appearance_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
+            AppearancePage._schedule_rkn_background_options_load_worker_start(page)
+            AppearancePage._schedule_rkn_background_options_load_worker_start(page)
+
+        single_shot.assert_called_once()
+        self.assertTrue(page._rkn_background_options_pending)
+
+        single_shot.call_args.args[1]()
+
+        page._start_rkn_background_options_load_worker.assert_called_once_with()
+        self.assertTrue(page._rkn_background_options_pending)
+
 
 if __name__ == "__main__":
     unittest.main()
