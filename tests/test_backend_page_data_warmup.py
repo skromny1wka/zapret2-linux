@@ -206,6 +206,7 @@ class BackendPageDataWarmupTests(unittest.TestCase):
             animations_enabled=True,
             smooth_scroll_enabled=True,
             editor_smooth_scroll_enabled=True,
+            sidebar_icon_style="standard",
             garland_enabled=False,
             snowflakes_enabled=False,
         )

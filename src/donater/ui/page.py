@@ -119,6 +119,8 @@ class PremiumPage(BasePage):
         self._device_info_start_scheduled = False
         self._reset_storage_runtime = OneShotWorkerRuntime()
         self._premium_action_runtime = OneShotWorkerRuntime()
+        self._pending_premium_action = ""
+        self._pending_premium_action_start_scheduled = False
 
         self._build_ui()
         self.bind_subscription_state_store(deps.subscription_state_store)
@@ -346,6 +348,8 @@ class PremiumPage(BasePage):
             blocking=True,
             warning_prefix="Premium reset storage worker",
         )
+        self._pending_premium_action = ""
+        self._pending_premium_action_start_scheduled = False
 
     # ── initialization ───────────────────────────────────────────────────────
 
@@ -383,6 +387,8 @@ class PremiumPage(BasePage):
             last_check_label=self.last_check_label,
         )
         self._sync_pairing_status_autopoll()
+        if self.__dict__.get("_pending_premium_action"):
+            self._schedule_pending_premium_action_start()
 
     def _on_premium_init_error(self, error) -> None:
         if self._cleanup_in_progress:
@@ -391,11 +397,35 @@ class PremiumPage(BasePage):
 
         log(f"Ошибка фоновой инициализации PremiumPage checker: {error}", "ERROR")
 
-    def _request_checker_init(self) -> bool:
+    def _request_checker_init(self, *, pending_action: str = "") -> bool:
         if self._premium.is_checker_ready():
             return True
+        action = str(pending_action or "").strip()
+        if action:
+            self._pending_premium_action = action
         self._start_premium_init_worker()
         return False
+
+    def _schedule_pending_premium_action_start(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("_pending_premium_action_start_scheduled", False):
+            return
+        self._pending_premium_action_start_scheduled = True
+        QTimer.singleShot(0, self._run_scheduled_pending_premium_action_start)
+
+    def _run_scheduled_pending_premium_action_start(self) -> None:
+        self._pending_premium_action_start_scheduled = False
+        action = str(self.__dict__.get("_pending_premium_action") or "")
+        self._pending_premium_action = ""
+        if self.__dict__.get("_cleanup_in_progress", False) or not action:
+            return
+        if action == "pair_code":
+            self._create_pair_code()
+        elif action == "check_status":
+            self._check_status()
+        elif action == "test_connection":
+            self._test_connection()
 
     # ── UI construction ──────────────────────────────────────────────────────
 
@@ -693,7 +723,7 @@ class PremiumPage(BasePage):
         )
         if not gate_plan.can_start:
             return
-        if not self._request_checker_init():
+        if not self._request_checker_init(pending_action="pair_code"):
             self._set_activation_status(
                 text_key="page.premium.activation.init",
                 text_default="Инициализация...",
@@ -753,7 +783,7 @@ class PremiumPage(BasePage):
         )
         if not gate_plan.can_start:
             return
-        if not self._request_checker_init():
+        if not self._request_checker_init(pending_action="check_status"):
             self._set_status_badge(
                 status="neutral",
                 text_key="page.premium.status.checking.title",
@@ -822,7 +852,7 @@ class PremiumPage(BasePage):
         )
         if not gate_plan.can_start:
             return
-        if not self._request_checker_init():
+        if not self._request_checker_init(pending_action="test_connection"):
             plan = premium_page_plans.build_connection_test_start_plan(
                 checker_ready=False,
             )

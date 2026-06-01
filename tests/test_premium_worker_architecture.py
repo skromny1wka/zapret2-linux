@@ -55,6 +55,42 @@ class PremiumWorkerArchitectureTests(unittest.TestCase):
         self.assertNotIn("start_premium_worker_task", page_source)
         self.assertFalse(hasattr(premium_page_tasks, "start_premium_worker_task"))
 
+    def test_pair_code_action_is_remembered_while_checker_initializes(self) -> None:
+        page = PremiumPage.__new__(PremiumPage)
+        page.current_thread = None
+        page._premium = SimpleNamespace(is_checker_ready=Mock(return_value=False))
+        page._pending_premium_action = ""
+        page._pending_premium_action_start_scheduled = False
+        page._start_premium_init_worker = Mock()
+        page._set_activation_status = Mock()
+
+        PremiumPage._create_pair_code(page)
+
+        self.assertEqual(page._pending_premium_action, "pair_code")
+        page._start_premium_init_worker.assert_called_once_with()
+
+    def test_pending_premium_action_restarts_after_event_loop_turn(self) -> None:
+        import donater.ui.page as premium_page
+
+        page = PremiumPage.__new__(PremiumPage)
+        page._cleanup_in_progress = False
+        page._pending_premium_action = "check_status"
+        page._pending_premium_action_start_scheduled = False
+        page._check_status = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(premium_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            PremiumPage._schedule_pending_premium_action_start(page)
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._check_status.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._check_status.assert_called_once_with()
+        self.assertEqual(page._pending_premium_action, "")
+
     def test_device_info_pending_restarts_after_event_loop_turn(self) -> None:
         import donater.ui.page as premium_page
 
