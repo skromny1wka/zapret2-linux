@@ -170,6 +170,24 @@ class AppearanceWorkerQueueTests(unittest.TestCase):
         page._rkn_background_options_runtime.start_qthread_worker.assert_called_once()
         self.assertTrue(page._rkn_background_options_pending)
 
+    def test_rkn_background_options_result_ignored_when_new_load_is_pending(self) -> None:
+        from ui.pages.appearance_page import AppearancePage
+
+        page = AppearancePage.__new__(AppearancePage)
+        page._cleanup_in_progress = False
+        page._rkn_background_options_runtime = Mock()
+        page._rkn_background_options_runtime.is_current.return_value = True
+        page._rkn_background_options_pending = True
+        page._apply_rkn_background_options = Mock()
+
+        AppearancePage._on_rkn_background_options_loaded(
+            page,
+            9,
+            {"saved_value": "old.png", "options": (("old.png", "Old"),)},
+        )
+
+        page._apply_rkn_background_options.assert_not_called()
+
     def test_windows_accent_pending_restarts_after_event_loop_turn(self) -> None:
         import ui.pages.appearance_page as appearance_page
         from ui.pages.appearance_page import AppearancePage

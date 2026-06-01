@@ -1013,6 +1013,8 @@ class AppearancePage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
+        if self.__dict__.get("_rkn_background_options_pending", False):
+            return
         data = result if isinstance(result, dict) else {}
         self._apply_rkn_background_options(
             saved_value=data.get("saved_value"),
