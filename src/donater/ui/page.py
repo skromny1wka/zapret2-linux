@@ -28,9 +28,6 @@ from donater.pairing_workflow import (
     stop_pairing_status_autopoll,
     sync_pairing_status_autopoll,
 )
-from donater.premium_page_tasks import (
-    is_premium_task_running,
-)
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from donater.ui.page_lifecycle import (
     activate_premium_page,
@@ -56,6 +53,12 @@ from app.state_store import AppUiState, MainWindowStateStore
 from ui.theme_semantic import get_semantic_palette
 from app.ui_texts import tr as tr_catalog
 
+
+def _premium_action_runtime_running(page) -> bool:
+    runtime = getattr(page, "__dict__", {}).get("_premium_action_runtime")
+    return bool(runtime is not None and runtime.is_running())
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # PremiumPage
 # ─────────────────────────────────────────────────────────────────────────────
@@ -74,7 +77,6 @@ class PremiumPage(BasePage):
             subtitle_key="page.premium.subtitle",
         )
         self._premium = deps.premium_feature
-        self.current_thread = None
         self._cleanup_in_progress = False
         self._activation_in_progress = False
         self._connection_test_in_progress = False
@@ -324,9 +326,8 @@ class PremiumPage(BasePage):
         close_premium_page(
             set_cleanup_in_progress_fn=lambda value: setattr(self, "_cleanup_in_progress", value),
             build_close_plan_fn=premium_page_plans.build_close_plan,
-            current_thread=self.current_thread,
+            premium_action_runtime=self._premium_action_runtime,
             stop_pairing_status_autopoll_fn=self._stop_pairing_status_autopoll,
-            set_current_thread_fn=lambda value: setattr(self, "current_thread", value),
             event=event,
         )
 
@@ -334,8 +335,7 @@ class PremiumPage(BasePage):
         cleanup_premium_page(
             set_cleanup_in_progress_fn=lambda value: setattr(self, "_cleanup_in_progress", value),
             stop_pairing_status_autopoll_fn=self._stop_pairing_status_autopoll,
-            current_thread=self.current_thread,
-            set_current_thread_fn=lambda value: setattr(self, "current_thread", value),
+            premium_action_runtime=self._premium_action_runtime,
         )
         self._open_bot_runtime.stop(
             blocking=True,
@@ -366,8 +366,11 @@ class PremiumPage(BasePage):
             "has_pending_pair_code": bool((snapshot or {}).get("pair_code")),
         }
 
+    def _is_premium_action_running(self) -> bool:
+        return _premium_action_runtime_running(self)
+
     def _start_premium_init_worker(self) -> None:
-        if is_premium_task_running(self.current_thread):
+        if _premium_action_runtime_running(self):
             return
         warmed = self._premium.consume_warmed_page_data()
         if warmed is not None and warmed.device_info:
@@ -540,7 +543,7 @@ class PremiumPage(BasePage):
             page_visible=self.isVisible(),
             activation_in_progress=self._activation_in_progress,
             connection_test_in_progress=self._connection_test_in_progress,
-            worker_running=is_premium_task_running(self.current_thread),
+            worker_running=self._is_premium_action_running(),
             current_time=int(time.time()),
             pairing_snapshot=self._pairing_autopoll_snapshot,
         )
@@ -552,7 +555,7 @@ class PremiumPage(BasePage):
             page_visible=self.isVisible(),
             activation_in_progress=self._activation_in_progress,
             connection_test_in_progress=self._connection_test_in_progress,
-            worker_running=is_premium_task_running(self.current_thread),
+            worker_running=self._is_premium_action_running(),
             current_time=int(time.time()),
             pairing_snapshot=self._pairing_autopoll_snapshot,
         )
@@ -567,7 +570,7 @@ class PremiumPage(BasePage):
             page_visible=self.isVisible(),
             activation_in_progress=self._activation_in_progress,
             connection_test_in_progress=self._connection_test_in_progress,
-            worker_running=is_premium_task_running(self.current_thread),
+            worker_running=self._is_premium_action_running(),
             current_time=int(time.time()),
             pairing_snapshot=self._pairing_autopoll_snapshot,
         )
@@ -728,7 +731,7 @@ class PremiumPage(BasePage):
     def _create_pair_code(self):
         self._cleanup_in_progress = False
         gate_plan = premium_page_plans.build_worker_gate_plan(
-            thread_running=is_premium_task_running(self.current_thread),
+            thread_running=self._is_premium_action_running(),
         )
         if not gate_plan.can_start:
             self._remember_pending_premium_action("pair_code")
@@ -789,7 +792,7 @@ class PremiumPage(BasePage):
     def _check_status(self):
         self._cleanup_in_progress = False
         gate_plan = premium_page_plans.build_worker_gate_plan(
-            thread_running=is_premium_task_running(self.current_thread),
+            thread_running=self._is_premium_action_running(),
         )
         if not gate_plan.can_start:
             self._remember_pending_premium_action("check_status")
@@ -859,7 +862,7 @@ class PremiumPage(BasePage):
     def _test_connection(self):
         self._cleanup_in_progress = False
         gate_plan = premium_page_plans.build_worker_gate_plan(
-            thread_running=is_premium_task_running(self.current_thread),
+            thread_running=self._is_premium_action_running(),
         )
         if not gate_plan.can_start:
             self._remember_pending_premium_action("test_connection")
@@ -925,14 +928,12 @@ class PremiumPage(BasePage):
             on_loaded=lambda _request_id, result: result_handler(result),
             on_failed=lambda _request_id, error: error_handler(error),
             on_finished=lambda _worker: self._on_worker_thread_finished(),
-            bind_worker=lambda worker: setattr(self, "current_thread", worker),
             signal_includes_request_id=False,
             loaded_signal_name="result_ready",
             failed_signal_name="error_occurred",
         )
 
     def _on_worker_thread_finished(self) -> None:
-        self.current_thread = None
         if self.__dict__.get("_pending_premium_action") and not self.__dict__.get(
             "_cleanup_in_progress",
             False,

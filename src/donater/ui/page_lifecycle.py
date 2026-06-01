@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from donater.premium_page_tasks import is_premium_task_running, stop_premium_worker_task
 from ui.fluent_widgets import set_tooltip
 
 
@@ -129,20 +128,22 @@ def close_premium_page(
     *,
     set_cleanup_in_progress_fn,
     build_close_plan_fn,
-    current_thread,
+    premium_action_runtime,
     stop_pairing_status_autopoll_fn,
-    set_current_thread_fn,
     event,
 ) -> None:
     set_cleanup_in_progress_fn(True)
     plan = build_close_plan_fn(
-        thread_running=is_premium_task_running(current_thread),
+        thread_running=premium_action_runtime.is_running(),
     )
     if plan.stop_autopoll:
         stop_pairing_status_autopoll_fn()
     if plan.should_quit_thread:
-        stop_premium_worker_task(current_thread, wait_timeout_ms=plan.wait_timeout_ms)
-    set_current_thread_fn(None)
+        premium_action_runtime.stop(
+            blocking=True,
+            wait_timeout_ms=plan.wait_timeout_ms,
+            warning_prefix="Premium action worker",
+        )
     event.accept()
 
 
@@ -150,13 +151,15 @@ def cleanup_premium_page(
     *,
     set_cleanup_in_progress_fn,
     stop_pairing_status_autopoll_fn,
-    current_thread,
-    set_current_thread_fn,
+    premium_action_runtime,
 ) -> None:
     set_cleanup_in_progress_fn(True)
     stop_pairing_status_autopoll_fn()
-    stop_premium_worker_task(current_thread, wait_timeout_ms=1000)
-    set_current_thread_fn(None)
+    premium_action_runtime.stop(
+        blocking=True,
+        wait_timeout_ms=1000,
+        warning_prefix="Premium action worker",
+    )
 
 
 def apply_premium_language(

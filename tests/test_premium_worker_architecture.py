@@ -60,17 +60,22 @@ class PremiumWorkerArchitectureTests(unittest.TestCase):
         page_init_source = inspect.getsource(PremiumPage.__init__)
         start_source = inspect.getsource(PremiumPage._start_worker_thread)
         page_source = inspect.getsource(PremiumPage)
+        lifecycle_source = inspect.getsource(__import__("donater.ui.page_lifecycle", fromlist=["cleanup_premium_page"]))
 
         self.assertIn("_premium_action_runtime = OneShotWorkerRuntime()", page_init_source)
         self.assertIn("_premium_action_runtime.start_qthread_worker", start_source)
         self.assertIn("loaded_signal_name=\"result_ready\"", start_source)
         self.assertIn("failed_signal_name=\"error_occurred\"", start_source)
+        self.assertIn("_is_premium_action_running", page_source)
+        self.assertIn("premium_action_runtime.stop", lifecycle_source)
         self.assertNotIn("start_premium_worker_task", page_source)
+        self.assertNotIn("current_thread", page_source)
+        self.assertNotIn("is_premium_task_running", page_source)
         self.assertFalse(hasattr(premium_page_tasks, "start_premium_worker_task"))
 
     def test_pair_code_action_is_remembered_while_checker_initializes(self) -> None:
         page = PremiumPage.__new__(PremiumPage)
-        page.current_thread = None
+        page._premium_action_runtime = SimpleNamespace(is_running=Mock(return_value=False))
         page._premium = SimpleNamespace(is_checker_ready=Mock(return_value=False))
         page._pending_premium_action = ""
         page._pending_premium_action_start_scheduled = False
@@ -104,10 +109,9 @@ class PremiumWorkerArchitectureTests(unittest.TestCase):
         page._check_status.assert_called_once_with()
         self.assertEqual(page._pending_premium_action, "")
 
-    def test_status_check_is_remembered_while_premium_worker_runs(self) -> None:
-        running_worker = SimpleNamespace(isRunning=Mock(return_value=True))
+    def test_status_check_is_remembered_while_premium_action_runtime_runs(self) -> None:
         page = PremiumPage.__new__(PremiumPage)
-        page.current_thread = running_worker
+        page._premium_action_runtime = SimpleNamespace(is_running=Mock(return_value=True))
         page._pending_premium_action = ""
         page._pending_premium_action_start_scheduled = False
         page._premium = SimpleNamespace(is_checker_ready=Mock(return_value=True))
@@ -122,7 +126,6 @@ class PremiumWorkerArchitectureTests(unittest.TestCase):
         import donater.ui.page as premium_page
 
         page = PremiumPage.__new__(PremiumPage)
-        page.current_thread = object()
         page._cleanup_in_progress = False
         page._pending_premium_action = "test_connection"
         page._pending_premium_action_start_scheduled = False
@@ -132,7 +135,6 @@ class PremiumWorkerArchitectureTests(unittest.TestCase):
         with patch.object(premium_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
             PremiumPage._on_worker_thread_finished(page)
 
-        self.assertIsNone(page.current_thread)
         single_shot.assert_called_once()
         page._test_connection.assert_not_called()
 
