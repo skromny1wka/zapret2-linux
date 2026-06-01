@@ -1,5 +1,7 @@
 import inspect
 import unittest
+from types import SimpleNamespace
+from unittest.mock import Mock
 from unittest.mock import patch
 
 from blockcheck import strategy_scan_targeting
@@ -35,6 +37,47 @@ class StrategyScanQuickTargetsRuntimeArchitectureTests(unittest.TestCase):
 
         self.assertEqual(first, ["example.com", "youtu.be"])
         self.assertEqual(second, first)
+
+    def test_quick_targets_pending_menu_restarts_after_event_loop_turn(self) -> None:
+        import blockcheck.ui.strategy_scan_page as strategy_scan_page
+
+        page = StrategyScanPage.__new__(StrategyScanPage)
+        page._cleanup_in_progress = False
+        page._quick_targets_pending = {"scan_protocol": "udp", "current_value": "latest"}
+        page._request_quick_targets_menu = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(strategy_scan_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            StrategyScanPage._on_quick_targets_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._request_quick_targets_menu.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._request_quick_targets_menu.assert_called_once_with(
+            scan_protocol="udp",
+            current_value="latest",
+        )
+
+    def test_quick_targets_request_waits_while_restart_is_scheduled(self) -> None:
+        page = StrategyScanPage.__new__(StrategyScanPage)
+        page._quick_targets_runtime = SimpleNamespace(is_running=Mock(return_value=False), start_qthread_worker=Mock())
+        page._quick_targets_start_scheduled = True
+        page._quick_targets_pending = None
+
+        StrategyScanPage._request_quick_targets_menu(
+            page,
+            scan_protocol="tcp_http",
+            current_value="example.com",
+        )
+
+        page._quick_targets_runtime.start_qthread_worker.assert_not_called()
+        self.assertEqual(
+            page._quick_targets_pending,
+            {"scan_protocol": "tcp_http", "current_value": "example.com"},
+        )
 
     def test_quick_stun_targets_cache_after_first_load(self) -> None:
         strategy_scan_targeting._quick_stun_targets_cache = None

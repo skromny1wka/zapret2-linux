@@ -113,6 +113,8 @@ class StrategyScanPage(BasePage):
         self._support_prepare_pending = None
         self._support_prepare_start_scheduled = False
         self._quick_targets_runtime = OneShotWorkerRuntime()
+        self._quick_targets_pending = None
+        self._quick_targets_start_scheduled = False
         self._strategy_scan_resume_save_runtime = OneShotWorkerRuntime()
         self._strategy_scan_resume_save_pending = None
         self._strategy_scan_resume_save_start_scheduled = False
@@ -372,14 +374,23 @@ class StrategyScanPage(BasePage):
         )
 
     def _request_quick_targets_menu(self, *, scan_protocol: str, current_value: str) -> None:
-        if self._quick_targets_runtime.is_running():
+        pending = {
+            "scan_protocol": str(scan_protocol or ""),
+            "current_value": str(current_value or ""),
+        }
+        if (
+            self._quick_targets_runtime.is_running()
+            or self.__dict__.get("_quick_targets_start_scheduled", False)
+        ):
+            self._quick_targets_pending = pending
             return
+        self._quick_targets_pending = None
 
         def worker_factory(request_id: int):
             return self.create_quick_targets_worker(
                 request_id,
-                scan_protocol=scan_protocol,
-                current_value=current_value,
+                scan_protocol=pending["scan_protocol"],
+                current_value=pending["current_value"],
             )
 
         def bind_worker(worker) -> None:
@@ -389,6 +400,7 @@ class StrategyScanPage(BasePage):
         self._quick_targets_runtime.start_qthread_worker(
             worker_factory=worker_factory,
             bind_worker=bind_worker,
+            on_finished=self._on_quick_targets_worker_finished,
         )
 
     def _on_quick_targets_loaded(self, request_id: int, menu_plan) -> None:
@@ -406,6 +418,33 @@ class StrategyScanPage(BasePage):
         ):
             return
         logger.warning("Failed to load quick targets: %s", error)
+
+    def _on_quick_targets_worker_finished(self, _worker) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("_quick_targets_pending"):
+            self._schedule_quick_targets_menu_start()
+
+    def _schedule_quick_targets_menu_start(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("_quick_targets_start_scheduled", False):
+            return
+        self._quick_targets_start_scheduled = True
+        QTimer.singleShot(0, self._run_scheduled_quick_targets_menu_start)
+
+    def _run_scheduled_quick_targets_menu_start(self) -> None:
+        self._quick_targets_start_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        pending = self.__dict__.get("_quick_targets_pending")
+        self._quick_targets_pending = None
+        if not pending:
+            return
+        self._request_quick_targets_menu(
+            scan_protocol=str(pending.get("scan_protocol") or ""),
+            current_value=str(pending.get("current_value") or ""),
+        )
 
     def _open_quick_targets_menu(self, menu_plan) -> None:
         if self._quick_domain_btn is None:
@@ -1050,6 +1089,8 @@ class StrategyScanPage(BasePage):
         self._support_prepare_runtime.cancel()
         self._support_prepare_pending = None
         self._support_prepare_start_scheduled = False
+        self._quick_targets_pending = None
+        self._quick_targets_start_scheduled = False
         self._quick_targets_runtime.stop(
             blocking=False,
             warning_prefix="strategy scan quick targets worker",
