@@ -370,7 +370,7 @@ class ControlPageActionMixin:
             runtime.program_settings_save_runtime.is_running()
             or bool(getattr(runtime, "program_settings_save_start_scheduled", False))
         ):
-            runtime.program_settings_save_pending.append((action, bool(enabled)))
+            runtime.queue_program_settings_save(action, bool(enabled))
             return
 
         runtime.program_settings_save_runtime.start_qthread_worker(
@@ -452,7 +452,7 @@ class ControlPageActionMixin:
     def _schedule_program_settings_save_start(self, action: str, enabled: bool) -> None:
         runtime = self._refresh_runtime
         if bool(getattr(runtime, "program_settings_save_start_scheduled", False)):
-            runtime.program_settings_save_pending.insert(0, (action, bool(enabled)))
+            runtime.queue_program_settings_save(action, bool(enabled), front=True)
             return
         runtime.program_settings_save_start_scheduled = True
         try:

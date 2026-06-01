@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import unittest
-from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 
@@ -34,21 +33,20 @@ class _Page:
 
 class ControlProgramSettingsSaveQueueTests(unittest.TestCase):
     def _make_page(self, *, running: bool):
+        from presets.ui.control.refresh_runtime_state import ModeControlRefreshRuntime
+
         save_runtime = _SaveRuntime(running=running)
         page = _Page()
         page._cleanup_in_progress = False
-        page._refresh_runtime = SimpleNamespace(
-            program_settings_save_runtime=save_runtime,
-            program_settings_save_pending=[],
-            program_settings_save_start_scheduled=False,
-        )
+        page._refresh_runtime = ModeControlRefreshRuntime()
+        page._refresh_runtime.program_settings_save_runtime = save_runtime
         page.create_program_settings_save_worker = Mock(return_value=object())
         page._on_program_settings_save_finished = Mock()
         page._on_program_settings_save_failed = Mock()
         page._bind_program_settings_save_worker = Mock()
         return page, save_runtime
 
-    def test_program_settings_save_keeps_all_pending_actions(self) -> None:
+    def test_program_settings_save_keeps_pending_actions_for_different_settings(self) -> None:
         page, save_runtime = self._make_page(running=True)
 
         _Page._request_program_settings_save(page, "auto_dpi", True)
@@ -62,6 +60,15 @@ class ControlProgramSettingsSaveQueueTests(unittest.TestCase):
                 ("hide_to_tray", False),
             ],
         )
+
+    def test_program_settings_save_replaces_pending_action_for_same_setting(self) -> None:
+        page, save_runtime = self._make_page(running=True)
+
+        _Page._request_program_settings_save(page, "hide_to_tray", True)
+        _Page._request_program_settings_save(page, "hide_to_tray", False)
+
+        self.assertEqual(save_runtime.started, [])
+        self.assertEqual(page._refresh_runtime.program_settings_save_pending, [("hide_to_tray", False)])
 
     def test_program_settings_save_queues_while_restart_is_scheduled(self) -> None:
         page, save_runtime = self._make_page(running=False)

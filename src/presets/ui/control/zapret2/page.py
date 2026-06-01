@@ -558,7 +558,7 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             runtime.additional_settings_save_runtime.is_running()
             or bool(getattr(runtime, "additional_settings_save_start_scheduled", False))
         ):
-            runtime.additional_settings_save_pending.append((setting, bool(enabled), launch_method))
+            runtime.queue_additional_settings_save(setting, bool(enabled), launch_method)
             return
         self._start_additional_settings_save_worker(setting, enabled, launch_method=launch_method)
 
@@ -603,7 +603,7 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
     def _schedule_additional_settings_save_start(self, setting: str, enabled: bool, *, launch_method: str) -> None:
         runtime = self._refresh_runtime
         if bool(getattr(runtime, "additional_settings_save_start_scheduled", False)):
-            runtime.additional_settings_save_pending.insert(0, (setting, bool(enabled), launch_method))
+            runtime.queue_additional_settings_save(setting, bool(enabled), launch_method, front=True)
             return
         runtime.additional_settings_save_start_scheduled = True
         try:

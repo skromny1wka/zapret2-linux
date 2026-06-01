@@ -25,6 +25,35 @@ class ModeControlRefreshRuntime:
         self.program_settings_save_pending: list[tuple[str, bool]] = []
         self.program_settings_save_start_scheduled = False
 
+    def queue_additional_settings_save(
+        self,
+        setting: str,
+        enabled: bool,
+        launch_method: str,
+        *,
+        front: bool = False,
+    ) -> None:
+        item = (str(setting or ""), bool(enabled), str(launch_method or ""))
+        self.additional_settings_save_pending = [
+            pending
+            for pending in self.additional_settings_save_pending
+            if not (pending[0] == item[0] and pending[2] == item[2])
+        ]
+        if front:
+            self.additional_settings_save_pending.insert(0, item)
+        else:
+            self.additional_settings_save_pending.append(item)
+
+    def queue_program_settings_save(self, action: str, enabled: bool, *, front: bool = False) -> None:
+        item = (str(action or ""), bool(enabled))
+        self.program_settings_save_pending = [
+            pending for pending in self.program_settings_save_pending if pending[0] != item[0]
+        ]
+        if front:
+            self.program_settings_save_pending.insert(0, item)
+        else:
+            self.program_settings_save_pending.append(item)
+
     def has_pending_refresh(self) -> bool:
         return bool(self.additional_settings_dirty)
 

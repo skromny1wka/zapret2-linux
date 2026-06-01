@@ -20,17 +20,17 @@ class _SaveRuntime:
 
 
 def _make_refresh_runtime(*, running: bool):
+    from presets.ui.control.refresh_runtime_state import ModeControlRefreshRuntime
+
     save_runtime = _SaveRuntime(running=running)
-    runtime = SimpleNamespace(
-        additional_settings_save_runtime=save_runtime,
-        additional_settings_save_pending=[],
-        additional_settings_save_request_id=1,
-        additional_settings_request_id=0,
-        additional_settings_dirty=False,
-        additional_settings_load_runtime=SimpleNamespace(cancel=Mock()),
-        mark_additional_settings_written=Mock(),
-        next_additional_settings_save_request_id=Mock(return_value=2),
-    )
+    runtime = ModeControlRefreshRuntime()
+    runtime.additional_settings_save_runtime = save_runtime
+    runtime.additional_settings_save_request_id = 1
+    runtime.additional_settings_request_id = 0
+    runtime.additional_settings_dirty = False
+    runtime.additional_settings_load_runtime = SimpleNamespace(cancel=Mock())
+    runtime.mark_additional_settings_written = Mock()
+    runtime.next_additional_settings_save_request_id = Mock(return_value=2)
     return runtime, save_runtime
 
 
@@ -43,7 +43,7 @@ def _make_page(page_cls, runtime):
 
 
 class ControlAdditionalSettingsSaveQueueTests(unittest.TestCase):
-    def test_zapret1_additional_settings_save_keeps_all_pending_toggles(self) -> None:
+    def test_zapret1_additional_settings_save_keeps_pending_toggles_for_different_settings(self) -> None:
         from presets.ui.control.zapret1.page import Zapret1ModeControlPage
 
         runtime, save_runtime = _make_refresh_runtime(running=True)
@@ -71,7 +71,7 @@ class ControlAdditionalSettingsSaveQueueTests(unittest.TestCase):
             ],
         )
 
-    def test_zapret2_additional_settings_save_keeps_all_pending_toggles(self) -> None:
+    def test_zapret2_additional_settings_save_keeps_pending_toggles_for_different_settings(self) -> None:
         from presets.ui.control.zapret2.page import Zapret2ModeControlPage
 
         runtime, save_runtime = _make_refresh_runtime(running=True)
@@ -98,6 +98,50 @@ class ControlAdditionalSettingsSaveQueueTests(unittest.TestCase):
                 ("debug_log", False, "zapret2"),
             ],
         )
+
+    def test_zapret1_additional_settings_save_replaces_pending_toggle_for_same_setting(self) -> None:
+        from presets.ui.control.zapret1.page import Zapret1ModeControlPage
+
+        runtime, save_runtime = _make_refresh_runtime(running=True)
+        page = _make_page(Zapret1ModeControlPage, runtime)
+
+        Zapret1ModeControlPage._request_additional_settings_save(
+            page,
+            "debug_log",
+            True,
+            launch_method="zapret1",
+        )
+        Zapret1ModeControlPage._request_additional_settings_save(
+            page,
+            "debug_log",
+            False,
+            launch_method="zapret1",
+        )
+
+        self.assertEqual(save_runtime.started, [])
+        self.assertEqual(runtime.additional_settings_save_pending, [("debug_log", False, "zapret1")])
+
+    def test_zapret2_additional_settings_save_replaces_pending_toggle_for_same_setting(self) -> None:
+        from presets.ui.control.zapret2.page import Zapret2ModeControlPage
+
+        runtime, save_runtime = _make_refresh_runtime(running=True)
+        page = _make_page(Zapret2ModeControlPage, runtime)
+
+        Zapret2ModeControlPage._request_additional_settings_save(
+            page,
+            "debug_log",
+            True,
+            launch_method="zapret2",
+        )
+        Zapret2ModeControlPage._request_additional_settings_save(
+            page,
+            "debug_log",
+            False,
+            launch_method="zapret2",
+        )
+
+        self.assertEqual(save_runtime.started, [])
+        self.assertEqual(runtime.additional_settings_save_pending, [("debug_log", False, "zapret2")])
 
     def test_zapret1_additional_settings_save_queues_while_restart_is_scheduled(self) -> None:
         from presets.ui.control.zapret1.page import Zapret1ModeControlPage
