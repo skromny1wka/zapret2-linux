@@ -346,6 +346,45 @@ class DnsWorkerArchitectureTests(unittest.TestCase):
             plain_text="newer",
         )
 
+    def test_dns_quick_check_queues_while_worker_runs(self) -> None:
+        page = DNSCheckPage.__new__(DNSCheckPage)
+        page._quick_runtime = SimpleNamespace(is_running=Mock(return_value=True))
+        page._quick_check_pending = False
+        page.result_text = Mock()
+        page._apply_interaction_state = Mock()
+        page._set_status = Mock()
+        page._start_quick_dns_check_worker = Mock()
+
+        DNSCheckPage.quick_dns_check(page)
+
+        self.assertTrue(page._quick_check_pending)
+        page.result_text.clear.assert_not_called()
+        page._apply_interaction_state.assert_not_called()
+        page._set_status.assert_not_called()
+        page._start_quick_dns_check_worker.assert_not_called()
+
+    def test_dns_pending_quick_check_restarts_after_event_loop_turn(self) -> None:
+        import dns.ui.dns_check_page as dns_check_page
+
+        page = DNSCheckPage.__new__(DNSCheckPage)
+        page._cleanup_in_progress = False
+        page._quick_check_pending = True
+        page._quick_check_start_scheduled = False
+        page.quick_dns_check = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(dns_check_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            DNSCheckPage._on_quick_dns_check_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page.quick_dns_check.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        self.assertFalse(page._quick_check_pending)
+        page.quick_dns_check.assert_called_once_with()
+
     def test_startup_dns_apply_uses_one_shot_runtime(self) -> None:
         module_source = inspect.getsource(dns_worker)
         async_source = inspect.getsource(dns_worker.apply_dns_on_startup_async)
