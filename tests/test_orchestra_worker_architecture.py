@@ -443,6 +443,80 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
         page._start_managed_action.assert_called_once_with(("blocked_remove", {"domain": "old.org"}))
         self.assertEqual(page._managed_action_pending, [("blocked_remove", {"domain": "new.org"})])
 
+    def test_locked_snapshot_load_queues_while_worker_runs(self) -> None:
+        from orchestra.ui.locked_page import OrchestraLockedPage
+
+        page = OrchestraLockedPage.__new__(OrchestraLockedPage)
+        page._cleanup_in_progress = False
+        page._snapshot_load_runtime = SimpleNamespace(is_running=Mock(return_value=True), start_qthread_worker=Mock())
+        page._snapshot_load_pending = False
+        page._start_snapshot_worker = Mock()
+
+        OrchestraLockedPage._start_snapshot_worker(page)
+
+        page._snapshot_load_runtime.start_qthread_worker.assert_not_called()
+        self.assertTrue(page._snapshot_load_pending)
+
+    def test_locked_snapshot_pending_load_restarts_after_event_loop_turn(self) -> None:
+        import orchestra.ui.locked_page as locked_page
+        from orchestra.ui.locked_page import OrchestraLockedPage
+
+        worker = object()
+        page = OrchestraLockedPage.__new__(OrchestraLockedPage)
+        page._cleanup_in_progress = False
+        page._snapshot_load_runtime = SimpleNamespace(worker=worker)
+        page._snapshot_load_pending = True
+        page._start_snapshot_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(locked_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
+            OrchestraLockedPage._on_snapshot_worker_finished(page, worker)
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._start_snapshot_worker.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._start_snapshot_worker.assert_called_once_with()
+
+    def test_blocked_snapshot_load_queues_while_worker_runs(self) -> None:
+        from orchestra.ui.blocked_page import OrchestraBlockedPage
+
+        page = OrchestraBlockedPage.__new__(OrchestraBlockedPage)
+        page._cleanup_in_progress = False
+        page._snapshot_load_runtime = SimpleNamespace(is_running=Mock(return_value=True), start_qthread_worker=Mock())
+        page._snapshot_load_pending = False
+        page._start_snapshot_worker = Mock()
+
+        OrchestraBlockedPage._start_snapshot_worker(page)
+
+        page._snapshot_load_runtime.start_qthread_worker.assert_not_called()
+        self.assertTrue(page._snapshot_load_pending)
+
+    def test_blocked_snapshot_pending_load_restarts_after_event_loop_turn(self) -> None:
+        import orchestra.ui.blocked_page as blocked_page
+        from orchestra.ui.blocked_page import OrchestraBlockedPage
+
+        worker = object()
+        page = OrchestraBlockedPage.__new__(OrchestraBlockedPage)
+        page._cleanup_in_progress = False
+        page._snapshot_load_runtime = SimpleNamespace(worker=worker)
+        page._snapshot_load_pending = True
+        page._start_snapshot_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(blocked_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
+            OrchestraBlockedPage._on_snapshot_worker_finished(page, worker)
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._start_snapshot_worker.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._start_snapshot_worker.assert_called_once_with()
+
     def test_whitelist_workers_receive_action_functions(self) -> None:
         from orchestra.managed_lists_workers import (
             OrchestraWhitelistActionWorker,

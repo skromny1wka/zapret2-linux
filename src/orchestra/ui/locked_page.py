@@ -164,6 +164,8 @@ class OrchestraLockedPage(BasePage):
         self._refresh_loading = False
         self._cleanup_in_progress = False
         self._snapshot_load_runtime = OneShotWorkerRuntime()
+        self._snapshot_load_pending = False
+        self._snapshot_load_start_scheduled = False
         self._managed_action_runtime = OneShotWorkerRuntime()
         self._managed_action_pending: list[tuple[str, dict]] = []
         self._managed_action_start_scheduled = False
@@ -434,6 +436,13 @@ class OrchestraLockedPage(BasePage):
     def _start_snapshot_worker(self) -> None:
         if self._cleanup_in_progress:
             return
+        if (
+            self._snapshot_load_runtime.is_running()
+            or self.__dict__.get("_snapshot_load_start_scheduled", False)
+        ):
+            self._snapshot_load_pending = True
+            return
+        self._snapshot_load_pending = False
         self._snapshot_load_runtime.start_qthread_worker(
             worker_factory=lambda request_id: self._orchestra.create_locked_snapshot_load_worker(request_id, self),
             on_loaded=self._on_snapshot_loaded,
@@ -456,6 +465,25 @@ class OrchestraLockedPage(BasePage):
     def _on_snapshot_worker_finished(self, worker) -> None:
         if self._snapshot_load_runtime.worker is worker:
             self._snapshot_load_runtime.worker = None
+        pending = bool(self.__dict__.get("_snapshot_load_pending", False))
+        self._snapshot_load_pending = False
+        if pending and not self._cleanup_in_progress:
+            self._schedule_snapshot_load_start()
+
+    def _schedule_snapshot_load_start(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("_snapshot_load_start_scheduled", False):
+            self._snapshot_load_pending = True
+            return
+        self._snapshot_load_start_scheduled = True
+        QTimer.singleShot(0, self._run_scheduled_snapshot_load_start)
+
+    def _run_scheduled_snapshot_load_start(self) -> None:
+        self._snapshot_load_start_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._start_snapshot_worker()
 
     def create_action_worker(self, request_id: int, *, action: str, **kwargs):
         return self._orchestra.create_locked_action_worker(
@@ -713,6 +741,8 @@ class OrchestraLockedPage(BasePage):
     def cleanup(self) -> None:
         self._cleanup_in_progress = True
         self._refresh_loading = False
+        self._snapshot_load_pending = False
+        self._snapshot_load_start_scheduled = False
         self._snapshot_load_runtime.stop(
             blocking=True,
             log_fn=log,
