@@ -273,6 +273,29 @@ class HostsPageRuntimeTests(unittest.TestCase):
         page._open_file_runtime.start_qthread_worker.assert_not_called()
         self.assertTrue(page._open_file_pending)
 
+    def test_open_hosts_file_scheduled_start_is_not_duplicated(self) -> None:
+        import hosts.ui.page as hosts_page
+        from hosts.ui.page import HostsPage
+
+        page = HostsPage.__new__(HostsPage)
+        page._cleanup_in_progress = False
+        page._open_file_pending = False
+        page._open_file_start_scheduled = False
+        page._request_open_hosts_file = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(hosts_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            HostsPage._schedule_open_hosts_file_start(page)
+            HostsPage._schedule_open_hosts_file_start(page)
+
+        single_shot.assert_called_once()
+        self.assertTrue(page._open_file_pending)
+        page._request_open_hosts_file.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._request_open_hosts_file.assert_called_once_with()
+
     def test_restore_permissions_pending_restarts_after_event_loop_turn(self) -> None:
         import hosts.ui.page as hosts_page
         from hosts.ui.page import HostsPage
