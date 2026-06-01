@@ -455,6 +455,42 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("create_whitelist_snapshot_load_worker", feature_source)
         self.assertIn("create_whitelist_action_worker", feature_source)
 
+    def test_locked_blocked_pages_use_feature_without_controller_wrappers(self) -> None:
+        from app.feature_facades.orchestra import OrchestraFeature
+        from orchestra.ui.blocked_page import OrchestraBlockedPage
+        from orchestra.ui.locked_page import OrchestraLockedPage
+        from orchestra.ui.settings_page import OrchestraSettingsPage
+        from ui.page_deps.system import build_orchestra_settings_page_kwargs
+
+        locked_init_source = inspect.getsource(OrchestraLockedPage.__init__)
+        locked_page_source = inspect.getsource(OrchestraLockedPage)
+        blocked_init_source = inspect.getsource(OrchestraBlockedPage.__init__)
+        blocked_page_source = inspect.getsource(OrchestraBlockedPage)
+        settings_init_source = inspect.getsource(OrchestraSettingsPage.__init__)
+        ensure_source = inspect.getsource(OrchestraSettingsPage._ensure_tab_page)
+        deps_source = inspect.getsource(build_orchestra_settings_page_kwargs)
+        feature_source = inspect.getsource(OrchestraFeature)
+
+        for source in (locked_init_source, blocked_init_source):
+            self.assertIn("orchestra_feature", source)
+            self.assertNotIn("controller", source)
+
+        for source in (locked_page_source, blocked_page_source):
+            self.assertNotIn("self._managed =", source)
+            self.assertNotIn("self._managed.", source)
+            self.assertIn("self._orchestra.", source)
+
+        self.assertIn("self._orchestra = orchestra_feature", settings_init_source)
+        self.assertIn("orchestra_feature=self._orchestra", ensure_source)
+        self.assertNotIn("controllers", settings_init_source)
+        self.assertNotIn("managed_lists_controller", deps_source)
+        self.assertNotIn("LockedStrategiesController", deps_source)
+        self.assertNotIn("BlockedStrategiesController", deps_source)
+        self.assertIn("create_locked_snapshot_load_worker", feature_source)
+        self.assertIn("create_locked_action_worker", feature_source)
+        self.assertIn("create_blocked_snapshot_load_worker", feature_source)
+        self.assertIn("create_blocked_action_worker", feature_source)
+
     def test_whitelist_snapshot_pending_refresh_restarts_after_event_loop_turn(self) -> None:
         import orchestra.ui.whitelist_page as whitelist_page
         from orchestra.ui.whitelist_page import OrchestraWhitelistPage

@@ -209,7 +209,7 @@ class BlockedDomainRow(QFrame):
 class OrchestraBlockedPage(BasePage):
     """Страница управления заблокированными стратегиями (чёрный список)"""
 
-    def __init__(self, parent=None, *, controller):
+    def __init__(self, parent=None, *, orchestra_feature):
         super().__init__(
             "Заблокированные стратегии",
             "Системные блокировки (strategy=1 для заблокированных РКН сайтов) + пользовательский чёрный список. Оркестратор не будет их использовать.",
@@ -218,8 +218,8 @@ class OrchestraBlockedPage(BasePage):
             subtitle_key="page.orchestra.blocked.subtitle",
         )
         self.setObjectName("orchestraBlockedPage")
-        self._managed = controller
-        self._askey_all = self._managed.askey_all
+        self._orchestra = orchestra_feature
+        self._askey_all = tuple(self._orchestra.ASKEY_ALL)
         self._hint_label = None
         self._add_card = None
         self._list_card = None
@@ -516,7 +516,7 @@ class OrchestraBlockedPage(BasePage):
         if self._cleanup_in_progress:
             return
         self._snapshot_load_runtime.start_qthread_worker(
-            worker_factory=lambda request_id: self._managed.create_snapshot_load_worker(request_id, self),
+            worker_factory=lambda request_id: self._orchestra.create_blocked_snapshot_load_worker(request_id, self),
             on_loaded=self._on_snapshot_loaded,
             on_failed=self._on_snapshot_failed,
             on_finished=self._on_snapshot_worker_finished,
@@ -539,7 +539,7 @@ class OrchestraBlockedPage(BasePage):
             self._snapshot_load_runtime.worker = None
 
     def create_action_worker(self, request_id: int, *, action: str, **kwargs):
-        return self._managed.create_action_worker(
+        return self._orchestra.create_blocked_action_worker(
             request_id,
             action=action,
             parent=self,
@@ -660,7 +660,7 @@ class OrchestraBlockedPage(BasePage):
             if item.widget():
                 item.widget().deleteLater()
 
-        snapshot = self._managed.current_snapshot()
+        snapshot = self._orchestra.current_blocked_snapshot()
 
         user_items = snapshot.user_items
         default_items = snapshot.default_items
@@ -773,7 +773,7 @@ class OrchestraBlockedPage(BasePage):
 
     def _update_count(self):
         """Обновляет счётчик"""
-        snapshot = self._managed.current_snapshot()
+        snapshot = self._orchestra.current_blocked_snapshot()
         self.count_label.setText(
             self._tr(
                 "page.orchestra.blocked.count.total",
@@ -788,7 +788,7 @@ class OrchestraBlockedPage(BasePage):
         """Блокирует стратегию"""
         if self._cleanup_in_progress:
             return
-        if not self._managed.runner:
+        if not self._orchestra.runner:
             return
 
         domain = self.domain_input.text().strip().lower()
@@ -813,10 +813,10 @@ class OrchestraBlockedPage(BasePage):
         """Очищает пользовательский чёрный список (системные блокировки остаются)"""
         if self._cleanup_in_progress:
             return
-        if not self._managed.runner:
+        if not self._orchestra.runner:
             return
 
-        user_count = self._managed.user_count()
+        user_count = self._orchestra.count_user_blocked_strategies()
 
         if user_count == 0:
             if InfoBar is not None:

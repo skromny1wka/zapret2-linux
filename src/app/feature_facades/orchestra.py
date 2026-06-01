@@ -11,10 +11,14 @@ from orchestra.ratings_workflow import load_orchestra_ratings_state
 @dataclass(slots=True, init=False)
 class OrchestraFeature:
     _whitelist_runtime_service: Any | None = field(default=None, repr=False, compare=False)
+    _direct_blocked_by_askey: dict = field(default_factory=dict, repr=False, compare=False)
+    _direct_locked_by_askey: dict = field(default_factory=dict, repr=False, compare=False)
     runner: Any = None
 
     def __init__(self, whitelist_runtime_service: Any | None = None, runner: Any = None) -> None:
         self._whitelist_runtime_service = whitelist_runtime_service
+        self._direct_blocked_by_askey = {}
+        self._direct_locked_by_askey = {}
         self.runner = runner
 
     @staticmethod
@@ -217,6 +221,212 @@ class OrchestraFeature:
             set_setting=self.set_setting,
             parent=parent,
         )
+
+    def reload_blocked_snapshot(self):
+        from orchestra.managed_lists_workflow import reload_blocked_snapshot
+
+        snapshot = reload_blocked_snapshot(
+            orchestra=self,
+            runner=self.runner,
+            askey_all=tuple(self.ASKEY_ALL),
+        )
+        self._remember_direct_blocked_snapshot(snapshot)
+        return snapshot
+
+    def create_blocked_snapshot_load_worker(self, request_id: int, parent=None):
+        from orchestra.managed_lists_workers import OrchestraManagedSnapshotLoadWorker
+
+        return OrchestraManagedSnapshotLoadWorker(request_id, self.reload_blocked_snapshot, parent)
+
+    def create_blocked_action_worker(self, request_id: int, *, action: str, parent=None, **kwargs):
+        from orchestra.managed_lists_workers import OrchestraManagedActionWorker
+
+        return OrchestraManagedActionWorker(
+            request_id,
+            self.reload_blocked_snapshot,
+            change_strategy=self.change_blocked_strategy,
+            remove_strategy=self.remove_blocked_strategy,
+            add_strategy=self.add_blocked_strategy,
+            clear_user_strategies=self.clear_user_blocked_strategies,
+            action=action,
+            parent=parent,
+            **kwargs,
+        )
+
+    def current_blocked_snapshot(self):
+        from orchestra.managed_lists_workflow import build_blocked_snapshot
+
+        snapshot = build_blocked_snapshot(
+            orchestra=self,
+            runner=self.runner,
+            direct_blocked_by_askey=self._direct_blocked_by_askey or None,
+            askey_all=tuple(self.ASKEY_ALL),
+        )
+        self._remember_direct_blocked_snapshot(snapshot)
+        return snapshot
+
+    def change_blocked_strategy(self, *, hostname: str, old_strategy: int, new_strategy: int, askey: str):
+        from orchestra.managed_lists_workflow import change_blocked_strategy
+
+        return change_blocked_strategy(
+            self.runner,
+            hostname=hostname,
+            old_strategy=old_strategy,
+            new_strategy=new_strategy,
+            askey=askey,
+        )
+
+    def remove_blocked_strategy(self, *, hostname: str, strategy: int, askey: str):
+        from orchestra.managed_lists_workflow import remove_blocked_strategy
+
+        return remove_blocked_strategy(
+            self.runner,
+            hostname=hostname,
+            strategy=strategy,
+            askey=askey,
+        )
+
+    def add_blocked_strategy(self, *, domain: str, strategy: int, askey: str):
+        from orchestra.managed_lists_workflow import add_blocked_strategy
+
+        return add_blocked_strategy(
+            self.runner,
+            domain=domain,
+            strategy=strategy,
+            askey=askey,
+        )
+
+    def count_user_blocked_strategies(self) -> int:
+        from orchestra.managed_lists_workflow import count_user_blocked_strategies
+
+        return count_user_blocked_strategies(self.runner, askey_all=tuple(self.ASKEY_ALL))
+
+    def clear_user_blocked_strategies(self, *, user_count: int):
+        from orchestra.managed_lists_workflow import clear_user_blocked_strategies
+
+        return clear_user_blocked_strategies(self.runner, user_count=user_count)
+
+    def reload_locked_snapshot(self):
+        from orchestra.managed_lists_workflow import reload_locked_snapshot
+
+        snapshot = reload_locked_snapshot(
+            orchestra=self,
+            runner=self.runner,
+            askey_all=tuple(self.ASKEY_ALL),
+        )
+        self._remember_direct_locked_snapshot(snapshot)
+        return snapshot
+
+    def create_locked_snapshot_load_worker(self, request_id: int, parent=None):
+        from orchestra.managed_lists_workers import OrchestraManagedSnapshotLoadWorker
+
+        return OrchestraManagedSnapshotLoadWorker(request_id, self.reload_locked_snapshot, parent)
+
+    def create_locked_action_worker(self, request_id: int, *, action: str, parent=None, **kwargs):
+        from orchestra.managed_lists_workers import OrchestraManagedActionWorker
+
+        return OrchestraManagedActionWorker(
+            request_id,
+            self.reload_locked_snapshot,
+            change_strategy=self.change_locked_strategy,
+            remove_strategy=self.remove_locked_strategy,
+            add_strategy=self.add_locked_strategy,
+            is_blocked_strategy=self.is_locked_strategy_blocked,
+            current_strategy=self.current_locked_strategy,
+            clear_strategies=self.clear_locked_strategies,
+            action=action,
+            parent=parent,
+            **kwargs,
+        )
+
+    def current_locked_snapshot(self):
+        from orchestra.managed_lists_workflow import build_locked_snapshot
+
+        snapshot = build_locked_snapshot(
+            orchestra=self,
+            runner=self.runner,
+            direct_locked_by_askey=self._direct_locked_by_askey or None,
+            askey_all=tuple(self.ASKEY_ALL),
+        )
+        self._remember_direct_locked_snapshot(snapshot)
+        return snapshot
+
+    def is_locked_strategy_blocked(self, *, domain: str, strategy: int) -> bool:
+        from orchestra.managed_lists_workflow import is_blocked_strategy
+
+        return is_blocked_strategy(
+            orchestra=self,
+            runner=self.runner,
+            domain=domain,
+            strategy=strategy,
+        )
+
+    def current_locked_strategy(self, *, domain: str, askey: str) -> int:
+        from orchestra.managed_lists_workflow import current_locked_strategy
+
+        return current_locked_strategy(
+            runner=self.runner,
+            direct_locked_by_askey=self._direct_locked_by_askey,
+            domain=domain,
+            askey=askey,
+        )
+
+    def change_locked_strategy(self, *, domain: str, new_strategy: int, askey: str):
+        from orchestra.managed_lists_workflow import change_locked_strategy
+
+        return change_locked_strategy(
+            orchestra=self,
+            runner=self.runner,
+            direct_locked_by_askey=self._direct_locked_by_askey,
+            domain=domain,
+            new_strategy=new_strategy,
+            askey=askey,
+        )
+
+    def add_locked_strategy(self, *, domain: str, strategy: int, askey: str):
+        from orchestra.managed_lists_workflow import add_locked_strategy
+
+        return add_locked_strategy(
+            orchestra=self,
+            runner=self.runner,
+            direct_locked_by_askey=self._direct_locked_by_askey,
+            domain=domain,
+            strategy=strategy,
+            askey=askey,
+        )
+
+    def remove_locked_strategy(self, *, domain: str, askey: str):
+        from orchestra.managed_lists_workflow import remove_locked_strategy
+
+        return remove_locked_strategy(
+            orchestra=self,
+            runner=self.runner,
+            direct_locked_by_askey=self._direct_locked_by_askey,
+            domain=domain,
+            askey=askey,
+        )
+
+    def count_locked_strategies(self) -> int:
+        from orchestra.managed_lists_workflow import count_locked_strategies
+
+        return count_locked_strategies(self.runner)
+
+    def clear_locked_strategies(self, *, total: int):
+        from orchestra.managed_lists_workflow import clear_locked_strategies
+
+        return clear_locked_strategies(
+            self.runner,
+            askey_all=tuple(self.ASKEY_ALL),
+            total=total,
+        )
+
+    def _remember_direct_blocked_snapshot(self, snapshot) -> None:
+        if snapshot.direct_blocked_by_askey is not None:
+            self._direct_blocked_by_askey = snapshot.direct_blocked_by_askey
+
+    def _remember_direct_locked_snapshot(self, snapshot) -> None:
+        if snapshot.direct_locked_by_askey is not None:
+            self._direct_locked_by_askey = snapshot.direct_locked_by_askey
 
     def get_whitelist_snapshot(self, runner, *, refresh: bool = False):
         return self._commands().get_whitelist_snapshot(

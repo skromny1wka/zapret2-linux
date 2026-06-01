@@ -76,7 +76,6 @@ from orchestra.ui.locked_page import OrchestraLockedPage
 from orchestra.ui.ratings_page import OrchestraRatingsPage
 from orchestra.ui.settings_page import OrchestraSettingsPage
 from orchestra.ui.whitelist_page import OrchestraWhitelistPage
-import orchestra.managed_lists_controller as orchestra_managed_lists_controller
 import app.feature_facades.orchestra as orchestra_feature_facade
 import dns.page_diagnostics_warning_workflow as dns_diag_workflow
 import dns.page_load_workflow as dns_load_workflow
@@ -3694,7 +3693,6 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         locked_reload_source = inspect.getsource(OrchestraLockedPage._reload_from_settings)
         blocked_reload_source = inspect.getsource(OrchestraBlockedPage._reload_from_settings)
         ratings_refresh_source = inspect.getsource(OrchestraRatingsPage._refresh_data)
-        managed_controller_source = inspect.getsource(orchestra_managed_lists_controller)
         orchestra_feature_source = inspect.getsource(orchestra_feature_facade.OrchestraFeature)
 
         self.assertIn("_start_snapshot_worker", locked_reload_source)
@@ -3703,7 +3701,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn(".reload_snapshot(", locked_reload_source)
         self.assertNotIn(".reload_snapshot(", blocked_reload_source)
         self.assertNotIn(".load_state(", ratings_refresh_source)
-        self.assertIn("create_snapshot_load_worker", managed_controller_source)
+        self.assertIn("create_locked_snapshot_load_worker", orchestra_feature_source)
+        self.assertIn("create_blocked_snapshot_load_worker", orchestra_feature_source)
         self.assertIn("create_ratings_state_load_worker", orchestra_feature_source)
 
     def test_control_top_summary_loads_preset_and_profile_count_through_worker(self) -> None:
@@ -3836,7 +3835,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
                 inspect.getsource(OrchestraLockedPage),
             )
         )
-        controller_source = inspect.getsource(orchestra_managed_lists_controller)
+        feature_source = inspect.getsource(orchestra_feature_facade.OrchestraFeature)
 
         for source in blocked_sources + locked_sources:
             self.assertIn("_request_managed_action", source)
@@ -3850,7 +3849,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         worker_source = inspect.getsource(managed_workers.OrchestraManagedActionWorker.run)
         self.assertIn("OneShotWorkerRuntime", page_sources)
         self.assertIn("create_action_worker", page_sources)
-        self.assertIn("create_action_worker", controller_source)
+        self.assertIn("create_locked_action_worker", feature_source)
+        self.assertIn("create_blocked_action_worker", feature_source)
         self.assertIn("change_strategy", worker_source)
         self.assertIn("remove_strategy", worker_source)
         self.assertIn("add_strategy", worker_source)

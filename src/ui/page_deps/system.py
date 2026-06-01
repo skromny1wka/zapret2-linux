@@ -230,16 +230,8 @@ def build_orchestra_page_kwargs(*, page_name: PageName, orchestra_feature, runti
 
 def build_orchestra_settings_page_kwargs(*, page_name: PageName, orchestra_feature) -> dict:
     _ = page_name
-    from orchestra.managed_lists_controller import (
-        BlockedStrategiesController,
-        LockedStrategiesController,
-    )
 
     return {
-        "controllers": {
-            "locked": LockedStrategiesController(orchestra_feature),
-            "blocked": BlockedStrategiesController(orchestra_feature),
-        },
         "orchestra_feature": orchestra_feature,
     }
 
