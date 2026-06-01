@@ -8,19 +8,46 @@ from unittest.mock import Mock
 
 
 class OrchestraWorkerArchitectureTests(unittest.TestCase):
-    def test_orchestra_controller_receives_runtime_state_callable(self) -> None:
+    def test_orchestra_page_uses_feature_without_page_controller_wrapper(self) -> None:
         from app.page_names import PageName
-        from orchestra.page_controller import OrchestraPageController
+        from orchestra.ui.page import OrchestraPage
         from ui.page_deps.system import build_orchestra_page_kwargs
 
-        init_source = inspect.getsource(OrchestraPageController.__init__)
-        controller_source = inspect.getsource(OrchestraPageController)
-        running_source = inspect.getsource(OrchestraPageController.is_runtime_running)
+        init_source = inspect.getsource(OrchestraPage.__init__)
+        page_source = inspect.getsource(OrchestraPage)
+        deps_source = inspect.getsource(build_orchestra_page_kwargs)
 
-        self.assertNotIn("runtime_feature", init_source)
-        self.assertNotIn("self._runtime", controller_source)
+        self.assertIn("orchestra_feature", init_source)
+        self.assertIn("self._orchestra = orchestra_feature", init_source)
         self.assertIn("is_runtime_running", init_source)
-        self.assertIn("self._is_runtime_running", running_source)
+        self.assertNotIn("OrchestraPageController", page_source)
+        self.assertNotIn("self._controller", page_source)
+        self.assertNotIn("orchestra.page_controller", deps_source)
+        self.assertNotIn('"controller"', deps_source)
+
+        runtime_feature = Mock()
+        runtime_feature.is_any_running.return_value = True
+        orchestra_feature = Mock()
+        kwargs = build_orchestra_page_kwargs(
+            page_name=PageName.ORCHESTRA,
+            orchestra_feature=orchestra_feature,
+            runtime_feature=runtime_feature,
+        )
+
+        self.assertIs(kwargs["orchestra_feature"], orchestra_feature)
+        self.assertTrue(callable(kwargs["is_runtime_running"]))
+        self.assertTrue(kwargs["is_runtime_running"]())
+        runtime_feature.is_any_running.assert_called_once_with(silent=True)
+
+    def test_orchestra_page_deps_receive_runtime_state_callable(self) -> None:
+        from app.page_names import PageName
+        from ui.page_deps.system import build_orchestra_page_kwargs
+
+        deps_source = inspect.getsource(build_orchestra_page_kwargs)
+
+        self.assertNotIn("OrchestraPageController", deps_source)
+        self.assertIn("_is_runtime_running", deps_source)
+        self.assertIn("runtime_feature.is_any_running", deps_source)
 
         runtime_feature = Mock()
         runtime_feature.is_any_running.return_value = True
@@ -30,8 +57,7 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
             runtime_feature=runtime_feature,
         )
 
-        controller = kwargs["controller"]
-        self.assertTrue(controller.is_runtime_running())
+        self.assertTrue(kwargs["is_runtime_running"]())
         runtime_feature.is_any_running.assert_called_once_with(silent=True)
 
     def test_page_workers_receive_action_functions(self) -> None:
@@ -77,7 +103,7 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
         self.assertNotIn("self._controller.", context_action_run)
 
     def test_orchestra_log_history_actions_run_through_worker(self) -> None:
-        from orchestra.page_controller import OrchestraPageController
+        from app.feature_facades.orchestra import OrchestraFeature
         from orchestra.ui.page import OrchestraPage
 
         view_source = inspect.getsource(OrchestraPage._view_log_history)
@@ -86,7 +112,7 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
         request_source = inspect.getsource(OrchestraPage._request_log_history_action)
         start_source = inspect.getsource(OrchestraPage._start_log_history_action_worker)
         page_source = inspect.getsource(OrchestraPage)
-        controller_source = inspect.getsource(OrchestraPageController)
+        feature_source = inspect.getsource(OrchestraFeature)
 
         for source in (view_source, delete_source, clear_source):
             self.assertIn("_request_log_history_action", source)
@@ -97,8 +123,8 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("create_log_history_action_worker", page_source)
         self.assertIn("start_qthread_worker", start_source)
         self.assertIn("_log_history_action_pending", request_source)
-        self.assertIn("create_log_history_action_worker", controller_source)
-        self.assertIn("run_log_history_action", controller_source)
+        self.assertIn("create_log_history_action_worker", feature_source)
+        self.assertIn("run_log_history_action", feature_source)
 
     def test_orchestra_log_history_pending_action_restarts_after_event_loop_turn(self) -> None:
         import orchestra.ui.page as orchestra_page
@@ -146,7 +172,7 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
 
     def test_orchestra_log_context_actions_run_through_worker(self) -> None:
         import orchestra.ui.page_log_context_workflow as log_context_workflow
-        from orchestra.page_controller import OrchestraPageController
+        from app.feature_facades.orchestra import OrchestraFeature
         from orchestra.ui.page import OrchestraPage
 
         lock_source = inspect.getsource(OrchestraPage._lock_strategy_from_log)
@@ -157,7 +183,7 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
         start_source = inspect.getsource(OrchestraPage._start_log_context_action_worker)
         menu_source = inspect.getsource(log_context_workflow.show_log_context_menu)
         page_source = inspect.getsource(OrchestraPage)
-        controller_source = inspect.getsource(OrchestraPageController)
+        feature_source = inspect.getsource(OrchestraFeature)
 
         for source in (lock_source, block_source, unblock_source, whitelist_source):
             self.assertIn("_request_log_context_action", source)
@@ -170,8 +196,8 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("create_log_context_action_worker", page_source)
         self.assertIn("start_qthread_worker", start_source)
         self.assertIn("_log_context_action_pending", request_source)
-        self.assertIn("create_log_context_action_worker", controller_source)
-        self.assertIn("run_log_context_action", controller_source)
+        self.assertIn("create_log_context_action_worker", feature_source)
+        self.assertIn("run_log_context_action", feature_source)
 
     def test_orchestra_log_context_pending_action_restarts_after_event_loop_turn(self) -> None:
         import orchestra.ui.page as orchestra_page

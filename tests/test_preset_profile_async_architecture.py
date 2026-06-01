@@ -78,7 +78,7 @@ from orchestra.ui.settings_page import OrchestraSettingsPage
 from orchestra.ui.whitelist_page import OrchestraWhitelistPage
 import orchestra.managed_lists_controller as orchestra_managed_lists_controller
 import orchestra.ratings_controller as orchestra_ratings_controller
-import orchestra.page_controller as orchestra_page_controller
+import app.feature_facades.orchestra as orchestra_feature_facade
 import dns.page_diagnostics_warning_workflow as dns_diag_workflow
 import dns.page_load_workflow as dns_load_workflow
 import dns.ui.page as dns_page
@@ -3748,14 +3748,14 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
         clear_source = inspect.getsource(OrchestraPage._clear_learned)
         page_source = inspect.getsource(OrchestraPage)
-        controller_source = inspect.getsource(orchestra_page_controller.OrchestraPageController)
+        feature_source = inspect.getsource(orchestra_feature_facade.OrchestraFeature)
         worker_source = inspect.getsource(orchestra_page_workers.OrchestraClearLearnedWorker.run)
 
         self.assertIn("_start_clear_learned_worker", clear_source)
         self.assertNotIn("self._controller.clear_learned_data()", clear_source)
         self.assertIn("OneShotWorkerRuntime", page_source)
         self.assertIn("create_clear_learned_worker", page_source)
-        self.assertIn("create_clear_learned_worker", controller_source)
+        self.assertIn("create_clear_learned_worker", feature_source)
         self.assertIn("clear_learned_data", worker_source)
 
     def test_orchestra_log_history_loads_through_worker(self) -> None:
@@ -3767,7 +3767,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         update_source = inspect.getsource(OrchestraPage._update_log_history)
         helper_source = inspect.getsource(orchestra_page_runtime_helpers.update_log_history_view)
         page_source = inspect.getsource(OrchestraPage)
-        controller_source = inspect.getsource(orchestra_page_controller.OrchestraPageController)
+        feature_source = inspect.getsource(orchestra_feature_facade.OrchestraFeature)
 
         self.assertTrue(hasattr(orchestra_page_workers, "OrchestraLogHistoryLoadWorker"))
         worker_source = inspect.getsource(orchestra_page_workers.OrchestraLogHistoryLoadWorker.run)
@@ -3778,7 +3778,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("logs=", helper_source)
         self.assertIn("_log_history_runtime", page_source)
         self.assertIn("create_log_history_load_worker", page_source)
-        self.assertIn("create_log_history_load_worker", controller_source)
+        self.assertIn("create_log_history_load_worker", feature_source)
         self.assertIn("load_log_history", worker_source)
 
     def test_orchestra_whitelist_actions_run_through_worker(self) -> None:

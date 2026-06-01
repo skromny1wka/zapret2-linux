@@ -9,7 +9,6 @@ from PyQt6.QtWidgets import (
 from qfluentwidgets import FluentIcon
 
 import orchestra.page_runtime as orchestra_page_runtime
-from orchestra.page_controller import OrchestraPageController
 from ui.pages.base_page import BasePage
 from ui.log_limits import ORCHESTRA_PENDING_MAX_LINES, apply_text_line_limit, put_latest_bounded
 from orchestra.ui.page_build import (
@@ -70,7 +69,7 @@ class OrchestraPage(BasePage):
     STATE_LEARNING = "learning"  # Перебирает стратегии (оранжевый)
     STATE_UNLOCKED = "unlocked"  # RST блокировка, переобучение (красный)
 
-    def __init__(self, parent=None, *, controller):
+    def __init__(self, parent=None, *, orchestra_feature, is_runtime_running):
         super().__init__(
             "Оркестратор v0.9.6 (Beta)",
             "Автоматическое обучение стратегий DPI bypass. Система находит лучшую стратегию для каждого домена (TCP: TLS/HTTP, UDP: QUIC/Discord Voice/STUN).\nЧтобы начать обучение зайдите на сайт и через несколько секунд обновите вкладку. Продолжайте это пока стратегия не будет помечена как LOCKED",
@@ -78,7 +77,8 @@ class OrchestraPage(BasePage):
             title_key="page.orchestra.title",
             subtitle_key="page.orchestra.subtitle",
         )
-        self._controller = controller
+        self._orchestra = orchestra_feature
+        self._is_runtime_running = is_runtime_running
 
         self._info_label = None
         self._filter_label = None
@@ -384,7 +384,7 @@ class OrchestraPage(BasePage):
         self._start_clear_learned_worker()
 
     def create_clear_learned_worker(self, request_id: int):
-        return self._controller.create_clear_learned_worker(request_id, self)
+        return self._orchestra.create_clear_learned_worker(request_id, self)
 
     def _start_clear_learned_worker(self) -> None:
         if self._clear_learned_runtime.is_running():
@@ -426,7 +426,7 @@ class OrchestraPage(BasePage):
         if self._cleanup_in_progress:
             return
         run_update_cycle(
-            is_runner_alive=self._controller.is_runtime_running,
+            is_runner_alive=self._is_runtime_running,
             state_idle=self.STATE_IDLE,
             update_status=self._update_status,
             update_learned_domains=self._update_learned_domains,
@@ -606,7 +606,7 @@ class OrchestraPage(BasePage):
         self._request_log_history_load()
 
     def create_log_history_load_worker(self, request_id: int):
-        return self._controller.create_log_history_load_worker(request_id, self)
+        return self._orchestra.create_log_history_load_worker(request_id, self)
 
     def _request_log_history_load(self) -> None:
         if self._log_history_runtime.is_running():
@@ -650,7 +650,7 @@ class OrchestraPage(BasePage):
             self._start_log_history_load_worker()
 
     def create_log_history_action_worker(self, request_id: int, *, action: str, log_id: str):
-        return self._controller.create_log_history_action_worker(
+        return self._orchestra.create_log_history_action_worker(
             request_id,
             action=action,
             log_id=log_id,
@@ -760,7 +760,7 @@ class OrchestraPage(BasePage):
         self._request_log_history_action("clear")
 
     def _get_runner(self):
-        return self._controller.runner()
+        return self._orchestra.runner
 
     def cleanup(self) -> None:
         self._cleanup_in_progress = True
@@ -848,7 +848,7 @@ class OrchestraPage(BasePage):
         copy_line_to_clipboard(text=text, append_log=self.append_log, tr_fn=self._tr)
 
     def _is_strategy_blocked_from_log(self, domain: str, strategy: int) -> bool:
-        return self._controller.is_strategy_blocked(domain=domain, strategy=int(strategy or 0))
+        return self._orchestra.is_strategy_blocked(domain=domain, strategy=int(strategy or 0))
 
     def create_log_context_action_worker(
         self,
@@ -859,7 +859,7 @@ class OrchestraPage(BasePage):
         strategy: int,
         protocol: str,
     ):
-        return self._controller.create_log_context_action_worker(
+        return self._orchestra.create_log_context_action_worker(
             request_id,
             action=action,
             domain=domain,
