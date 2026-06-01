@@ -174,7 +174,7 @@ class ProfileOrderPageTests(unittest.TestCase):
 
         self.assertIn("_apply_profile_order_move_locally", moved_source)
         self.assertIn("_reload_order_profiles", moved_source)
-        self.assertLess(moved_source.index("_apply_profile_order_move_locally"), moved_source.index("_reload_order_profiles"))
+        self.assertLess(moved_source.index("_apply_profile_order_move_locally"), moved_source.rindex("_reload_order_profiles"))
         self.assertIn("move_profile_item", list_source)
         self.assertIn("move_profile_item", local_source)
 
@@ -512,6 +512,44 @@ class ProfileOrderPageTests(unittest.TestCase):
 
         page._apply_profile_order_move_locally.assert_not_called()
         page._reload_order_profiles.assert_not_called()
+
+    def test_order_page_reloads_after_queue_when_previous_move_was_not_applied_locally(self) -> None:
+        from profile.ui.profile_order_page import ProfileOrderPageBase
+
+        page = ProfileOrderPageBase.__new__(ProfileOrderPageBase)
+        page._cleanup_in_progress = False
+        page._order_move_runtime = SimpleNamespace(is_current=Mock(return_value=True))
+        page._pending_profile_order_moves = [
+            {
+                "action": "end",
+                "source_profile_key": "profile-c",
+                "destination_profile_key": "",
+            }
+        ]
+        page._apply_profile_order_move_locally = Mock()
+        page._reload_order_profiles = Mock()
+
+        ProfileOrderPageBase._on_profile_order_moved(
+            page,
+            4,
+            "after",
+            "profile-a",
+            "profile-b",
+            True,
+        )
+
+        page._pending_profile_order_moves = []
+        ProfileOrderPageBase._on_profile_order_moved(
+            page,
+            5,
+            "end",
+            "profile-c",
+            "",
+            True,
+        )
+
+        page._apply_profile_order_move_locally.assert_not_called()
+        page._reload_order_profiles.assert_called_once_with(force=True)
 
     def test_profile_order_move_waits_while_restart_is_scheduled(self) -> None:
         from profile.ui.profile_order_page import ProfileOrderPageBase

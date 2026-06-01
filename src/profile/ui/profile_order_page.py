@@ -45,6 +45,7 @@ class ProfileOrderPageBase(BasePage):
         self._order_move_runtime = OneShotWorkerRuntime()
         self._pending_profile_order_moves: list[dict[str, str]] = []
         self._order_move_start_scheduled = False
+        self._order_move_reload_required = False
         self._breadcrumb = None
         self._cleanup_in_progress = False
         self._build_content()
@@ -284,6 +285,12 @@ class ProfileOrderPageBase(BasePage):
         ):
             return
         if self.__dict__.get("_pending_profile_order_moves"):
+            if result:
+                self._order_move_reload_required = True
+            return
+        if self.__dict__.get("_order_move_reload_required", False):
+            self._order_move_reload_required = False
+            self._reload_order_profiles(force=True)
             return
         if result and self._apply_profile_order_move_locally(
             action,
@@ -302,6 +309,11 @@ class ProfileOrderPageBase(BasePage):
             return
         log(f"{self.__class__.__name__}: не удалось переместить profile в порядке preset: {error}", "ERROR")
         InfoBar.error(title="Ошибка", content=str(error), parent=self.window())
+        if self.__dict__.get("_order_move_reload_required", False) and not self.__dict__.get(
+            "_pending_profile_order_moves"
+        ):
+            self._order_move_reload_required = False
+            self._reload_order_profiles(force=True)
 
     def _on_profile_order_move_worker_finished(self, _worker) -> None:
         if self.__dict__.get("_pending_profile_order_moves") and not bool(
@@ -353,6 +365,7 @@ class ProfileOrderPageBase(BasePage):
         self._pending_order_payload_apply = None
         self._order_payload_apply_scheduled = False
         self._order_move_start_scheduled = False
+        self._order_move_reload_required = False
         self.__dict__.setdefault("_pending_profile_order_moves", []).clear()
         self._order_load_runtime.stop(warning_prefix="Profile order load worker")
         self._order_load_runtime.cancel()
