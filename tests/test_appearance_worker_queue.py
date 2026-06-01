@@ -54,6 +54,29 @@ class AppearanceWorkerQueueTests(unittest.TestCase):
         self.assertFalse(page._initial_state_load_pending)
         self.assertFalse(page._initial_state_load_pending_force)
 
+    def test_initial_state_result_ignored_when_new_load_is_pending(self) -> None:
+        from ui.pages.appearance_page import AppearancePage
+
+        page = AppearancePage.__new__(AppearancePage)
+        page._cleanup_in_progress = False
+        page._initial_state_load_runtime = Mock()
+        page._initial_state_load_runtime.is_current.return_value = True
+        page._initial_state_load_pending = True
+        page._initial_state_plan = "old-plan"
+        page._ui_language = "ru"
+        page._apply_initial_display_state = Mock()
+        page._schedule_lower_sections_build = Mock()
+        page._lower_sections_build_scheduled = True
+        page.isVisible = Mock(return_value=True)
+        plan = SimpleNamespace(ui_language="en")
+
+        AppearancePage._on_initial_state_loaded(page, 12, plan)
+
+        self.assertEqual(page._initial_state_plan, "old-plan")
+        self.assertEqual(page._ui_language, "ru")
+        page._apply_initial_display_state.assert_not_called()
+        page._schedule_lower_sections_build.assert_not_called()
+
     def test_appearance_save_pending_restarts_after_event_loop_turn(self) -> None:
         import ui.pages.appearance_page as appearance_page
         from ui.pages.appearance_page import AppearancePage

@@ -719,6 +719,8 @@ class AppearancePage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
+        if self.__dict__.get("_initial_state_load_pending", False):
+            return
         self._initial_state_plan = plan
         self._ui_language = plan.ui_language
         self._apply_initial_display_state(plan)
