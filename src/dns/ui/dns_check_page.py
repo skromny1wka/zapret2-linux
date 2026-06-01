@@ -42,6 +42,8 @@ class DNSCheckPage(BasePage):
         self._dns = dns_feature
         self._cleanup_in_progress = False
         self._check_runtime = OneShotWorkerRuntime()
+        self._check_pending = False
+        self._check_start_scheduled = False
         self._save_runtime = OneShotWorkerRuntime()
         self._save_results_pending: dict[str, str] | None = None
         self._save_results_start_scheduled = False
@@ -276,8 +278,10 @@ class DNSCheckPage(BasePage):
 
     def start_check(self):
         """Начинает полную проверку DNS."""
-        if self._check_runtime.is_running():
+        if self._check_runtime.is_running() or self.__dict__.get("_check_start_scheduled", False):
+            self._check_pending = True
             return
+        self._check_pending = False
         self._cleanup_in_progress = False
         
         self.result_text.clear()
@@ -350,7 +354,27 @@ class DNSCheckPage(BasePage):
         self._set_status(plan.status_text, tone=plan.status_tone, bold=True)
 
     def _on_check_worker_finished(self, _request_id: int, _thread) -> None:
-        pass
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("_check_pending", False):
+            self._schedule_full_dns_check_start()
+
+    def _schedule_full_dns_check_start(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("_check_start_scheduled", False):
+            return
+        self._check_start_scheduled = True
+        QTimer.singleShot(0, self._run_scheduled_full_dns_check_start)
+
+    def _run_scheduled_full_dns_check_start(self) -> None:
+        self._check_start_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if not self.__dict__.get("_check_pending", False):
+            return
+        self._check_pending = False
+        self.start_check()
     
     def quick_dns_check(self):
         """Выполняет быструю проверку только системного DNS."""
@@ -513,6 +537,8 @@ class DNSCheckPage(BasePage):
 
         try:
             self._cleanup_in_progress = True
+            self._check_pending = False
+            self._check_start_scheduled = False
             self._save_results_pending = None
             self._save_results_start_scheduled = False
             self._quick_check_pending = False
