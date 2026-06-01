@@ -10,7 +10,6 @@ from PyQt6.QtWidgets import (
 )
 
 import hosts.page_plans as hosts_page_plans
-from hosts.page_controller import HostsPageController
 from hosts.ui.page_runtime import create_page_hosts_runtime, create_runtime_cache
 from ui.pages.base_page import BasePage
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
@@ -123,7 +122,7 @@ class HostsPage(BasePage):
             subtitle_key="page.hosts.subtitle",
         )
 
-        self._controller = HostsPageController(deps.hosts_feature)
+        self._hosts = deps.hosts_feature
         self.hosts_runtime = None
         self.service_combos = {}
         self.service_icon_labels = {}
@@ -248,7 +247,7 @@ class HostsPage(BasePage):
             return
         started_at = time.perf_counter()
         self._selection_load_runtime.start_qthread_worker(
-            worker_factory=lambda request_id: self._controller.create_selection_load_worker(
+            worker_factory=lambda request_id: self._hosts.create_selection_load_worker(
                 request_id,
                 self,
             ),
@@ -362,14 +361,14 @@ class HostsPage(BasePage):
         if self.hosts_runtime is not None:
             return
 
-        self.hosts_runtime = create_page_hosts_runtime(self._controller.create_hosts_runtime)
+        self.hosts_runtime = create_page_hosts_runtime(self._hosts.create_hosts_runtime)
 
     def _invalidate_cache(self):
         """Сбрасывает кеш активных доменов"""
         self._runtime_cache.invalidate()
 
     def _get_hosts_path_str(self) -> str:
-        return self._controller.get_hosts_path_str()
+        return self._hosts.get_hosts_path_str()
 
     def _build_ui(self):
         # Информационная заметка
@@ -445,7 +444,7 @@ class HostsPage(BasePage):
             return
         self._catalog_refresh_pending_trigger = ""
         self._catalog_refresh_runtime.start_qthread_worker(
-            worker_factory=lambda request_id: self._controller.create_catalog_refresh_worker(
+            worker_factory=lambda request_id: self._hosts.create_catalog_refresh_worker(
                 request_id,
                 trigger=str(trigger or "watcher"),
                 parent=self,
@@ -467,7 +466,7 @@ class HostsPage(BasePage):
             trigger=str(trigger or "watcher"),
             services_layout_exists=self._services_layout is not None,
             page_visible=self.isVisible(),
-            invalidate_catalog_cache=self._controller.invalidate_catalog_cache,
+            invalidate_catalog_cache=self._hosts.invalidate_catalog_cache,
             rebuild_services_selectors=self._rebuild_services_selectors,
             log_info=lambda message: log(message, "INFO"),
         )
@@ -546,7 +545,7 @@ class HostsPage(BasePage):
         try:
             self._services_catalog_runtime.start_qobject_worker(
                 parent=self,
-                worker_factory=lambda _request_id: self._controller.create_services_catalog_worker(
+                worker_factory=lambda _request_id: self._hosts.create_services_catalog_worker(
                     hosts_runtime=self.hosts_runtime,
                     current_selection=dict(self._service_dns_selection),
                     direct_title=self._tr("page.hosts.group.direct", "Напрямую из hosts"),
@@ -618,7 +617,7 @@ class HostsPage(BasePage):
         self._request_restore_hosts_permissions()
 
     def create_permission_restore_worker(self, request_id: int):
-        return self._controller.create_permission_restore_worker(request_id, self)
+        return self._hosts.create_permission_restore_worker(request_id, self)
 
     def _request_restore_hosts_permissions(self) -> None:
         if self._permission_restore_runtime.is_running():
@@ -912,7 +911,7 @@ class HostsPage(BasePage):
         self._request_open_hosts_file()
 
     def create_open_hosts_file_worker(self, request_id: int):
-        return self._controller.create_open_hosts_file_worker(request_id, self)
+        return self._hosts.create_open_hosts_file_worker(request_id, self)
 
     def _request_open_hosts_file(self) -> None:
         if self._open_file_runtime.is_running() or self.__dict__.get("_open_file_start_scheduled", False):
@@ -980,7 +979,7 @@ class HostsPage(BasePage):
             applying=self._applying,
             operation=operation,
             payload=payload,
-            create_operation_worker_fn=self._controller.create_operation_worker,
+            create_operation_worker_fn=self._hosts.create_operation_worker,
             on_operation_complete=self._on_operation_complete,
             on_thread_finished=self._on_hosts_thread_finished,
             parent=self,
@@ -999,7 +998,7 @@ class HostsPage(BasePage):
             self._selection_save_pending = payload
             return
         self._selection_save_runtime.start_qthread_worker(
-            worker_factory=lambda request_id: self._controller.create_selection_save_worker(
+            worker_factory=lambda request_id: self._hosts.create_selection_save_worker(
                 request_id,
                 payload,
                 self,
@@ -1110,7 +1109,7 @@ class HostsPage(BasePage):
 
         self._state_load_request_context = context
         self._state_load_runtime.start_qthread_worker(
-            worker_factory=lambda request_id: self._controller.create_state_load_worker(
+            worker_factory=lambda request_id: self._hosts.create_state_load_worker(
                 request_id,
                 self.hosts_runtime,
                 self,

@@ -14,12 +14,22 @@ if str(PROJECT_SRC) not in sys.path:
 
 
 class HostsPageRuntimeTests(unittest.TestCase):
+    def test_hosts_page_uses_feature_without_page_controller_wrapper(self) -> None:
+        from hosts.ui.page import HostsPage
+
+        page_source = inspect.getsource(HostsPage)
+        init_source = inspect.getsource(HostsPage.__init__)
+        run_source = inspect.getsource(HostsPage._run_operation)
+
+        self.assertIn("self._hosts = deps.hosts_feature", init_source)
+        self.assertNotIn("HostsPageController", page_source)
+        self.assertNotIn("self._controller", page_source)
+        self.assertIn("create_operation_worker_fn=self._hosts.create_operation_worker", run_source)
+
     def test_hosts_feature_does_not_expose_heavy_direct_actions(self) -> None:
         from app.feature_facades.hosts import build_hosts_feature
-        from hosts.page_controller import HostsPageController
 
         feature = build_hosts_feature()
-        controller = HostsPageController(feature)
 
         for attr_name in (
             "load_user_selection",
@@ -33,10 +43,8 @@ class HostsPageRuntimeTests(unittest.TestCase):
             "execute_hosts_operation",
         ):
             self.assertFalse(hasattr(feature, attr_name), attr_name)
-            self.assertFalse(hasattr(controller, attr_name), attr_name)
 
-    def test_page_controller_passes_status_callback_to_hosts_runtime(self) -> None:
-        from hosts.page_controller import HostsPageController
+    def test_page_feature_passes_status_callback_to_hosts_runtime(self) -> None:
         from hosts.ui.page_runtime import create_page_hosts_runtime
 
         captured = {}
@@ -46,32 +54,28 @@ class HostsPageRuntimeTests(unittest.TestCase):
                 captured["status_callback"] = status_callback
                 return "runtime"
 
-        controller = HostsPageController(HostsFeature())
-
-        runtime = create_page_hosts_runtime(controller.create_hosts_runtime)
+        runtime = create_page_hosts_runtime(HostsFeature().create_hosts_runtime)
 
         self.assertEqual(runtime, "runtime")
         self.assertTrue(callable(captured["status_callback"]))
 
     def test_user_selection_save_runs_through_worker(self) -> None:
-        from hosts.page_controller import HostsPageController
         from hosts.ui.page import HostsPage
         import hosts.commands as hosts_commands
         import hosts.selection_save_worker as selection_save_worker
 
         self.assertTrue(hasattr(selection_save_worker, "HostsSelectionSaveWorker"))
         worker_source = inspect.getsource(selection_save_worker.HostsSelectionSaveWorker.run)
-        controller_source = inspect.getsource(HostsPageController)
         init_source = inspect.getsource(HostsPage.__init__)
         request_source = inspect.getsource(HostsPage._request_user_selection_save)
         finished_source = inspect.getsource(HostsPage._on_user_selection_save_worker_finished)
 
-        self.assertIn("create_selection_save_worker", controller_source)
+        self.assertIn("self._hosts = deps.hosts_feature", init_source)
         self.assertIn("_selection_save_runtime", init_source)
         self.assertIn("start_qthread_worker", request_source)
         self.assertIn("_selection_save_pending", request_source)
         self.assertIn("_selection_save_pending", finished_source)
-        self.assertIn("self._hosts.create_selection_save_worker", controller_source)
+        self.assertIn("self._hosts.create_selection_save_worker", request_source)
         self.assertIn("_save_user_selection", worker_source)
         self.assertNotIn("hosts.commands", worker_source)
         self.assertNotIn("self._controller", worker_source)
@@ -301,44 +305,39 @@ class HostsPageRuntimeTests(unittest.TestCase):
         )
 
     def test_catalog_refresh_signature_runs_through_worker(self) -> None:
-        from hosts.page_controller import HostsPageController
         from hosts.ui.page import HostsPage
         import hosts.catalog_refresh_worker as catalog_refresh_worker
 
-        controller_source = inspect.getsource(HostsPageController)
         page_init_source = inspect.getsource(HostsPage.__init__)
         refresh_source = inspect.getsource(HostsPage._refresh_catalog_if_needed)
         worker_source = inspect.getsource(catalog_refresh_worker.HostsCatalogRefreshWorker)
 
-        self.assertIn("create_catalog_refresh_worker", controller_source)
+        self.assertIn("self._hosts = deps.hosts_feature", page_init_source)
         self.assertIn("_catalog_refresh_runtime", page_init_source)
         self.assertIn("start_qthread_worker", refresh_source)
         self.assertIn("create_catalog_refresh_worker", refresh_source)
         self.assertNotIn("get_catalog_signature_fn=self._controller.get_catalog_signature", refresh_source)
-        self.assertIn("self._hosts.create_catalog_refresh_worker", controller_source)
+        self.assertIn("self._hosts.create_catalog_refresh_worker", refresh_source)
         self.assertIn("_get_catalog_signature", worker_source)
         self.assertNotIn("hosts.commands", worker_source)
         self.assertNotIn("self._controller", worker_source)
 
-    def test_hosts_operation_worker_is_created_by_controller(self) -> None:
-        from hosts.page_controller import HostsPageController
+    def test_hosts_operation_worker_is_created_by_feature(self) -> None:
         from hosts.ui.page import HostsPage
         import hosts.operation_workflow as operation_workflow
 
-        controller_source = inspect.getsource(HostsPageController)
         workflow_source = inspect.getsource(operation_workflow.start_hosts_operation)
         page_init_source = inspect.getsource(HostsPage.__init__)
         run_source = inspect.getsource(HostsPage._run_operation)
         cleanup_source = inspect.getsource(HostsPage.cleanup)
 
-        self.assertIn("create_operation_worker", controller_source)
-        self.assertIn("self._hosts.create_operation_worker", controller_source)
+        self.assertIn("self._hosts = deps.hosts_feature", page_init_source)
         self.assertIn("_operation_runtime = OneShotWorkerRuntime()", page_init_source)
         self.assertIn("operation_runtime=self._operation_runtime", run_source)
         self.assertIn("start_qobject_worker", workflow_source)
         self.assertIn("create_operation_worker_fn", workflow_source)
         self.assertIn("create_operation_worker_fn(", workflow_source)
-        self.assertIn("create_operation_worker_fn=self._controller.create_operation_worker", run_source)
+        self.assertIn("create_operation_worker_fn=self._hosts.create_operation_worker", run_source)
         self.assertIn("_operation_runtime.stop", cleanup_source)
         self.assertIn("_operation_runtime.cancel", cleanup_source)
         self.assertNotIn("QThread", workflow_source)
