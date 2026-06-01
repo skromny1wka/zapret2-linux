@@ -3,7 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable
 
+from PyQt6.QtCore import QTimer
+
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
+
+
+@dataclass(slots=True)
+class TelegramProxyTrayToggleState:
+    pending_count: int = 0
+    start_scheduled: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +37,7 @@ class TelegramProxyFeature:
     consume_auto_deeplink_request: Callable
     _tray_start_runtime: OneShotWorkerRuntime = field(default_factory=OneShotWorkerRuntime)
     _tray_stop_runtime: OneShotWorkerRuntime = field(default_factory=OneShotWorkerRuntime)
+    _tray_toggle_state: TelegramProxyTrayToggleState = field(default_factory=TelegramProxyTrayToggleState)
 
     def is_running(self) -> bool:
         try:
@@ -52,6 +61,8 @@ class TelegramProxyFeature:
             pass
 
     def cleanup(self) -> None:
+        self._tray_toggle_state.pending_count = 0
+        self._tray_toggle_state.start_scheduled = False
         self._tray_start_runtime.stop(blocking=True, warning_prefix="Telegram Proxy tray start worker")
         self._tray_stop_runtime.stop(blocking=True, warning_prefix="Telegram Proxy tray stop worker")
         try:
@@ -179,10 +190,11 @@ class TelegramProxyFeature:
 
     def toggle_async(self) -> None:
         try:
+            if self._tray_toggle_is_busy():
+                self._queue_tray_toggle()
+                return
             manager = self.get_proxy_manager()
             if manager.is_running:
-                if self._tray_stop_runtime.is_running():
-                    return
                 self._tray_stop_runtime.start_qthread_worker(
                     worker_factory=lambda _request_id: self.create_stop_runtime_worker(
                         manager=manager,
@@ -190,11 +202,10 @@ class TelegramProxyFeature:
                         set_enabled=self.set_enabled,
                         enabled_after_stop=False,
                     ),
+                    on_finished=self._on_tray_toggle_worker_finished,
                     signal_includes_request_id=False,
                     loaded_signal_name="stopped",
                 )
-                return
-            if self._tray_start_runtime.is_running():
                 return
 
             config = self.get_start_config()
@@ -206,6 +217,7 @@ class TelegramProxyFeature:
                     host=config.host,
                     upstream_config=config.upstream_config,
                 ),
+                on_finished=self._on_tray_toggle_worker_finished,
                 signal_includes_request_id=False,
                 loaded_signal_name="completed",
             )
@@ -213,6 +225,33 @@ class TelegramProxyFeature:
             from log.log import log
 
             log(f"Telegram Proxy toggle error: {exc}", "WARNING")
+
+    def _tray_toggle_is_busy(self) -> bool:
+        return (
+            self._tray_start_runtime.is_running()
+            or self._tray_stop_runtime.is_running()
+            or bool(self._tray_toggle_state.start_scheduled)
+        )
+
+    def _queue_tray_toggle(self) -> None:
+        self._tray_toggle_state.pending_count += 1
+
+    def _on_tray_toggle_worker_finished(self, _worker) -> None:
+        if self._tray_toggle_state.pending_count > 0:
+            self._schedule_tray_toggle_start()
+
+    def _schedule_tray_toggle_start(self) -> None:
+        if self._tray_toggle_state.start_scheduled:
+            return
+        self._tray_toggle_state.start_scheduled = True
+        QTimer.singleShot(0, self._run_scheduled_tray_toggle)
+
+    def _run_scheduled_tray_toggle(self) -> None:
+        self._tray_toggle_state.start_scheduled = False
+        if self._tray_toggle_state.pending_count <= 0:
+            return
+        self._tray_toggle_state.pending_count -= 1
+        self.toggle_async()
 
 
 def build_telegram_proxy_feature() -> TelegramProxyFeature:
