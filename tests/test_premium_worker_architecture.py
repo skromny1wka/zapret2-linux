@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import importlib.util
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -8,7 +9,6 @@ from unittest.mock import Mock, patch
 from app.feature_facades.premium import PremiumFeature
 import donater.commands as premium_commands
 import donater.open_bot_worker as open_bot_worker
-import donater.premium_page_tasks as premium_page_tasks
 import donater.subscription_manager as subscription_manager
 import donater.subscription_worker as subscription_worker
 from donater.ui.page import PremiumPage
@@ -71,7 +71,7 @@ class PremiumWorkerArchitectureTests(unittest.TestCase):
         self.assertNotIn("start_premium_worker_task", page_source)
         self.assertNotIn("current_thread", page_source)
         self.assertNotIn("is_premium_task_running", page_source)
-        self.assertFalse(hasattr(premium_page_tasks, "start_premium_worker_task"))
+        self.assertIsNone(importlib.util.find_spec("donater.premium_page_tasks"))
 
     def test_pair_code_action_is_remembered_while_checker_initializes(self) -> None:
         page = PremiumPage.__new__(PremiumPage)
