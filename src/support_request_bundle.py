@@ -3,6 +3,7 @@ from __future__ import annotations
 import glob
 import os
 import platform
+import shutil
 import subprocess
 import sys
 import time
@@ -11,8 +12,6 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Sequence
-
-from PyQt6.QtWidgets import QApplication
 
 from config.build_info import APP_VERSION
 from config.config import LOGS_FOLDER
@@ -141,15 +140,90 @@ def build_support_template(
 
 
 def _copy_to_clipboard(text: str) -> bool:
+    value = str(text or "")
+    if not value:
+        return False
+    if sys.platform == "win32":
+        return _copy_to_clipboard_windows(value)
+    if sys.platform == "darwin":
+        return _copy_to_clipboard_command(["pbcopy"], value)
+
+    for command in (
+        ["wl-copy"],
+        ["xclip", "-selection", "clipboard"],
+        ["xsel", "--clipboard", "--input"],
+        ["clip.exe"],
+    ):
+        if shutil.which(command[0]):
+            return _copy_to_clipboard_command(command, value)
+    return False
+
+
+def _copy_to_clipboard_command(command: list[str], text: str) -> bool:
     try:
-        app = QApplication.instance()
-        if app is None:
+        completed = subprocess.run(
+            command,
+            input=text,
+            text=True,
+            capture_output=True,
+            timeout=3,
+            check=False,
+        )
+        return completed.returncode == 0
+    except Exception:
+        return False
+
+
+def _copy_to_clipboard_windows(text: str) -> bool:
+    try:
+        import ctypes
+
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        kernel32.GlobalAlloc.argtypes = [ctypes.c_uint, ctypes.c_size_t]
+        kernel32.GlobalAlloc.restype = ctypes.c_void_p
+        kernel32.GlobalLock.argtypes = [ctypes.c_void_p]
+        kernel32.GlobalLock.restype = ctypes.c_void_p
+        kernel32.GlobalUnlock.argtypes = [ctypes.c_void_p]
+        kernel32.GlobalUnlock.restype = ctypes.c_int
+        kernel32.GlobalFree.argtypes = [ctypes.c_void_p]
+        kernel32.GlobalFree.restype = ctypes.c_void_p
+        user32.OpenClipboard.argtypes = [ctypes.c_void_p]
+        user32.OpenClipboard.restype = ctypes.c_int
+        user32.EmptyClipboard.restype = ctypes.c_int
+        user32.SetClipboardData.argtypes = [ctypes.c_uint, ctypes.c_void_p]
+        user32.SetClipboardData.restype = ctypes.c_void_p
+        user32.CloseClipboard.restype = ctypes.c_int
+
+        encoded = (text + "\0").encode("utf-16le")
+        handle = kernel32.GlobalAlloc(0x0002, len(encoded))
+        if not handle:
             return False
-        clipboard = app.clipboard()
-        if clipboard is None:
+
+        locked = kernel32.GlobalLock(handle)
+        if not locked:
+            kernel32.GlobalFree(handle)
             return False
-        clipboard.setText(text)
-        return True
+
+        ctypes.memmove(locked, encoded, len(encoded))
+        kernel32.GlobalUnlock(handle)
+
+        if not user32.OpenClipboard(None):
+            kernel32.GlobalFree(handle)
+            return False
+
+        handed_to_windows = False
+        try:
+            if not user32.EmptyClipboard():
+                return False
+            if not user32.SetClipboardData(13, handle):
+                return False
+            handed_to_windows = True
+            return True
+        finally:
+            user32.CloseClipboard()
+            if not handed_to_windows:
+                kernel32.GlobalFree(handle)
     except Exception:
         return False
 
