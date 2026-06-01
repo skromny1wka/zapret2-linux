@@ -50,6 +50,26 @@ class LogsWorkerArchitectureTests(unittest.TestCase):
 
         page._request_open_logs_folder.assert_called_once_with()
 
+    def test_open_folder_scheduled_start_is_not_duplicated(self) -> None:
+        page = logs_page.LogsPage.__new__(logs_page.LogsPage)
+        page._cleanup_in_progress = False
+        page._open_folder_pending = False
+        page._open_folder_start_scheduled = False
+        page._request_open_logs_folder = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(logs_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
+            logs_page.LogsPage._schedule_open_logs_folder_start(page)
+            logs_page.LogsPage._schedule_open_logs_folder_start(page)
+
+        single_shot.assert_called_once()
+        self.assertFalse(page._open_folder_pending)
+        page._request_open_logs_folder.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._request_open_logs_folder.assert_called_once_with()
+
     def test_logs_overview_pending_cleanup_restarts_after_event_loop_turn(self) -> None:
         page = logs_page.LogsPage.__new__(logs_page.LogsPage)
         page._cleanup_in_progress = False

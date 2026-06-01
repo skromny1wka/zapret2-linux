@@ -1023,6 +1023,8 @@ class LogsPage(BasePage):
     def _schedule_open_logs_folder_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
+        if self.__dict__.get("_open_folder_start_scheduled", False):
+            return
         self._open_folder_start_scheduled = True
         QTimer.singleShot(0, self._run_scheduled_open_logs_folder_start)
 
