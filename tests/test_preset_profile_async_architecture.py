@@ -2554,7 +2554,11 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
         self.assertIn("create_settings_save_worker", page_source)
         self.assertIn("_settings_save_runtime", page_source)
-        self.assertIn("_settings_save_pending.append", request_source)
+        self.assertIn("_queue_settings_save_payload", request_source)
+        self.assertIn(
+            "_settings_save_pending",
+            inspect.getsource(TelegramProxyPage._queue_settings_save_payload),
+        )
         self.assertIn("_settings_save_runtime.is_running()", request_source)
         self.assertIn("start_qthread_worker", start_source)
         self.assertIn("bind_worker", start_source)
