@@ -1412,6 +1412,7 @@ class ProfileSetupPageBase(BasePage):
             return
         runtime = self._worker_runtime("_list_file_load_runtime")
         if runtime.is_running() or self.__dict__.get("_list_file_load_start_scheduled", False):
+            self._list_file_load_request_id += 1
             self._pending_list_file_load = True
             return
         if self._list_file_status_label is not None:

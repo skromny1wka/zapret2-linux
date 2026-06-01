@@ -168,6 +168,31 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
         self.assertFalse(page._setup_load_dirty)
         self.assertFalse(page._setup_load_start_scheduled)
 
+    def test_list_file_reload_invalidates_running_load_result(self) -> None:
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        runtime = SimpleNamespace(
+            is_running=Mock(return_value=True),
+            start_qthread_worker=Mock(),
+        )
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._editor_tab_built = True
+        page._profile_key = "profile-1"
+        page._list_file_load_runtime = runtime
+        page._list_file_load_request_id = 4
+        page._pending_list_file_load = False
+        page._list_file_load_start_scheduled = False
+        page._list_file_status_label = Mock()
+        page._schedule_list_file_editor_state_apply = Mock()
+
+        ProfileSetupPageBase._request_list_file_editor_state(page)
+        ProfileSetupPageBase._on_list_file_editor_state_loaded(page, 4, object())
+
+        runtime.start_qthread_worker.assert_not_called()
+        self.assertTrue(page._pending_list_file_load)
+        self.assertEqual(page._list_file_load_request_id, 5)
+        page._schedule_list_file_editor_state_apply.assert_not_called()
+
     def test_context_action_worker_receives_action_functions(self) -> None:
         from profile.profile_setup_loader import ProfilePresetProfileActionWorker
 
