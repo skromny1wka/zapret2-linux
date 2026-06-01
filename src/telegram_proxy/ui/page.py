@@ -1459,7 +1459,7 @@ class TelegramProxyPage(BasePage):
             self._external_link_runtime.is_running()
             or self.__dict__.get("_external_link_start_scheduled", False)
         ):
-            self.__dict__.setdefault("_external_link_pending", []).append(
+            self._queue_external_link(
                 {
                     "url": str(url or ""),
                     "success_log": str(success_log or ""),
@@ -1481,6 +1481,18 @@ class TelegramProxyPage(BasePage):
             bind_worker=bind_worker,
             on_finished=self._on_external_link_worker_finished,
         )
+
+    def _queue_external_link(self, payload: dict[str, str]) -> None:
+        queued = {
+            "url": str((payload or {}).get("url") or ""),
+            "success_log": str((payload or {}).get("success_log") or ""),
+            "error_prefix": str((payload or {}).get("error_prefix") or ""),
+        }
+        pending = self.__dict__.setdefault("_external_link_pending", [])
+        url = queued["url"]
+        if url and any(str(item.get("url") or "") == url for item in pending):
+            return
+        pending.append(queued)
 
     def _on_external_link_finished(self, plan) -> None:
         if self._cleanup_in_progress:
@@ -1511,7 +1523,7 @@ class TelegramProxyPage(BasePage):
             "error_prefix": str((payload or {}).get("error_prefix") or ""),
         }
         if self.__dict__.get("_external_link_start_scheduled", False):
-            self.__dict__.setdefault("_external_link_pending", []).append(queued)
+            self._queue_external_link(queued)
             return
         self._external_link_start_scheduled = True
         QTimer.singleShot(0, lambda value=queued: self._run_scheduled_external_link_worker_start(value))

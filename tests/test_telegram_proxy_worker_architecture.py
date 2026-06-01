@@ -310,6 +310,38 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
         )
         page.create_external_link_worker.assert_not_called()
 
+    def test_duplicate_external_link_request_is_queued_once(self) -> None:
+        from telegram_proxy.ui.page import TelegramProxyPage
+
+        class _Runtime:
+            def is_running(self) -> bool:
+                return True
+
+        page = TelegramProxyPage.__new__(TelegramProxyPage)
+        page._external_link_runtime = _Runtime()
+        page._external_link_start_scheduled = False
+        page._external_link_pending = []
+        page.create_external_link_worker = Mock()
+
+        TelegramProxyPage._start_external_link_worker(
+            page,
+            "tg://proxy-one",
+            success_log="one",
+            error_prefix="bad one",
+        )
+        TelegramProxyPage._start_external_link_worker(
+            page,
+            "tg://proxy-one",
+            success_log="one",
+            error_prefix="bad one",
+        )
+
+        self.assertEqual(
+            page._external_link_pending,
+            [{"url": "tg://proxy-one", "success_log": "one", "error_prefix": "bad one"}],
+        )
+        page.create_external_link_worker.assert_not_called()
+
     def test_external_link_worker_finished_schedules_next_queued_link(self) -> None:
         import telegram_proxy.ui.page as telegram_proxy_page
         from telegram_proxy.ui.page import TelegramProxyPage
