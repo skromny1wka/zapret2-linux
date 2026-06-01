@@ -118,6 +118,8 @@ class LogsPage(BasePage):
         self._logs_overview_restart_scheduled = False
         self._tail_runtime = OneShotWorkerRuntime()
         self._support_prepare_runtime = OneShotWorkerRuntime()
+        self._support_prepare_pending = False
+        self._support_prepare_start_scheduled = False
         self._open_folder_runtime = OneShotWorkerRuntime()
         self._open_folder_pending = False
         self._open_folder_start_scheduled = False
@@ -691,8 +693,13 @@ class LogsPage(BasePage):
         self._request_support_prepare()
 
     def _request_support_prepare(self) -> None:
-        if self._support_prepare_runtime.is_running():
+        if (
+            self._support_prepare_runtime.is_running()
+            or self.__dict__.get("_support_prepare_start_scheduled", False)
+        ):
+            self._support_prepare_pending = True
             return
+        self._support_prepare_pending = False
         self._support_prepare_runtime.start_qthread_worker(
             worker_factory=lambda request_id: self._logs.create_support_prepare_worker(
                 request_id,
@@ -702,7 +709,7 @@ class LogsPage(BasePage):
             ),
             on_loaded=self._on_support_prepare_finished,
             on_failed=self._on_support_prepare_failed,
-            on_finished=lambda _worker: None,
+            on_finished=self._on_support_prepare_worker_finished,
         )
 
     def _on_support_prepare_finished(self, request_id: int, result) -> None:
@@ -736,6 +743,29 @@ class LogsPage(BasePage):
                 content=feedback.infobar_content,
                 parent=self.window(),
             )
+
+    def _on_support_prepare_worker_finished(self, _worker) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("_support_prepare_pending", False):
+            self._schedule_support_prepare_start()
+
+    def _schedule_support_prepare_start(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("_support_prepare_start_scheduled", False):
+            return
+        self._support_prepare_start_scheduled = True
+        QTimer.singleShot(0, self._run_scheduled_support_prepare_start)
+
+    def _run_scheduled_support_prepare_start(self) -> None:
+        self._support_prepare_start_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if not self.__dict__.get("_support_prepare_pending", False):
+            return
+        self._support_prepare_pending = False
+        self._request_support_prepare()
 
     def _refresh_logs_list(self, *, run_cleanup: bool = True):
         """Обновляет список доступных лог-файлов"""
@@ -847,6 +877,8 @@ class LogsPage(BasePage):
 
     def _stop_support_prepare_worker(self, blocking: bool = False) -> None:
         try:
+            self._support_prepare_pending = False
+            self._support_prepare_start_scheduled = False
             self._support_prepare_runtime.stop(
                 blocking=blocking,
                 log_fn=log,

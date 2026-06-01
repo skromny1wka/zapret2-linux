@@ -91,6 +91,35 @@ class LogsWorkerArchitectureTests(unittest.TestCase):
 
         page._refresh_logs_list.assert_called_once_with(run_cleanup=True)
 
+    def test_support_prepare_pending_restarts_after_event_loop_turn(self) -> None:
+        page = logs_page.LogsPage.__new__(logs_page.LogsPage)
+        page._cleanup_in_progress = False
+        page._support_prepare_pending = True
+        page._request_support_prepare = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(logs_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
+            logs_page.LogsPage._on_support_prepare_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._request_support_prepare.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._request_support_prepare.assert_called_once_with()
+
+    def test_support_prepare_request_waits_while_restart_is_scheduled(self) -> None:
+        page = logs_page.LogsPage.__new__(logs_page.LogsPage)
+        page._support_prepare_start_scheduled = True
+        page._support_prepare_pending = False
+        page._support_prepare_runtime = SimpleNamespace(is_running=Mock(return_value=False), start_qthread_worker=Mock())
+
+        logs_page.LogsPage._request_support_prepare(page)
+
+        page._support_prepare_runtime.start_qthread_worker.assert_not_called()
+        self.assertTrue(page._support_prepare_pending)
+
 
 if __name__ == "__main__":
     unittest.main()
