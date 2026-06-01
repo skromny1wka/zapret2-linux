@@ -34,6 +34,31 @@ class DpiSettingsWorkerQueueTests(unittest.TestCase):
 
         page._start_dpi_settings_worker.assert_called_once_with(("apply_launch_method", "zapret2_mode"))
 
+    def test_dpi_settings_scheduled_start_queues_latest_action(self) -> None:
+        import settings.dpi.page as dpi_page
+        from settings.dpi.page import DpiSettingsPage
+
+        page = DpiSettingsPage.__new__(DpiSettingsPage)
+        page._cleanup_in_progress = False
+        page._dpi_settings_start_scheduled = False
+        page._dpi_settings_pending = []
+        page._start_dpi_settings_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        old_payload = ("apply_launch_method", "zapret1_mode")
+        new_payload = ("apply_launch_method", "zapret2_mode")
+        with patch.object(dpi_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            DpiSettingsPage._schedule_dpi_settings_worker_start(page, old_payload)
+            DpiSettingsPage._schedule_dpi_settings_worker_start(page, new_payload)
+
+        single_shot.assert_called_once()
+        self.assertEqual(page._dpi_settings_pending, [new_payload])
+
+        single_shot.call_args.args[1]()
+
+        page._start_dpi_settings_worker.assert_called_once_with(old_payload)
+        self.assertEqual(page._dpi_settings_pending, [new_payload])
+
     def test_orchestra_setting_pending_restarts_after_event_loop_turn(self) -> None:
         import settings.dpi.page as dpi_page
         from settings.dpi.page import DpiSettingsPage
@@ -54,6 +79,31 @@ class DpiSettingsWorkerQueueTests(unittest.TestCase):
         single_shot.call_args.args[1]()
 
         page._start_orchestra_setting_save_worker.assert_called_once_with(("debug_file", True))
+
+    def test_orchestra_setting_scheduled_start_queues_latest_value(self) -> None:
+        import settings.dpi.page as dpi_page
+        from settings.dpi.page import DpiSettingsPage
+
+        page = DpiSettingsPage.__new__(DpiSettingsPage)
+        page._cleanup_in_progress = False
+        page._orchestra_settings_save_start_scheduled = False
+        page._orchestra_settings_save_pending = []
+        page._start_orchestra_setting_save_worker = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        old_payload = ("debug_file", True)
+        new_payload = ("debug_file", False)
+        with patch.object(dpi_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            DpiSettingsPage._schedule_orchestra_setting_save_worker_start(page, old_payload)
+            DpiSettingsPage._schedule_orchestra_setting_save_worker_start(page, new_payload)
+
+        single_shot.assert_called_once()
+        self.assertEqual(page._orchestra_settings_save_pending, [new_payload])
+
+        single_shot.call_args.args[1]()
+
+        page._start_orchestra_setting_save_worker.assert_called_once_with(old_payload)
+        self.assertEqual(page._orchestra_settings_save_pending, [new_payload])
 
 
 if __name__ == "__main__":

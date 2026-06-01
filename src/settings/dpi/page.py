@@ -395,6 +395,10 @@ class DpiSettingsPage(BasePage):
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         queued = (str(payload[0] if payload else ""), str(payload[1] if payload else ""))
+        if self.__dict__.get("_dpi_settings_start_scheduled", False):
+            self._dpi_settings_pending.append(queued)
+            self._coalesce_dpi_settings_pending()
+            return
         self._dpi_settings_start_scheduled = True
         QTimer.singleShot(0, lambda value=queued: self._run_scheduled_dpi_settings_worker_start(value))
 
@@ -556,6 +560,10 @@ class DpiSettingsPage(BasePage):
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         queued = (str(payload[0] if payload else ""), payload[1] if payload else None)
+        if self.__dict__.get("_orchestra_settings_save_start_scheduled", False):
+            self._orchestra_settings_save_pending.append(queued)
+            self._coalesce_orchestra_settings_save_pending()
+            return
         self._orchestra_settings_save_start_scheduled = True
         QTimer.singleShot(0, lambda value=queued: self._run_scheduled_orchestra_setting_save_worker_start(value))
 
