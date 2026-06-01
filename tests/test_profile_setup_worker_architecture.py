@@ -313,6 +313,45 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
             ],
         )
 
+    def test_profile_folder_set_collapsed_keeps_latest_pending_state(self) -> None:
+        from profile.ui.preset_setup_page import PresetSetupPageBase
+
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._profile_folder_action_start_scheduled = True
+        page._profile_folder_action_pending = []
+        page._profile_folder_action_runtime = SimpleNamespace(is_running=Mock(return_value=False), start_qthread_worker=Mock())
+
+        PresetSetupPageBase._request_profile_folder_action(
+            page,
+            "set_collapsed",
+            folder_key="games",
+            collapsed=True,
+            refresh=False,
+        )
+        PresetSetupPageBase._request_profile_folder_action(
+            page,
+            "set_collapsed",
+            folder_key="games",
+            collapsed=False,
+            refresh=False,
+        )
+
+        page._profile_folder_action_runtime.start_qthread_worker.assert_not_called()
+        self.assertEqual(
+            page._profile_folder_action_pending,
+            [
+                {
+                    "action": "set_collapsed",
+                    "folder_key": "games",
+                    "name": "",
+                    "direction": 0,
+                    "collapsed": False,
+                    "refresh": False,
+                    "context_extra": {},
+                }
+            ],
+        )
+
     def test_profile_context_action_waits_while_next_write_start_is_scheduled(self) -> None:
         from profile.ui.preset_setup_page import PresetSetupPageBase
 

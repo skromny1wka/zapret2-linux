@@ -1533,7 +1533,11 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("self._load_profile_folder_state", worker_source)
         self.assertNotIn("from profile.folders", worker_source)
         self.assertNotIn("from profile.folders import", inspect.getsource(PresetSetupPageBase))
-        self.assertIn("_profile_folder_action_pending.append", request_source)
+        self.assertIn("_queue_profile_folder_action", request_source)
+        self.assertIn(
+            "_profile_folder_action_pending",
+            inspect.getsource(PresetSetupPageBase._queue_profile_folder_action),
+        )
         self.assertIn("_profile_folder_action_pending.pop(0)", finished_source)
         self.assertIn("show_menu", action_finished_source)
         self.assertIn("_create_profile_folder_action_worker", request_source)
