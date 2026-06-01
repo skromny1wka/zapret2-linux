@@ -156,6 +156,30 @@ class BlobsWorkerArchitectureTests(unittest.TestCase):
         page._start_blob_action_worker.assert_called_once_with(old_payload)
         self.assertEqual(page._blob_action_pending, [new_payload])
 
+    def test_duplicate_blob_action_is_queued_once(self) -> None:
+        page = BlobsPage.__new__(BlobsPage)
+        page._blob_action_runtime = SimpleNamespace(is_running=Mock(return_value=True))
+        page._blob_action_start_scheduled = False
+        page._blob_action_pending = []
+        page._start_blob_action_worker = Mock()
+
+        BlobsPage._request_blob_action(page, "delete", name="same.bin")
+        BlobsPage._request_blob_action(page, "delete", name="same.bin")
+
+        self.assertEqual(
+            page._blob_action_pending,
+            [
+                {
+                    "action": "delete",
+                    "name": "same.bin",
+                    "blob_type": "",
+                    "value": "",
+                    "description": "",
+                }
+            ],
+        )
+        page._start_blob_action_worker.assert_not_called()
+
     def test_blob_open_action_pending_restarts_after_event_loop_turn(self) -> None:
         page = BlobsPage.__new__(BlobsPage)
         page._cleanup_in_progress = False
@@ -193,6 +217,19 @@ class BlobsWorkerArchitectureTests(unittest.TestCase):
 
         page._start_blob_open_action_worker.assert_called_once_with("bin_folder")
         self.assertEqual(page._blob_open_action_pending, ["blobs_json"])
+
+    def test_duplicate_blob_open_action_is_queued_once(self) -> None:
+        page = BlobsPage.__new__(BlobsPage)
+        page._blob_open_action_runtime = SimpleNamespace(is_running=Mock(return_value=True))
+        page._blob_open_action_start_scheduled = False
+        page._blob_open_action_pending = []
+        page._start_blob_open_action_worker = Mock()
+
+        BlobsPage._request_blob_open_action(page, "blobs_json")
+        BlobsPage._request_blob_open_action(page, "blobs_json")
+
+        self.assertEqual(page._blob_open_action_pending, ["blobs_json"])
+        page._start_blob_open_action_worker.assert_not_called()
 
 
 if __name__ == "__main__":

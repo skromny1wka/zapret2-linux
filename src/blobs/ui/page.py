@@ -331,9 +331,16 @@ class BlobsPage(BasePage):
             "description": str(description or ""),
         }
         if self._blob_action_runtime.is_running() or self.__dict__.get("_blob_action_start_scheduled", False):
-            self._blob_action_pending.append(payload)
+            self._queue_blob_action(payload)
             return
         self._start_blob_action_worker(payload)
+
+    def _queue_blob_action(self, payload: dict[str, str]) -> None:
+        queued = dict(payload or {})
+        pending = self.__dict__.setdefault("_blob_action_pending", [])
+        if queued in pending:
+            return
+        pending.append(queued)
 
     def _start_blob_action_worker(self, payload: dict[str, str]) -> None:
         self._blob_action_runtime.start_qthread_worker(
@@ -410,7 +417,7 @@ class BlobsPage(BasePage):
             return
         queued = dict(payload or {})
         if self.__dict__.get("_blob_action_start_scheduled", False):
-            self._blob_action_pending.append(queued)
+            self._queue_blob_action(queued)
             return
         self._blob_action_start_scheduled = True
         QTimer.singleShot(0, lambda value=queued: self._run_scheduled_blob_action_worker_start(value))
@@ -445,9 +452,18 @@ class BlobsPage(BasePage):
         if not action:
             return
         if self._blob_open_action_runtime.is_running() or self.__dict__.get("_blob_open_action_start_scheduled", False):
-            self._blob_open_action_pending.append(action)
+            self._queue_blob_open_action(action)
             return
         self._start_blob_open_action_worker(action)
+
+    def _queue_blob_open_action(self, action: str) -> None:
+        clean_action = str(action or "").strip()
+        if not clean_action:
+            return
+        pending = self.__dict__.setdefault("_blob_open_action_pending", [])
+        if clean_action in pending:
+            return
+        pending.append(clean_action)
 
     def _start_blob_open_action_worker(self, action: str) -> None:
         self._blob_open_action_runtime.start_qthread_worker(
@@ -484,7 +500,7 @@ class BlobsPage(BasePage):
         if not clean_action or self.__dict__.get("_cleanup_in_progress", False):
             return
         if self.__dict__.get("_blob_open_action_start_scheduled", False):
-            self._blob_open_action_pending.append(clean_action)
+            self._queue_blob_open_action(clean_action)
             return
         self._blob_open_action_start_scheduled = True
         QTimer.singleShot(0, lambda value=clean_action: self._run_scheduled_blob_open_action_worker_start(value))
