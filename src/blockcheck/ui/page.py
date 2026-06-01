@@ -1068,6 +1068,8 @@ class BlockcheckPage(BasePage):
         ):
             return
         context = dict(context or {})
+        if self._has_pending_user_domain_action(str(context.get("domain") or result or "")):
+            return
         if action == "add":
             text = str(context.get("domain") or "")
             normalized = str(result or "").strip()
@@ -1098,6 +1100,16 @@ class BlockcheckPage(BasePage):
         ):
             return
         logger.warning("Failed to %s BlockCheck domain: %s", action, error)
+
+    def _has_pending_user_domain_action(self, domain: str) -> bool:
+        candidate = str(domain or "").strip()
+        if not candidate:
+            return False
+        pending_actions = self.__dict__.setdefault("_user_domain_action_pending", [])
+        return any(
+            str(item.get("domain") or "").strip() == candidate
+            for item in pending_actions
+        )
 
     def _on_user_domain_action_runtime_finished(self, _worker) -> None:
         if self._user_domain_action_pending and not self._cleanup_in_progress:

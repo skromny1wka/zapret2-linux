@@ -97,6 +97,43 @@ class BlockcheckUserDomainRuntimeArchitectureTests(unittest.TestCase):
             ],
         )
 
+    def test_user_domain_add_result_ignored_when_same_domain_action_is_pending(self) -> None:
+        page = BlockcheckPage.__new__(BlockcheckPage)
+        page._cleanup_in_progress = False
+        page._user_domain_action_pending = [{"action": "remove", "domain": "example.com"}]
+        page._user_domain_action_runtime = SimpleNamespace(is_current=Mock(return_value=True))
+        page._add_chip = Mock()
+        page._domain_input = SimpleNamespace(clear=Mock())
+
+        BlockcheckPage._on_user_domain_action_finished(
+            page,
+            5,
+            "add",
+            "example.com",
+            {"domain": "example.com"},
+        )
+
+        page._add_chip.assert_not_called()
+        page._domain_input.clear.assert_not_called()
+
+    def test_user_domain_remove_result_ignored_when_same_domain_action_is_pending(self) -> None:
+        page = BlockcheckPage.__new__(BlockcheckPage)
+        page._cleanup_in_progress = False
+        page._user_domain_action_pending = [{"action": "add", "domain": "example.com"}]
+        page._user_domain_action_runtime = SimpleNamespace(is_current=Mock(return_value=True))
+        page._domains_flow_layout = object()
+
+        with patch("blockcheck.ui.page.remove_domain_chip") as remove_chip:
+            BlockcheckPage._on_user_domain_action_finished(
+                page,
+                5,
+                "remove",
+                "example.com",
+                {"domain": "example.com"},
+            )
+
+        remove_chip.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
