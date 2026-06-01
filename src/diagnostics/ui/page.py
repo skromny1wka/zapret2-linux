@@ -1,6 +1,6 @@
 """Новая вкладка диагностики соединений в стиле Windows 11."""
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -56,6 +56,8 @@ class ConnectionTestPage(BasePage):
         self._cleanup_in_progress = False
         self._connection_test_runtime = OneShotWorkerRuntime()
         self._support_prepare_runtime = OneShotWorkerRuntime()
+        self._support_prepare_pending = None
+        self._support_prepare_start_scheduled = False
 
         # Контейнер с ограниченной шириной, чтобы не расползалось за края
         self.container = QWidget(self.content)
@@ -277,17 +279,24 @@ class ConnectionTestPage(BasePage):
         self._request_support_prepare(selection=self.test_combo.currentText())
 
     def _request_support_prepare(self, *, selection: str) -> None:
-        if self._support_prepare_runtime.is_running():
+        payload = {"selection": str(selection or "")}
+        if (
+            self._support_prepare_runtime.is_running()
+            or self.__dict__.get("_support_prepare_start_scheduled", False)
+        ):
+            self._support_prepare_pending = dict(payload)
             self._set_status("Подготовка обращения уже идёт...", "info")
             return
         self._set_status("Подготовка обращения...", "info")
         if self.send_log_btn is not None:
             self.send_log_btn.setEnabled(False)
+        self._start_support_prepare_worker(payload)
 
+    def _start_support_prepare_worker(self, payload: dict) -> None:
         self._support_prepare_runtime.start_qthread_worker(
             worker_factory=lambda request_id: self.create_support_prepare_worker(
                 request_id,
-                selection=selection,
+                selection=str(payload.get("selection") or ""),
             ),
             on_failed=self._on_support_prepare_failed,
             on_finished=self._on_support_prepare_worker_finished,
@@ -317,8 +326,32 @@ class ConnectionTestPage(BasePage):
         self._set_status("Ошибка подготовки обращения", "error")
 
     def _on_support_prepare_worker_finished(self, _worker) -> None:
+        pending = self.__dict__.get("_support_prepare_pending")
+        if pending is not None and not self._cleanup_in_progress:
+            self._schedule_support_prepare_worker_start(dict(pending or {}))
+            return
         if not self._cleanup_in_progress and self.send_log_btn is not None:
             self.send_log_btn.setEnabled(True)
+
+    def _schedule_support_prepare_worker_start(self, payload: dict) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._support_prepare_pending = dict(payload or {})
+        if self.__dict__.get("_support_prepare_start_scheduled", False):
+            return
+        self._support_prepare_start_scheduled = True
+        QTimer.singleShot(0, self._run_scheduled_support_prepare_worker_start)
+
+    def _run_scheduled_support_prepare_worker_start(self) -> None:
+        self._support_prepare_start_scheduled = False
+        pending = self.__dict__.get("_support_prepare_pending")
+        self._support_prepare_pending = None
+        if pending is None or self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._set_status("Подготовка обращения...", "info")
+        if self.send_log_btn is not None:
+            self.send_log_btn.setEnabled(False)
+        self._start_support_prepare_worker(dict(pending or {}))
 
     # ──────────────────────────────────────────────────────────────
     # Вспомогательное
@@ -378,6 +411,8 @@ class ConnectionTestPage(BasePage):
                 warning_prefix="connection_support_prepare_worker",
             )
             self._support_prepare_runtime.cancel()
-            
+            self._support_prepare_pending = None
+            self._support_prepare_start_scheduled = False
+
         except Exception as e:
             log(f"Ошибка при очистке connection_page: {e}", "DEBUG")

@@ -4469,7 +4469,12 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         support_worker = importlib.import_module("diagnostics.support_worker")
         page_source = inspect.getsource(ConnectionTestPage)
         handler_source = inspect.getsource(ConnectionTestPage.open_support_with_log)
-        request_source = inspect.getsource(ConnectionTestPage._request_support_prepare)
+        request_source = "\n".join(
+            (
+                inspect.getsource(ConnectionTestPage._request_support_prepare),
+                inspect.getsource(ConnectionTestPage._start_support_prepare_worker),
+            )
+        )
         handler_body = handler_source.split("\n", 1)[1]
         worker_source = inspect.getsource(support_worker.ConnectionSupportPrepareWorker.run)
         feature_source = inspect.getsource(DiagnosticsFeature)
