@@ -130,6 +130,35 @@ class UserPresetWriteSerializationTests(unittest.TestCase):
             ],
         )
 
+    def test_folder_action_result_ignored_when_new_folder_action_is_pending(self) -> None:
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_folder_action_request_id = 5
+        page._preset_folder_action_pending = [
+            {
+                "action": "rename",
+                "folder_key": "games",
+                "name": "Games",
+                "direction": 0,
+                "collapsed": False,
+                "context_extra": {},
+            }
+        ]
+        page._runtime_service = Mock()
+        page._show_folder_menu_with_state = Mock()
+        page._refresh_presets_view_from_cache = Mock()
+
+        UserPresetsPageBase._on_preset_folder_action_finished(
+            page,
+            5,
+            "rename",
+            True,
+            {"folder_state": {"folders": {}, "items": {}}},
+        )
+
+        page._runtime_service.update_cached_folder_state.assert_not_called()
+        page._show_folder_menu_with_state.assert_not_called()
+        page._refresh_presets_view_from_cache.assert_not_called()
+
     def test_storage_action_waits_while_next_write_start_is_scheduled(self) -> None:
         page = UserPresetsPageBase.__new__(UserPresetsPageBase)
         page._preset_write_action_start_scheduled = True

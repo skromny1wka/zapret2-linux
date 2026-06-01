@@ -1215,6 +1215,8 @@ class UserPresetsPageBase(BasePage):
     def _on_preset_folder_action_finished(self, request_id: int, action: str, result, context) -> None:
         if request_id != int(getattr(self, "_preset_folder_action_request_id", 0) or 0):
             return
+        if self.__dict__.get("_preset_folder_action_pending"):
+            return
         context = dict(context or {})
         if isinstance(result, dict):
             self._runtime_service.update_cached_folder_state(result)
