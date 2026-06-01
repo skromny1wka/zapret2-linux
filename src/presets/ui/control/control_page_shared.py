@@ -517,13 +517,9 @@ def cleanup_control_page_subscriptions(owner) -> None:
     runtime = getattr(owner, "_refresh_runtime", None)
     if runtime is not None:
         runtime.top_summary_pending = False
-        worker = getattr(runtime, "top_summary_worker", None)
-        if worker is not None:
-            try:
-                worker.quit()
-            except Exception:
-                pass
-            runtime.top_summary_worker = None
+        runtime.top_summary_start_scheduled = False
+        runtime.top_summary_runtime.stop(warning_prefix="Control top summary worker")
+        runtime.top_summary_runtime.cancel()
 
         runtime.program_settings_load_pending = False
         runtime.program_settings_load_start_scheduled = False

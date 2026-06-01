@@ -16,6 +16,7 @@ class ModeControlRefreshRuntime:
         self.additional_settings_dirty = True
         self.top_summary_runtime = OneShotWorkerRuntime()
         self.top_summary_pending = False
+        self.top_summary_start_scheduled = False
         self.top_summary_request_id = 0
         self.program_settings_load_runtime = OneShotWorkerRuntime()
         self.program_settings_load_pending = False
@@ -59,6 +60,7 @@ class ModeControlRefreshRuntime:
     def stop_workers(self, *, log_fn=None) -> None:
         self.additional_settings_load_start_scheduled = False
         self.additional_settings_save_start_scheduled = False
+        self.top_summary_start_scheduled = False
         self.program_settings_load_start_scheduled = False
         self.program_settings_save_start_scheduled = False
         for runtime, label in (

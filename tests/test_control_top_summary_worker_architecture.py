@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import unittest
 
+import presets.ui.control.control_page_shared as control_page_shared
 from presets.ui.control.zapret1.page import Zapret1ModeControlPage
 from presets.ui.control.zapret2.page import Zapret2ModeControlPage
 import ui.page_deps.presets as preset_page_deps
@@ -50,6 +51,7 @@ class ControlTopSummaryWorkerArchitectureTests(unittest.TestCase):
     def test_control_pages_start_refresh_workers_through_runtime(self) -> None:
         for page_cls in (Zapret1ModeControlPage, Zapret2ModeControlPage):
             top_summary_source = inspect.getsource(page_cls._request_top_summary_worker)
+            top_summary_finished_source = inspect.getsource(page_cls._on_top_summary_worker_finished)
             load_source = inspect.getsource(page_cls._schedule_additional_settings_reload)
             save_source = inspect.getsource(page_cls._start_additional_settings_save_worker)
             page_source = inspect.getsource(page_cls)
@@ -58,9 +60,15 @@ class ControlTopSummaryWorkerArchitectureTests(unittest.TestCase):
                 self.assertIn("start_qthread_worker", source)
                 self.assertNotIn("worker.start()", source)
 
+            self.assertIn("_schedule_top_summary_worker_start", top_summary_finished_source)
+            self.assertNotIn("self._request_top_summary_worker()", top_summary_finished_source)
             self.assertNotIn("runtime.top_summary_worker", page_source)
             self.assertNotIn("runtime.additional_settings_worker", page_source)
             self.assertNotIn("runtime.additional_settings_save_worker", page_source)
+
+        cleanup_source = inspect.getsource(control_page_shared.cleanup_control_page_subscriptions)
+        self.assertIn("top_summary_runtime.stop", cleanup_source)
+        self.assertNotIn("top_summary_worker", cleanup_source)
 
     def test_page_deps_wraps_additional_settings_setters_inside_worker_factory(self) -> None:
         source = inspect.getsource(preset_page_deps.build_control_page_kwargs)
