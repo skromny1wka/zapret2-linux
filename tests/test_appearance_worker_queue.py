@@ -13,6 +13,47 @@ if str(PROJECT_SRC) not in sys.path:
 
 
 class AppearanceWorkerQueueTests(unittest.TestCase):
+    def test_initial_state_load_queues_while_worker_runs(self) -> None:
+        from ui.pages.appearance_page import AppearancePage
+
+        page = AppearancePage.__new__(AppearancePage)
+        page._cleanup_in_progress = False
+        page._initial_state_plan = None
+        page._initial_state_load_runtime = SimpleNamespace(is_running=Mock(return_value=True), start_qthread_worker=Mock())
+        page._initial_state_load_pending = False
+        page._initial_state_load_pending_force = False
+
+        AppearancePage._request_initial_state_load(page, force=True)
+
+        page._initial_state_load_runtime.start_qthread_worker.assert_not_called()
+        self.assertTrue(page._initial_state_load_pending)
+        self.assertTrue(page._initial_state_load_pending_force)
+
+    def test_initial_state_pending_load_restarts_after_event_loop_turn(self) -> None:
+        import ui.pages.appearance_page as appearance_page
+        from ui.pages.appearance_page import AppearancePage
+
+        page = AppearancePage.__new__(AppearancePage)
+        page._cleanup_in_progress = False
+        page._initial_state_load_pending = True
+        page._initial_state_load_pending_force = True
+        page._initial_state_load_start_scheduled = False
+        page._request_initial_state_load = Mock()
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(appearance_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
+            AppearancePage._on_initial_state_worker_finished(page, object())
+
+        single_shot.assert_called_once()
+        self.assertEqual(single_shot.call_args.args[0], 0)
+        page._request_initial_state_load.assert_not_called()
+
+        single_shot.call_args.args[1]()
+
+        page._request_initial_state_load.assert_called_once_with(force=True)
+        self.assertFalse(page._initial_state_load_pending)
+        self.assertFalse(page._initial_state_load_pending_force)
+
     def test_appearance_save_pending_restarts_after_event_loop_turn(self) -> None:
         import ui.pages.appearance_page as appearance_page
         from ui.pages.appearance_page import AppearancePage
