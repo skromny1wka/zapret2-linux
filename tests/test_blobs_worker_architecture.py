@@ -55,6 +55,7 @@ class BlobsWorkerArchitectureTests(unittest.TestCase):
     def test_blobs_runtime_helpers_do_not_keep_direct_open_actions(self) -> None:
         helper_names = set(vars(blobs_runtime_helpers))
 
+        self.assertNotIn("reload_blobs_data", helper_names)
         self.assertNotIn("open_bin_folder_action", helper_names)
         self.assertNotIn("open_json_action", helper_names)
 

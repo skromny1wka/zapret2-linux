@@ -136,28 +136,6 @@ def delete_blob_named(
     request_blob_action_fn("delete", name=name)
 
 
-def reload_blobs_data(
-    *,
-    cleanup_in_progress: bool,
-    reload_btn,
-    reload_callback,
-    reload_blobs_fn,
-    log_info,
-    log_error,
-) -> None:
-    if cleanup_in_progress:
-        return
-    reload_btn.set_loading(True)
-    try:
-        reload_blobs_fn()
-        reload_callback()
-        log_info("Блобы перезагружены")
-    except Exception as exc:
-        log_error(f"Ошибка перезагрузки блобов: {exc}")
-    finally:
-        reload_btn.set_loading(False)
-
-
 def apply_blobs_language(
     *,
     tr_fn,
