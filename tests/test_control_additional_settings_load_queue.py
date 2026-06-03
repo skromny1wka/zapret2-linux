@@ -26,6 +26,7 @@ def _make_refresh_runtime(*, running: bool):
         additional_settings_dirty=False,
         additional_settings_request_id=0,
         next_additional_settings_request_id=Mock(return_value=1),
+        accept_additional_settings_result=Mock(return_value=True),
     )
     return runtime, load_runtime
 
@@ -158,6 +159,30 @@ class ControlAdditionalSettingsLoadQueueTests(unittest.TestCase):
         self.assertTrue(runtime.additional_settings_load_pending)
         self.assertTrue(runtime.additional_settings_dirty)
         self.assertEqual(len(callbacks), 1)
+
+    def test_zapret1_additional_settings_result_ignored_when_new_load_is_pending(self) -> None:
+        from presets.ui.control.zapret1.page import Zapret1ModeControlPage
+
+        runtime, _load_runtime = _make_refresh_runtime(running=False)
+        runtime.additional_settings_load_pending = True
+        page = _make_page(Zapret1ModeControlPage, runtime)
+        page._apply_additional_settings_state = Mock()
+
+        Zapret1ModeControlPage._on_additional_settings_loaded(page, 1, {"discord_restart": True})
+
+        page._apply_additional_settings_state.assert_not_called()
+
+    def test_zapret2_additional_settings_result_ignored_when_new_load_is_pending(self) -> None:
+        from presets.ui.control.zapret2.page import Zapret2ModeControlPage
+
+        runtime, _load_runtime = _make_refresh_runtime(running=False)
+        runtime.additional_settings_load_pending = True
+        page = _make_page(Zapret2ModeControlPage, runtime)
+        page._apply_additional_settings_state = Mock()
+
+        Zapret2ModeControlPage._on_additional_settings_loaded(page, 1, {"discord_restart": True})
+
+        page._apply_additional_settings_state.assert_not_called()
 
 
 if __name__ == "__main__":

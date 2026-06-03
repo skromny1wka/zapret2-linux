@@ -511,6 +511,8 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
     def _on_additional_settings_loaded(self, request_id: int, state: dict) -> None:
         if not self._refresh_runtime.accept_additional_settings_result(request_id):
             return
+        if bool(getattr(self._refresh_runtime, "additional_settings_load_pending", False)):
+            return
         plan = _zapret2_page_runtime().build_additional_settings_state(state if isinstance(state, dict) else {})
         self._apply_additional_settings_state(plan)
 
