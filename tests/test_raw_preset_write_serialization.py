@@ -106,6 +106,36 @@ class RawPresetWriteSerializationTests(unittest.TestCase):
         page.create_raw_preset_activate_worker.assert_called_once_with(1, "Next.txt", page)
         self.assertEqual(page._raw_activate_runtime.started, [worker])
 
+    def test_stale_raw_preset_action_worker_finished_does_not_start_pending_activation(self) -> None:
+        old_worker = object()
+        current_worker = object()
+        page = PresetRawEditorPage.__new__(PresetRawEditorPage)
+        page._raw_action_runtime_worker = current_worker
+        page._raw_action_runtime = _Runtime(running=False)
+        page._raw_activate_runtime = _Runtime(running=False)
+        page._raw_save_runtime = _Runtime(running=False)
+        page._raw_preset_write_operation_start_scheduled = False
+        page._raw_preset_save_start_scheduled = False
+        page._raw_preset_activation_start_scheduled = False
+        page._cleanup_in_progress = False
+        page._pending_raw_preset_write_operations = [{"kind": "activate", "file_name": "Next.txt"}]
+        page.create_raw_preset_activate_worker = Mock()
+        callbacks = []
+
+        with patch(
+            "presets.ui.common.preset_subpage_base.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            PresetRawEditorPage._on_raw_preset_action_worker_finished(page, old_worker)
+
+        self.assertIs(page._raw_action_runtime_worker, current_worker)
+        self.assertEqual(callbacks, [])
+        page.create_raw_preset_activate_worker.assert_not_called()
+        self.assertEqual(
+            page._pending_raw_preset_write_operations,
+            [{"kind": "activate", "file_name": "Next.txt"}],
+        )
+
     def test_duplicate_raw_preset_action_is_not_replayed_from_old_queue(self) -> None:
         worker = object()
         page = PresetRawEditorPage.__new__(PresetRawEditorPage)
