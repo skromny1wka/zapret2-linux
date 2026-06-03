@@ -3158,6 +3158,8 @@ class ProfileSetupPageBase(BasePage):
     def _on_enabled_save_failed(self, request_id: int, error: str) -> None:
         if request_id != self._enabled_save_request_id:
             return
+        if self.__dict__.get("_pending_enabled_save") is not None:
+            return
         if self._enabled_checkbox is not None:
             set_widget_enabled_if_changed(self._enabled_checkbox, True)
         log(f"{self.__class__.__name__}: не удалось изменить состояние профиля: {error}", "ERROR")
