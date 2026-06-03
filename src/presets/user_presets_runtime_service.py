@@ -771,6 +771,8 @@ class UserPresetsRuntimeService:
     def _on_metadata_failed(self, request_id: int, error: str, page=None) -> None:
         if request_id != self._metadata_load_request_id:
             return
+        if self.__dict__.get("_metadata_load_pending_page") is not None:
+            return
         _ = self._resolve_page(page)
         self._ui_dirty = True
         log(f"Ошибка загрузки пресетов: {error}", "ERROR")
