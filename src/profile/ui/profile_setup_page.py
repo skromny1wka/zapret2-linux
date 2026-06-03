@@ -2628,9 +2628,11 @@ class ProfileSetupPageBase(BasePage):
     def _on_list_file_save_failed(self, request_id: int, error: str) -> None:
         if request_id != self._list_file_save_request_id:
             return
+        if self.__dict__.get("_pending_list_file_save"):
+            return
         log(f"{self.__class__.__name__}: не удалось сохранить файл списка profile: {error}", "ERROR")
         self._render_list_file_validation((), fallback_error=str(error))
-        if self._list_file_save_button is not None and not self.__dict__.get("_pending_list_file_save"):
+        if self._list_file_save_button is not None:
             set_widget_enabled_if_changed(self._list_file_save_button, True)
         InfoBar.error(title="Ошибка", content=str(error), parent=self.window())
 
@@ -3032,7 +3034,9 @@ class ProfileSetupPageBase(BasePage):
     def _on_raw_profile_save_failed(self, request_id: int, error: str) -> None:
         if request_id != self._raw_profile_save_request_id:
             return
-        if self._raw_profile_save_button is not None and not self.__dict__.get("_pending_raw_profile_save"):
+        if self.__dict__.get("_pending_raw_profile_save"):
+            return
+        if self._raw_profile_save_button is not None:
             set_widget_enabled_if_changed(self._raw_profile_save_button, True)
         log(f"{self.__class__.__name__}: не удалось сохранить сырой текст profile: {error}", "ERROR")
         InfoBar.error(
