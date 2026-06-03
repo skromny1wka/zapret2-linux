@@ -33,6 +33,26 @@ class ControlTopSummaryWorkerQueueTests(unittest.TestCase):
                 self.assertTrue(page._refresh_runtime.top_summary_start_scheduled)
                 page._request_top_summary_worker.assert_not_called()
 
+    def test_stale_top_summary_worker_finish_does_not_schedule_pending_replay(self) -> None:
+        for page_cls in (Zapret1ModeControlPage, Zapret2ModeControlPage):
+            with self.subTest(page=page_cls.__name__):
+                old_worker = object()
+                current_worker = object()
+                page = page_cls.__new__(page_cls)
+                page._cleanup_in_progress = False
+                page._refresh_runtime = create_refresh_runtime()
+                page._refresh_runtime.top_summary_runtime.worker = current_worker
+                page._refresh_runtime.top_summary_pending = True
+                page._schedule_top_summary_worker_start = Mock(
+                    side_effect=AssertionError("stale top summary worker must not schedule replay")
+                )
+
+                page_cls._on_top_summary_worker_finished(page, old_worker)
+
+                self.assertIs(page._refresh_runtime.top_summary_runtime.worker, current_worker)
+                self.assertTrue(page._refresh_runtime.top_summary_pending)
+                page._schedule_top_summary_worker_start.assert_not_called()
+
     def test_scheduled_top_summary_start_replays_latest_pending_request(self) -> None:
         for page_cls in (Zapret1ModeControlPage, Zapret2ModeControlPage):
             with self.subTest(page=page_cls.__name__):

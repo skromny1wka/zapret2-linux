@@ -273,6 +273,9 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
 
     def _on_top_summary_worker_finished(self, worker) -> None:
         runtime = self._refresh_runtime
+        current_worker = getattr(runtime.top_summary_runtime, "worker", None)
+        if current_worker is not None and worker is not current_worker:
+            return
         if runtime.top_summary_pending and not self._cleanup_in_progress:
             self._schedule_top_summary_worker_start()
 
