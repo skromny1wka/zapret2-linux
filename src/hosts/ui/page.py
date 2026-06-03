@@ -1216,6 +1216,9 @@ class HostsPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
+        pending = dict(self.__dict__.get("_state_load_pending") or {})
+        if bool(pending.get("show_access_errors")) or bool(pending.get("update_status")):
+            return
         log(f"Hosts: ошибка загрузки состояния: {error}", "ERROR")
         if bool((self._state_load_request_context or {}).get("show_access_errors")):
             self._show_error(

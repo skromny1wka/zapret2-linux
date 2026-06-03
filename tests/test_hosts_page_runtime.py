@@ -520,6 +520,25 @@ class HostsPageRuntimeTests(unittest.TestCase):
         page._apply_hosts_access_state.assert_not_called()
         page._apply_hosts_runtime_state_to_ui.assert_not_called()
 
+    def test_hosts_state_error_ignored_when_new_state_load_is_pending(self) -> None:
+        import hosts.ui.page as hosts_page
+        from hosts.ui.page import HostsPage
+
+        page = HostsPage.__new__(HostsPage)
+        page._cleanup_in_progress = False
+        page._state_load_runtime = Mock()
+        page._state_load_runtime.is_current.return_value = True
+        page._state_load_pending = {"show_access_errors": False, "update_status": True}
+        page._state_load_request_context = {"show_access_errors": True, "update_status": True}
+        page._show_error = Mock()
+        page._tr = Mock(side_effect=lambda _key, default, **kwargs: default.format(**kwargs))
+
+        with patch.object(hosts_page, "log") as log_mock:
+            HostsPage._on_hosts_state_failed(page, 7, "stale error")
+
+        log_mock.assert_not_called()
+        page._show_error.assert_not_called()
+
     def test_hosts_state_request_waits_while_restart_is_scheduled(self) -> None:
         from hosts.ui.page import HostsPage
 
