@@ -178,15 +178,17 @@ class OneShotWorkerRuntime:
         self.thread = None
 
     def _finish_qobject_worker(self, request_id: int, thread, on_finished: Callable | None) -> None:
-        if self.thread is thread:
-            self.thread = None
-            self.worker = None
+        if self.thread is not thread:
+            return
+        self.thread = None
+        self.worker = None
         if on_finished is not None:
             on_finished(request_id, thread)
 
     def _finish_qthread_worker(self, worker, on_finished: Callable | None) -> None:
-        if self.worker is worker:
-            self.worker = None
+        if self.worker is not worker:
+            return
+        self.worker = None
         if on_finished is not None:
             on_finished(worker)
 
