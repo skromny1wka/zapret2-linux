@@ -394,6 +394,8 @@ class AutostartPage(BasePage):
         self._show_autostart_error(message)
 
     def _on_autostart_action_worker_finished(self, _worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_autostart_action_runtime"), _worker):
+            return
         if self._autostart_action_pending and not self._cleanup_in_progress:
             pending = self._autostart_action_pending.pop(0)
             self._schedule_autostart_action_worker_start(pending)
@@ -600,9 +602,22 @@ class AutostartPage(BasePage):
         self.mode_label.setText(self._tr("page.autostart.mode.unknown", "Неизвестно"))
 
     def _on_mode_load_worker_finished(self, _worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_mode_load_runtime"), _worker):
+            return
         if self._mode_load_pending and not self._cleanup_in_progress:
             self._mode_load_pending = False
             self._schedule_mode_load_worker_start()
+
+    def _is_current_worker_finish(self, runtime, worker) -> bool:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return False
+        request_id = getattr(worker, "_request_id", None)
+        if request_id is None:
+            return True
+        try:
+            return int(request_id) == int(getattr(runtime, "request_id", -1))
+        except (TypeError, ValueError):
+            return False
 
     def _schedule_mode_load_worker_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):

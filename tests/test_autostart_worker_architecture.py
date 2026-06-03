@@ -70,6 +70,17 @@ class AutostartWorkerArchitectureTests(unittest.TestCase):
 
         page._start_autostart_action_worker.assert_called_once_with(("enable", True, "Strategy"))
 
+    def test_stale_autostart_action_finish_does_not_restart_pending_action(self) -> None:
+        page = AutostartPage.__new__(AutostartPage)
+        page._cleanup_in_progress = False
+        page._autostart_action_runtime = SimpleNamespace(request_id=3)
+        page._autostart_action_pending = [("enable", True, "Strategy")]
+        page._schedule_autostart_action_worker_start = Mock()
+
+        AutostartPage._on_autostart_action_worker_finished(page, SimpleNamespace(_request_id=2))
+
+        page._schedule_autostart_action_worker_start.assert_not_called()
+
     def test_autostart_action_scheduled_start_queues_next_action(self) -> None:
         page = AutostartPage.__new__(AutostartPage)
         page._cleanup_in_progress = False
@@ -148,6 +159,17 @@ class AutostartWorkerArchitectureTests(unittest.TestCase):
         single_shot.call_args.args[1]()
 
         page._start_mode_load_worker.assert_called_once_with()
+
+    def test_stale_mode_load_finish_does_not_restart_pending_load(self) -> None:
+        page = AutostartPage.__new__(AutostartPage)
+        page._cleanup_in_progress = False
+        page._mode_load_runtime = SimpleNamespace(request_id=5)
+        page._mode_load_pending = True
+        page._schedule_mode_load_worker_start = Mock()
+
+        AutostartPage._on_mode_load_worker_finished(page, SimpleNamespace(_request_id=4))
+
+        page._schedule_mode_load_worker_start.assert_not_called()
 
     def test_mode_load_scheduled_start_queues_next_refresh(self) -> None:
         page = AutostartPage.__new__(AutostartPage)
