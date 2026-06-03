@@ -239,6 +239,34 @@ class ControlAdditionalSettingsSaveQueueTests(unittest.TestCase):
         self.assertEqual(save_runtime.started, [worker])
         self.assertEqual(runtime.additional_settings_save_pending, [])
 
+    def test_zapret1_additional_settings_save_error_ignored_when_new_save_is_pending(self) -> None:
+        from presets.ui.control.zapret1.page import Zapret1ModeControlPage
+
+        runtime, _save_runtime = _make_refresh_runtime(running=False)
+        runtime.additional_settings_save_request_id = 4
+        runtime.additional_settings_save_pending = [("debug_log", False, "zapret1")]
+        page = _make_page(Zapret1ModeControlPage, runtime)
+        page.window = Mock(return_value=object())
+
+        with patch("presets.ui.control.zapret1.page.InfoBar.warning") as warning_mock:
+            Zapret1ModeControlPage._on_additional_settings_save_failed(page, 4, "debug_log", "stale error")
+
+        warning_mock.assert_not_called()
+
+    def test_zapret2_additional_settings_save_error_ignored_when_new_save_is_pending(self) -> None:
+        from presets.ui.control.zapret2.page import Zapret2ModeControlPage
+
+        runtime, _save_runtime = _make_refresh_runtime(running=False)
+        runtime.additional_settings_save_request_id = 4
+        runtime.additional_settings_save_pending = [("debug_log", False, "zapret2")]
+        page = _make_page(Zapret2ModeControlPage, runtime)
+        page.window = Mock(return_value=object())
+
+        with patch("qfluentwidgets.InfoBar.warning") as warning_mock:
+            Zapret2ModeControlPage._on_additional_settings_save_failed(page, 4, "debug_log", "stale error")
+
+        warning_mock.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

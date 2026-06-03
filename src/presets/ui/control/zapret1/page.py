@@ -557,6 +557,8 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
     def _on_additional_settings_save_failed(self, request_id: int, _setting: str, error: str) -> None:
         if request_id != self._refresh_runtime.additional_settings_save_request_id:
             return
+        if self._refresh_runtime.additional_settings_save_pending:
+            return
         InfoBar.warning(title="Ошибка", content=f"Не удалось сохранить настройку: {error}", parent=self.window())
 
     def _on_additional_settings_save_worker_finished(self, worker) -> None:
