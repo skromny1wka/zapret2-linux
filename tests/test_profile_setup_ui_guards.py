@@ -1051,6 +1051,18 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
 
         self.assertEqual(page._enabled_checkbox.enabled_calls, [])
 
+    def test_enabled_save_error_ignored_when_new_toggle_is_pending(self) -> None:
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._enabled_save_request_id = 5
+        page._pending_enabled_save = False
+        page._enabled_checkbox = _BoolWidget(enabled=False)
+
+        ProfileSetupPageBase._on_enabled_save_failed(page, 5, "old error")
+
+        self.assertEqual(page._enabled_checkbox.enabled_calls, [])
+
     def test_raw_profile_save_error_ignored_when_new_save_is_pending(self) -> None:
         from unittest.mock import Mock, patch
 
