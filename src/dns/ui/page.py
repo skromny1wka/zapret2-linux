@@ -492,6 +492,8 @@ class NetworkPage(BasePage):
         self._on_page_state_loaded(state)
 
     def _on_page_load_worker_finished(self, _worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_page_load_runtime"), _worker):
+            return
         if self.__dict__.get("_page_load_pending", False):
             self._schedule_page_load_worker_start()
 
@@ -773,6 +775,8 @@ class NetworkPage(BasePage):
         log(f"Ошибка применения DNS: {error}", "ERROR")
 
     def _on_dns_apply_worker_finished(self, _worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_dns_apply_runtime"), _worker):
+            return
         self._start_next_dns_mutation_action()
 
     def _has_pending_dns_mutation_action(self) -> bool:
@@ -1142,6 +1146,8 @@ class NetworkPage(BasePage):
         )
 
     def _on_force_dns_action_worker_finished(self, _worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_force_dns_action_runtime"), _worker):
+            return
         self._start_next_dns_mutation_action()
 
     def _schedule_force_dns_action_worker_start(self, payload: dict[str, object]) -> None:
@@ -1217,6 +1223,8 @@ class NetworkPage(BasePage):
         )
 
     def _on_dns_flush_cache_worker_finished(self, _worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_dns_flush_cache_runtime"), _worker):
+            return
         if self._dns_flush_cache_pending and not self._cleanup_in_progress:
             self._dns_flush_cache_pending = False
             self._schedule_dns_flush_cache_worker_start()
@@ -1351,6 +1359,8 @@ class NetworkPage(BasePage):
         self._on_test_complete(results)
 
     def _on_connectivity_test_worker_finished(self, _worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_connectivity_test_runtime"), _worker):
+            return
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         if self.__dict__.get("_connectivity_test_pending", False):
@@ -1467,8 +1477,21 @@ class NetworkPage(BasePage):
         log(f"Ошибка подготовки ISP DNS предупреждения: {error}", "DEBUG")
 
     def _on_isp_dns_warning_worker_finished(self, _worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_isp_warning_runtime"), _worker):
+            return
         if self.__dict__.get("_isp_warning_pending", False):
             self._schedule_isp_warning_worker_start()
+
+    def _is_current_worker_finish(self, runtime, worker) -> bool:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return False
+        request_id = getattr(worker, "_request_id", None)
+        if request_id is None:
+            return True
+        try:
+            return int(request_id) == int(getattr(runtime, "request_id", -1))
+        except (TypeError, ValueError):
+            return False
 
     def _schedule_isp_warning_worker_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
