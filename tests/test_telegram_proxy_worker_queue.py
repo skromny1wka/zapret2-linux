@@ -115,6 +115,20 @@ class TelegramProxyWorkerQueueTests(unittest.TestCase):
             [("host", "proxy.local", 0), ("port", "", 9090)],
         )
 
+    def test_settings_save_failure_ignored_when_new_save_is_pending(self) -> None:
+        page = TelegramProxyPage.__new__(TelegramProxyPage)
+        page._cleanup_in_progress = False
+        page._settings_save_runtime = Mock()
+        page._settings_save_runtime.is_current.return_value = True
+        page._settings_save_pending = [{"action": "port", "port": 9090}]
+        page._settings_save_restart_pending = "schedule"
+
+        with patch.object(telegram_proxy_page, "log") as log_mock:
+            TelegramProxyPage._on_settings_save_failed(page, 7, "host", "stale error", {})
+
+        self.assertEqual(page._settings_save_restart_pending, "schedule")
+        log_mock.assert_not_called()
+
     def test_scheduled_external_link_start_queues_next_link(self) -> None:
         page = TelegramProxyPage.__new__(TelegramProxyPage)
         page._cleanup_in_progress = False

@@ -1039,6 +1039,8 @@ class TelegramProxyPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
+        if self.__dict__.get("_settings_save_pending"):
+            return
         self._settings_save_restart_pending = ""
         log(f"{self.__class__.__name__}: не удалось сохранить настройку Telegram Proxy ({action}): {error}", "WARNING")
 
