@@ -278,6 +278,40 @@ class UserPresetWriteSerializationTests(unittest.TestCase):
         )
         page._runtime_service.apply_active_preset_marker_for_file.assert_called_once_with("Next.txt")
 
+    def test_stale_item_action_worker_finished_does_not_start_pending_write(self) -> None:
+        old_worker = object()
+        current_worker = object()
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_item_action_runtime_worker = current_worker
+        page._preset_activate_runtime = _Runtime(running=False)
+        page._preset_item_action_runtime = _Runtime(running=False)
+        page._preset_bulk_action_runtime = _Runtime(running=False)
+        page._preset_edit_action_runtime = _Runtime(running=False)
+        page._preset_storage_action_runtime = _Runtime(running=False)
+        page._preset_folder_action_runtime = _Runtime(running=False)
+        page._preset_folder_action_pending = []
+        page._preset_write_action_start_scheduled = False
+        page._preset_folder_action_start_scheduled = False
+        page._cleanup_in_progress = False
+        page._pending_preset_write_actions = [
+            {
+                "kind": "activate",
+                "file_name": "Next.txt",
+                "display_name": "Next",
+            }
+        ]
+        callbacks = []
+
+        with patch(
+            "presets.ui.common.user_presets_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            UserPresetsPageBase._on_preset_item_action_worker_finished(page, old_worker)
+
+        self.assertIs(page._preset_item_action_runtime_worker, current_worker)
+        self.assertEqual(len(callbacks), 0)
+        self.assertEqual(page._pending_preset_write_actions[0]["file_name"], "Next.txt")
+
     def test_scheduled_activation_uses_latest_request_before_worker_starts(self) -> None:
         page = UserPresetsPageBase.__new__(UserPresetsPageBase)
         page._preset_activate_runtime = _Runtime(running=False)
