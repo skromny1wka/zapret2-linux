@@ -271,6 +271,37 @@ class UserPresetsMetadataLoadQueueTests(unittest.TestCase):
         self._app.processEvents()
         self.assertEqual(calls, ["rows", "watcher"])
 
+    def test_metadata_load_result_ignored_when_new_load_is_pending(self) -> None:
+        from presets.user_presets_runtime_service import UserPresetsRuntimeAdapter, UserPresetsRuntimeService
+
+        page = SimpleNamespace(isVisible=lambda: True)
+        adapter = UserPresetsRuntimeAdapter(
+            bulk_reset_running=lambda: False,
+            read_single_metadata=lambda _name: None,
+            selected_source_file_name=lambda: "",
+            presets_dir=lambda: None,
+            cached_metadata=lambda: {},
+            load_all_metadata=lambda: {},
+            load_folder_state=lambda: {},
+            build_rows_plan=lambda _metadata, _folder_state: object(),
+            apply_rows_plan=lambda _plan, _started_at: None,
+        )
+        service = UserPresetsRuntimeService()
+        service.attach_page(page, adapter)
+        service._metadata_load_request_id = 7
+        service._metadata_load_pending_page = page
+        service._cached_presets_metadata = {"Old.txt": {}}
+        service._cached_folder_state = {"items": {"Old.txt": {}}}
+        service._schedule_watched_preset_files_sync = Mock()
+        service._request_rows_plan_refresh = Mock()
+
+        service._on_metadata_loaded(7, {"New.txt": {}}, {"items": {"New.txt": {}}}, 1.5, page)
+
+        self.assertEqual(service._cached_presets_metadata, {"Old.txt": {}})
+        self.assertEqual(service._cached_folder_state, {"items": {"Old.txt": {}}})
+        service._schedule_watched_preset_files_sync.assert_not_called()
+        service._request_rows_plan_refresh.assert_not_called()
+
     def test_single_metadata_pending_refresh_restarts_after_worker_signal_returns(self) -> None:
         from presets.user_presets_runtime_service import UserPresetsRuntimeAdapter, UserPresetsRuntimeService
 

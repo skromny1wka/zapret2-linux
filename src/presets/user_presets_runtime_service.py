@@ -755,6 +755,8 @@ class UserPresetsRuntimeService:
     ) -> None:
         if request_id != self._metadata_load_request_id:
             return
+        if self.__dict__.get("_metadata_load_pending_page") is not None:
+            return
         page = self._resolve_page(page)
         adapter = self._resolve_adapter()
         self._cached_presets_metadata = dict(all_presets)
