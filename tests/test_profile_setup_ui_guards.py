@@ -1105,6 +1105,38 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         self.assertEqual(page._enabled_checkbox.enabled_calls, [])
         self.assertFalse(page._loading)
 
+    def test_strategy_apply_error_ignored_when_new_strategy_is_pending(self) -> None:
+        from unittest.mock import Mock, patch
+
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._strategy_apply_request_id = 8
+        page._pending_strategy_apply = "new-strategy"
+        page.reload_current_profile = Mock()
+
+        with patch("profile.ui.profile_setup_page.log") as log_mock:
+            ProfileSetupPageBase._on_strategy_apply_failed(page, 8, "old error")
+
+        log_mock.assert_not_called()
+        page.reload_current_profile.assert_not_called()
+
+    def test_strategy_feedback_error_ignored_when_new_feedback_is_pending(self) -> None:
+        from unittest.mock import Mock, patch
+
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._strategy_feedback_save_request_id = 9
+        page._pending_strategy_feedback_save = {"rating": "work", "favorite": None}
+        page.reload_current_profile = Mock()
+
+        with patch("profile.ui.profile_setup_page.log") as log_mock:
+            ProfileSetupPageBase._on_strategy_feedback_save_failed(page, 9, "old error")
+
+        log_mock.assert_not_called()
+        page.reload_current_profile.assert_not_called()
+
     def test_editable_settings_skip_duplicate_text_and_visibility(self) -> None:
         from types import SimpleNamespace
         from unittest.mock import Mock, patch

@@ -3320,6 +3320,8 @@ class ProfileSetupPageBase(BasePage):
     def _on_strategy_apply_failed(self, request_id: int, error: str) -> None:
         if request_id != int(getattr(self, "_strategy_apply_request_id", 0) or 0):
             return
+        if getattr(self, "_pending_strategy_apply", None):
+            return
         log(f"{self.__class__.__name__}: не удалось применить стратегию: {error}", "ERROR")
         self.reload_current_profile()
 
@@ -3514,9 +3516,10 @@ class ProfileSetupPageBase(BasePage):
     def _on_strategy_feedback_save_failed(self, request_id: int, error: str) -> None:
         if request_id != int(getattr(self, "_strategy_feedback_save_request_id", 0) or 0):
             return
+        if self.__dict__.get("_pending_strategy_feedback_save"):
+            return
         log(f"{self.__class__.__name__}: не удалось обновить оценку стратегии: {error}", "ERROR")
-        if not self.__dict__.get("_pending_strategy_feedback_save"):
-            self.reload_current_profile()
+        self.reload_current_profile()
 
     def _on_strategy_feedback_save_worker_finished(self, worker) -> None:
         if not self._accept_current_profile_setup_worker_finished("_strategy_feedback_save_runtime_worker", worker):
