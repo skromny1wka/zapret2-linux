@@ -322,6 +322,8 @@ class ControlPageActionMixin:
             cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
         ):
             return
+        if bool(getattr(runtime, "program_settings_load_pending", False)):
+            return
         try:
             self._publish_program_settings_snapshot(snapshot)
         except Exception:
@@ -336,6 +338,8 @@ class ControlPageActionMixin:
             request_id,
             cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
         ):
+            return
+        if bool(getattr(runtime, "program_settings_load_pending", False)):
             return
         try:
             from log.log import log

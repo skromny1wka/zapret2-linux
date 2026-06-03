@@ -84,6 +84,29 @@ class ControlProgramSettingsLoadQueueTests(unittest.TestCase):
         self.assertTrue(page._refresh_runtime.program_settings_load_pending)
         self.assertEqual(len(callbacks), 1)
 
+    def test_program_settings_load_result_ignored_when_new_load_is_pending(self) -> None:
+        page, load_runtime = self._make_page(running=False)
+        load_runtime.is_current = Mock(return_value=True)
+        page._refresh_runtime.program_settings_load_pending = True
+        page._publish_program_settings_snapshot = Mock()
+        page._apply_program_settings_snapshot = Mock()
+        snapshot = object()
+
+        ControlPageActionMixin._on_program_settings_load_finished(page, 4, snapshot)
+
+        page._publish_program_settings_snapshot.assert_not_called()
+        page._apply_program_settings_snapshot.assert_not_called()
+
+    def test_program_settings_load_error_ignored_when_new_load_is_pending(self) -> None:
+        page, load_runtime = self._make_page(running=False)
+        load_runtime.is_current = Mock(return_value=True)
+        page._refresh_runtime.program_settings_load_pending = True
+
+        with patch("log.log.log") as log_mock:
+            ControlPageActionMixin._on_program_settings_load_failed(page, 4, "stale error")
+
+        log_mock.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
