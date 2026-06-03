@@ -409,6 +409,8 @@ class ControlPageActionMixin:
             cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
         ):
             return
+        if runtime.program_settings_save_pending:
+            return
         self._set_status(str(message or ""))
 
     def _on_program_settings_save_finished(self, request_id: int, action: str, result) -> None:
@@ -417,6 +419,8 @@ class ControlPageActionMixin:
             request_id,
             cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
         ):
+            return
+        if runtime.program_settings_save_pending:
             return
         try:
             if action == "auto_dpi":
@@ -445,6 +449,8 @@ class ControlPageActionMixin:
             request_id,
             cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
         ):
+            return
+        if runtime.program_settings_save_pending:
             return
         from qfluentwidgets import InfoBar
 

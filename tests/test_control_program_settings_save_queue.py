@@ -106,6 +106,47 @@ class ControlProgramSettingsSaveQueueTests(unittest.TestCase):
         self.assertEqual(save_runtime.started, [worker])
         self.assertEqual(page._refresh_runtime.program_settings_save_pending, [])
 
+    def test_program_settings_save_status_ignored_when_new_save_is_pending(self) -> None:
+        from presets.ui.control.control_page_shared import ControlPageActionMixin
+
+        page, save_runtime = self._make_page(running=False)
+        save_runtime.is_current = Mock(return_value=True)
+        page._refresh_runtime.program_settings_save_pending = [("hide_to_tray", False)]
+        page._set_status = Mock()
+
+        ControlPageActionMixin._on_program_settings_save_status(page, 4, "hide_to_tray", "stale")
+
+        page._set_status.assert_not_called()
+
+    def test_program_settings_save_result_ignored_when_new_save_is_pending(self) -> None:
+        from presets.ui.control.control_page_shared import ControlPageActionMixin
+
+        page, save_runtime = self._make_page(running=False)
+        save_runtime.is_current = Mock(return_value=True)
+        page._refresh_runtime.program_settings_save_pending = [("hide_to_tray", False)]
+        page._remember_hide_to_tray_on_minimize_close = Mock()
+        page._sync_program_settings = Mock()
+
+        ControlPageActionMixin._on_program_settings_save_finished(page, 4, "hide_to_tray", True)
+
+        page._remember_hide_to_tray_on_minimize_close.assert_not_called()
+        page._sync_program_settings.assert_not_called()
+
+    def test_program_settings_save_error_ignored_when_new_save_is_pending(self) -> None:
+        from presets.ui.control.control_page_shared import ControlPageActionMixin
+
+        page, save_runtime = self._make_page(running=False)
+        save_runtime.is_current = Mock(return_value=True)
+        page._refresh_runtime.program_settings_save_pending = [("hide_to_tray", False)]
+        page._sync_program_settings = Mock()
+        page.window = Mock(return_value=object())
+
+        with patch("qfluentwidgets.InfoBar.warning") as warning_mock:
+            ControlPageActionMixin._on_program_settings_save_failed(page, 4, "hide_to_tray", "stale error")
+
+        warning_mock.assert_not_called()
+        page._sync_program_settings.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
