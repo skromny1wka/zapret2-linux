@@ -673,8 +673,13 @@ class UpdatePageRuntime:
     def _is_current_worker_finish(self, runtime, worker) -> bool:
         if self.__dict__.get("_cleanup_in_progress", False):
             return False
+        if runtime is None:
+            return True
         request_id = getattr(worker, "_request_id", None)
         if request_id is None:
+            current_worker = getattr(runtime, "worker", None)
+            if current_worker is not None:
+                return worker is current_worker
             return True
         try:
             return int(request_id) == int(getattr(runtime, "request_id", -1))
