@@ -49,6 +49,30 @@ class PresetSummaryRefreshRuntimeTests(unittest.TestCase):
 
         runtime.request_refresh.assert_called_once_with()
 
+    def test_stale_summary_worker_finish_does_not_restart_pending_refresh(self) -> None:
+        import presets.display_state_refresh as display_state_refresh
+        from presets.display_state_refresh import PresetProfileStrategySummaryRefreshRuntime
+
+        runtime = PresetProfileStrategySummaryRefreshRuntime.__new__(
+            PresetProfileStrategySummaryRefreshRuntime
+        )
+        runtime._summary_runtime = SimpleNamespace(request_id=2)
+        runtime._pending = True
+        runtime._start_scheduled = False
+        runtime.request_refresh = Mock()
+        single_shot = Mock()
+
+        with patch.object(display_state_refresh, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            PresetProfileStrategySummaryRefreshRuntime._on_worker_finished(
+                runtime,
+                SimpleNamespace(_request_id=1),
+            )
+
+        single_shot.assert_not_called()
+        runtime.request_refresh.assert_not_called()
+        self.assertTrue(runtime._pending)
+        self.assertFalse(runtime._start_scheduled)
+
     def test_window_close_cleans_up_summary_refresh_runtime(self) -> None:
         import main.application_lifecycle_port as lifecycle_port
         import main.window_lifecycle_cleanup as lifecycle_cleanup

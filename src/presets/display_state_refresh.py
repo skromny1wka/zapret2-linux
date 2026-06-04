@@ -102,9 +102,20 @@ class PresetProfileStrategySummaryRefreshRuntime(QObject):
         if self._summary_runtime.is_current(request_id):
             log(f"Preset summary refresh skipped: {error}", "DEBUG")
 
-    def _on_worker_finished(self, _worker) -> None:
+    def _on_worker_finished(self, worker) -> None:
+        if not self._is_current_worker_finish(worker):
+            return
         if self._pending:
             self._schedule_refresh_start()
+
+    def _is_current_worker_finish(self, worker) -> bool:
+        request_id = getattr(worker, "_request_id", None)
+        if request_id is None:
+            return True
+        try:
+            return int(request_id) == int(self._summary_runtime.request_id)
+        except (TypeError, ValueError):
+            return False
 
     def _schedule_refresh_start(self) -> None:
         if self.__dict__.get("_start_scheduled", False):
