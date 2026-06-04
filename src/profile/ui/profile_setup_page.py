@@ -919,6 +919,7 @@ class ProfileSetupPageBase(BasePage):
         self._loading = False
         self._setup_load_runtime = OneShotWorkerRuntime()
         self._setup_load_request_id = 0
+        self._setup_load_runtime_worker = None
         self._setup_load_dirty = False
         self._setup_load_start_scheduled = False
         self._list_file_load_runtime = OneShotWorkerRuntime()
@@ -2166,7 +2167,7 @@ class ProfileSetupPageBase(BasePage):
         set_widget_text_if_changed(self._summary, "Загрузка profile...")
         set_widget_enabled_if_changed(self._enabled_checkbox, False)
         runtime = self._worker_runtime("_setup_load_runtime")
-        runtime.start_qthread_worker(
+        started = runtime.start_qthread_worker(
             worker_factory=lambda _runtime_request_id: self.create_profile_setup_load_worker(
                 request_id,
                 self._profile_key,
@@ -2176,6 +2177,8 @@ class ProfileSetupPageBase(BasePage):
             on_failed=self._on_profile_setup_payload_failed,
             on_finished=self._on_profile_setup_worker_finished,
         )
+        worker = started[1] if isinstance(started, tuple) and len(started) > 1 else getattr(runtime, "worker", None)
+        self._setup_load_runtime_worker = worker
 
     def _on_profile_setup_payload_loaded(self, request_id: int, payload) -> None:
         if request_id != self._setup_load_request_id:
@@ -2222,6 +2225,8 @@ class ProfileSetupPageBase(BasePage):
         set_widget_enabled_if_changed(self._enabled_checkbox, False)
 
     def _on_profile_setup_worker_finished(self, _worker) -> None:
+        if not self._accept_current_profile_setup_worker_finished("_setup_load_runtime_worker", _worker):
+            return
         if self.__dict__.get("_setup_load_dirty") and not self.__dict__.get("_cleanup_in_progress", False):
             self._schedule_profile_setup_load_start()
 

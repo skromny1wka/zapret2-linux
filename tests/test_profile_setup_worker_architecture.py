@@ -136,13 +136,15 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
     def test_profile_setup_pending_reload_starts_after_worker_signal(self) -> None:
         from profile.ui.profile_setup_page import ProfileSetupPageBase
 
+        worker = object()
         runtime = SimpleNamespace(
             is_running=Mock(return_value=False),
-            start_qthread_worker=Mock(),
+            start_qthread_worker=Mock(return_value=(1, worker)),
         )
         page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
         page._profile_key = "profile-1"
         page._setup_load_runtime = runtime
+        page._setup_load_runtime_worker = worker
         page._setup_load_request_id = 0
         page._setup_load_dirty = True
         page._setup_load_start_scheduled = False
@@ -156,7 +158,7 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
             "profile.ui.profile_setup_page.QTimer.singleShot",
             side_effect=lambda _delay, callback: callbacks.append(callback),
         ):
-            ProfileSetupPageBase._on_profile_setup_worker_finished(page, object())
+            ProfileSetupPageBase._on_profile_setup_worker_finished(page, worker)
 
         runtime.start_qthread_worker.assert_not_called()
         self.assertEqual(len(callbacks), 1)
@@ -167,6 +169,38 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
         runtime.start_qthread_worker.assert_called_once()
         self.assertFalse(page._setup_load_dirty)
         self.assertFalse(page._setup_load_start_scheduled)
+
+    def test_stale_profile_setup_worker_finished_does_not_restart_pending_reload(self) -> None:
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        current_worker = object()
+        stale_worker = object()
+        runtime = SimpleNamespace(
+            is_running=Mock(return_value=False),
+            start_qthread_worker=Mock(),
+        )
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._profile_key = "profile-1"
+        page._setup_load_runtime = runtime
+        page._setup_load_runtime_worker = current_worker
+        page._setup_load_request_id = 4
+        page._setup_load_dirty = True
+        page._setup_load_start_scheduled = False
+        page._cleanup_in_progress = False
+        page._summary = Mock()
+        page._enabled_checkbox = Mock()
+        page.create_profile_setup_load_worker = Mock()
+        callbacks = []
+
+        with patch(
+            "profile.ui.profile_setup_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            ProfileSetupPageBase._on_profile_setup_worker_finished(page, stale_worker)
+
+        runtime.start_qthread_worker.assert_not_called()
+        self.assertEqual(callbacks, [])
+        self.assertTrue(page._setup_load_dirty)
 
     def test_list_file_reload_invalidates_running_load_result(self) -> None:
         from profile.ui.profile_setup_page import ProfileSetupPageBase
