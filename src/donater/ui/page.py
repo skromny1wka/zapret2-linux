@@ -640,7 +640,9 @@ class PremiumPage(BasePage):
 
         log(f"Ошибка обновления информации об устройстве: {error}", "DEBUG")
 
-    def _on_device_info_worker_finished(self, _worker) -> None:
+    def _on_device_info_worker_finished(self, worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_device_info_runtime"), worker):
+            return
         pending = self._device_info_pending
         self._device_info_pending = False
         if pending and not self._cleanup_in_progress:
@@ -691,7 +693,9 @@ class PremiumPage(BasePage):
             return
         self._show_open_extend_bot_error(str(error))
 
-    def _on_open_extend_bot_worker_finished(self, _worker) -> None:
+    def _on_open_extend_bot_worker_finished(self, worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_open_bot_runtime"), worker):
+            return
         if self._open_bot_pending and not self._cleanup_in_progress:
             self._open_bot_pending = False
             self._schedule_open_extend_bot_worker_start()
@@ -1012,7 +1016,9 @@ class PremiumPage(BasePage):
                 parent=self.window(),
             )
 
-    def _on_reset_storage_worker_finished(self, _worker) -> None:
+    def _on_reset_storage_worker_finished(self, worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_reset_storage_runtime"), worker):
+            return
         if self.__dict__.get("_reset_storage_pending", False) and not self.__dict__.get(
             "_cleanup_in_progress",
             False,
@@ -1035,3 +1041,17 @@ class PremiumPage(BasePage):
         if not pending or self.__dict__.get("_cleanup_in_progress", False):
             return
         self._start_reset_storage_worker()
+
+    def _is_current_worker_finish(self, runtime, worker) -> bool:
+        if runtime is None:
+            return True
+        request_id = getattr(worker, "_request_id", None)
+        if request_id is not None:
+            try:
+                return int(request_id) == int(getattr(runtime, "request_id", request_id))
+            except (TypeError, ValueError):
+                return False
+        current_worker = getattr(runtime, "worker", None)
+        if current_worker is not None:
+            return worker is current_worker
+        return True

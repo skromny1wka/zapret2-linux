@@ -174,6 +174,23 @@ class PremiumWorkerArchitectureTests(unittest.TestCase):
 
         page._start_device_info_load_worker.assert_called_once_with()
 
+    def test_stale_device_info_worker_finished_does_not_restart_pending_load(self) -> None:
+        import donater.ui.page as premium_page
+
+        page = PremiumPage.__new__(PremiumPage)
+        page._device_info_runtime = SimpleNamespace(worker=object())
+        page._device_info_pending = True
+        page._cleanup_in_progress = False
+        page._start_device_info_load_worker = Mock()
+        single_shot = Mock()
+
+        with patch.object(premium_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            PremiumPage._on_device_info_worker_finished(page, object())
+
+        single_shot.assert_not_called()
+        page._start_device_info_load_worker.assert_not_called()
+        self.assertTrue(page._device_info_pending)
+
     def test_open_bot_pending_restarts_after_event_loop_turn(self) -> None:
         import donater.ui.page as premium_page
 
@@ -193,6 +210,23 @@ class PremiumWorkerArchitectureTests(unittest.TestCase):
         single_shot.call_args.args[1]()
 
         page._request_open_extend_bot.assert_called_once_with()
+
+    def test_stale_open_bot_worker_finished_does_not_restart_pending_open(self) -> None:
+        import donater.ui.page as premium_page
+
+        page = PremiumPage.__new__(PremiumPage)
+        page._open_bot_runtime = SimpleNamespace(worker=object())
+        page._open_bot_pending = True
+        page._cleanup_in_progress = False
+        page._request_open_extend_bot = Mock()
+        single_shot = Mock()
+
+        with patch.object(premium_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            PremiumPage._on_open_extend_bot_worker_finished(page, object())
+
+        single_shot.assert_not_called()
+        page._request_open_extend_bot.assert_not_called()
+        self.assertTrue(page._open_bot_pending)
 
     def test_device_info_pending_restart_is_coalesced_while_scheduled(self) -> None:
         import donater.ui.page as premium_page
@@ -270,6 +304,24 @@ class PremiumWorkerArchitectureTests(unittest.TestCase):
 
         page._start_reset_storage_worker.assert_called_once_with()
         self.assertFalse(page._reset_storage_pending)
+
+    def test_stale_reset_storage_worker_finished_does_not_restart_pending_reset(self) -> None:
+        import donater.ui.page as premium_page
+
+        page = PremiumPage.__new__(PremiumPage)
+        page._reset_storage_runtime = SimpleNamespace(worker=object())
+        page._cleanup_in_progress = False
+        page._reset_storage_pending = True
+        page._reset_storage_start_scheduled = False
+        page._start_reset_storage_worker = Mock()
+        single_shot = Mock()
+
+        with patch.object(premium_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            PremiumPage._on_reset_storage_worker_finished(page, object())
+
+        single_shot.assert_not_called()
+        page._start_reset_storage_worker.assert_not_called()
+        self.assertTrue(page._reset_storage_pending)
 
 
 if __name__ == "__main__":
