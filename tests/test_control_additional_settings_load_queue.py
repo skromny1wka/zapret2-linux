@@ -28,6 +28,14 @@ def _make_refresh_runtime(*, running: bool):
         next_additional_settings_request_id=Mock(return_value=1),
         accept_additional_settings_result=Mock(return_value=True),
     )
+
+    def _accept_worker_finish(worker, request_attr: str) -> bool:
+        request_id = getattr(worker, "_request_id", None)
+        if request_id is None:
+            return True
+        return int(request_id) == int(getattr(runtime, request_attr, -1))
+
+    runtime.accept_worker_finish = _accept_worker_finish
     return runtime, load_runtime
 
 
@@ -111,6 +119,42 @@ class ControlAdditionalSettingsLoadQueueTests(unittest.TestCase):
         callbacks[0]()
 
         self.assertEqual(load_runtime.started, 1)
+
+    def test_zapret1_stale_additional_settings_finish_does_not_start_pending_reload(self) -> None:
+        from presets.ui.control.zapret1.page import Zapret1ModeControlPage
+
+        runtime, load_runtime = _make_refresh_runtime(running=False)
+        runtime.additional_settings_request_id = 2
+        runtime.additional_settings_load_pending = True
+        page = _make_page(Zapret1ModeControlPage, runtime)
+
+        with patch("presets.ui.control.zapret1.page.QTimer.singleShot") as single_shot:
+            Zapret1ModeControlPage._on_additional_settings_load_worker_finished(
+                page,
+                SimpleNamespace(_request_id=1),
+            )
+
+        single_shot.assert_not_called()
+        self.assertTrue(runtime.additional_settings_load_pending)
+        self.assertEqual(load_runtime.started, 0)
+
+    def test_zapret2_stale_additional_settings_finish_does_not_start_pending_reload(self) -> None:
+        from presets.ui.control.zapret2.page import Zapret2ModeControlPage
+
+        runtime, load_runtime = _make_refresh_runtime(running=False)
+        runtime.additional_settings_request_id = 2
+        runtime.additional_settings_load_pending = True
+        page = _make_page(Zapret2ModeControlPage, runtime)
+
+        with patch("presets.ui.control.zapret2.page.QTimer.singleShot") as single_shot:
+            Zapret2ModeControlPage._on_additional_settings_load_worker_finished(
+                page,
+                SimpleNamespace(_request_id=1),
+            )
+
+        single_shot.assert_not_called()
+        self.assertTrue(runtime.additional_settings_load_pending)
+        self.assertEqual(load_runtime.started, 0)
 
     def test_zapret1_additional_settings_reload_waits_while_restart_is_scheduled(self) -> None:
         from presets.ui.control.zapret1.page import Zapret1ModeControlPage

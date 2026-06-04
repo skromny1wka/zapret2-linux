@@ -521,6 +521,8 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
 
     def _on_additional_settings_load_worker_finished(self, worker) -> None:
         runtime = self._refresh_runtime
+        if not runtime.accept_worker_finish(worker, "additional_settings_request_id"):
+            return
         if runtime.additional_settings_load_pending and not self._cleanup_in_progress:
             runtime.additional_settings_load_pending = False
             self._schedule_additional_settings_reload_start()
@@ -598,6 +600,8 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
 
     def _on_additional_settings_save_worker_finished(self, worker) -> None:
         runtime = self._refresh_runtime
+        if not runtime.accept_worker_finish(worker, "additional_settings_save_request_id"):
+            return
         pending = runtime.additional_settings_save_pending
         if pending and not self._cleanup_in_progress:
             next_save = pending.pop(0)

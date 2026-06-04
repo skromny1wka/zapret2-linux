@@ -86,6 +86,15 @@ class ModeControlRefreshRuntime:
         self.mark_additional_settings_applied()
         return True
 
+    def accept_worker_finish(self, worker, request_attr: str) -> bool:
+        request_id = getattr(worker, "_request_id", None)
+        if request_id is None:
+            return True
+        try:
+            return int(request_id) == int(getattr(self, request_attr, -1))
+        except (TypeError, ValueError):
+            return False
+
     def stop_workers(self, *, log_fn=None) -> None:
         self.additional_settings_load_start_scheduled = False
         self.additional_settings_save_start_scheduled = False
