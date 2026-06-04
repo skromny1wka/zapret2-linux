@@ -729,6 +729,24 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
 
         page._start_snapshot_worker.assert_called_once_with(refresh=True)
 
+    def test_stale_whitelist_snapshot_finish_does_not_restart_pending_refresh(self) -> None:
+        import orchestra.ui.whitelist_page as whitelist_page
+        from orchestra.ui.whitelist_page import OrchestraWhitelistPage
+
+        page = OrchestraWhitelistPage.__new__(OrchestraWhitelistPage)
+        page._cleanup_in_progress = False
+        page._snapshot_runtime = SimpleNamespace(request_id=2)
+        page._snapshot_refresh_pending = True
+        page._start_snapshot_worker = Mock()
+        single_shot = Mock()
+
+        with patch.object(whitelist_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            OrchestraWhitelistPage._on_snapshot_finished(page, SimpleNamespace(_request_id=1))
+
+        single_shot.assert_not_called()
+        page._start_snapshot_worker.assert_not_called()
+        self.assertTrue(page._snapshot_refresh_pending)
+
     def test_whitelist_action_queues_while_worker_runs(self) -> None:
         from orchestra.ui.whitelist_page import OrchestraWhitelistPage
 
@@ -786,6 +804,28 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
             "remove",
             domain="example.org",
             user_domains=None,
+        )
+
+    def test_stale_whitelist_action_finish_does_not_restart_pending_action(self) -> None:
+        import orchestra.ui.whitelist_page as whitelist_page
+        from orchestra.ui.whitelist_page import OrchestraWhitelistPage
+
+        current_worker = object()
+        page = OrchestraWhitelistPage.__new__(OrchestraWhitelistPage)
+        page._cleanup_in_progress = False
+        page._action_runtime = SimpleNamespace(worker=current_worker, request_id=2)
+        page._whitelist_action_pending = [{"action": "remove", "domain": "example.org", "user_domains": None}]
+        page._request_whitelist_action = Mock()
+        single_shot = Mock()
+
+        with patch.object(whitelist_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            OrchestraWhitelistPage._on_whitelist_action_finished(page, SimpleNamespace(_request_id=1))
+
+        single_shot.assert_not_called()
+        page._request_whitelist_action.assert_not_called()
+        self.assertEqual(
+            page._whitelist_action_pending,
+            [{"action": "remove", "domain": "example.org", "user_domains": None}],
         )
 
 

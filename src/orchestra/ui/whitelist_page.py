@@ -439,7 +439,9 @@ class OrchestraWhitelistPage(BasePage):
             return
         log(f"Не удалось загрузить whitelist: {error}", "WARNING")
 
-    def _on_snapshot_finished(self, _worker) -> None:
+    def _on_snapshot_finished(self, worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_snapshot_runtime"), worker):
+            return
         if self._snapshot_refresh_pending and not bool(getattr(self, "_cleanup_in_progress", False)):
             self._snapshot_refresh_pending = False
             self._schedule_snapshot_refresh_start()
@@ -736,6 +738,8 @@ class OrchestraWhitelistPage(BasePage):
         log(f"Не удалось выполнить действие whitelist ({action}): {error}", "WARNING")
 
     def _on_whitelist_action_finished(self, worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_action_runtime"), worker):
+            return
         if self._action_runtime.worker is worker:
             self._action_runtime.worker = None
         if self.__dict__.get("_cleanup_in_progress", False):
@@ -744,6 +748,17 @@ class OrchestraWhitelistPage(BasePage):
         pending = dict(pending_actions.pop(0)) if pending_actions else None
         if pending is not None:
             self._schedule_whitelist_action_start(pending)
+
+    def _is_current_worker_finish(self, runtime, worker) -> bool:
+        request_id = getattr(worker, "_request_id", None)
+        if request_id is None:
+            return True
+        if runtime is None:
+            return False
+        try:
+            return int(request_id) == int(getattr(runtime, "request_id", -1))
+        except (TypeError, ValueError):
+            return False
 
     def _schedule_whitelist_action_start(self, pending: dict[str, object]) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
