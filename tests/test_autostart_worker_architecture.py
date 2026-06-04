@@ -81,6 +81,20 @@ class AutostartWorkerArchitectureTests(unittest.TestCase):
 
         page._schedule_autostart_action_worker_start.assert_not_called()
 
+    def test_stale_autostart_action_worker_object_finish_does_not_restart_pending_action(self) -> None:
+        old_worker = object()
+        current_worker = object()
+        page = AutostartPage.__new__(AutostartPage)
+        page._cleanup_in_progress = False
+        page._autostart_action_runtime = SimpleNamespace(request_id=3, worker=current_worker)
+        page._autostart_action_pending = [("enable", True, "Strategy")]
+        page._schedule_autostart_action_worker_start = Mock()
+
+        AutostartPage._on_autostart_action_worker_finished(page, old_worker)
+
+        page._schedule_autostart_action_worker_start.assert_not_called()
+        self.assertEqual(page._autostart_action_pending, [("enable", True, "Strategy")])
+
     def test_autostart_action_scheduled_start_queues_next_action(self) -> None:
         page = AutostartPage.__new__(AutostartPage)
         page._cleanup_in_progress = False
@@ -170,6 +184,20 @@ class AutostartWorkerArchitectureTests(unittest.TestCase):
         AutostartPage._on_mode_load_worker_finished(page, SimpleNamespace(_request_id=4))
 
         page._schedule_mode_load_worker_start.assert_not_called()
+
+    def test_stale_mode_load_worker_object_finish_does_not_restart_pending_load(self) -> None:
+        old_worker = object()
+        current_worker = object()
+        page = AutostartPage.__new__(AutostartPage)
+        page._cleanup_in_progress = False
+        page._mode_load_runtime = SimpleNamespace(request_id=5, worker=current_worker)
+        page._mode_load_pending = True
+        page._schedule_mode_load_worker_start = Mock()
+
+        AutostartPage._on_mode_load_worker_finished(page, old_worker)
+
+        page._schedule_mode_load_worker_start.assert_not_called()
+        self.assertTrue(page._mode_load_pending)
 
     def test_mode_load_scheduled_start_queues_next_refresh(self) -> None:
         page = AutostartPage.__new__(AutostartPage)
