@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 
@@ -25,6 +26,7 @@ class _Page:
     _on_program_settings_save_worker_finished = ControlPageActionMixin._on_program_settings_save_worker_finished
     _schedule_program_settings_save_start = ControlPageActionMixin._schedule_program_settings_save_start
     _run_scheduled_program_settings_save_start = ControlPageActionMixin._run_scheduled_program_settings_save_start
+    _is_current_worker_finish = ControlPageActionMixin._is_current_worker_finish
     create_program_settings_save_worker = Mock()
     _on_program_settings_save_finished = Mock()
     _on_program_settings_save_failed = Mock()
@@ -105,6 +107,19 @@ class ControlProgramSettingsSaveQueueTests(unittest.TestCase):
         )
         self.assertEqual(save_runtime.started, [worker])
         self.assertEqual(page._refresh_runtime.program_settings_save_pending, [])
+
+    def test_stale_program_settings_save_worker_finished_does_not_start_pending_save(self) -> None:
+        page, save_runtime = self._make_page(running=False)
+        save_runtime.request_id = 2
+        page._refresh_runtime.program_settings_save_pending = [("hide_to_tray", True)]
+
+        with patch("presets.ui.control.control_page_shared.QTimer.singleShot") as single_shot:
+            _Page._on_program_settings_save_worker_finished(page, SimpleNamespace(_request_id=1))
+
+        single_shot.assert_not_called()
+        page.create_program_settings_save_worker.assert_not_called()
+        self.assertEqual(save_runtime.started, [])
+        self.assertEqual(page._refresh_runtime.program_settings_save_pending, [("hide_to_tray", True)])
 
     def test_program_settings_save_status_ignored_when_new_save_is_pending(self) -> None:
         from presets.ui.control.control_page_shared import ControlPageActionMixin

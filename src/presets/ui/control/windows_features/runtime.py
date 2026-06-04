@@ -97,6 +97,8 @@ class ControlPageWindowsFeatureMixin:
         self._continue_defender_toggle(bool(disable), is_admin=False)
 
     def _on_defender_admin_check_worker_finished(self, _worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_defender_admin_check_runtime"), _worker):
+            return
         pending = self.__dict__.get("_defender_admin_check_pending")
         if pending is not None and not bool(getattr(self, "_cleanup_in_progress", False)):
             self._schedule_defender_admin_check_worker_start(bool(pending))
@@ -159,6 +161,17 @@ class ControlPageWindowsFeatureMixin:
         if runtime is not None:
             runtime.stop(blocking=True, warning_prefix="Defender admin check worker")
             runtime.cancel()
+
+    def _is_current_worker_finish(self, runtime, worker) -> bool:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return False
+        request_id = getattr(worker, "_request_id", None)
+        if request_id is None:
+            return True
+        try:
+            return int(request_id) == int(getattr(runtime, "request_id", -1))
+        except (TypeError, ValueError):
+            return False
 
     def _on_max_blocker_toggled(self, enable: bool) -> None:
         import presets.ui.control.control_runtime as control_runtime

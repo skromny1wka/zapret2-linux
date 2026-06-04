@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from presets.ui.control.windows_features.runtime import ControlPageWindowsFeatureMixin
@@ -60,6 +61,21 @@ class ControlDefenderAdminCheckQueueTests(unittest.TestCase):
 
         page.create_program_settings_admin_check_worker.assert_called_once_with(0)
         self.assertEqual(page._defender_admin_check_runtime.started, [worker])
+
+    def test_stale_defender_admin_check_worker_finished_does_not_restart_pending_check(self) -> None:
+        page = _Page()
+        page._cleanup_in_progress = False
+        page._defender_admin_check_runtime = _Runtime(running=False)
+        page._defender_admin_check_runtime.request_id = 2
+        page._defender_admin_check_pending = True
+        page.create_program_settings_admin_check_worker = Mock()
+
+        with patch("presets.ui.control.windows_features.runtime.QTimer.singleShot") as single_shot:
+            page._on_defender_admin_check_worker_finished(SimpleNamespace(_request_id=1))
+
+        single_shot.assert_not_called()
+        page.create_program_settings_admin_check_worker.assert_not_called()
+        self.assertTrue(page._defender_admin_check_pending)
 
     def test_defender_admin_check_keeps_latest_request_while_restart_is_scheduled(self) -> None:
         page = _Page()

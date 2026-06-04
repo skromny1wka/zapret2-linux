@@ -241,6 +241,8 @@ class ControlPageActionMixin:
         self._show_external_open_url_error(error_title, error_default, str(error))
 
     def _on_external_open_url_worker_finished(self, _worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_external_open_url_runtime"), _worker):
+            return
         pending = self.__dict__.get("_external_open_url_pending") or []
         if pending and not bool(getattr(self, "_cleanup_in_progress", False)):
             self._schedule_external_open_url_worker_start(pending.pop(0))
@@ -350,6 +352,8 @@ class ControlPageActionMixin:
 
     def _on_program_settings_load_worker_finished(self, _worker) -> None:
         runtime = self._refresh_runtime
+        if not self._is_current_worker_finish(runtime.program_settings_load_runtime, _worker):
+            return
         if runtime.program_settings_load_pending and not bool(getattr(self, "_cleanup_in_progress", False)):
             runtime.program_settings_load_pending = False
             self._schedule_program_settings_load_start()
@@ -461,6 +465,8 @@ class ControlPageActionMixin:
 
     def _on_program_settings_save_worker_finished(self, _worker) -> None:
         runtime = self._refresh_runtime
+        if not self._is_current_worker_finish(runtime.program_settings_save_runtime, _worker):
+            return
         pending = runtime.program_settings_save_pending
         if pending and not bool(getattr(self, "_cleanup_in_progress", False)):
             next_save = pending.pop(0)
@@ -485,6 +491,17 @@ class ControlPageActionMixin:
         if bool(getattr(self, "_cleanup_in_progress", False)):
             return
         self._request_program_settings_save(str(action or ""), bool(enabled))
+
+    def _is_current_worker_finish(self, runtime, worker) -> bool:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return False
+        request_id = getattr(worker, "_request_id", None)
+        if request_id is None:
+            return True
+        try:
+            return int(request_id) == int(getattr(runtime, "request_id", -1))
+        except (TypeError, ValueError):
+            return False
 
 
 def bind_control_ui_state_store(
