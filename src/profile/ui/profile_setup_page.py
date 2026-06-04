@@ -956,9 +956,11 @@ class ProfileSetupPageBase(BasePage):
         self._enabled_save_start_scheduled = False
         self._user_profile_update_runtime = OneShotWorkerRuntime()
         self._user_profile_update_request_id = 0
+        self._user_profile_update_runtime_worker = None
         self._pending_user_profile_updates: list[dict[str, str]] = []
         self._user_profile_delete_runtime = OneShotWorkerRuntime()
         self._user_profile_delete_request_id = 0
+        self._user_profile_delete_runtime_worker = None
         self._pending_user_profile_deletes: list[str] = []
         self._pending_user_profile_operations: list[dict[str, str]] = []
         self._user_profile_write_operation_start_scheduled = False
@@ -1837,7 +1839,7 @@ class ProfileSetupPageBase(BasePage):
         self._user_profile_update_request_id = int(getattr(self, "_user_profile_update_request_id", 0) or 0) + 1
         request_id = self._user_profile_update_request_id
         self._set_user_profile_buttons_enabled(False)
-        runtime.start_qthread_worker(
+        started = runtime.start_qthread_worker(
             worker_factory=lambda _runtime_request_id: self.create_profile_user_update_worker(
                 request_id,
                 profile_id=profile_id,
@@ -1851,6 +1853,8 @@ class ProfileSetupPageBase(BasePage):
             on_finished=self._on_user_profile_update_worker_finished,
             loaded_signal_name="updated",
         )
+        worker = started[1] if isinstance(started, tuple) and len(started) > 1 else getattr(runtime, "worker", None)
+        self._user_profile_update_runtime_worker = worker
 
     def _on_user_profile_update_finished(
         self,
@@ -1897,6 +1901,8 @@ class ProfileSetupPageBase(BasePage):
         )
 
     def _on_user_profile_update_worker_finished(self, _worker) -> None:
+        if not self._accept_current_profile_setup_worker_finished("_user_profile_update_runtime_worker", _worker):
+            return
         if self._schedule_next_pending_user_profile_write_operation_start():
             return
         self._set_user_profile_buttons_enabled(True)
@@ -1927,7 +1933,7 @@ class ProfileSetupPageBase(BasePage):
         self._user_profile_delete_request_id = int(getattr(self, "_user_profile_delete_request_id", 0) or 0) + 1
         request_id = self._user_profile_delete_request_id
         self._set_user_profile_buttons_enabled(False)
-        runtime.start_qthread_worker(
+        started = runtime.start_qthread_worker(
             worker_factory=lambda _runtime_request_id: self.create_profile_user_delete_worker(
                 request_id,
                 profile_id=profile_id,
@@ -1938,6 +1944,8 @@ class ProfileSetupPageBase(BasePage):
             on_finished=self._on_user_profile_delete_worker_finished,
             loaded_signal_name="deleted",
         )
+        worker = started[1] if isinstance(started, tuple) and len(started) > 1 else getattr(runtime, "worker", None)
+        self._user_profile_delete_runtime_worker = worker
 
     def _on_user_profile_delete_finished(self, request_id: int, profile_id: str, changed: int) -> None:
         if request_id != int(getattr(self, "_user_profile_delete_request_id", 0) or 0):
@@ -1967,6 +1975,8 @@ class ProfileSetupPageBase(BasePage):
         )
 
     def _on_user_profile_delete_worker_finished(self, _worker) -> None:
+        if not self._accept_current_profile_setup_worker_finished("_user_profile_delete_runtime_worker", _worker):
+            return
         if self._schedule_next_pending_user_profile_write_operation_start():
             return
         self._set_user_profile_buttons_enabled(True)
