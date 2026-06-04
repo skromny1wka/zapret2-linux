@@ -318,6 +318,8 @@ class ProfileOrderPageBase(BasePage):
             self._reload_order_profiles(force=True)
 
     def _on_profile_order_move_worker_finished(self, _worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_order_move_runtime"), _worker):
+            return
         if self.__dict__.get("_pending_profile_order_moves") and not bool(
             self.__dict__.get("_cleanup_in_progress", False)
         ):
@@ -343,6 +345,17 @@ class ProfileOrderPageBase(BasePage):
             str(pending.get("source_profile_key") or ""),
             destination_profile_key=str(pending.get("destination_profile_key") or ""),
         )
+
+    def _is_current_worker_finish(self, runtime, worker) -> bool:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return False
+        request_id = getattr(worker, "_request_id", None)
+        if request_id is None:
+            return True
+        try:
+            return int(request_id) == int(getattr(runtime, "request_id", -1))
+        except (TypeError, ValueError):
+            return False
 
     def _apply_profile_order_move_locally(
         self,
