@@ -11,6 +11,7 @@ class WindowGeometrySaveWorker(QThread):
 
     def __init__(
         self,
+        request_id: int,
         *,
         geometry: tuple[int, int, int, int] | None,
         maximized: bool,
@@ -19,6 +20,7 @@ class WindowGeometrySaveWorker(QThread):
         parent=None,
     ):
         super().__init__(parent)
+        self._request_id = int(request_id)
         self._geometry = None if geometry is None else tuple(int(value) for value in geometry)
         self._maximized = bool(maximized)
         self._get_window_geometry = get_window_geometry

@@ -41,6 +41,7 @@ class WindowGeometryFeature:
 
     def create_geometry_save_worker(
         self,
+        request_id: int,
         *,
         geometry: tuple[int, int, int, int] | None,
         maximized: bool,
@@ -49,6 +50,7 @@ class WindowGeometryFeature:
         from app.window_geometry_workers import WindowGeometrySaveWorker
 
         return WindowGeometrySaveWorker(
+            request_id,
             geometry=geometry,
             maximized=bool(maximized),
             get_window_geometry=self.get_window_geometry,

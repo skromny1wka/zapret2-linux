@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QApplication
 
@@ -642,7 +641,8 @@ class WindowGeometryRuntime:
             runtime = OneShotWorkerRuntime()
             self._geometry_save_runtime = runtime
         runtime.start_qthread_worker(
-            worker_factory=lambda _request_id: self._create_geometry_save_worker(
+            worker_factory=lambda request_id: self._create_geometry_save_worker(
+                request_id,
                 geometry=geometry,
                 maximized=bool(maximized),
                 parent=self.host,
@@ -655,12 +655,17 @@ class WindowGeometryRuntime:
         )
 
     def _on_geometry_save_finished(self, _request_id: int, geometry, maximized) -> None:
+        runtime = self.__dict__.get("_geometry_save_runtime")
+        if not self._is_current_worker_request_id(runtime, _request_id):
+            return
         self._last_persisted_maximized = bool(maximized)
         self._pending_window_maximized_state = bool(maximized)
         if geometry is not None:
             self._last_persisted_geometry = tuple(int(value) for value in geometry)
 
     def _on_geometry_save_worker_finished(self, _worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_geometry_save_runtime"), _worker):
+            return
         pending = self._geometry_save_pending
         self._geometry_save_pending = None
         if pending is not None:
@@ -683,3 +688,17 @@ class WindowGeometryRuntime:
         if pending is None or bool(self.__dict__.get("_cleanup_in_progress", False)):
             return
         self._start_geometry_save_worker(pending)
+
+    def _is_current_worker_finish(self, runtime, worker) -> bool:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return False
+        request_id = getattr(worker, "_request_id", None)
+        if request_id is None:
+            return True
+        return self._is_current_worker_request_id(runtime, request_id)
+
+    def _is_current_worker_request_id(self, runtime, request_id) -> bool:
+        try:
+            return int(request_id) == int(getattr(runtime, "request_id", -1))
+        except (TypeError, ValueError):
+            return False

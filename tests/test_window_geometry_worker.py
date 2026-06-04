@@ -18,9 +18,12 @@ class WindowGeometryWorkerTests(unittest.TestCase):
         import ui.window_geometry_runtime as runtime
 
         geometry_runtime = runtime.WindowGeometryRuntime.__new__(runtime.WindowGeometryRuntime)
+        geometry_runtime._cleanup_in_progress = False
+        geometry_runtime._geometry_save_runtime = SimpleNamespace(request_id=7)
         geometry_runtime._last_persisted_maximized = None
         geometry_runtime._pending_window_maximized_state = None
         geometry_runtime._last_persisted_geometry = None
+        geometry_runtime._geometry_save_runtime = SimpleNamespace(request_id=7)
 
         runtime.WindowGeometryRuntime._on_geometry_save_finished(
             geometry_runtime,
@@ -33,6 +36,26 @@ class WindowGeometryWorkerTests(unittest.TestCase):
         self.assertTrue(geometry_runtime._last_persisted_maximized)
         self.assertTrue(geometry_runtime._pending_window_maximized_state)
 
+    def test_stale_geometry_save_loaded_callback_is_ignored(self) -> None:
+        import ui.window_geometry_runtime as runtime
+
+        geometry_runtime = runtime.WindowGeometryRuntime.__new__(runtime.WindowGeometryRuntime)
+        geometry_runtime._last_persisted_maximized = False
+        geometry_runtime._pending_window_maximized_state = False
+        geometry_runtime._last_persisted_geometry = (1, 2, 300, 200)
+        geometry_runtime._geometry_save_runtime = SimpleNamespace(request_id=8)
+
+        runtime.WindowGeometryRuntime._on_geometry_save_finished(
+            geometry_runtime,
+            7,
+            (10, 20, 800, 600),
+            True,
+        )
+
+        self.assertEqual(geometry_runtime._last_persisted_geometry, (1, 2, 300, 200))
+        self.assertFalse(geometry_runtime._last_persisted_maximized)
+        self.assertFalse(geometry_runtime._pending_window_maximized_state)
+
     def test_regular_window_geometry_saves_run_through_worker(self) -> None:
         import main.window_lifecycle_setup as lifecycle_setup
         from app.feature_facades.window_geometry import WindowGeometryFeature
@@ -41,6 +64,7 @@ class WindowGeometryWorkerTests(unittest.TestCase):
 
         self.assertTrue(hasattr(worker_module, "WindowGeometrySaveWorker"))
 
+        worker_init_source = inspect.getsource(worker_module.WindowGeometrySaveWorker.__init__)
         worker_source = inspect.getsource(worker_module.WindowGeometrySaveWorker.run)
         feature_source = inspect.getsource(WindowGeometryFeature)
         lifecycle_source = inspect.getsource(lifecycle_setup.attach_window_lifecycle)
@@ -54,6 +78,8 @@ class WindowGeometryWorkerTests(unittest.TestCase):
         self.assertIn("set_window_geometry=self.set_window_geometry", feature_source)
         self.assertIn("get_window_geometry=self.get_window_geometry", feature_source)
         self.assertIn("features.window_geometry.create_geometry_save_worker", lifecycle_source)
+        self.assertIn("request_id", worker_init_source)
+        self.assertIn("self._request_id", worker_init_source)
         self.assertIn("create_geometry_save_worker", runtime_source)
         self.assertIn("_geometry_save_runtime = OneShotWorkerRuntime()", runtime_source)
         self.assertNotIn("ui.window_geometry_worker", runtime_source)
@@ -74,6 +100,8 @@ class WindowGeometryWorkerTests(unittest.TestCase):
         import ui.window_geometry_runtime as runtime
 
         geometry_runtime = runtime.WindowGeometryRuntime.__new__(runtime.WindowGeometryRuntime)
+        geometry_runtime._cleanup_in_progress = False
+        geometry_runtime._geometry_save_runtime = SimpleNamespace(request_id=1)
         geometry_runtime._geometry_save_pending = ((10, 20, 800, 600), True)
         geometry_runtime._start_geometry_save_worker = Mock()
         single_shot = Mock(side_effect=lambda _delay, _callback: None)
@@ -91,6 +119,26 @@ class WindowGeometryWorkerTests(unittest.TestCase):
         single_shot.call_args.args[1]()
 
         geometry_runtime._start_geometry_save_worker.assert_called_once_with(((10, 20, 800, 600), True))
+
+    def test_stale_geometry_save_worker_finished_does_not_restart_pending_save(self) -> None:
+        import ui.window_geometry_runtime as runtime
+
+        geometry_runtime = runtime.WindowGeometryRuntime.__new__(runtime.WindowGeometryRuntime)
+        geometry_runtime._cleanup_in_progress = False
+        geometry_runtime._geometry_save_runtime = SimpleNamespace(request_id=2)
+        geometry_runtime._geometry_save_pending = ((10, 20, 800, 600), True)
+        geometry_runtime._start_geometry_save_worker = Mock()
+        single_shot = Mock()
+
+        with patch.object(runtime, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            runtime.WindowGeometryRuntime._on_geometry_save_worker_finished(
+                geometry_runtime,
+                SimpleNamespace(_request_id=1),
+            )
+
+        single_shot.assert_not_called()
+        geometry_runtime._start_geometry_save_worker.assert_not_called()
+        self.assertEqual(geometry_runtime._geometry_save_pending, ((10, 20, 800, 600), True))
 
 
 if __name__ == "__main__":
