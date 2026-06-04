@@ -58,9 +58,22 @@ def apply_window_opacity(*, set_window_opacity, value: int) -> None:
         pass
 
 
+def resolve_tray_icon_path() -> str:
+    from config.build_info import CHANNEL
+    from config.config import ICON_DEV_PATH, ICON_PATH
+
+    icon_path = ICON_DEV_PATH if CHANNEL.lower() == "dev" else ICON_PATH
+    if not os.path.exists(icon_path):
+        icon_path = ICON_PATH
+    return os.path.abspath(icon_path)
+
+
 def init_tray(
     *,
     window_port: Any,
+    icon_path: str,
+    app_version: str,
+    tray_manager_factory,
     startup_state,
     tray_feature: Any,
     notify,
@@ -72,24 +85,10 @@ def init_tray(
         log("Системный трей уже инициализирован, пропускаем", "DEBUG")
         return existing_manager
 
-    from config.build_info import APP_VERSION, CHANNEL
-    from config.config import ICON_DEV_PATH, ICON_PATH
-    from PyQt6.QtGui import QIcon
-    from PyQt6.QtWidgets import QApplication
-    from tray import SystemTrayManager
-
-    icon_path = ICON_DEV_PATH if CHANNEL.lower() == "dev" else ICON_PATH
-    if not os.path.exists(icon_path):
-        icon_path = ICON_PATH
-
-    app_icon = QIcon(icon_path)
-    window_port.set_window_icon(app_icon)
-    QApplication.instance().setWindowIcon(app_icon)
-
-    tray_manager = SystemTrayManager(
+    tray_manager = tray_manager_factory(
         window_port=window_port,
-        icon_path=os.path.abspath(icon_path),
-        app_version=APP_VERSION,
+        icon_path=os.path.abspath(str(icon_path or "")),
+        app_version=str(app_version or ""),
         tray_feature=tray_feature,
     )
 
