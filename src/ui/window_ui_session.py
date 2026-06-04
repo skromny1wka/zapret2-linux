@@ -49,6 +49,7 @@ class WindowUiSession:
     sidebar_search_preset_loader: Callable[[str], tuple[object, ...]] | None = None
     sidebar_expanded_save_worker_factory: Callable[..., Any] | None = None
     sidebar_expanded_save_runtime: OneShotWorkerRuntime = field(default_factory=OneShotWorkerRuntime)
+    sidebar_expanded_save_runtime_worker: Any | None = None
     sidebar_search_runtime_cache: dict[str, tuple[float, tuple[object, ...]]] = field(default_factory=dict)
     sidebar_expanded_save_pending: bool | None = None
     sidebar_expanded_save_start_scheduled: bool = False

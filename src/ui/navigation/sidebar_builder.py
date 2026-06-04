@@ -107,7 +107,7 @@ def _start_sidebar_expanded_save_worker(window, expanded: bool) -> None:
     if create_worker is None:
         return
 
-    runtime.start_qthread_worker(
+    started = runtime.start_qthread_worker(
         worker_factory=lambda _request_id: create_worker(
             expanded=bool(expanded),
             state_key=SIDEBAR_EXPANDED_UI_STATE_KEY,
@@ -115,10 +115,12 @@ def _start_sidebar_expanded_save_worker(window, expanded: bool) -> None:
         ),
         on_loaded=lambda _request_id, _expanded: None,
         on_failed=lambda _request_id, error: log(f"Не удалось сохранить состояние сайдбара: {error}", "DEBUG"),
-        on_finished=lambda _worker, current_window=window: _on_sidebar_expanded_save_worker_finished(current_window),
+        on_finished=lambda worker, current_window=window: _on_sidebar_expanded_save_worker_finished(current_window, worker),
         signal_includes_request_id=False,
         loaded_signal_name="saved",
     )
+    worker = started[1] if isinstance(started, tuple) and len(started) > 1 else getattr(runtime, "worker", None)
+    session.sidebar_expanded_save_runtime_worker = worker
 
 
 def _ensure_sidebar_expanded_save_runtime(session) -> OneShotWorkerRuntime:
@@ -129,10 +131,14 @@ def _ensure_sidebar_expanded_save_runtime(session) -> OneShotWorkerRuntime:
     return runtime
 
 
-def _on_sidebar_expanded_save_worker_finished(window) -> None:
+def _on_sidebar_expanded_save_worker_finished(window, worker=None) -> None:
     session = get_window_ui_session(window)
     if session is None:
         return
+    current_worker = getattr(session, "sidebar_expanded_save_runtime_worker", None)
+    if current_worker is not None and worker is not current_worker:
+        return
+    session.sidebar_expanded_save_runtime_worker = None
     pending = getattr(session, "sidebar_expanded_save_pending", None)
     if pending is None:
         return
