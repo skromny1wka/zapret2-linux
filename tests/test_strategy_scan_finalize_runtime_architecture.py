@@ -61,6 +61,25 @@ class StrategyScanFinalizeRuntimeArchitectureTests(unittest.TestCase):
         page._request_strategy_scan_finalize.assert_called_once_with(report)
         self.assertIsNone(page._strategy_scan_finalize_pending)
 
+    def test_stale_finalize_worker_finished_does_not_restart_pending_finalize(self) -> None:
+        import blockcheck.ui.strategy_scan_page as strategy_scan_page
+
+        page = StrategyScanPage.__new__(StrategyScanPage)
+        report = object()
+        page._cleanup_in_progress = False
+        page._strategy_scan_finalize_runtime = SimpleNamespace(worker=object())
+        page._strategy_scan_finalize_pending = report
+        page._strategy_scan_finalize_start_scheduled = False
+        page._request_strategy_scan_finalize = Mock()
+        single_shot = Mock()
+
+        with patch.object(strategy_scan_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            StrategyScanPage._on_strategy_scan_finalize_worker_finished(page, object())
+
+        single_shot.assert_not_called()
+        page._request_strategy_scan_finalize.assert_not_called()
+        self.assertIs(page._strategy_scan_finalize_pending, report)
+
 
 if __name__ == "__main__":
     unittest.main()

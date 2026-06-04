@@ -61,6 +61,26 @@ class StrategyScanQuickTargetsRuntimeArchitectureTests(unittest.TestCase):
             current_value="latest",
         )
 
+    def test_stale_quick_targets_worker_finished_does_not_restart_pending_menu(self) -> None:
+        import blockcheck.ui.strategy_scan_page as strategy_scan_page
+
+        page = StrategyScanPage.__new__(StrategyScanPage)
+        page._cleanup_in_progress = False
+        page._quick_targets_runtime = SimpleNamespace(worker=object())
+        page._quick_targets_pending = {"scan_protocol": "udp", "current_value": "latest"}
+        page._request_quick_targets_menu = Mock()
+        single_shot = Mock()
+
+        with patch.object(strategy_scan_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            StrategyScanPage._on_quick_targets_worker_finished(page, object())
+
+        single_shot.assert_not_called()
+        page._request_quick_targets_menu.assert_not_called()
+        self.assertEqual(
+            page._quick_targets_pending,
+            {"scan_protocol": "udp", "current_value": "latest"},
+        )
+
     def test_quick_targets_request_waits_while_restart_is_scheduled(self) -> None:
         page = StrategyScanPage.__new__(StrategyScanPage)
         page._quick_targets_runtime = SimpleNamespace(is_running=Mock(return_value=False), start_qthread_worker=Mock())
