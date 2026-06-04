@@ -74,6 +74,28 @@ class AppearanceWorkerQueueTests(unittest.TestCase):
         self.assertTrue(page._initial_state_load_pending)
         self.assertTrue(page._initial_state_load_pending_force)
 
+    def test_stale_initial_state_worker_object_finished_does_not_restart_pending_load(self) -> None:
+        import ui.pages.appearance_page as appearance_page
+        from ui.pages.appearance_page import AppearancePage
+
+        old_worker = object()
+        current_worker = object()
+        page = AppearancePage.__new__(AppearancePage)
+        page._cleanup_in_progress = False
+        page._initial_state_load_runtime = SimpleNamespace(request_id=3, worker=current_worker)
+        page._initial_state_load_pending = True
+        page._initial_state_load_pending_force = True
+        page._request_initial_state_load = Mock()
+        single_shot = Mock()
+
+        with patch.object(appearance_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
+            AppearancePage._on_initial_state_worker_finished(page, old_worker)
+
+        single_shot.assert_not_called()
+        page._request_initial_state_load.assert_not_called()
+        self.assertTrue(page._initial_state_load_pending)
+        self.assertTrue(page._initial_state_load_pending_force)
+
     def test_initial_state_result_ignored_when_new_load_is_pending(self) -> None:
         from ui.pages.appearance_page import AppearancePage
 
@@ -131,6 +153,26 @@ class AppearanceWorkerQueueTests(unittest.TestCase):
 
         with patch.object(appearance_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
             AppearancePage._on_appearance_save_worker_finished(page, SimpleNamespace(_request_id=7))
+
+        single_shot.assert_not_called()
+        page._start_appearance_save_worker.assert_not_called()
+        self.assertEqual(page._appearance_save_pending, [{"action": "display_mode", "value": "dark"}])
+
+    def test_stale_appearance_save_worker_object_finished_does_not_restart_pending_save(self) -> None:
+        import ui.pages.appearance_page as appearance_page
+        from ui.pages.appearance_page import AppearancePage
+
+        old_worker = object()
+        current_worker = object()
+        page = AppearancePage.__new__(AppearancePage)
+        page._cleanup_in_progress = False
+        page._appearance_save_runtime = SimpleNamespace(request_id=8, worker=current_worker)
+        page._appearance_save_pending = [{"action": "display_mode", "value": "dark"}]
+        page._start_appearance_save_worker = Mock()
+        single_shot = Mock()
+
+        with patch.object(appearance_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
+            AppearancePage._on_appearance_save_worker_finished(page, old_worker)
 
         single_shot.assert_not_called()
         page._start_appearance_save_worker.assert_not_called()
@@ -238,6 +280,26 @@ class AppearanceWorkerQueueTests(unittest.TestCase):
         page._start_rkn_background_options_load_worker.assert_not_called()
         self.assertTrue(page._rkn_background_options_pending)
 
+    def test_stale_rkn_background_options_worker_object_finished_does_not_restart_pending_load(self) -> None:
+        import ui.pages.appearance_page as appearance_page
+        from ui.pages.appearance_page import AppearancePage
+
+        old_worker = object()
+        current_worker = object()
+        page = AppearancePage.__new__(AppearancePage)
+        page._cleanup_in_progress = False
+        page._rkn_background_options_runtime = SimpleNamespace(request_id=5, worker=current_worker)
+        page._rkn_background_options_pending = True
+        page._start_rkn_background_options_load_worker = Mock()
+        single_shot = Mock()
+
+        with patch.object(appearance_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
+            AppearancePage._on_rkn_background_options_worker_finished(page, old_worker)
+
+        single_shot.assert_not_called()
+        page._start_rkn_background_options_load_worker.assert_not_called()
+        self.assertTrue(page._rkn_background_options_pending)
+
     def test_rkn_background_options_scheduled_start_queues_next_load(self) -> None:
         import ui.pages.appearance_page as appearance_page
         from ui.pages.appearance_page import AppearancePage
@@ -317,6 +379,26 @@ class AppearanceWorkerQueueTests(unittest.TestCase):
 
         with patch.object(appearance_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
             AppearancePage._on_windows_accent_worker_finished(page, SimpleNamespace(_request_id=11))
+
+        single_shot.assert_not_called()
+        page._start_windows_accent_load_worker.assert_not_called()
+        self.assertTrue(page._windows_accent_load_pending)
+
+    def test_stale_windows_accent_worker_object_finished_does_not_restart_pending_load(self) -> None:
+        import ui.pages.appearance_page as appearance_page
+        from ui.pages.appearance_page import AppearancePage
+
+        old_worker = object()
+        current_worker = object()
+        page = AppearancePage.__new__(AppearancePage)
+        page._cleanup_in_progress = False
+        page._windows_accent_load_runtime = SimpleNamespace(request_id=12, worker=current_worker)
+        page._windows_accent_load_pending = True
+        page._start_windows_accent_load_worker = Mock()
+        single_shot = Mock()
+
+        with patch.object(appearance_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
+            AppearancePage._on_windows_accent_worker_finished(page, old_worker)
 
         single_shot.assert_not_called()
         page._start_windows_accent_load_worker.assert_not_called()
