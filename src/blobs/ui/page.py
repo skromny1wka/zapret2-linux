@@ -235,6 +235,8 @@ class BlobsPage(BasePage):
             pass
 
     def _on_blobs_load_worker_finished(self, _worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_blobs_load_runtime"), _worker):
+            return
         if hasattr(self, "reload_btn"):
             self.reload_btn.set_loading(False)
         if self._blobs_load_pending and not self._cleanup_in_progress:
@@ -408,6 +410,8 @@ class BlobsPage(BasePage):
         )
 
     def _on_blob_action_worker_finished(self, _worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_blob_action_runtime"), _worker):
+            return
         if self._blob_action_pending and not self._cleanup_in_progress:
             pending = self._blob_action_pending.pop(0)
             self._schedule_blob_action_worker_start(pending)
@@ -491,6 +495,8 @@ class BlobsPage(BasePage):
         )
 
     def _on_blob_open_action_worker_finished(self, _worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_blob_open_action_runtime"), _worker):
+            return
         if self._blob_open_action_pending and not self._cleanup_in_progress:
             pending = self._blob_open_action_pending.pop(0)
             self._schedule_blob_open_action_worker_start(pending)
@@ -510,6 +516,17 @@ class BlobsPage(BasePage):
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         self._start_blob_open_action_worker(str(action or "").strip())
+
+    def _is_current_worker_finish(self, runtime, worker) -> bool:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return False
+        request_id = getattr(worker, "_request_id", None)
+        if request_id is None:
+            return True
+        try:
+            return int(request_id) == int(getattr(runtime, "request_id", -1))
+        except (TypeError, ValueError):
+            return False
 
     def set_ui_language(self, language: str) -> None:
         super().set_ui_language(language)

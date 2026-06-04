@@ -97,6 +97,24 @@ class BlobsWorkerArchitectureTests(unittest.TestCase):
 
         page._start_blobs_load_worker.assert_called_once_with(reload=True)
 
+    def test_stale_blobs_load_worker_finished_does_not_restart_pending_load(self) -> None:
+        page = BlobsPage.__new__(BlobsPage)
+        page._cleanup_in_progress = False
+        page._blobs_load_runtime = SimpleNamespace(request_id=3)
+        page._blobs_load_pending = True
+        page._blobs_load_pending_reload = True
+        page._start_blobs_load_worker = Mock()
+        page.reload_btn = SimpleNamespace(set_loading=Mock())
+        single_shot = Mock()
+
+        with patch.object(blobs_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
+            BlobsPage._on_blobs_load_worker_finished(page, SimpleNamespace(_request_id=2))
+
+        single_shot.assert_not_called()
+        page._start_blobs_load_worker.assert_not_called()
+        self.assertTrue(page._blobs_load_pending)
+        self.assertTrue(page._blobs_load_pending_reload)
+
     def test_blobs_load_scheduled_start_uses_latest_pending_reload(self) -> None:
         page = BlobsPage.__new__(BlobsPage)
         page._cleanup_in_progress = False
@@ -133,6 +151,21 @@ class BlobsWorkerArchitectureTests(unittest.TestCase):
         single_shot.call_args.args[1]()
 
         page._start_blob_action_worker.assert_called_once_with({"action": "delete", "name": "a.bin"})
+
+    def test_stale_blob_action_worker_finished_does_not_restart_pending_action(self) -> None:
+        page = BlobsPage.__new__(BlobsPage)
+        page._cleanup_in_progress = False
+        page._blob_action_runtime = SimpleNamespace(request_id=7)
+        page._blob_action_pending = [{"action": "delete", "name": "a.bin"}]
+        page._start_blob_action_worker = Mock()
+        single_shot = Mock()
+
+        with patch.object(blobs_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
+            BlobsPage._on_blob_action_worker_finished(page, SimpleNamespace(_request_id=6))
+
+        single_shot.assert_not_called()
+        page._start_blob_action_worker.assert_not_called()
+        self.assertEqual(page._blob_action_pending, [{"action": "delete", "name": "a.bin"}])
 
     def test_blob_action_scheduled_start_queues_next_payload(self) -> None:
         page = BlobsPage.__new__(BlobsPage)
@@ -197,6 +230,21 @@ class BlobsWorkerArchitectureTests(unittest.TestCase):
         single_shot.call_args.args[1]()
 
         page._start_blob_open_action_worker.assert_called_once_with("blobs_json")
+
+    def test_stale_blob_open_action_worker_finished_does_not_restart_pending_open(self) -> None:
+        page = BlobsPage.__new__(BlobsPage)
+        page._cleanup_in_progress = False
+        page._blob_open_action_runtime = SimpleNamespace(request_id=5)
+        page._blob_open_action_pending = ["blobs_json"]
+        page._start_blob_open_action_worker = Mock()
+        single_shot = Mock()
+
+        with patch.object(blobs_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
+            BlobsPage._on_blob_open_action_worker_finished(page, SimpleNamespace(_request_id=4))
+
+        single_shot.assert_not_called()
+        page._start_blob_open_action_worker.assert_not_called()
+        self.assertEqual(page._blob_open_action_pending, ["blobs_json"])
 
     def test_blob_open_action_scheduled_start_queues_next_action(self) -> None:
         page = BlobsPage.__new__(BlobsPage)
