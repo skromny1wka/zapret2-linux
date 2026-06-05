@@ -57,7 +57,7 @@ class AppearanceFeature:
 
     def create_rkn_background_options_load_worker(self, request_id: int, *, parent=None):
         from settings.appearance_workers import AppearanceRknBackgroundOptionsLoadWorker
-        from ui.theme import get_rkn_background_options
+        from settings.appearance_backgrounds import get_rkn_background_options
 
         return AppearanceRknBackgroundOptionsLoadWorker(
             request_id,

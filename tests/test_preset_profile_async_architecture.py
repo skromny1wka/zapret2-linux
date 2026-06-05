@@ -1942,6 +1942,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("worker.start()", start_source)
         self.assertIn("create_rkn_background_options_load_worker", page_source)
         self.assertIn("create_rkn_background_options_load_worker", feature_source)
+        self.assertIn("settings.appearance_backgrounds", feature_source)
+        self.assertNotIn("ui.theme", feature_source)
         self.assertNotIn("AppearanceRknBackgroundOptionsLoadWorker", create_source)
         self.assertIn("self._appearance.create_rkn_background_options_load_worker", create_source)
         self.assertIn("_request_rkn_background_options_load", reload_source)
