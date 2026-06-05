@@ -191,9 +191,7 @@ def build_user_presets_page_kwargs(
     return {
         "preset_runtime_actions": UserPresetsRuntimeActions(
             get_selected_source_preset_file_name=presets_feature.get_selected_source_preset_file_name,
-            get_preset_manifest_by_file_name=presets_feature.get_preset_manifest_by_file_name,
             list_preset_manifests=presets_feature.list_preset_manifests,
-            get_selected_source_preset_manifest=presets_feature.get_selected_source_preset_manifest,
             get_user_presets_dir=presets_feature.get_user_presets_dir,
             get_cached_preset_list_metadata=presets_feature.get_cached_preset_list_metadata,
             warm_preset_list_metadata_cache=presets_feature.warm_preset_list_metadata_cache,

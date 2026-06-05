@@ -11,9 +11,7 @@ from presets.user_presets_page_plans import UserPresetListPlan, build_preset_row
 @dataclass(frozen=True, slots=True)
 class UserPresetsRuntimeActions:
     get_selected_source_preset_file_name: Callable[..., object]
-    get_preset_manifest_by_file_name: Callable[..., object]
     list_preset_manifests: Callable[..., object]
-    get_selected_source_preset_manifest: Callable[..., object]
     get_user_presets_dir: Callable[..., object]
     get_cached_preset_list_metadata: Callable[..., object]
     warm_preset_list_metadata_cache: Callable[..., object]
@@ -39,7 +37,6 @@ class UserPresetsListingApi(Protocol):
     def get_cached_preset_list_metadata_light(self) -> dict[str, dict[str, object]] | None: ...
     def load_preset_list_metadata_light(self) -> dict[str, dict[str, object]]: ...
     def read_single_preset_list_metadata_light(self, file_name: str) -> tuple[str, dict[str, object]] | None: ...
-    def resolve_display_name(self, reference: str) -> str: ...
     def build_preset_rows_plan(
         self,
         *,
@@ -208,9 +205,6 @@ class _UserPresetsListingApiImpl:
     def read_single_preset_list_metadata_light(self, file_name: str) -> tuple[str, dict[str, object]] | None:
         return self._runtime.read_single_preset_list_metadata_light(file_name)
 
-    def resolve_display_name(self, reference: str) -> str:
-        return self._runtime.resolve_display_name(reference)
-
     def build_preset_rows_plan(
         self,
         *,
@@ -241,21 +235,6 @@ class UserPresetsPageRuntime:
 
     def _preset_actions(self) -> UserPresetsRuntimeActions:
         return self._config.preset_runtime_actions
-
-    def is_builtin_preset_file(self, name: str) -> bool:
-        candidate = str(name or "").strip()
-        if not candidate or not candidate.lower().endswith(".txt"):
-            return False
-        try:
-            manifest = self._preset_actions().get_preset_manifest_by_file_name(
-                self._config.launch_method,
-                candidate,
-            )
-            if manifest is not None:
-                return str(manifest.kind or "").strip().lower() == "builtin"
-        except Exception:
-            pass
-        return False
 
     def list_preset_entries_light(self) -> list[dict[str, object]]:
         try:
@@ -334,34 +313,6 @@ class UserPresetsPageRuntime:
         )
 
         return candidate_file_name, metadata
-
-    def resolve_display_name(self, reference: str) -> str:
-        candidate = str(reference or "").strip()
-        if not candidate:
-            return ""
-        if candidate.lower().endswith(".txt"):
-            try:
-                manifest = self._preset_actions().get_preset_manifest_by_file_name(
-                    self._config.launch_method,
-                    candidate,
-                )
-                if manifest is not None:
-                    return manifest.name
-            except Exception:
-                pass
-        return candidate
-
-    def is_builtin_preset_file_with_cache(self, name: str, cached_metadata: dict[str, dict[str, object]] | None) -> bool:
-        candidate = str(name or "").strip()
-        if not candidate or not candidate.lower().endswith(".txt"):
-            return False
-
-        if isinstance(cached_metadata, dict):
-            cached_meta = cached_metadata.get(candidate)
-            if isinstance(cached_meta, dict):
-                return bool(cached_meta.get("is_builtin", False))
-
-        return self.is_builtin_preset_file(candidate)
 
     def build_preset_rows_plan(
         self,

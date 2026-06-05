@@ -50,18 +50,31 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
     def test_user_presets_page_receives_concrete_preset_actions_instead_of_feature(self) -> None:
         from app.page_names import PageName
         from presets.ui.common.user_presets_page import UserPresetsPageBase
-        from presets.ui.common.user_presets_page_runtime import UserPresetsPageRuntimeConfig
+        from presets.ui.common.user_presets_page_runtime import (
+            UserPresetsPageRuntime,
+            UserPresetsPageRuntimeConfig,
+            UserPresetsRuntimeActions,
+        )
         from ui.page_deps.presets import build_user_presets_page_kwargs
 
         init_source = inspect.getsource(UserPresetsPageBase.__init__)
         page_source = inspect.getsource(UserPresetsPageBase)
+        runtime_actions_source = inspect.getsource(UserPresetsRuntimeActions)
         runtime_config_source = inspect.getsource(UserPresetsPageRuntimeConfig)
+        runtime_source = inspect.getsource(UserPresetsPageRuntime)
         runtime_build_source = inspect.getsource(UserPresetsPageBase._build_page_runtime)
+        deps_source = inspect.getsource(build_user_presets_page_kwargs)
 
         self.assertNotIn("presets_feature", init_source)
         self.assertNotIn("self._presets_feature", page_source)
         self.assertNotIn("get_presets_feature", runtime_config_source)
         self.assertNotIn("get_presets_feature", runtime_build_source)
+        self.assertNotIn("get_preset_manifest_by_file_name", runtime_actions_source)
+        self.assertNotIn("get_selected_source_preset_manifest", runtime_actions_source)
+        self.assertNotIn("get_preset_manifest_by_file_name", runtime_source)
+        self.assertNotIn("get_selected_source_preset_manifest", runtime_source)
+        self.assertNotIn("get_preset_manifest_by_file_name=", deps_source)
+        self.assertNotIn("get_selected_source_preset_manifest=", deps_source)
         self.assertIn("preset_runtime_actions", init_source)
         self.assertIn("connect_preset_signals", init_source)
         self.assertIn("create_user_presets_open_folder_worker", init_source)
