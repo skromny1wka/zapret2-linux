@@ -9,6 +9,13 @@ class UpdateChannelActionResult:
     message: str
 
 
+@dataclass(slots=True)
+class ServerFullCheckGateResult:
+    telegram_only: bool
+    keep_existing_rows: bool
+    message: str = ""
+
+
 def is_auto_update_enabled() -> bool:
     from settings.store import get_auto_update_enabled
 
@@ -37,6 +44,28 @@ def open_update_channel(channel: str) -> UpdateChannelActionResult:
         return UpdateChannelActionResult(True, domain)
     except Exception as exc:
         return UpdateChannelActionResult(False, str(exc))
+
+
+def prepare_server_full_check(*, skip_rate_limit: bool = False) -> ServerFullCheckGateResult:
+    from updater.rate_limiter import UpdateRateLimiter
+
+    if not bool(skip_rate_limit):
+        can_full, message = UpdateRateLimiter.can_check_servers_full()
+        if not can_full:
+            return ServerFullCheckGateResult(
+                telegram_only=True,
+                keep_existing_rows=True,
+                message=(
+                    f"⏱️ Полная проверка VPS заблокирована: {message}. "
+                    "fallback=telegram-only"
+                ),
+            )
+
+    UpdateRateLimiter.record_servers_full_check()
+    return ServerFullCheckGateResult(
+        telegram_only=False,
+        keep_existing_rows=False,
+    )
 
 
 def retry_server_check_without_dpi(*, is_any_running, shutdown_sync) -> tuple[bool, bool, str]:

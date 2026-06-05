@@ -247,12 +247,11 @@ class UpdatePageRuntimeServerRecoveryTests(unittest.TestCase):
         runtime, _view, runtime_feature = self._make_runtime()
 
         with (
-            patch("updater.update_page_runtime.UpdateRateLimiter.record_servers_full_check"),
             patch.object(runtime, "_start_server_check_workflow") as start_server_check,
             patch.object(runtime, "_start_version_check_workflow") as start_version_check,
             self._stub_retry_worker_start(runtime),
         ):
-            runtime.start_checks(telegram_only=False, skip_server_rate_limit=True)
+            runtime._continue_start_checks(telegram_only=False, keep_existing_rows=False)
             runtime._on_server_checked("Telegram Bot", {"status": "offline"})
             runtime._on_server_checked("Primary", {"status": "error"})
             runtime._on_server_checked("GitHub API", {"status": "error"})
@@ -269,13 +268,12 @@ class UpdatePageRuntimeServerRecoveryTests(unittest.TestCase):
         runtime, _view, runtime_feature = self._make_runtime()
 
         with (
-            patch("updater.update_page_runtime.UpdateRateLimiter.record_servers_full_check"),
             patch.object(runtime, "_start_server_check_workflow"),
             patch.object(runtime, "_start_version_check_workflow") as start_version_check,
             self._stub_retry_worker_start(runtime),
             self._stub_dpi_restart_worker_start(runtime),
         ):
-            runtime.start_checks(telegram_only=False, skip_server_rate_limit=True)
+            runtime._continue_start_checks(telegram_only=False, keep_existing_rows=False)
             runtime._on_server_checked("GitHub API", {"status": "error"})
             runtime._on_servers_complete()
             retry_request_id = runtime._server_retry_without_dpi_runtime.request_id
@@ -294,11 +292,10 @@ class UpdatePageRuntimeServerRecoveryTests(unittest.TestCase):
         runtime, _view, runtime_feature = self._make_runtime()
 
         with (
-            patch("updater.update_page_runtime.UpdateRateLimiter.record_servers_full_check"),
             patch.object(runtime, "_start_server_check_workflow"),
             patch.object(runtime, "_start_version_check_workflow") as start_version_check,
         ):
-            runtime.start_checks(telegram_only=False, skip_server_rate_limit=True)
+            runtime._continue_start_checks(telegram_only=False, keep_existing_rows=False)
             runtime._on_server_checked("Telegram Bot", {"status": "offline"})
             runtime._on_server_checked("Primary", {"status": "online", "is_current": True})
             runtime._on_servers_complete()

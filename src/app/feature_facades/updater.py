@@ -57,6 +57,16 @@ class UpdaterFeature:
             parent=parent,
         )
 
+    def create_server_full_check_gate_worker(self, request_id: int, *, skip_rate_limit: bool, parent=None):
+        from updater.settings_workers import UpdaterServerFullCheckGateWorker
+
+        return UpdaterServerFullCheckGateWorker(
+            request_id,
+            skip_rate_limit=bool(skip_rate_limit),
+            prepare_server_full_check=self.prepare_server_full_check,
+            parent=parent,
+        )
+
     def create_server_retry_without_dpi_worker(self, request_id: int, *, is_any_running, shutdown_sync, parent=None):
         from updater.retry_workers import UpdaterServerRetryWithoutDpiWorker
 
@@ -97,6 +107,9 @@ class UpdaterFeature:
 
     def open_update_channel(self, channel: str):
         return self._commands().open_update_channel(channel)
+
+    def prepare_server_full_check(self, *, skip_rate_limit: bool = False):
+        return self._commands().prepare_server_full_check(skip_rate_limit=bool(skip_rate_limit))
 
     def invalidate_update_cache(self, channel: str) -> None:
         from updater import invalidate_cache

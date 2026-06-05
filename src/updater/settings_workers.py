@@ -94,3 +94,30 @@ class UpdaterCacheInvalidateWorker(QThread):
             self.failed.emit(self._request_id, self._context, str(exc))
             return
         self.loaded.emit(self._request_id, self._context)
+
+
+class UpdaterServerFullCheckGateWorker(QThread):
+    loaded = pyqtSignal(int, object)
+    failed = pyqtSignal(int, str)
+
+    def __init__(
+        self,
+        request_id: int,
+        *,
+        skip_rate_limit: bool,
+        prepare_server_full_check: Callable[..., Any],
+        parent=None,
+    ):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self._skip_rate_limit = bool(skip_rate_limit)
+        self._prepare_server_full_check = prepare_server_full_check
+
+    def run(self) -> None:
+        try:
+            result = self._prepare_server_full_check(skip_rate_limit=self._skip_rate_limit)
+        except Exception as exc:
+            log(f"UpdaterServerFullCheckGateWorker: проверка лимита VPS не выполнена: {exc}", "ERROR")
+            self.failed.emit(self._request_id, str(exc))
+            return
+        self.loaded.emit(self._request_id, result)

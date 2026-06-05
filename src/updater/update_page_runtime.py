@@ -11,9 +11,6 @@ from ui.page_deps.types import UpdateRuntimeActions
 
 from log.log import log
 
-from updater.rate_limiter import UpdateRateLimiter
-
-
 @dataclass(slots=True)
 class UpdateFoundState:
     is_available: bool = False
@@ -129,6 +126,7 @@ class UpdatePageRuntime:
         self._auto_check_save_runtime = OneShotWorkerRuntime()
         self._update_channel_open_runtime = OneShotWorkerRuntime()
         self._cache_invalidate_runtime = OneShotWorkerRuntime()
+        self._server_check_gate_runtime = OneShotWorkerRuntime()
         self._update_install_runtime = OneShotWorkerRuntime()
         self._cleanup_in_progress = False
         self._auto_check_load_pending = False
@@ -136,9 +134,11 @@ class UpdatePageRuntime:
         self._auto_check_save_pending: bool | None = None
         self._cache_invalidate_pending_context: str | None = None
         self._update_channel_open_pending = ""
+        self._server_check_gate_pending: bool | None = None
         self._auto_check_save_start_scheduled = False
         self._cache_invalidate_start_scheduled = False
         self._update_channel_open_start_scheduled = False
+        self._server_check_gate_start_scheduled = False
         self._auto_check_user_changed = False
         self._dpi_restart_after = ""
 
@@ -398,20 +398,94 @@ class UpdatePageRuntime:
             log("⏭️ Пропуск проверки - идёт скачивание обновления", "🔄 UPDATE")
             return
 
-        keep_existing_rows = False
-
         if not telegram_only:
-            if not skip_server_rate_limit:
-                can_full, msg = UpdateRateLimiter.can_check_servers_full()
-                if not can_full:
-                    telegram_only = True
-                    keep_existing_rows = True
-                    log(f"⏱️ Полная проверка VPS заблокирована: {msg}. fallback=telegram-only", "🔄 UPDATE")
+            self._request_server_check_gate(skip_rate_limit=bool(skip_server_rate_limit))
+            return
 
-            if not telegram_only:
-                UpdateRateLimiter.record_servers_full_check()
-                self._check_state.last_check_time = time.time()
+        self._continue_start_checks(telegram_only=True, keep_existing_rows=False)
 
+    def _request_server_check_gate(self, *, skip_rate_limit: bool) -> None:
+        if (
+            self._server_check_gate_runtime.is_running()
+            or self.__dict__.get("_server_check_gate_start_scheduled", False)
+        ):
+            self._server_check_gate_pending = bool(skip_rate_limit)
+            return
+        self._server_check_gate_pending = None
+        self._start_server_check_gate_worker(skip_rate_limit=bool(skip_rate_limit))
+
+    def _start_server_check_gate_worker(self, *, skip_rate_limit: bool) -> None:
+        self._server_check_gate_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: self._updater_feature.create_server_full_check_gate_worker(
+                request_id,
+                skip_rate_limit=bool(skip_rate_limit),
+                parent=self._view.window(),
+            ),
+            on_loaded=self._on_server_check_gate_finished,
+            on_failed=self._on_server_check_gate_failed,
+            on_finished=self._on_server_check_gate_worker_finished,
+        )
+
+    def _on_server_check_gate_finished(self, request_id: int, result) -> None:
+        if not self._server_check_gate_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
+            return
+        if self.__dict__.get("_server_check_gate_pending") is not None:
+            return
+        message = str(getattr(result, "message", "") or "")
+        if message:
+            log(message, "🔄 UPDATE")
+        self._continue_start_checks(
+            telegram_only=bool(getattr(result, "telegram_only", False)),
+            keep_existing_rows=bool(getattr(result, "keep_existing_rows", False)),
+        )
+
+    def _on_server_check_gate_failed(self, request_id: int, error: str) -> None:
+        if not self._server_check_gate_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
+            return
+        log(f"Не удалось проверить лимит полной проверки VPS: {error}", "WARNING")
+        self._continue_start_checks(telegram_only=True, keep_existing_rows=True)
+
+    def _on_server_check_gate_worker_finished(self, _worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_server_check_gate_runtime"), _worker):
+            return
+        if self._cleanup_in_progress:
+            return
+        pending = self.__dict__.get("_server_check_gate_pending")
+        if pending is not None:
+            self._schedule_server_check_gate_start(bool(pending))
+
+    def _schedule_server_check_gate_start(self, skip_rate_limit: bool) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        self._server_check_gate_pending = bool(skip_rate_limit)
+        if self.__dict__.get("_server_check_gate_start_scheduled", False):
+            return
+        self._server_check_gate_start_scheduled = True
+        QTimer.singleShot(0, self._run_scheduled_server_check_gate_start)
+
+    def _run_scheduled_server_check_gate_start(self) -> None:
+        self._server_check_gate_start_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        pending = self.__dict__.get("_server_check_gate_pending")
+        self._server_check_gate_pending = None
+        if pending is None:
+            return
+        self._request_server_check_gate(skip_rate_limit=bool(pending))
+
+    def _continue_start_checks(self, *, telegram_only: bool, keep_existing_rows: bool) -> None:
+        if self._cleanup_in_progress or self._check_state.is_active:
+            return
+        if not self._can_start_new_check():
+            return
+        if not telegram_only:
+            self._check_state.last_check_time = time.time()
         self._reset_check_state(keep_cached_data=True)
         self._check_state.is_active = True
         self._server_check_recovery = ServerCheckRecoveryState(enabled=not telegram_only)
@@ -696,6 +770,7 @@ class UpdatePageRuntime:
         self._teardown_auto_check_save_worker()
         self._teardown_update_channel_open_worker()
         self._teardown_cache_invalidate_worker()
+        self._teardown_server_check_gate_worker()
         self._teardown_update_runtime(wait_for_finish=True)
 
     def _resolve_idle_view_decision(self) -> UpdateIdleViewDecision:
@@ -941,6 +1016,16 @@ class UpdatePageRuntime:
             warning_prefix="cache_invalidate_worker",
         )
         self._cache_invalidate_runtime.cancel()
+
+    def _teardown_server_check_gate_worker(self) -> None:
+        self._server_check_gate_pending = None
+        self._server_check_gate_start_scheduled = False
+        self._server_check_gate_runtime.stop(
+            blocking=True,
+            log_fn=log,
+            warning_prefix="server_check_gate_worker",
+        )
+        self._server_check_gate_runtime.cancel()
 
     def _teardown_update_runtime(self, *, wait_for_finish: bool = False) -> None:
         try:

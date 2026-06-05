@@ -210,6 +210,69 @@ class UpdaterSettingsWorkerArchitectureTests(unittest.TestCase):
         self.assertNotIn("updater_commands.invalidate_cache", worker_source)
         self.assertNotIn("import updater.commands", worker_source)
 
+    def test_server_full_check_gate_runs_through_worker(self) -> None:
+        feature_source = inspect.getsource(UpdaterFeature)
+        runtime_source = inspect.getsource(update_page_runtime.UpdatePageRuntime)
+        worker_source = inspect.getsource(settings_workers.UpdaterServerFullCheckGateWorker)
+        worker_signature = inspect.signature(settings_workers.UpdaterServerFullCheckGateWorker.__init__)
+
+        self.assertIn("create_server_full_check_gate_worker", feature_source)
+        self.assertIn("prepare_server_full_check=self.prepare_server_full_check", feature_source)
+        self.assertIn("prepare_server_full_check", worker_signature.parameters)
+        self.assertIn("_prepare_server_full_check", worker_source)
+        self.assertIn("_server_check_gate_runtime", runtime_source)
+        self.assertIn("create_server_full_check_gate_worker", runtime_source)
+        self.assertNotIn("UpdateRateLimiter", runtime_source)
+
+    def test_full_server_check_starts_rate_limit_gate_worker(self) -> None:
+        runtime = update_page_runtime.UpdatePageRuntime.__new__(update_page_runtime.UpdatePageRuntime)
+        runtime._cleanup_in_progress = False
+        runtime._check_state = SimpleNamespace(is_active=False)
+        runtime._can_start_new_check = Mock(return_value=True)
+        runtime._request_server_check_gate = Mock()
+        runtime._continue_start_checks = Mock()
+
+        update_page_runtime.UpdatePageRuntime.start_checks(
+            runtime,
+            telegram_only=False,
+            skip_server_rate_limit=True,
+        )
+
+        runtime._request_server_check_gate.assert_called_once_with(skip_rate_limit=True)
+        runtime._continue_start_checks.assert_not_called()
+
+    def test_telegram_only_check_skips_rate_limit_gate_worker(self) -> None:
+        runtime = update_page_runtime.UpdatePageRuntime.__new__(update_page_runtime.UpdatePageRuntime)
+        runtime._cleanup_in_progress = False
+        runtime._check_state = SimpleNamespace(is_active=False)
+        runtime._can_start_new_check = Mock(return_value=True)
+        runtime._request_server_check_gate = Mock()
+        runtime._continue_start_checks = Mock()
+
+        update_page_runtime.UpdatePageRuntime.start_checks(runtime, telegram_only=True)
+
+        runtime._request_server_check_gate.assert_not_called()
+        runtime._continue_start_checks.assert_called_once_with(telegram_only=True, keep_existing_rows=False)
+
+    def test_server_check_gate_result_continues_start_check(self) -> None:
+        runtime = update_page_runtime.UpdatePageRuntime.__new__(update_page_runtime.UpdatePageRuntime)
+        runtime._cleanup_in_progress = False
+        runtime._server_check_gate_pending = None
+        runtime._server_check_gate_runtime = Mock()
+        runtime._server_check_gate_runtime.is_current.return_value = True
+        runtime._continue_start_checks = Mock()
+
+        update_page_runtime.UpdatePageRuntime._on_server_check_gate_finished(
+            runtime,
+            11,
+            SimpleNamespace(telegram_only=True, keep_existing_rows=True, message="limited"),
+        )
+
+        runtime._continue_start_checks.assert_called_once_with(
+            telegram_only=True,
+            keep_existing_rows=True,
+        )
+
     def test_retry_workers_receive_feature_action_callables(self) -> None:
         feature_source = inspect.getsource(UpdaterFeature)
         retry_source = inspect.getsource(retry_workers.UpdaterServerRetryWithoutDpiWorker)
