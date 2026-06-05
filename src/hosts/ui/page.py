@@ -177,6 +177,7 @@ class HostsPage(BasePage):
         self._runtime_initialized = False
         self._runtime_access_checked = False
         self._service_dns_selection = {}
+        self._adobe_active = False
 
         self._build_ui()
         self._apply_page_theme(force=True)
@@ -888,10 +889,9 @@ class HostsPage(BasePage):
 
     def _build_adobe_section(self):
         self.add_section_title(text_key="page.hosts.section.additional")
-        is_adobe_active = self.hosts_runtime.is_adobe_domains_active() if self.hosts_runtime else False
         widgets = build_hosts_adobe_section(
             tr_fn=self._tr,
-            adobe_active=is_adobe_active,
+            adobe_active=bool(self.__dict__.get("_adobe_active", False)),
             on_toggle_adobe=self._toggle_adobe,
             switch_button_cls=SwitchButton,
         )
@@ -1290,6 +1290,7 @@ class HostsPage(BasePage):
 
         # Adobe
         is_adobe = status_display.adobe_active
+        self._adobe_active = bool(is_adobe)
         self.adobe_switch.blockSignals(True)
         self.adobe_switch.setChecked(is_adobe)
         self.adobe_switch.blockSignals(False)

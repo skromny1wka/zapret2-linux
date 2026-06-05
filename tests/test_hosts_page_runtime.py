@@ -59,6 +59,25 @@ class HostsPageRuntimeTests(unittest.TestCase):
         self.assertEqual(runtime, "runtime")
         self.assertTrue(callable(captured["status_callback"]))
 
+    def test_adobe_section_uses_cached_state_instead_of_reading_hosts_in_ui_thread(self) -> None:
+        import hosts.ui.page as hosts_page
+        from hosts.ui.page import HostsPage
+
+        page = HostsPage.__new__(HostsPage)
+        page.hosts_runtime = SimpleNamespace(is_adobe_domains_active=Mock(side_effect=AssertionError("sync hosts read")))
+        page._adobe_active = True
+        page.add_section_title = Mock()
+        page.add_widget = Mock()
+        page._tr = Mock(side_effect=lambda _key, default, **_kwargs: default)
+
+        widgets = SimpleNamespace(description_label=object(), title_label=object(), switch=object(), card=object())
+        with patch.object(hosts_page, "build_hosts_adobe_section", return_value=widgets) as build_section:
+            HostsPage._build_adobe_section(page)
+
+        page.hosts_runtime.is_adobe_domains_active.assert_not_called()
+        build_section.assert_called_once()
+        self.assertTrue(build_section.call_args.kwargs["adobe_active"])
+
     def test_user_selection_save_runs_through_worker(self) -> None:
         from hosts.ui.page import HostsPage
         import hosts.commands as hosts_commands
