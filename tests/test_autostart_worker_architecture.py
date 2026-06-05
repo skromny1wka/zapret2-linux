@@ -239,6 +239,33 @@ class AutostartWorkerArchitectureTests(unittest.TestCase):
         page._start_mode_load_worker.assert_called_once_with()
         self.assertTrue(page._mode_load_pending)
 
+    def test_mode_load_result_ignored_when_new_load_is_pending(self) -> None:
+        page = AutostartPage.__new__(AutostartPage)
+        page._cleanup_in_progress = False
+        page._mode_load_pending = True
+        page._mode_load_runtime = Mock()
+        page._mode_load_runtime.is_current.return_value = True
+        page._apply_loaded_mode = Mock()
+
+        AutostartPage._on_mode_loaded(page, 5, "zapret2")
+
+        page._apply_loaded_mode.assert_not_called()
+
+    def test_mode_load_error_ignored_when_new_load_is_pending(self) -> None:
+        page = AutostartPage.__new__(AutostartPage)
+        page._cleanup_in_progress = False
+        page._mode_load_pending = True
+        page._mode_load_runtime = Mock()
+        page._mode_load_runtime.is_current.return_value = True
+        page.mode_label = Mock()
+        page._tr = Mock(return_value="Неизвестно")
+
+        with patch.object(autostart_page, "log") as log_mock:
+            AutostartPage._on_mode_load_failed(page, 5, "old mode failed")
+
+        log_mock.assert_not_called()
+        page.mode_label.setText.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -592,6 +592,8 @@ class AutostartPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
+        if self.__dict__.get("_mode_load_pending", False):
+            return
         self._apply_loaded_mode(method)
 
     def _on_mode_load_failed(self, request_id: int, error: str) -> None:
@@ -599,6 +601,8 @@ class AutostartPage(BasePage):
             request_id,
             cleanup_in_progress=self._cleanup_in_progress,
         ):
+            return
+        if self.__dict__.get("_mode_load_pending", False):
             return
         log(f"Ошибка обновления режима: {error}", "WARNING")
         self.mode_label.setText(self._tr("page.autostart.mode.unknown", "Неизвестно"))
