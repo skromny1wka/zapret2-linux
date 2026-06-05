@@ -2697,6 +2697,41 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         page._apply_payload.assert_called_once_with(second_payload, view_state=None)
 
+    def test_loaded_profile_payload_is_ignored_while_refresh_is_pending(self) -> None:
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._profile_load_request_id = 8
+        page._cleanup_in_progress = False
+        page._profile_payload_loaded_once = False
+        page._profile_payload_dirty = True
+        page._profile_load_refresh_pending = True
+        page._schedule_profile_payload_apply = Mock(
+            side_effect=AssertionError("pending newer profile list load must own the visible payload")
+        )
+        payload = SimpleNamespace(items=(), selected_preset_name="Old")
+
+        PresetSetupPageBase._on_profile_payload_loaded(page, 8, payload)
+
+        self.assertFalse(page._profile_payload_loaded_once)
+        self.assertTrue(page._profile_payload_dirty)
+        self.assertTrue(page._profile_load_refresh_pending)
+        page._schedule_profile_payload_apply.assert_not_called()
+
+    def test_failed_profile_payload_is_ignored_while_refresh_is_pending(self) -> None:
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._profile_load_request_id = 8
+        page._cleanup_in_progress = False
+        page._profile_payload_dirty = True
+        page._profile_load_refresh_pending = True
+        page._show_empty_state = Mock(
+            side_effect=AssertionError("pending newer profile list load must own the error state")
+        )
+
+        PresetSetupPageBase._on_profile_payload_failed(page, 8, "boom")
+
+        self.assertTrue(page._profile_payload_dirty)
+        self.assertTrue(page._profile_load_refresh_pending)
+        page._show_empty_state.assert_not_called()
+
     def test_preset_switch_refresh_schedules_profile_payload_request(self) -> None:
         page = PresetSetupPageBase.__new__(PresetSetupPageBase)
         page._schedule_profiles_payload_request = Mock()

@@ -324,6 +324,8 @@ class PresetSetupPageBase(BasePage):
     def _on_profile_payload_loaded(self, request_id: int, payload) -> None:
         if request_id != self._profile_load_request_id or self._cleanup_in_progress:
             return
+        if self.__dict__.get("_profile_load_refresh_pending", False):
+            return
         view_state = getattr(payload, "view_state", None)
         payload = getattr(payload, "payload", payload)
         self._profile_payload_loaded_once = True
@@ -351,6 +353,8 @@ class PresetSetupPageBase(BasePage):
 
     def _on_profile_payload_failed(self, request_id: int, error: str) -> None:
         if request_id != self._profile_load_request_id or self._cleanup_in_progress:
+            return
+        if self.__dict__.get("_profile_load_refresh_pending", False):
             return
         self._profile_payload_dirty = True
         log(f"{self.__class__.__name__}: не удалось прочитать профили: {error}", "ERROR")
