@@ -312,6 +312,8 @@ class ConnectionTestPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
+        if self.__dict__.get("_support_prepare_pending") is not None:
+            return
         for line in plan.log_lines:
             self._append(line)
         self._set_status(plan.status_text, plan.status_tone)
@@ -321,6 +323,8 @@ class ConnectionTestPage(BasePage):
             request_id,
             cleanup_in_progress=self._cleanup_in_progress,
         ):
+            return
+        if self.__dict__.get("_support_prepare_pending") is not None:
             return
         self._append(f"❌ Не удалось подготовить обращение: {error}")
         self._set_status("Ошибка подготовки обращения", "error")

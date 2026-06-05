@@ -83,6 +83,39 @@ class DiagnosticsSupportRuntimeArchitectureTests(unittest.TestCase):
         page.send_log_btn.setEnabled.assert_not_called()
         self.assertEqual(page._support_prepare_pending, {"selection": "YouTube"})
 
+    def test_support_prepare_result_is_ignored_when_new_prepare_is_pending(self) -> None:
+        page = ConnectionTestPage.__new__(ConnectionTestPage)
+        page._cleanup_in_progress = False
+        page._support_prepare_pending = {"selection": "YouTube"}
+        page._support_prepare_runtime = Mock()
+        page._support_prepare_runtime.is_current.return_value = True
+        page._append = Mock()
+        page._set_status = Mock()
+        plan = SimpleNamespace(
+            log_lines=["old support line"],
+            status_text="old status",
+            status_tone="success",
+        )
+
+        ConnectionTestPage._on_support_prepare_finished(page, 7, plan)
+
+        page._append.assert_not_called()
+        page._set_status.assert_not_called()
+
+    def test_support_prepare_error_is_ignored_when_new_prepare_is_pending(self) -> None:
+        page = ConnectionTestPage.__new__(ConnectionTestPage)
+        page._cleanup_in_progress = False
+        page._support_prepare_pending = {"selection": "YouTube"}
+        page._support_prepare_runtime = Mock()
+        page._support_prepare_runtime.is_current.return_value = True
+        page._append = Mock()
+        page._set_status = Mock()
+
+        ConnectionTestPage._on_support_prepare_failed(page, 7, "old error")
+
+        page._append.assert_not_called()
+        page._set_status.assert_not_called()
+
     def test_support_prepare_runtime_keeps_page_worker_boundary(self) -> None:
         page_source = inspect.getsource(ConnectionTestPage)
         request_source = "\n".join(
