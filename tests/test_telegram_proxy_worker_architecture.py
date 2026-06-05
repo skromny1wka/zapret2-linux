@@ -481,6 +481,21 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
         page._start_log_line_worker.assert_called_once_with("first")
         self.assertEqual(page._log_line_pending, ["second"])
 
+    def test_log_line_error_ignored_when_new_line_is_pending(self) -> None:
+        import telegram_proxy.ui.page as telegram_proxy_page
+        from telegram_proxy.ui.page import TelegramProxyPage
+
+        page = TelegramProxyPage.__new__(TelegramProxyPage)
+        page._cleanup_in_progress = False
+        page._log_line_pending = ["new line"]
+        page._log_line_runtime = Mock()
+        page._log_line_runtime.is_current.return_value = True
+
+        with patch.object(telegram_proxy_page, "log") as log_mock:
+            TelegramProxyPage._on_log_line_worker_failed(page, 6, "old log append failed")
+
+        log_mock.assert_not_called()
+
     def test_auto_deeplink_result_ignored_when_new_check_is_pending(self) -> None:
         import telegram_proxy.ui.page as telegram_proxy_page
         from telegram_proxy.ui.page import TelegramProxyPage

@@ -746,6 +746,8 @@ class TelegramProxyPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
+        if self.__dict__.get("_log_line_pending"):
+            return
         log(f"Telegram Proxy log append failed: {error}", "WARNING")
 
     def _on_log_line_worker_finished(self, _worker) -> None:
