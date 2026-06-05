@@ -754,6 +754,31 @@ class UserPresetsMetadataLoadQueueTests(unittest.TestCase):
 
         service._schedule_rows_plan_apply.assert_not_called()
 
+    def test_pending_rows_plan_apply_is_ignored_when_new_plan_is_pending(self) -> None:
+        from presets.user_presets_runtime_service import UserPresetsRuntimeAdapter, UserPresetsRuntimeService
+
+        page = SimpleNamespace(isVisible=lambda: True)
+        adapter = UserPresetsRuntimeAdapter(
+            bulk_reset_running=lambda: False,
+            read_single_metadata=lambda _name: None,
+            selected_source_file_name=lambda: "",
+            presets_dir=lambda: None,
+            cached_metadata=lambda: {},
+            load_all_metadata=lambda: {},
+            load_folder_state=lambda: {},
+            build_rows_plan=lambda _metadata, _folder_state: object(),
+            apply_rows_plan=Mock(),
+        )
+        service = UserPresetsRuntimeService()
+        service.attach_page(page, adapter)
+        service._pending_rows_plan_apply = ("old-plan", 1.5, page)
+        service._rows_plan_apply_scheduled = True
+        service._rows_plan_pending = ({"Latest.txt": {}}, {"items": {}}, 2.5, page)
+
+        service._run_scheduled_rows_plan_apply()
+
+        adapter.apply_rows_plan.assert_not_called()
+
     def test_rows_plan_error_ignored_when_new_plan_is_pending(self) -> None:
         import presets.user_presets_runtime_service as runtime_service
         from presets.user_presets_runtime_service import UserPresetsRuntimeAdapter, UserPresetsRuntimeService

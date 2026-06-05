@@ -897,6 +897,11 @@ class UserPresetsRuntimeService:
         self._rows_plan_apply_scheduled = False
         if pending is None:
             return
+        if (
+            self.__dict__.get("_rows_plan_pending") is not None
+            or self.__dict__.get("_rows_plan_start_scheduled", False)
+        ):
+            return
         plan, started_at, page = pending
         _ = self._resolve_page(page)
         adapter = self._resolve_adapter()
