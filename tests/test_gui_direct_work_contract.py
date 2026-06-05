@@ -50,7 +50,11 @@ FORBIDDEN_IMPORT_ROOTS = {
     "winreg",
 }
 
-FORBIDDEN_BUILTIN_CALLS = {"open"}
+FORBIDDEN_BUILTIN_CALLS = {"open", "sleep"}
+
+FORBIDDEN_IMPORTS = {
+    ("time", "sleep"),
+}
 
 FORBIDDEN_ATTRIBUTE_CALLS = {
     ("_time", "sleep"),
@@ -127,6 +131,10 @@ class GuiDirectWorkContractTests(unittest.TestCase):
                 root = str(node.module or "").split(".", 1)[0]
                 if root in FORBIDDEN_IMPORT_ROOTS:
                     offenders.append(f"{rel_path}:{node.lineno}:from {node.module} import ...")
+                    continue
+                for alias in node.names:
+                    if (str(node.module or ""), str(alias.name or "")) in FORBIDDEN_IMPORTS:
+                        offenders.append(f"{rel_path}:{node.lineno}:from {node.module} import {alias.name}")
         return offenders
 
     def _find_forbidden_calls(self, tree: ast.Module, rel_path: str) -> list[str]:
