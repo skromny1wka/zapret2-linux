@@ -201,6 +201,8 @@ class BlobsPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
+        if self.__dict__.get("_blobs_load_pending", False):
+            return
         load_blobs_into_ui(
             cleanup_in_progress=self._cleanup_in_progress,
             blobs_layout=self.blobs_layout,
@@ -221,6 +223,8 @@ class BlobsPage(BasePage):
             request_id,
             cleanup_in_progress=self._cleanup_in_progress,
         ):
+            return
+        if self.__dict__.get("_blobs_load_pending", False):
             return
         log(f"Ошибка загрузки блобов: {error}", "ERROR")
         try:
@@ -368,6 +372,8 @@ class BlobsPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
+        if self.__dict__.get("_blob_action_pending"):
+            return
         context = dict(context or {})
         name = str(context.get("name") or "")
         if bool(result):
@@ -393,6 +399,8 @@ class BlobsPage(BasePage):
             request_id,
             cleanup_in_progress=self._cleanup_in_progress,
         ):
+            return
+        if self.__dict__.get("_blob_action_pending"):
             return
         log(f"Ошибка действия blob ({action}): {error}", "ERROR")
         name = str((dict(context or {})).get("name") or "")
@@ -484,6 +492,8 @@ class BlobsPage(BasePage):
             request_id,
             cleanup_in_progress=self._cleanup_in_progress,
         ):
+            return
+        if self.__dict__.get("_blob_open_action_pending"):
             return
         log(f"Ошибка открытия blobs action {action}: {error}", "ERROR")
         message_key = "page.blobs.error.open_file" if action == "blobs_json" else "page.blobs.error.open_folder"
