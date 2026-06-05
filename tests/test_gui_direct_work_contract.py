@@ -60,7 +60,6 @@ FORBIDDEN_ATTRIBUTE_CALLS = {
     ("_time", "sleep"),
     ("QThread", "msleep"),
     ("QThread", "sleep"),
-    ("QThread", "wait"),
     ("QApplication", "processEvents"),
     ("os", "startfile"),
     ("subprocess", "run"),
@@ -71,6 +70,10 @@ FORBIDDEN_ATTRIBUTE_CALLS = {
     ("webbrowser", "open"),
     ("requests", "get"),
     ("requests", "post"),
+}
+
+FORBIDDEN_ATTRIBUTE_METHODS = {
+    "wait",
 }
 
 FORBIDDEN_IO_METHODS = {
@@ -150,6 +153,9 @@ class GuiDirectWorkContractTests(unittest.TestCase):
                 owner_name = self._call_name(node.func.value)
                 pair = (owner_name, node.func.attr)
                 if pair in FORBIDDEN_ATTRIBUTE_CALLS:
+                    offenders.append(f"{rel_path}:{node.lineno}:{owner_name}.{node.func.attr}()")
+                    continue
+                if node.func.attr in FORBIDDEN_ATTRIBUTE_METHODS:
                     offenders.append(f"{rel_path}:{node.lineno}:{owner_name}.{node.func.attr}()")
                     continue
                 if node.func.attr in FORBIDDEN_IO_METHODS and self._looks_like_path_io(node.func.value):
