@@ -427,6 +427,8 @@ class OrchestraWhitelistPage(BasePage):
             cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
         ):
             return
+        if self.__dict__.get("_snapshot_refresh_pending", False):
+            return
         if not refresh and snapshot.revision == self._last_snapshot_revision:
             return
         self._apply_whitelist_snapshot(snapshot)
@@ -436,6 +438,8 @@ class OrchestraWhitelistPage(BasePage):
             request_id,
             cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
         ):
+            return
+        if self.__dict__.get("_snapshot_refresh_pending", False):
             return
         log(f"Не удалось загрузить whitelist: {error}", "WARNING")
 

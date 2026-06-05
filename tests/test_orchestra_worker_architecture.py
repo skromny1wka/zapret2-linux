@@ -1021,6 +1021,36 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
         page._start_snapshot_worker.assert_not_called()
         self.assertTrue(page._snapshot_refresh_pending)
 
+    def test_whitelist_snapshot_result_ignored_when_refresh_is_pending(self) -> None:
+        from orchestra.ui.whitelist_page import OrchestraWhitelistPage
+
+        page = OrchestraWhitelistPage.__new__(OrchestraWhitelistPage)
+        page._cleanup_in_progress = False
+        page._snapshot_runtime = Mock()
+        page._snapshot_runtime.is_current.return_value = True
+        page._snapshot_refresh_pending = True
+        page._last_snapshot_revision = 1
+        page._apply_whitelist_snapshot = Mock()
+
+        OrchestraWhitelistPage._on_snapshot_loaded(page, 7, True, SimpleNamespace(revision=2))
+
+        page._apply_whitelist_snapshot.assert_not_called()
+
+    def test_whitelist_snapshot_error_ignored_when_refresh_is_pending(self) -> None:
+        import orchestra.ui.whitelist_page as whitelist_page
+        from orchestra.ui.whitelist_page import OrchestraWhitelistPage
+
+        page = OrchestraWhitelistPage.__new__(OrchestraWhitelistPage)
+        page._cleanup_in_progress = False
+        page._snapshot_runtime = Mock()
+        page._snapshot_runtime.is_current.return_value = True
+        page._snapshot_refresh_pending = True
+
+        with patch.object(whitelist_page, "log") as log_mock:
+            OrchestraWhitelistPage._on_snapshot_failed(page, 7, True, "old error")
+
+        log_mock.assert_not_called()
+
     def test_whitelist_action_queues_while_worker_runs(self) -> None:
         from orchestra.ui.whitelist_page import OrchestraWhitelistPage
 
