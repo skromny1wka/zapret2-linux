@@ -882,6 +882,8 @@ class PresetRawEditorPage(BasePage):
     ) -> None:
         if request_id != self._raw_save_request_id:
             return
+        if self.__dict__.get("_pending_raw_preset_save") is not None:
+            return
         current_file_name = str(self._preset_file_name or "").strip().lower()
         saved_file_name = str(requested_file_name or "").strip().lower()
         if current_file_name and saved_file_name and current_file_name != saved_file_name:
@@ -898,6 +900,8 @@ class PresetRawEditorPage(BasePage):
 
     def _on_raw_preset_save_failed(self, request_id: int, error: str) -> None:
         if request_id != self._raw_save_request_id:
+            return
+        if self.__dict__.get("_pending_raw_preset_save") is not None:
             return
         self._raw_save_succeeded = False
         self._set_footer(f"Ошибка сохранения: {error}")

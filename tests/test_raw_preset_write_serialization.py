@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from presets.ui.common.preset_subpage_base import PresetRawEditorPage
@@ -388,6 +389,43 @@ class RawPresetWriteSerializationTests(unittest.TestCase):
         )
         self.assertEqual(page._pending_raw_preset_save, None)
         self.assertEqual(page._pending_raw_preset_write_operations, [])
+
+    def test_raw_preset_save_result_ignored_when_next_save_is_pending(self) -> None:
+        updated = SimpleNamespace(name="Updated", file_name="Updated.txt", kind="user")
+        result = SimpleNamespace(updated=updated, path="C:/Zapret/Dev/presets/winws2/Updated.txt", footer_text="Saved")
+        page = PresetRawEditorPage.__new__(PresetRawEditorPage)
+        page._raw_save_request_id = 3
+        page._pending_raw_preset_save = ("Default.txt", "--new\nlatest", True)
+        page._preset_name = "Default"
+        page._preset_file_name = "Default.txt"
+        page._preset_path = "C:/Zapret/Dev/presets/winws2/Default.txt"
+        page._preset_origin = "user"
+        page._raw_save_succeeded = False
+        page._content_publish_pending = True
+        page._set_footer = Mock(side_effect=AssertionError("pending save must own the footer"))
+
+        PresetRawEditorPage._on_raw_preset_save_finished(page, 3, "Default.txt", result, True)
+
+        self.assertEqual(page._preset_name, "Default")
+        self.assertEqual(page._preset_file_name, "Default.txt")
+        self.assertEqual(page._preset_path, "C:/Zapret/Dev/presets/winws2/Default.txt")
+        self.assertFalse(page._raw_save_succeeded)
+        self.assertTrue(page._content_publish_pending)
+        page._set_footer.assert_not_called()
+
+    def test_raw_preset_save_error_ignored_when_next_save_is_pending(self) -> None:
+        page = PresetRawEditorPage.__new__(PresetRawEditorPage)
+        page._raw_save_request_id = 3
+        page._pending_raw_preset_save = ("Default.txt", "--new\nlatest", True)
+        page._raw_save_succeeded = True
+        page._set_footer = Mock(side_effect=AssertionError("pending save must own the error footer"))
+        page._show_error = Mock(side_effect=AssertionError("pending save must own the error message"))
+
+        PresetRawEditorPage._on_raw_preset_save_failed(page, 3, "old error")
+
+        self.assertTrue(page._raw_save_succeeded)
+        page._set_footer.assert_not_called()
+        page._show_error.assert_not_called()
 
 
 if __name__ == "__main__":
