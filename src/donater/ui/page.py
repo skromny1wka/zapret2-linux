@@ -338,10 +338,13 @@ class PremiumPage(BasePage):
             stop_pairing_status_autopoll_fn=self._stop_pairing_status_autopoll,
             premium_action_runtime=self._premium_action_runtime,
         )
+        self._open_bot_pending = False
+        self._open_bot_start_scheduled = False
         self._open_bot_runtime.stop(
-            blocking=True,
+            blocking=False,
             warning_prefix="Premium open bot worker",
         )
+        self._open_bot_runtime.cancel()
         self._device_info_pending = False
         self._device_info_runtime.stop(
             blocking=True,

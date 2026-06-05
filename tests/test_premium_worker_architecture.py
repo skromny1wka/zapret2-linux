@@ -312,6 +312,39 @@ class PremiumWorkerArchitectureTests(unittest.TestCase):
 
         page._show_open_extend_bot_error.assert_not_called()
 
+    def test_cleanup_stops_open_bot_worker_without_blocking_gui(self) -> None:
+        page = PremiumPage.__new__(PremiumPage)
+        page._cleanup_in_progress = False
+        page._stop_pairing_status_autopoll = Mock()
+        page._premium_action_runtime = Mock()
+        page._open_bot_runtime = Mock()
+        page._device_info_runtime = Mock()
+        page._reset_storage_runtime = Mock()
+        page._open_bot_pending = True
+        page._open_bot_start_scheduled = True
+        page._device_info_pending = True
+        page._reset_storage_pending = True
+        page._reset_storage_start_scheduled = True
+        page._premium_action_runtime_worker = object()
+        page._pending_premium_action = "activate"
+        page._pending_premium_action_start_scheduled = True
+
+        PremiumPage.cleanup(page)
+
+        self.assertTrue(page._cleanup_in_progress)
+        self.assertFalse(page._open_bot_pending)
+        self.assertFalse(page._open_bot_start_scheduled)
+        page._open_bot_runtime.stop.assert_called_once_with(
+            blocking=False,
+            warning_prefix="Premium open bot worker",
+        )
+        page._open_bot_runtime.cancel.assert_called_once()
+        page._premium_action_runtime.stop.assert_called_once_with(
+            blocking=True,
+            wait_timeout_ms=1000,
+            warning_prefix="Premium action worker",
+        )
+
     def test_device_info_pending_restart_is_coalesced_while_scheduled(self) -> None:
         import donater.ui.page as premium_page
 
