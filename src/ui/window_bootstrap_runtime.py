@@ -88,6 +88,9 @@ def create_preset_runtime_coordinator(window, runtime_deps: WindowRuntimeBootstr
         get_active_preset_path=lambda: resolve_active_preset_watch_path(
             presets_feature=runtime_deps.presets_feature,
         ),
+        get_preset_source_path_by_file_name=lambda method, file_name: (
+            runtime_deps.presets_feature.get_preset_source_path_by_file_name(method, file_name)
+        ),
         refresh_after_switch=summary_refresh_runtime.request_refresh,
     )
 

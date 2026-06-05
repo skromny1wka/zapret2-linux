@@ -221,6 +221,36 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
         self._app.processEvents()
         self.assertEqual(watcher_calls, ["watcher"])
 
+    def test_preset_switch_watcher_uses_switched_file_name_not_selected_lookup(self) -> None:
+        from core.runtime.preset_runtime_coordinator import PresetRuntimeCoordinator
+        from settings.mode import ZAPRET2_MODE
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            preset_path = Path(tmp_dir) / "Default v5.txt"
+            preset_path.write_text("--new\n", encoding="utf-8")
+            path_calls: list[tuple[str, str]] = []
+
+            coordinator = PresetRuntimeCoordinator(
+                presets_feature=SimpleNamespace(),
+                ui_state_store=None,
+                get_launch_method=lambda: ZAPRET2_MODE,
+                get_active_preset_path=lambda: (_ for _ in ()).throw(
+                    AssertionError("watcher setup must not re-read selected source preset")
+                ),
+                get_preset_source_path_by_file_name=lambda method, file_name: path_calls.append(
+                    (method, file_name)
+                )
+                or str(preset_path),
+                refresh_after_switch=lambda: None,
+                request_selected_source_preset_apply=lambda *_args: True,
+                request_preset_content_apply=lambda *_args: True,
+            )
+
+            coordinator.handle_preset_switched(ZAPRET2_MODE, "Default v5.txt")
+            self._app.processEvents()
+
+        self.assertEqual(path_calls, [(ZAPRET2_MODE, "Default v5.txt")])
+
     def test_rapid_preset_switches_coalesce_deferred_ui_work(self) -> None:
         from core.runtime.preset_runtime_coordinator import PresetRuntimeCoordinator
         from settings.mode import ZAPRET2_MODE

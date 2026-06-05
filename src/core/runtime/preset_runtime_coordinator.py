@@ -19,6 +19,12 @@ class PendingPresetApply:
     preset_file_name: str
 
 
+@dataclass(frozen=True)
+class PendingPresetWatch:
+    launch_method: str
+    preset_file_name: str
+
+
 class PresetRuntimeCoordinator(QObject):
     """Координирует применение выбранного source preset вне UI-страниц.
 
@@ -33,6 +39,7 @@ class PresetRuntimeCoordinator(QObject):
         ui_state_store,
         get_launch_method: Callable[[], str],
         get_active_preset_path: Callable[[], str],
+        get_preset_source_path_by_file_name: Callable[[str, str], str] | None = None,
         refresh_after_switch: Callable[[], None],
         request_selected_source_preset_apply: Callable[[str, str, str], bool],
         request_preset_content_apply: Callable[[str, str, str], bool],
@@ -42,6 +49,7 @@ class PresetRuntimeCoordinator(QObject):
         self._ui_state_store = ui_state_store
         self._get_launch_method = get_launch_method
         self._get_active_preset_path = get_active_preset_path
+        self._get_preset_source_path_by_file_name = get_preset_source_path_by_file_name
         self._refresh_after_switch = refresh_after_switch
         self._request_selected_source_preset_apply_callback = request_selected_source_preset_apply
         self._request_preset_content_apply = request_preset_content_apply
@@ -56,10 +64,11 @@ class PresetRuntimeCoordinator(QObject):
         self._last_active_preset_key: tuple[str, str] | None = None
         self._active_preset_revision_publish_pending = False
         self._active_preset_file_watcher_setup_pending = False
+        self._pending_active_preset_watch: PendingPresetWatch | None = None
         self._preset_content_apply_timer: QTimer | None = None
 
     def setup_active_preset_file_watcher(self) -> None:
-        watched_path = self._get_active_preset_path()
+        watched_path = self._resolve_active_preset_watch_path()
         if not watched_path:
             return
 
@@ -108,7 +117,10 @@ class PresetRuntimeCoordinator(QObject):
             )
             return
         log(f"Пресет переключен: {selected_file_name}", "INFO")
-        self._schedule_active_preset_file_watcher_setup()
+        self._schedule_active_preset_file_watcher_setup(
+            launch_method=method,
+            preset_file_name=selected_file_name,
+        )
         self._schedule_selected_source_preset_apply(
             launch_method=method,
             reason="preset_switched",
@@ -132,7 +144,10 @@ class PresetRuntimeCoordinator(QObject):
         selected_file_name = str(preset_file_name or "").strip()
         if selected_file_name:
             self._last_active_preset_key = (method, selected_file_name.lower())
-        self._schedule_active_preset_file_watcher_setup()
+        self._schedule_active_preset_file_watcher_setup(
+            launch_method=method,
+            preset_file_name=selected_file_name,
+        )
         try:
             store = self._ui_state_store
             if store is not None:
@@ -246,6 +261,10 @@ class PresetRuntimeCoordinator(QObject):
         if pending is None:
             return
 
+        self._pending_active_preset_watch = PendingPresetWatch(
+            launch_method=pending.launch_method,
+            preset_file_name=pending.preset_file_name,
+        )
         self.setup_active_preset_file_watcher()
         self._publish_active_preset_content_changed(pending.preset_file_name)
         self._request_preset_content_apply(
@@ -287,8 +306,34 @@ class PresetRuntimeCoordinator(QObject):
         except Exception:
             pass
 
-    def _schedule_active_preset_file_watcher_setup(self) -> None:
+    def _resolve_active_preset_watch_path(self) -> str:
+        pending = self._pending_active_preset_watch
+        self._pending_active_preset_watch = None
+        if pending is not None:
+            method = normalize_launch_method(pending.launch_method, default="")
+            file_name = str(pending.preset_file_name or "").strip()
+            resolver = self._get_preset_source_path_by_file_name
+            if method and file_name and callable(resolver):
+                try:
+                    return str(resolver(method, file_name) or "")
+                except Exception:
+                    pass
+        return str(self._get_active_preset_path() or "")
+
+    def _schedule_active_preset_file_watcher_setup(
+        self,
+        *,
+        launch_method: str = "",
+        preset_file_name: str = "",
+    ) -> None:
         """Перевешивает watcher после текущего GUI-события, не внутри клика."""
+        method = normalize_launch_method(launch_method, default="")
+        file_name = str(preset_file_name or "").strip()
+        if method and file_name:
+            self._pending_active_preset_watch = PendingPresetWatch(
+                launch_method=method,
+                preset_file_name=file_name,
+            )
         if self._active_preset_file_watcher_setup_pending:
             return
         self._active_preset_file_watcher_setup_pending = True
