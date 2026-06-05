@@ -92,6 +92,35 @@ class UpdaterChangelogLinkQueueTests(unittest.TestCase):
 
         page._start_changelog_link_open_worker.assert_called_once_with("https://new.example.org")
 
+    def test_changelog_link_result_is_ignored_when_new_link_is_pending(self) -> None:
+        from updater.ui.page import ServersPage
+
+        page = ServersPage.__new__(ServersPage)
+        page._cleanup_in_progress = False
+        page._changelog_link_open_pending = "https://new.example.org"
+        page._changelog_link_open_runtime = Mock()
+        page._changelog_link_open_runtime.is_current.return_value = True
+        page._show_changelog_link_open_error = Mock()
+        result = SimpleNamespace(ok=False, error="old error")
+
+        ServersPage._on_changelog_link_open_finished(page, 5, result)
+
+        page._show_changelog_link_open_error.assert_not_called()
+
+    def test_changelog_link_error_is_ignored_when_new_link_is_pending(self) -> None:
+        from updater.ui.page import ServersPage
+
+        page = ServersPage.__new__(ServersPage)
+        page._cleanup_in_progress = False
+        page._changelog_link_open_pending = "https://new.example.org"
+        page._changelog_link_open_runtime = Mock()
+        page._changelog_link_open_runtime.is_current.return_value = True
+        page._show_changelog_link_open_error = Mock()
+
+        ServersPage._on_changelog_link_open_failed(page, 5, "old error")
+
+        page._show_changelog_link_open_error.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

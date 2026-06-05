@@ -390,6 +390,8 @@ class ServersPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
+        if self.__dict__.get("_changelog_link_open_pending") is not None:
+            return
         if getattr(result, "ok", False):
             return
         self._show_changelog_link_open_error(str(getattr(result, "error", "") or ""))
@@ -399,6 +401,8 @@ class ServersPage(BasePage):
             request_id,
             cleanup_in_progress=self._cleanup_in_progress,
         ):
+            return
+        if self.__dict__.get("_changelog_link_open_pending") is not None:
             return
         self._show_changelog_link_open_error(str(error or ""))
 
