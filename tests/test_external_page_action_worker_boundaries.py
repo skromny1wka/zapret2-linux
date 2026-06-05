@@ -186,6 +186,40 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
         )
         self.assertEqual(page._support_open_pending, [second])
 
+    def test_support_open_result_is_ignored_when_new_action_is_pending(self) -> None:
+        page = SupportPage.__new__(SupportPage)
+        page._support_open_runtime = SimpleNamespace(is_current=Mock(return_value=True))
+        page._support_open_pending = [("discord", Mock(), "discord.error", "discord {error}")]
+        page._show_support_open_error = Mock()
+
+        SupportPage._on_support_open_action_finished(
+            page,
+            3,
+            "telegram",
+            SimpleNamespace(ok=False, message="old error"),
+            error_key="telegram.error",
+            error_default="telegram {error}",
+        )
+
+        page._show_support_open_error.assert_not_called()
+
+    def test_support_open_error_is_ignored_when_new_action_is_pending(self) -> None:
+        page = SupportPage.__new__(SupportPage)
+        page._support_open_runtime = SimpleNamespace(is_current=Mock(return_value=True))
+        page._support_open_pending = [("discord", Mock(), "discord.error", "discord {error}")]
+        page._show_support_open_error = Mock()
+
+        SupportPage._on_support_open_action_failed(
+            page,
+            3,
+            "telegram",
+            "old error",
+            error_key="telegram.error",
+            error_default="telegram {error}",
+        )
+
+        page._show_support_open_error.assert_not_called()
+
     def test_about_open_actions_are_queued_while_worker_runs(self) -> None:
         class _Runtime:
             def is_running(self) -> bool:
@@ -332,6 +366,40 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
             "",
         )
         self.assertEqual(page._about_open_pending, [second])
+
+    def test_about_open_result_is_ignored_when_new_action_is_pending(self) -> None:
+        page = AboutPage.__new__(AboutPage)
+        page._cleanup_in_progress = False
+        page._about_open_runtime = SimpleNamespace(is_current=Mock(return_value=True))
+        page._about_open_pending = [("github", Mock(), "github {error}", "")]
+        page._show_about_open_error = Mock()
+
+        AboutPage._on_about_open_action_finished(
+            page,
+            3,
+            SimpleNamespace(ok=False, message="old error"),
+            error_default="telegram {error}",
+            raw_error_message="",
+        )
+
+        page._show_about_open_error.assert_not_called()
+
+    def test_about_open_error_is_ignored_when_new_action_is_pending(self) -> None:
+        page = AboutPage.__new__(AboutPage)
+        page._cleanup_in_progress = False
+        page._about_open_runtime = SimpleNamespace(is_current=Mock(return_value=True))
+        page._about_open_pending = [("github", Mock(), "github {error}", "")]
+        page._show_about_open_error = Mock()
+
+        AboutPage._on_about_open_action_failed(
+            page,
+            3,
+            "old error",
+            error_default="telegram {error}",
+            raw_error_message="",
+        )
+
+        page._show_about_open_error.assert_not_called()
 
 
 if __name__ == "__main__":

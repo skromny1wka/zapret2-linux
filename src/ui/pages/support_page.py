@@ -260,6 +260,8 @@ class SupportPage(BasePage):
     ) -> None:
         if not self._support_open_runtime.is_current(request_id):
             return
+        if self.__dict__.get("_support_open_pending"):
+            return
         if result.ok:
             return
         self._show_support_open_error(error_key, error_default, str(getattr(result, "message", "") or ""))
@@ -274,6 +276,8 @@ class SupportPage(BasePage):
         error_default: str,
     ) -> None:
         if not self._support_open_runtime.is_current(request_id):
+            return
+        if self.__dict__.get("_support_open_pending"):
             return
         self._show_support_open_error(error_key, error_default, str(error))
 
