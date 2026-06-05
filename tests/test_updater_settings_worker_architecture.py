@@ -107,6 +107,22 @@ class UpdaterSettingsWorkerArchitectureTests(unittest.TestCase):
         runtime._resolve_idle_view_decision.assert_not_called()
         runtime.apply_idle_view_state.assert_not_called()
 
+    def test_auto_check_load_error_ignored_when_new_load_is_pending(self) -> None:
+        runtime = update_page_runtime.UpdatePageRuntime.__new__(update_page_runtime.UpdatePageRuntime)
+        runtime._cleanup_in_progress = False
+        runtime._auto_check_load_pending = True
+        runtime._auto_check_load_runtime = Mock()
+        runtime._auto_check_load_runtime.is_current.return_value = True
+
+        with patch.object(update_page_runtime, "log") as log_mock:
+            update_page_runtime.UpdatePageRuntime._on_auto_check_load_failed(
+                runtime,
+                12,
+                "old load failed",
+            )
+
+        log_mock.assert_not_called()
+
     def test_channel_open_worker_receives_feature_action_callable(self) -> None:
         feature_source = inspect.getsource(UpdaterFeature)
         worker_source = inspect.getsource(settings_workers.UpdaterChannelOpenWorker)
@@ -438,6 +454,22 @@ class UpdaterSettingsWorkerArchitectureTests(unittest.TestCase):
         )
 
         runtime._schedule_auto_check_save_start.assert_not_called()
+
+    def test_auto_check_save_error_ignored_when_new_save_is_pending(self) -> None:
+        runtime = update_page_runtime.UpdatePageRuntime.__new__(update_page_runtime.UpdatePageRuntime)
+        runtime._cleanup_in_progress = False
+        runtime._auto_check_save_pending = False
+        runtime._auto_check_save_runtime = Mock()
+        runtime._auto_check_save_runtime.is_current.return_value = True
+
+        with patch.object(update_page_runtime, "log") as log_mock:
+            update_page_runtime.UpdatePageRuntime._on_auto_check_save_failed(
+                runtime,
+                13,
+                "old save failed",
+            )
+
+        log_mock.assert_not_called()
 
     def test_auto_check_save_scheduled_start_uses_latest_pending_value(self) -> None:
         runtime = update_page_runtime.UpdatePageRuntime.__new__(update_page_runtime.UpdatePageRuntime)

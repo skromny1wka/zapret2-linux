@@ -348,6 +348,8 @@ class UpdatePageRuntime:
     def _on_auto_check_load_failed(self, request_id: int, error: str) -> None:
         if not self._auto_check_load_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
             return
+        if self.__dict__.get("_auto_check_load_pending", False):
+            return
         log(f"Не удалось загрузить автопроверку обновлений: {error}", "WARNING")
 
     def _on_auto_check_load_worker_finished(self, _worker) -> None:
@@ -643,6 +645,8 @@ class UpdatePageRuntime:
 
     def _on_auto_check_save_failed(self, request_id: int, error: str) -> None:
         if not self._auto_check_save_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
+            return
+        if self.__dict__.get("_auto_check_save_pending") is not None:
             return
         log(f"Не удалось сохранить автопроверку обновлений: {error}", "WARNING")
 
