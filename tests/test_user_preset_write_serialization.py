@@ -605,6 +605,33 @@ class UserPresetWriteSerializationTests(unittest.TestCase):
             destination_folder_key="",
         )
 
+    def test_write_action_errors_ignored_when_next_write_is_pending(self) -> None:
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_edit_action_request_id = 2
+        page._preset_bulk_action_request_id = 3
+        page._preset_item_action_request_id = 4
+        page._pending_preset_write_actions = [{"kind": "activate", "file_name": "Next.txt"}]
+        page._pending_preset_storage_actions = []
+        page._preset_item_action_pending = []
+        page._preset_bulk_action_pending = []
+        page._preset_edit_action_pending = []
+        page._pending_preset_activation = None
+        page._preset_folder_action_pending = []
+        page._config = Mock(tr_prefix="page.user_presets")
+        page._ui_language = "ru"
+        page.window = Mock(return_value=None)
+
+        with (
+            patch("presets.ui.common.user_presets_page.InfoBar.error") as error,
+            patch("presets.ui.common.user_presets_page.log") as log_mock,
+        ):
+            UserPresetsPageBase._on_preset_edit_action_failed(page, 2, "rename", "old edit", {})
+            UserPresetsPageBase._on_preset_bulk_action_failed(page, 3, "import", "old bulk", {})
+            UserPresetsPageBase._on_preset_item_action_failed(page, 4, "delete", "old item")
+
+        error.assert_not_called()
+        log_mock.assert_not_called()
+
     def test_legacy_pending_edit_action_restarts_later_after_worker_finished(self) -> None:
         page = UserPresetsPageBase.__new__(UserPresetsPageBase)
         page._preset_activate_runtime = _Runtime(running=False)

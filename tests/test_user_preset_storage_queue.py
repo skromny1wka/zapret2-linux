@@ -185,6 +185,32 @@ class UserPresetStorageQueueTests(unittest.TestCase):
         next_worker.start.assert_called_once_with()
         self.assertEqual(page._pending_preset_storage_actions, [])
 
+    def test_storage_action_error_ignored_when_next_write_is_pending(self) -> None:
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_storage_action_request_id = 4
+        page._pending_preset_write_actions = [
+            {
+                "kind": "storage",
+                "action": "rating",
+                "name": "Preset.txt",
+                "display_name": "Preset",
+                "rating": 9,
+            }
+        ]
+        page._pending_preset_storage_actions = [
+            {
+                "action": "rating",
+                "name": "Preset.txt",
+                "display_name": "Preset",
+                "rating": 9,
+            }
+        ]
+
+        with patch("presets.ui.common.user_presets_page.log") as log_mock:
+            UserPresetsPageBase._on_preset_storage_action_failed(page, 4, "rating", "old error", {})
+
+        log_mock.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

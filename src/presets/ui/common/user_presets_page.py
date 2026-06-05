@@ -847,6 +847,8 @@ class UserPresetsPageBase(BasePage):
     def _on_preset_edit_action_failed(self, request_id: int, action: str, error: str, _context) -> None:
         if request_id != int(getattr(self, "_preset_edit_action_request_id", 0) or 0):
             return
+        if self._has_pending_preset_write_action():
+            return
         log(f"Ошибка действия preset ({action}): {error}", "ERROR")
         InfoBar.error(
             title=self._tr("common.error.title", "Ошибка"),
@@ -963,6 +965,8 @@ class UserPresetsPageBase(BasePage):
 
     def _on_preset_bulk_action_failed(self, request_id: int, action: str, error: str, _context) -> None:
         if request_id != int(getattr(self, "_preset_bulk_action_request_id", 0) or 0):
+            return
+        if self._has_pending_preset_write_action():
             return
         log(f"Ошибка массового действия preset ({action}): {error}", "ERROR")
         error_key = "error.import_exception" if action == "import" else "error.reset_all_exception"
@@ -1430,6 +1434,20 @@ class UserPresetsPageBase(BasePage):
                 return True
         return False
 
+    def _has_pending_preset_write_action(self) -> bool:
+        return any(
+            self.__dict__.get(attr)
+            for attr in (
+                "_pending_preset_write_actions",
+                "_pending_preset_storage_actions",
+                "_preset_item_action_pending",
+                "_preset_bulk_action_pending",
+                "_preset_edit_action_pending",
+                "_pending_preset_activation",
+                "_preset_folder_action_pending",
+            )
+        )
+
     def _queue_preset_write_action(
         self,
         kind: str,
@@ -1854,6 +1872,8 @@ class UserPresetsPageBase(BasePage):
     def _on_preset_storage_action_failed(self, request_id: int, action: str, error: str, _context) -> None:
         if request_id != int(getattr(self, "_preset_storage_action_request_id", 0) or 0):
             return
+        if self._has_pending_preset_write_action():
+            return
         if action == "pin":
             log(f"Ошибка закрепления пресета: {error}", "ERROR")
         elif action == "move_step":
@@ -2241,6 +2261,8 @@ class UserPresetsPageBase(BasePage):
 
     def _on_preset_item_action_failed(self, request_id: int, action: str, error: str) -> None:
         if request_id != int(getattr(self, "_preset_item_action_request_id", 0) or 0):
+            return
+        if self._has_pending_preset_write_action():
             return
         log(f"Ошибка действия preset ({action}): {error}", "ERROR")
         InfoBar.error(
