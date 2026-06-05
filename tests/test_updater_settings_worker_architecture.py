@@ -323,6 +323,20 @@ class UpdaterSettingsWorkerArchitectureTests(unittest.TestCase):
         log_mock.assert_not_called()
         runtime._continue_start_checks.assert_not_called()
 
+    def test_stale_server_check_gate_finish_does_not_restart_pending_gate(self) -> None:
+        runtime = update_page_runtime.UpdatePageRuntime.__new__(update_page_runtime.UpdatePageRuntime)
+        runtime._cleanup_in_progress = False
+        runtime._server_check_gate_runtime = SimpleNamespace(request_id=8)
+        runtime._server_check_gate_pending = True
+        runtime._schedule_server_check_gate_start = Mock()
+
+        update_page_runtime.UpdatePageRuntime._on_server_check_gate_worker_finished(
+            runtime,
+            SimpleNamespace(_request_id=7),
+        )
+
+        runtime._schedule_server_check_gate_start.assert_not_called()
+
     def test_retry_workers_receive_feature_action_callables(self) -> None:
         feature_source = inspect.getsource(UpdaterFeature)
         retry_source = inspect.getsource(retry_workers.UpdaterServerRetryWithoutDpiWorker)
