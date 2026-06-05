@@ -91,6 +91,8 @@ class PresetProfileStrategySummaryRefreshRuntime(QObject):
     def _on_summary_loaded(self, request_id: int, state) -> None:
         if not self._summary_runtime.is_current(request_id):
             return
+        if self.__dict__.get("_pending", False):
+            return
         from presets.display_state import publish_profile_strategy_summary_in_store
 
         publish_profile_strategy_summary_in_store(
@@ -99,8 +101,11 @@ class PresetProfileStrategySummaryRefreshRuntime(QObject):
         )
 
     def _on_summary_failed(self, request_id: int, error: str) -> None:
-        if self._summary_runtime.is_current(request_id):
-            log(f"Preset summary refresh skipped: {error}", "DEBUG")
+        if not self._summary_runtime.is_current(request_id):
+            return
+        if self.__dict__.get("_pending", False):
+            return
+        log(f"Preset summary refresh skipped: {error}", "DEBUG")
 
     def _on_worker_finished(self, worker) -> None:
         if not self._is_current_worker_finish(worker):

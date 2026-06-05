@@ -94,6 +94,41 @@ class PresetSummaryRefreshRuntimeTests(unittest.TestCase):
         self.assertTrue(runtime._pending)
         self.assertFalse(runtime._start_scheduled)
 
+    def test_summary_result_is_ignored_when_new_refresh_is_pending(self) -> None:
+        import presets.display_state as display_state
+        from presets.display_state import ProfileStrategyDisplayState
+        from presets.display_state_refresh import PresetProfileStrategySummaryRefreshRuntime
+
+        runtime = PresetProfileStrategySummaryRefreshRuntime.__new__(
+            PresetProfileStrategySummaryRefreshRuntime
+        )
+        runtime._summary_runtime = Mock()
+        runtime._summary_runtime.is_current.return_value = True
+        runtime._pending = True
+        runtime._state_store = Mock()
+        state = ProfileStrategyDisplayState(summary="old summary", active_count=1)
+
+        with patch.object(display_state, "publish_profile_strategy_summary_in_store") as publish:
+            PresetProfileStrategySummaryRefreshRuntime._on_summary_loaded(runtime, 2, state)
+
+        publish.assert_not_called()
+
+    def test_summary_error_is_ignored_when_new_refresh_is_pending(self) -> None:
+        import presets.display_state_refresh as display_state_refresh
+        from presets.display_state_refresh import PresetProfileStrategySummaryRefreshRuntime
+
+        runtime = PresetProfileStrategySummaryRefreshRuntime.__new__(
+            PresetProfileStrategySummaryRefreshRuntime
+        )
+        runtime._summary_runtime = Mock()
+        runtime._summary_runtime.is_current.return_value = True
+        runtime._pending = True
+
+        with patch.object(display_state_refresh, "log") as log_mock:
+            PresetProfileStrategySummaryRefreshRuntime._on_summary_failed(runtime, 2, "old error")
+
+        log_mock.assert_not_called()
+
     def test_window_close_cleans_up_summary_refresh_runtime(self) -> None:
         import main.application_lifecycle_port as lifecycle_port
         import main.window_lifecycle_cleanup as lifecycle_cleanup
