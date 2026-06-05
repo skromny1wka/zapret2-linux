@@ -448,6 +448,8 @@ class UpdatePageRuntime:
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
+        if self.__dict__.get("_server_check_gate_pending") is not None:
+            return
         log(f"Не удалось проверить лимит полной проверки VPS: {error}", "WARNING")
         self._continue_start_checks(telegram_only=True, keep_existing_rows=True)
 
@@ -555,10 +557,14 @@ class UpdatePageRuntime:
     def _on_update_cache_invalidate_finished(self, request_id: int, context: str) -> None:
         if not self._cache_invalidate_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
             return
+        if self.__dict__.get("_cache_invalidate_pending_context"):
+            return
         self._continue_after_update_cache_invalidate(str(context or ""))
 
     def _on_update_cache_invalidate_failed(self, request_id: int, context: str, error: str) -> None:
         if not self._cache_invalidate_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
+            return
+        if self.__dict__.get("_cache_invalidate_pending_context"):
             return
         log(f"Не удалось очистить кэш обновлений: {error}", "WARNING")
         self._continue_after_update_cache_invalidate(str(context or ""))

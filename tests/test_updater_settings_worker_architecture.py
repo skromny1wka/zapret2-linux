@@ -289,6 +289,24 @@ class UpdaterSettingsWorkerArchitectureTests(unittest.TestCase):
             keep_existing_rows=True,
         )
 
+    def test_server_check_gate_error_ignored_when_new_gate_is_pending(self) -> None:
+        runtime = update_page_runtime.UpdatePageRuntime.__new__(update_page_runtime.UpdatePageRuntime)
+        runtime._cleanup_in_progress = False
+        runtime._server_check_gate_pending = True
+        runtime._server_check_gate_runtime = Mock()
+        runtime._server_check_gate_runtime.is_current.return_value = True
+        runtime._continue_start_checks = Mock()
+
+        with patch.object(update_page_runtime, "log") as log_mock:
+            update_page_runtime.UpdatePageRuntime._on_server_check_gate_failed(
+                runtime,
+                11,
+                "old gate failed",
+            )
+
+        log_mock.assert_not_called()
+        runtime._continue_start_checks.assert_not_called()
+
     def test_retry_workers_receive_feature_action_callables(self) -> None:
         feature_source = inspect.getsource(UpdaterFeature)
         retry_source = inspect.getsource(retry_workers.UpdaterServerRetryWithoutDpiWorker)
@@ -351,6 +369,41 @@ class UpdaterSettingsWorkerArchitectureTests(unittest.TestCase):
         single_shot.call_args.args[1]()
 
         runtime._request_update_cache_invalidate.assert_called_once_with("install_update")
+
+    def test_cache_invalidate_result_ignored_when_new_context_is_pending(self) -> None:
+        runtime = update_page_runtime.UpdatePageRuntime.__new__(update_page_runtime.UpdatePageRuntime)
+        runtime._cleanup_in_progress = False
+        runtime._cache_invalidate_pending_context = "install_update"
+        runtime._cache_invalidate_runtime = Mock()
+        runtime._cache_invalidate_runtime.is_current.return_value = True
+        runtime._continue_after_update_cache_invalidate = Mock()
+
+        update_page_runtime.UpdatePageRuntime._on_update_cache_invalidate_finished(
+            runtime,
+            10,
+            "manual_check",
+        )
+
+        runtime._continue_after_update_cache_invalidate.assert_not_called()
+
+    def test_cache_invalidate_error_ignored_when_new_context_is_pending(self) -> None:
+        runtime = update_page_runtime.UpdatePageRuntime.__new__(update_page_runtime.UpdatePageRuntime)
+        runtime._cleanup_in_progress = False
+        runtime._cache_invalidate_pending_context = "install_update"
+        runtime._cache_invalidate_runtime = Mock()
+        runtime._cache_invalidate_runtime.is_current.return_value = True
+        runtime._continue_after_update_cache_invalidate = Mock()
+
+        with patch.object(update_page_runtime, "log") as log_mock:
+            update_page_runtime.UpdatePageRuntime._on_update_cache_invalidate_failed(
+                runtime,
+                10,
+                "manual_check",
+                "old invalidate failed",
+            )
+
+        log_mock.assert_not_called()
+        runtime._continue_after_update_cache_invalidate.assert_not_called()
 
     def test_auto_check_save_pending_restarts_after_event_loop_turn(self) -> None:
         runtime = update_page_runtime.UpdatePageRuntime.__new__(update_page_runtime.UpdatePageRuntime)
