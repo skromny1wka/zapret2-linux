@@ -582,6 +582,36 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
 
         page._apply_list_file_editor_state.assert_called_once_with(state)
 
+    def test_pending_list_file_state_apply_is_ignored_after_new_load_is_pending(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        state = SimpleNamespace(
+            kind="hostlist",
+            display_path="lists/old.txt",
+            text="old.example",
+            base_text="",
+            user_text="old.example",
+            editable=True,
+            error_text="",
+            invalid_lines=(),
+        )
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._pending_list_file_state_apply = state
+        page._list_file_state_apply_scheduled = True
+        page._cleanup_in_progress = False
+        page._pending_list_file_load = True
+        page._apply_list_file_editor_state = Mock(
+            side_effect=AssertionError("pending newer list file load must own the visible editor state")
+        )
+
+        ProfileSetupPageBase._run_scheduled_list_file_editor_state_apply(page)
+
+        page._apply_list_file_editor_state.assert_not_called()
+        self.assertTrue(page._pending_list_file_load)
+
     def test_pending_profile_setup_payload_apply_is_ignored_after_new_load_is_pending(self) -> None:
         from types import SimpleNamespace
         from unittest.mock import Mock

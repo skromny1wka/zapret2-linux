@@ -1479,6 +1479,8 @@ class ProfileSetupPageBase(BasePage):
         self._list_file_state_apply_scheduled = False
         if state is None or self.__dict__.get("_cleanup_in_progress"):
             return
+        if self.__dict__.get("_pending_list_file_load") or self.__dict__.get("_list_file_load_start_scheduled", False):
+            return
         self._apply_list_file_editor_state(state)
 
     def _on_list_file_editor_state_failed(self, request_id: int, error: str) -> None:
