@@ -348,6 +348,11 @@ class PresetSetupPageBase(BasePage):
         self._profile_payload_apply_scheduled = False
         if pending is None or self._cleanup_in_progress:
             return
+        if (
+            self.__dict__.get("_profile_load_refresh_pending", False)
+            or self.__dict__.get("_profile_payload_request_scheduled", False)
+        ):
+            return
         payload, view_state = pending
         self._apply_payload(payload, view_state=view_state)
 

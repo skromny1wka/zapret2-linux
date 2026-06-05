@@ -2697,6 +2697,34 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         page._apply_payload.assert_called_once_with(second_payload, view_state=None)
 
+    def test_pending_profile_payload_apply_is_ignored_after_refresh_is_requested(self) -> None:
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._profile_load_request_id = 8
+        page._cleanup_in_progress = False
+        page._profile_payload_loaded_once = False
+        page._profile_payload_dirty = True
+        page._profile_load_refresh_pending = False
+        page._profile_payload_request_scheduled = False
+        page._profile_payload_request_force = False
+        page._apply_payload = Mock()
+        page._request_profiles_payload = Mock()
+        payload = SimpleNamespace(items=(), selected_preset_name="Old")
+        callbacks = []
+
+        with patch(
+            "profile.ui.preset_setup_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            PresetSetupPageBase._on_profile_payload_loaded(page, 8, payload)
+            PresetSetupPageBase.refresh_from_preset_switch(page)
+
+        self.assertEqual(len(callbacks), 2)
+        self.assertTrue(page._profile_payload_request_scheduled)
+
+        callbacks[0]()
+
+        page._apply_payload.assert_not_called()
+
     def test_loaded_profile_payload_is_ignored_while_refresh_is_pending(self) -> None:
         page = PresetSetupPageBase.__new__(PresetSetupPageBase)
         page._profile_load_request_id = 8
