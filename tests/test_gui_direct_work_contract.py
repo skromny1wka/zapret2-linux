@@ -41,6 +41,10 @@ GUI_SHELL_PATTERNS = (
     "updater/update_page_runtime.py",
 )
 
+ALLOWED_PROCESS_EVENTS_FILES = {
+    "ui/startup_ui_metrics.py",
+}
+
 FORBIDDEN_IMPORT_ROOTS = {
     "requests",
     "socket",
@@ -106,6 +110,21 @@ class GuiDirectWorkContractTests(unittest.TestCase):
         offenders: list[str] = []
         for path in self._iter_shell_files():
             offenders.extend(self._collect_offenders(path))
+
+        self.assertEqual([], offenders)
+
+    def test_process_events_is_limited_to_startup_ui_pump(self) -> None:
+        offenders: list[str] = []
+        for path in SRC_ROOT.rglob("*.py"):
+            rel_path = path.relative_to(SRC_ROOT).as_posix()
+            if rel_path in ALLOWED_PROCESS_EVENTS_FILES:
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+                    if node.func.attr == "processEvents":
+                        owner_name = self._call_name(node.func.value)
+                        offenders.append(f"{rel_path}:{node.lineno}:{owner_name}.processEvents()")
 
         self.assertEqual([], offenders)
 

@@ -217,7 +217,6 @@ def on_stop_and_exit_finished(runtime_owner):
 
     try:
         QApplication.closeAllWindows()
-        QApplication.processEvents()
     except Exception:
         pass
 
