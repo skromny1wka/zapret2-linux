@@ -769,6 +769,8 @@ class StrategyScanPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
+        if self.__dict__.get("_strategy_scan_finalize_pending") is not None:
+            return
         apply_finished_scan(
             blockcheck_feature=self._blockcheck,
             finish_plan=finish_plan,
@@ -785,6 +787,8 @@ class StrategyScanPage(BasePage):
             request_id,
             cleanup_in_progress=self._cleanup_in_progress,
         ):
+            return
+        if self.__dict__.get("_strategy_scan_finalize_pending") is not None:
             return
         logger.warning("Failed to finalize strategy scan: %s", error)
         self._reset_ui()

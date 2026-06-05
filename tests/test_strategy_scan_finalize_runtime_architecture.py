@@ -80,6 +80,43 @@ class StrategyScanFinalizeRuntimeArchitectureTests(unittest.TestCase):
         page._request_strategy_scan_finalize.assert_not_called()
         self.assertIs(page._strategy_scan_finalize_pending, report)
 
+    def test_finalize_result_is_ignored_when_new_finalize_is_pending(self) -> None:
+        import blockcheck.ui.strategy_scan_page as strategy_scan_page
+
+        page = StrategyScanPage.__new__(StrategyScanPage)
+        page._cleanup_in_progress = False
+        page._strategy_scan_finalize_pending = object()
+        page._strategy_scan_finalize_runtime = Mock()
+        page._strategy_scan_finalize_runtime.is_current.return_value = True
+        page._blockcheck = Mock()
+        page._reset_ui = Mock()
+        page._set_support_status = Mock()
+        page._scan_protocol = "tcp_https"
+        page._progress_bar = object()
+        page._status_label = object()
+        page.window = Mock(return_value=object())
+
+        with patch.object(strategy_scan_page, "apply_finished_scan") as apply_finished_scan:
+            StrategyScanPage._on_strategy_scan_finalize_finished(page, 8, object())
+
+        apply_finished_scan.assert_not_called()
+
+    def test_finalize_error_is_ignored_when_new_finalize_is_pending(self) -> None:
+        page = StrategyScanPage.__new__(StrategyScanPage)
+        page._cleanup_in_progress = False
+        page._strategy_scan_finalize_pending = object()
+        page._strategy_scan_finalize_runtime = Mock()
+        page._strategy_scan_finalize_runtime.is_current.return_value = True
+        page._reset_ui = Mock()
+        page._status_label = SimpleNamespace(setText=Mock())
+        page._set_support_status = Mock()
+
+        StrategyScanPage._on_strategy_scan_finalize_failed(page, 8, "old error")
+
+        page._reset_ui.assert_not_called()
+        page._status_label.setText.assert_not_called()
+        page._set_support_status.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
