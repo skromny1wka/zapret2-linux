@@ -92,7 +92,7 @@ class DnsForceDnsActionWorker(QThread):
         self.completed.emit(self._request_id, self._action, result, context)
 
     def _run_toggle(self) -> dict[str, object]:
-        from dns.ui import page_plans as dns_page_plans
+        from dns import page_plans as dns_page_plans
 
         requested_enabled = bool(self._enabled)
         current_state = bool(self._get_force_dns_status())
@@ -128,7 +128,7 @@ class DnsForceDnsActionWorker(QThread):
         }
 
     def _run_reset_dhcp(self) -> dict[str, object]:
-        from dns.ui import page_plans as dns_page_plans
+        from dns import page_plans as dns_page_plans
 
         command_result = self._disable_force_dns(reset_to_auto=True)
         force_dns_active = bool(self._get_force_dns_status())
@@ -168,7 +168,7 @@ class DnsFlushCacheWorker(QThread):
         self._flush_dns_cache = flush_dns_cache
 
     def run(self) -> None:
-        from dns.ui import page_plans as dns_page_plans
+        from dns import page_plans as dns_page_plans
 
         try:
             result = self._flush_dns_cache()
@@ -212,7 +212,7 @@ class DnsIspWarningWorker(QThread):
         self._normalize_adapter_alias = normalize_adapter_alias
 
     def run(self) -> None:
-        from dns.ui import page_plans as dns_page_plans
+        from dns import page_plans as dns_page_plans
 
         try:
             plan = dns_page_plans.build_isp_dns_warning_plan(
@@ -277,7 +277,7 @@ class DnsApplyWorker(QThread):
         self.completed.emit(self._request_id, result)
 
     def _run_apply(self) -> dict[str, object]:
-        from dns.ui import page_plans as dns_page_plans
+        from dns import page_plans as dns_page_plans
 
         if not self._adapters:
             return {"plan": None, "dns_info": None}

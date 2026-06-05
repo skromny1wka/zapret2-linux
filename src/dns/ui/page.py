@@ -30,7 +30,7 @@ from app.ui_texts import tr as tr_catalog
 from log.log import log
 
 from dns.dns_providers import DNS_PROVIDERS
-from dns.ui import page_plans as dns_page_plans
+from dns import page_plans as dns_page_plans
 from dns.ui.adapters import build_adapter_cards, refresh_adapter_cards
 from dns.ui.cards import DNSProviderCard, AdapterCard
 from dns.ui.dns_build import build_auto_dns_ui, build_custom_dns_ui

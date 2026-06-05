@@ -29,6 +29,8 @@ class DnsWorkerArchitectureTests(unittest.TestCase):
         self.assertNotIn("self._dns.", worker_source)
         self.assertNotIn("import dns.public", worker_source)
         self.assertNotIn("dns_public.", worker_source)
+        self.assertNotIn("from dns.ui import page_plans", worker_source)
+        self.assertIn("from dns import page_plans", worker_source)
 
         for expected in (
             "get_force_dns_status=get_force_dns_status",
