@@ -30,7 +30,9 @@ class PresetsFeature:
 
     def _preset_services(self):
         if self._services is None:
-            self._services = self._commands().create_preset_services(self._app_paths)
+            from presets.services_bundle import create_preset_services
+
+            self._services = create_preset_services(self._app_paths)
         return self._services
 
     def _metadata_cache(self) -> dict:

@@ -14,6 +14,10 @@ FORBIDDEN_COMMAND_IMPORT_ROOTS = {
     "ui",
 }
 
+FORBIDDEN_COMMAND_IMPORT_MODULES = {
+    "presets.ui_store",
+}
+
 
 class CommandsUiBoundaryTests(unittest.TestCase):
     def test_command_modules_do_not_import_gui_modules(self) -> None:
@@ -28,8 +32,11 @@ class CommandsUiBoundaryTests(unittest.TestCase):
                         if root in FORBIDDEN_COMMAND_IMPORT_ROOTS:
                             offenders.append(f"{rel_path}:{node.lineno}:import {alias.name}")
                 elif isinstance(node, ast.ImportFrom):
-                    root = str(node.module or "").split(".", 1)[0]
+                    module = str(node.module or "")
+                    root = module.split(".", 1)[0]
                     if root in FORBIDDEN_COMMAND_IMPORT_ROOTS:
+                        offenders.append(f"{rel_path}:{node.lineno}:from {node.module} import ...")
+                    if module in FORBIDDEN_COMMAND_IMPORT_MODULES:
                         offenders.append(f"{rel_path}:{node.lineno}:from {node.module} import ...")
 
         self.assertEqual([], offenders)
