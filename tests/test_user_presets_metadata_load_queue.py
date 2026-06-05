@@ -754,6 +754,34 @@ class UserPresetsMetadataLoadQueueTests(unittest.TestCase):
 
         service._schedule_rows_plan_apply.assert_not_called()
 
+    def test_rows_plan_error_ignored_when_new_plan_is_pending(self) -> None:
+        import presets.user_presets_runtime_service as runtime_service
+        from presets.user_presets_runtime_service import UserPresetsRuntimeAdapter, UserPresetsRuntimeService
+
+        page = SimpleNamespace(isVisible=lambda: True)
+        adapter = UserPresetsRuntimeAdapter(
+            bulk_reset_running=lambda: False,
+            read_single_metadata=lambda _name: None,
+            selected_source_file_name=lambda: "",
+            presets_dir=lambda: None,
+            cached_metadata=lambda: {},
+            load_all_metadata=lambda: {},
+            load_folder_state=lambda: {},
+            build_rows_plan=lambda _metadata, _folder_state: object(),
+            apply_rows_plan=lambda _plan, _started_at: None,
+        )
+        service = UserPresetsRuntimeService()
+        service.attach_page(page, adapter)
+        service._rows_plan_request_id = 4
+        service._rows_plan_pending = ({"Latest.txt": {}}, {"items": {}}, 2.5, page)
+        service._ui_dirty = False
+
+        with patch.object(runtime_service, "log") as log_mock:
+            service._on_rows_plan_failed(4, "old error", page)
+
+        self.assertFalse(service._ui_dirty)
+        log_mock.assert_not_called()
+
     def test_remove_deleted_preset_locally_does_not_write_folder_meta_from_gui_path(self) -> None:
         from presets.user_presets_runtime_service import UserPresetsRuntimeAdapter, UserPresetsRuntimeService
 

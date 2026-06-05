@@ -906,6 +906,8 @@ class UserPresetsRuntimeService:
     def _on_rows_plan_failed(self, request_id: int, error: str, page=None) -> None:
         if request_id != self._rows_plan_request_id:
             return
+        if self.__dict__.get("_rows_plan_pending") is not None:
+            return
         self._ui_dirty = True
         log(f"Ошибка подготовки списка пресетов: {error}", "ERROR")
 
