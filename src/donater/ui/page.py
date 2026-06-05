@@ -619,6 +619,8 @@ class PremiumPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
+        if self.__dict__.get("_device_info_pending", False):
+            return
         if not snapshot:
             return
         self._set_pairing_autopoll_snapshot_from_device_info(snapshot)
@@ -684,12 +686,16 @@ class PremiumPage(BasePage):
     def _on_open_extend_bot_finished(self, request_id: int, result) -> None:
         if not self._open_bot_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
             return
+        if self.__dict__.get("_open_bot_pending", False):
+            return
         if result.ok:
             return
         self._show_open_extend_bot_error(str(getattr(result, "message", "") or ""))
 
     def _on_open_extend_bot_failed(self, request_id: int, error: str) -> None:
         if not self._open_bot_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
+            return
+        if self.__dict__.get("_open_bot_pending", False):
             return
         self._show_open_extend_bot_error(str(error))
 
@@ -990,6 +996,8 @@ class PremiumPage(BasePage):
     def _on_reset_storage_finished(self, request_id: int, _result) -> None:
         if not self._reset_storage_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
             return
+        if self.__dict__.get("_reset_storage_pending", False):
+            return
         self._days_state_kind, self._days_state_value = apply_reset_plan_ui(
             key_input=self.key_input,
             set_activation_status=self._set_activation_status,
@@ -1004,6 +1012,8 @@ class PremiumPage(BasePage):
 
     def _on_reset_storage_failed(self, request_id: int, error: str) -> None:
         if not self._reset_storage_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
+            return
+        if self.__dict__.get("_reset_storage_pending", False):
             return
         if InfoBar:
             InfoBar.warning(

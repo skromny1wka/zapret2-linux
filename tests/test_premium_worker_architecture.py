@@ -191,6 +191,25 @@ class PremiumWorkerArchitectureTests(unittest.TestCase):
         page._start_device_info_load_worker.assert_not_called()
         self.assertTrue(page._device_info_pending)
 
+    def test_device_info_result_is_ignored_when_new_load_is_pending(self) -> None:
+        import donater.ui.page as premium_page
+
+        page = PremiumPage.__new__(PremiumPage)
+        page._cleanup_in_progress = False
+        page._device_info_runtime = SimpleNamespace(is_current=Mock(return_value=True))
+        page._device_info_pending = True
+        page._set_pairing_autopoll_snapshot_from_device_info = Mock()
+        page._tr = Mock(side_effect=lambda _key, default, **_kwargs: default)
+        page.device_id_label = Mock()
+        page.saved_key_label = Mock()
+        page.last_check_label = Mock()
+
+        with patch.object(premium_page, "apply_device_info_snapshot_labels") as apply_labels:
+            PremiumPage._on_device_info_loaded(page, 4, {"device_id": "old"})
+
+        page._set_pairing_autopoll_snapshot_from_device_info.assert_not_called()
+        apply_labels.assert_not_called()
+
     def test_open_bot_pending_restarts_after_event_loop_turn(self) -> None:
         import donater.ui.page as premium_page
 
@@ -227,6 +246,32 @@ class PremiumWorkerArchitectureTests(unittest.TestCase):
         single_shot.assert_not_called()
         page._request_open_extend_bot.assert_not_called()
         self.assertTrue(page._open_bot_pending)
+
+    def test_open_bot_result_is_ignored_when_new_open_is_pending(self) -> None:
+        page = PremiumPage.__new__(PremiumPage)
+        page._cleanup_in_progress = False
+        page._open_bot_runtime = SimpleNamespace(is_current=Mock(return_value=True))
+        page._open_bot_pending = True
+        page._show_open_extend_bot_error = Mock()
+
+        PremiumPage._on_open_extend_bot_finished(
+            page,
+            4,
+            SimpleNamespace(ok=False, message="old error"),
+        )
+
+        page._show_open_extend_bot_error.assert_not_called()
+
+    def test_open_bot_error_is_ignored_when_new_open_is_pending(self) -> None:
+        page = PremiumPage.__new__(PremiumPage)
+        page._cleanup_in_progress = False
+        page._open_bot_runtime = SimpleNamespace(is_current=Mock(return_value=True))
+        page._open_bot_pending = True
+        page._show_open_extend_bot_error = Mock()
+
+        PremiumPage._on_open_extend_bot_failed(page, 4, "old error")
+
+        page._show_open_extend_bot_error.assert_not_called()
 
     def test_device_info_pending_restart_is_coalesced_while_scheduled(self) -> None:
         import donater.ui.page as premium_page
@@ -322,6 +367,43 @@ class PremiumWorkerArchitectureTests(unittest.TestCase):
         single_shot.assert_not_called()
         page._start_reset_storage_worker.assert_not_called()
         self.assertTrue(page._reset_storage_pending)
+
+    def test_reset_storage_result_is_ignored_when_new_reset_is_pending(self) -> None:
+        import donater.ui.page as premium_page
+
+        page = PremiumPage.__new__(PremiumPage)
+        page._cleanup_in_progress = False
+        page._reset_storage_runtime = SimpleNamespace(is_current=Mock(return_value=True))
+        page._reset_storage_pending = True
+        page.key_input = Mock()
+        page._set_activation_status = Mock()
+        page._update_device_info = Mock()
+        page._set_status_badge = Mock()
+        page._render_days_label = Mock()
+        page._set_activation_section_visible = Mock()
+        page._stop_pairing_status_autopoll = Mock()
+        page._apply_subscription_state = Mock()
+
+        with patch.object(premium_page, "apply_reset_plan_ui", return_value=("idle", "")) as apply_reset:
+            PremiumPage._on_reset_storage_finished(page, 4, object())
+
+        apply_reset.assert_not_called()
+        page._render_days_label.assert_not_called()
+
+    def test_reset_storage_error_is_ignored_when_new_reset_is_pending(self) -> None:
+        import donater.ui.page as premium_page
+
+        page = PremiumPage.__new__(PremiumPage)
+        page._cleanup_in_progress = False
+        page._reset_storage_runtime = SimpleNamespace(is_current=Mock(return_value=True))
+        page._reset_storage_pending = True
+        page._tr = Mock(side_effect=lambda _key, default, **kwargs: default.format(**kwargs) if kwargs else default)
+        page.window = Mock(return_value=object())
+
+        with patch.object(premium_page.InfoBar, "warning") as warning:
+            PremiumPage._on_reset_storage_failed(page, 4, "old error")
+
+        warning.assert_not_called()
 
 
 if __name__ == "__main__":
