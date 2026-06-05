@@ -15,11 +15,12 @@ FRESHNESS_GUARD_MARKERS = (
     "accept_worker_finish",
     "current_worker",
     "_runtime_worker",
+    "request_id !=",
 )
 
 
 class WorkerFinishedPendingGuardContractTests(unittest.TestCase):
-    def test_pending_worker_or_runtime_finished_handlers_check_current_worker_or_request(self) -> None:
+    def test_pending_finished_handlers_check_current_worker_or_request(self) -> None:
         offenders: list[str] = []
         for path in SRC_ROOT.rglob("*.py"):
             text = path.read_text(encoding="utf-8", errors="replace")
@@ -32,7 +33,7 @@ class WorkerFinishedPendingGuardContractTests(unittest.TestCase):
                     continue
                 if not node.name.startswith("_on_"):
                     continue
-                if not (node.name.endswith("worker_finished") or node.name.endswith("runtime_finished")):
+                if "finished" not in node.name:
                     continue
 
                 source = ast.get_source_segment(text, node) or ""
