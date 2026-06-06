@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 from config.build_info import APP_VERSION
 
 from app.ui_texts import tr as tr_catalog
+from ui.accessibility import set_control_accessibility
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens, get_themed_qta_icon
 from ui.theme_refresh import ThemeRefreshBinding
 import updater.update_page_plans as update_page_plans
@@ -82,6 +83,11 @@ class ChangelogCard(CardWidget):
         self.close_btn = TransparentToolButton()
         self.close_btn.setFixedSize(24, 24)
         self.close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        set_control_accessibility(
+            self.close_btn,
+            name="Закрыть уведомление об обновлении",
+            description="Скрывает карточку обновления.",
+        )
         self.close_btn.clicked.connect(self._on_dismiss)
         header.addWidget(self.close_btn)
 
@@ -142,6 +148,11 @@ class ChangelogCard(CardWidget):
         self.later_btn = PushButton()
         self.later_btn.setText(self._tr("page.servers.changelog.button.later", "Позже"))
         self.later_btn.setFixedHeight(32)
+        set_control_accessibility(
+            self.later_btn,
+            name="Отложить обновление",
+            description="Скрывает карточку обновления. Установку можно запустить позже.",
+        )
         self.later_btn.clicked.connect(self._on_dismiss)
         buttons_layout.addWidget(self.later_btn)
 
@@ -149,12 +160,37 @@ class ChangelogCard(CardWidget):
             self._tr("page.servers.changelog.button.install", "Установить"),
             icon=FluentIcon.DOWNLOAD,
         )
+        set_control_accessibility(
+            self.install_btn,
+            name="Установить обновление",
+            description="Запускает установку доступного обновления.",
+        )
         self.install_btn.clicked.connect(self._on_install)
         buttons_layout.addWidget(self.install_btn)
 
         layout.addWidget(self.buttons_widget)
 
         self._apply_theme(force=True)
+
+    def _update_accessibility(self) -> None:
+        version = (self._raw_version or "").strip()
+        if version:
+            card_name = f"{self.title_label.text()}: версия {version}"
+            install_name = f"Установить обновление {version}"
+        else:
+            card_name = self.title_label.text()
+            install_name = "Установить обновление"
+
+        set_control_accessibility(
+            self,
+            name=card_name,
+            description="Карточка обновления. Содержит версию, список изменений и кнопки действий.",
+        )
+        set_control_accessibility(
+            self.install_btn,
+            name=install_name,
+            description="Запускает установку доступного обновления.",
+        )
 
     def _apply_theme(self, tokens=None, force: bool = False) -> None:
         _ = force
@@ -204,6 +240,7 @@ class ChangelogCard(CardWidget):
         self.close_btn.setVisible(plan.close_visible)
         self.show()
         self._apply_theme()
+        self._update_accessibility()
 
     def start_download(self, version: str):
         plan = update_page_plans.build_changelog_download_start_plan(
@@ -241,6 +278,7 @@ class ChangelogCard(CardWidget):
         self.speed_label.setText(plan.speed_label_text)
         self.eta_label.setText(plan.eta_label_text)
         self.progress_widget.setVisible(plan.progress_visible)
+        self._update_accessibility()
 
     def update_progress(self, percent: int, done_bytes: int, total_bytes: int):
         plan = update_page_plans.build_changelog_progress_plan(
@@ -277,6 +315,7 @@ class ChangelogCard(CardWidget):
         self.version_label.setText(plan.version_text)
         self.speed_label.setText(plan.speed_label_text)
         self.eta_label.setText(plan.eta_label_text)
+        self._update_accessibility()
 
     def download_complete(self):
         plan = update_page_plans.build_changelog_terminal_plan(
@@ -300,6 +339,7 @@ class ChangelogCard(CardWidget):
         self.progress_label.setText(plan.progress_label_text)
         self.speed_label.setText(plan.speed_label_text)
         self.eta_label.setText(plan.eta_label_text)
+        self._update_accessibility()
 
     def download_failed(self, error: str):
         plan = update_page_plans.build_changelog_terminal_plan(
@@ -328,6 +368,7 @@ class ChangelogCard(CardWidget):
         self.buttons_widget.setVisible(plan.buttons_visible)
         self.close_btn.setVisible(plan.close_visible)
         self.install_btn.setText(plan.install_text)
+        self._update_accessibility()
 
     def set_ui_language(self, language: str) -> None:
         self._ui_language = language
@@ -351,6 +392,7 @@ class ChangelogCard(CardWidget):
         self.eta_label.setText(plan.eta_label_text)
         self.install_btn.setText(plan.install_text)
         self._apply_theme()
+        self._update_accessibility()
 
     def _on_install(self):
         self.install_clicked.emit()
