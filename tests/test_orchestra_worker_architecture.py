@@ -859,6 +859,34 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
         page._start_snapshot_worker.assert_not_called()
         self.assertTrue(page._snapshot_load_pending)
 
+    def test_locked_cleanup_does_not_block_snapshot_load_worker(self) -> None:
+        from orchestra.ui.locked_page import OrchestraLockedPage
+
+        page = OrchestraLockedPage.__new__(OrchestraLockedPage)
+        page._cleanup_in_progress = False
+        page._refresh_loading = True
+        page._snapshot_load_pending = True
+        page._snapshot_load_start_scheduled = True
+        page._snapshot_load_runtime = Mock()
+        page._managed_action_runtime = Mock()
+        page._managed_action_pending = [("locked_remove", {"domain": "example.org"})]
+        page._managed_action_start_scheduled = True
+
+        OrchestraLockedPage.cleanup(page)
+
+        self.assertTrue(page._cleanup_in_progress)
+        self.assertFalse(page._refresh_loading)
+        self.assertFalse(page._snapshot_load_pending)
+        self.assertFalse(page._snapshot_load_start_scheduled)
+        page._snapshot_load_runtime.stop.assert_called_once()
+        self.assertFalse(page._snapshot_load_runtime.stop.call_args.kwargs["blocking"])
+        page._managed_action_runtime.stop.assert_called_once()
+        self.assertTrue(page._managed_action_runtime.stop.call_args.kwargs["blocking"])
+        page._snapshot_load_runtime.cancel.assert_called_once()
+        page._managed_action_runtime.cancel.assert_called_once()
+        self.assertEqual(page._managed_action_pending, [])
+        self.assertFalse(page._managed_action_start_scheduled)
+
     def test_blocked_snapshot_load_queues_while_worker_runs(self) -> None:
         from orchestra.ui.blocked_page import OrchestraBlockedPage
 
@@ -913,6 +941,34 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
         single_shot.assert_not_called()
         page._start_snapshot_worker.assert_not_called()
         self.assertTrue(page._snapshot_load_pending)
+
+    def test_blocked_cleanup_does_not_block_snapshot_load_worker(self) -> None:
+        from orchestra.ui.blocked_page import OrchestraBlockedPage
+
+        page = OrchestraBlockedPage.__new__(OrchestraBlockedPage)
+        page._cleanup_in_progress = False
+        page._refresh_loading = True
+        page._snapshot_load_pending = True
+        page._snapshot_load_start_scheduled = True
+        page._snapshot_load_runtime = Mock()
+        page._managed_action_runtime = Mock()
+        page._managed_action_pending = [("blocked_remove", {"domain": "example.org"})]
+        page._managed_action_start_scheduled = True
+
+        OrchestraBlockedPage.cleanup(page)
+
+        self.assertTrue(page._cleanup_in_progress)
+        self.assertFalse(page._refresh_loading)
+        self.assertFalse(page._snapshot_load_pending)
+        self.assertFalse(page._snapshot_load_start_scheduled)
+        page._snapshot_load_runtime.stop.assert_called_once()
+        self.assertFalse(page._snapshot_load_runtime.stop.call_args.kwargs["blocking"])
+        page._managed_action_runtime.stop.assert_called_once()
+        self.assertTrue(page._managed_action_runtime.stop.call_args.kwargs["blocking"])
+        page._snapshot_load_runtime.cancel.assert_called_once()
+        page._managed_action_runtime.cancel.assert_called_once()
+        self.assertEqual(page._managed_action_pending, [])
+        self.assertFalse(page._managed_action_start_scheduled)
 
     def test_whitelist_workers_receive_action_functions(self) -> None:
         from orchestra.managed_lists_workers import (

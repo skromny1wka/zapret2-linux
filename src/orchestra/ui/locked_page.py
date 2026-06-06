@@ -770,7 +770,7 @@ class OrchestraLockedPage(BasePage):
         self._snapshot_load_pending = False
         self._snapshot_load_start_scheduled = False
         self._snapshot_load_runtime.stop(
-            blocking=True,
+            blocking=False,
             log_fn=log,
             warning_prefix="Orchestra locked snapshot worker",
         )
