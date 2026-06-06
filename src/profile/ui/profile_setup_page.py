@@ -58,6 +58,21 @@ from ui.widgets.fluent_scrollbar import install_fluent_scrollbars
 from ui.widgets.hover_row import paint_profile_hover_row, profile_hover_row_rect
 
 
+_PROFILE_SETUP_CLEANUP_RUNTIMES = (
+    ("_setup_load_runtime", "profile setup load worker", False),
+    ("_list_file_load_runtime", "profile list file load worker", False),
+    ("_list_file_validation_runtime", "profile list file validation worker", False),
+    ("_list_file_save_runtime", "profile list file save worker", True),
+    ("_settings_save_runtime", "profile settings save worker", True),
+    ("_raw_profile_save_runtime", "profile raw text save worker", True),
+    ("_enabled_save_runtime", "profile enabled save worker", True),
+    ("_user_profile_update_runtime", "profile user update worker", True),
+    ("_user_profile_delete_runtime", "profile user delete worker", True),
+    ("_strategy_apply_runtime", "profile strategy apply worker", True),
+    ("_strategy_feedback_save_runtime", "profile strategy feedback save worker", True),
+)
+
+
 def set_widget_text_if_changed(widget, text: str) -> bool:
     value = str(text or "")
     try:
@@ -3749,23 +3764,11 @@ class ProfileSetupPageBase(BasePage):
             "_strategy_feedback_save_request_id",
         ):
             setattr(self, attr, int(getattr(self, attr, 0) or 0) + 1)
-        for attr, warning_prefix in (
-            ("_setup_load_runtime", "profile setup load worker"),
-            ("_list_file_load_runtime", "profile list file load worker"),
-            ("_list_file_validation_runtime", "profile list file validation worker"),
-            ("_list_file_save_runtime", "profile list file save worker"),
-            ("_settings_save_runtime", "profile settings save worker"),
-            ("_raw_profile_save_runtime", "profile raw text save worker"),
-            ("_enabled_save_runtime", "profile enabled save worker"),
-            ("_user_profile_update_runtime", "profile user update worker"),
-            ("_user_profile_delete_runtime", "profile user delete worker"),
-            ("_strategy_apply_runtime", "profile strategy apply worker"),
-            ("_strategy_feedback_save_runtime", "profile strategy feedback save worker"),
-        ):
+        for attr, warning_prefix, blocking in _PROFILE_SETUP_CLEANUP_RUNTIMES:
             runtime = self.__dict__.get(attr)
             if runtime is None:
                 continue
-            runtime.stop(blocking=True, log_fn=log, warning_prefix=warning_prefix)
+            runtime.stop(blocking=blocking, log_fn=log, warning_prefix=warning_prefix)
             runtime.cancel()
         self._strategy_apply_runtime_strategy_id = ""
         self._enabled_save_runtime_enabled = None
