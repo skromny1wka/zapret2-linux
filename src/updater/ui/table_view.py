@@ -6,6 +6,7 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QTableWidgetItem
 
 import updater.update_page_plans as update_page_plans
+from ui.accessibility import set_item_accessible_text
 
 
 def apply_server_table_headers(table, *, tr_fn) -> None:
@@ -33,16 +34,40 @@ def render_server_row(
         channel=channel,
         language=language,
     )
+    row_accessible_text = _server_row_accessible_text(plan)
     name_item = QTableWidgetItem(plan.server_text)
     if plan.server_accent:
         name_item.setForeground(QColor(accent_hex))
+    set_item_accessible_text(name_item, row_accessible_text)
     table.setItem(row, 0, name_item)
 
     status_item = QTableWidgetItem(plan.status_text)
     status_item.setForeground(QColor(*plan.status_color))
+    set_item_accessible_text(status_item, row_accessible_text)
     table.setItem(row, 1, status_item)
-    table.setItem(row, 2, QTableWidgetItem(plan.time_text))
-    table.setItem(row, 3, QTableWidgetItem(plan.extra_text))
+
+    time_item = QTableWidgetItem(plan.time_text)
+    set_item_accessible_text(time_item, row_accessible_text)
+    table.setItem(row, 2, time_item)
+
+    extra_item = QTableWidgetItem(plan.extra_text)
+    set_item_accessible_text(extra_item, row_accessible_text)
+    table.setItem(row, 3, extra_item)
+
+
+def _server_row_accessible_text(plan) -> str:
+    server_text = _strip_status_markers(getattr(plan, "server_text", ""))
+    status_text = _strip_status_markers(getattr(plan, "status_text", ""))
+    time_text = _strip_status_markers(getattr(plan, "time_text", "")) or "-"
+    extra_text = _strip_status_markers(getattr(plan, "extra_text", "")) or "-"
+    return f"Сервер {server_text}, статус {status_text}, время {time_text}, версии {extra_text}"
+
+
+def _strip_status_markers(text: object) -> str:
+    value = str(text or "").strip()
+    for marker in ("●", "⭐"):
+        value = value.replace(marker, "")
+    return " ".join(value.split())
 
 
 def refresh_server_rows(

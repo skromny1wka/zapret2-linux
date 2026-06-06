@@ -1,0 +1,110 @@
+from __future__ import annotations
+
+import os
+from types import SimpleNamespace
+import unittest
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication, QTableWidget
+from qfluentwidgets import PushButton
+
+
+class TableAccessibilityTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._app = QApplication.instance() or QApplication([])
+
+    def test_strategy_scan_result_row_has_screen_reader_text(self) -> None:
+        from blockcheck.ui.strategy_scan_page_results_workflow import add_strategy_result_row
+
+        class _Feature:
+            def build_result_presentation(self, _result, *, scan_cursor: int):
+                self.scan_cursor = scan_cursor
+                return SimpleNamespace(
+                    number_text="1",
+                    strategy_name="TLS fake",
+                    strategy_tooltip="Подмена TLS",
+                    status_text="OK",
+                    status_tone="success",
+                    status_tooltip="Стратегия сработала",
+                    time_text="120 ms",
+                    can_apply=True,
+                    stored_row={"strategy": "TLS fake"},
+                )
+
+        table = QTableWidget(0, 5)
+
+        add_strategy_result_row(
+            blockcheck_feature=_Feature(),
+            table=table,
+            result=SimpleNamespace(strategy_args="--lua-desync=fake", strategy_name="TLS fake"),
+            scan_cursor=0,
+            tr_fn=lambda _key, default: default,
+            push_button_cls=PushButton,
+            on_apply_strategy=lambda _args, _name: None,
+        )
+
+        expected = "Стратегия TLS fake, статус OK, время 120 ms"
+        self.assertEqual(table.item(0, 1).data(Qt.ItemDataRole.AccessibleTextRole), expected)
+        self.assertEqual(table.item(0, 2).data(Qt.ItemDataRole.AccessibleTextRole), expected)
+        self.assertEqual(table.cellWidget(0, 4).accessibleName(), "Применить стратегию TLS fake")
+
+    def test_updater_server_row_has_screen_reader_text(self) -> None:
+        from updater.ui.table_view import render_server_row
+
+        table = QTableWidget(1, 4)
+
+        render_server_row(
+            table,
+            row=0,
+            server_name="server-1",
+            status={"status": "online", "response_time": 0.12, "stable_version": "1.2.3", "dev_version": "1.2.4"},
+            channel="stable",
+            language="ru",
+            accent_hex="#52c477",
+        )
+
+        text = table.item(0, 1).data(Qt.ItemDataRole.AccessibleTextRole)
+
+        self.assertIn("Сервер server-1", text)
+        self.assertIn("статус Онлайн", text)
+
+    def test_blockcheck_tcp_result_row_has_screen_reader_text(self) -> None:
+        from blockcheck.models import SingleTestResult, TargetResult, TestStatus, TestType
+        from blockcheck.ui.page_results_workflow import update_tcp_result_table
+
+        table = QTableWidget(0, 5)
+        target = TargetResult(
+            name="YouTube",
+            value="youtube.com",
+            tests=[
+                SingleTestResult(
+                    target_name="youtube.com",
+                    test_type=TestType.TCP_16_20,
+                    status=TestStatus.FAIL,
+                    error_code="TCP_16_20",
+                    detail="Блокировка после 16 KB",
+                    raw_data={
+                        "target_id": "youtube.com",
+                        "asn": "12345",
+                        "provider": "Example ISP",
+                        "bytes_received": 20480,
+                    },
+                )
+            ],
+        )
+
+        update_tcp_result_table(target_result=target, tcp_table=table, tcp_section_label=None)
+
+        text = table.item(0, 3).data(Qt.ItemDataRole.AccessibleTextRole)
+
+        self.assertIn("TCP youtube.com", text)
+        self.assertIn("AS12345", text)
+        self.assertIn("Example ISP", text)
+        self.assertIn("статус DETECTED", text)
+
+
+if __name__ == "__main__":
+    unittest.main()

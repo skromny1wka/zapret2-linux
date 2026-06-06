@@ -88,6 +88,19 @@ class AccessibilityHelpersTests(unittest.TestCase):
         self.assertEqual(widget.accessible_name, "Запущено")
         self.assertEqual(widget.properties["screenReaderStateText"], "Запущено")
 
+    def test_set_item_accessible_text_sets_item_roles(self) -> None:
+        from PyQt6.QtCore import Qt
+        from PyQt6.QtWidgets import QTableWidgetItem
+
+        from ui.accessibility import set_item_accessible_text
+
+        item = QTableWidgetItem("OK")
+
+        set_item_accessible_text(item, "Статус: OK", description="Проверка прошла успешно")
+
+        self.assertEqual(item.data(Qt.ItemDataRole.AccessibleTextRole), "Статус: OK")
+        self.assertEqual(item.data(Qt.ItemDataRole.AccessibleDescriptionRole), "Проверка прошла успешно")
+
     def test_set_tooltip_also_sets_accessible_description(self) -> None:
         from unittest.mock import patch
 

@@ -13,6 +13,7 @@ from blockcheck.ui.helpers import (
     sort_results_by_family,
     truncate_detail,
 )
+from ui.accessibility import set_item_accessible_text
 from ui.widgets.fluent_item_tooltip import set_fluent_item_tooltip
 
 
@@ -194,24 +195,59 @@ def update_tcp_result_table(*, target_result, tcp_table, tcp_section_label) -> N
             row = tcp_table.rowCount()
             tcp_table.insertRow(row)
 
-        tcp_table.setItem(row, 0, make_readonly_item(target_id))
-        tcp_table.setItem(row, 1, make_readonly_item(asn_text))
-        tcp_table.setItem(row, 2, make_readonly_item(provider))
-
         status_text, color = tcp_status_text_and_color(test)
+        detail_text = format_result_detail(test)
+        row_accessible_text = _tcp_row_accessible_text(
+            target_id=target_id,
+            asn_text=asn_text,
+            provider=provider,
+            status_text=status_text,
+            detail_text=detail_text,
+        )
+        tcp_table.setItem(row, 0, _tcp_accessible_item(target_id, row_accessible_text))
+        tcp_table.setItem(row, 1, _tcp_accessible_item(asn_text, row_accessible_text))
+        tcp_table.setItem(row, 2, _tcp_accessible_item(provider, row_accessible_text))
+
         status_item = make_readonly_item(status_text)
         status_item.setForeground(QColor(color))
-        set_fluent_item_tooltip(status_item, format_result_detail(test))
+        set_fluent_item_tooltip(status_item, detail_text)
+        set_item_accessible_text(status_item, row_accessible_text, description=detail_text)
         tcp_table.setItem(row, 3, status_item)
 
-        detail_text = format_result_detail(test)
         bytes_received = raw.get("bytes_received")
         if isinstance(bytes_received, int) and bytes_received > 0:
             detail_text += f" | {bytes_received}B"
         detail_item = make_readonly_item(truncate_detail(detail_text))
         detail_item.setForeground(QColor("#9aa0a6"))
         set_fluent_item_tooltip(detail_item, detail_text)
+        set_item_accessible_text(detail_item, row_accessible_text, description=detail_text)
         tcp_table.setItem(row, 4, detail_item)
+
+
+def _tcp_accessible_item(text: str, accessible_text: str) -> QTableWidgetItem:
+    item = make_readonly_item(text)
+    set_item_accessible_text(item, accessible_text)
+    return item
+
+
+def _tcp_row_accessible_text(
+    *,
+    target_id: str,
+    asn_text: str,
+    provider: str,
+    status_text: str,
+    detail_text: str,
+) -> str:
+    parts = [
+        f"TCP {str(target_id or '-').strip() or '-'}",
+        str(asn_text or "-").strip() or "-",
+        str(provider or "-").strip() or "-",
+        f"статус {str(status_text or '-').strip() or '-'}",
+    ]
+    detail = str(detail_text or "").strip()
+    if detail:
+        parts.append(detail)
+    return ", ".join(parts)
 
 
 def update_target_result_table(*, target_result, table, tcp_table, tcp_section_label) -> None:

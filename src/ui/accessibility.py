@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from PyQt6.QtCore import Qt
+
 
 def _clean_text(text: object) -> str:
     return " ".join(str(text or "").strip().split())
@@ -78,9 +80,30 @@ def set_state_text(widget, text: object) -> None:
         pass
 
 
+def set_item_accessible_text(item, text: object, *, description: object | None = None) -> None:
+    """Задаёт текст для диктора у строки/ячейки Qt item-модели."""
+
+    if item is None:
+        return
+    value = _clean_text(text)
+    if value:
+        try:
+            item.setData(Qt.ItemDataRole.AccessibleTextRole, value)
+        except Exception:
+            pass
+    if description is not None:
+        description_value = _clean_text(description)
+        if description_value:
+            try:
+                item.setData(Qt.ItemDataRole.AccessibleDescriptionRole, description_value)
+            except Exception:
+                pass
+
+
 __all__ = [
     "set_accessible_description",
     "set_accessible_name",
     "set_control_accessibility",
+    "set_item_accessible_text",
     "set_state_text",
 ]

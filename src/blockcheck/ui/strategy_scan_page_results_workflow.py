@@ -10,6 +10,7 @@ from ui.fluent_widgets import InfoBarHelper
 from app.ui_texts import tr as tr_catalog
 import blockcheck.strategy_scan_run_workflow as strategy_scan_run_workflow
 from qfluentwidgets import FluentIcon
+from ui.accessibility import set_control_accessibility, set_item_accessible_text
 from ui.widgets.fluent_item_tooltip import set_fluent_item_tooltip
 
 
@@ -61,15 +62,18 @@ def add_strategy_result_row(
     )
     row_idx = table.rowCount()
     table.insertRow(row_idx)
+    row_accessible_text = _strategy_result_accessible_text(row_plan)
 
     num_item = QTableWidgetItem(row_plan.number_text)
     num_item.setFlags(num_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
     num_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+    set_item_accessible_text(num_item, row_accessible_text)
     table.setItem(row_idx, 0, num_item)
 
     name_item = QTableWidgetItem(row_plan.strategy_name)
     name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
     set_fluent_item_tooltip(name_item, row_plan.strategy_tooltip)
+    set_item_accessible_text(name_item, row_accessible_text, description=row_plan.strategy_tooltip)
     table.setItem(row_idx, 1, name_item)
 
     status_item = QTableWidgetItem(row_plan.status_text)
@@ -81,11 +85,13 @@ def add_strategy_result_row(
         status_item.setForeground(QColor("#e05454"))
     status_item.setFlags(status_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
     set_fluent_item_tooltip(status_item, row_plan.status_tooltip)
+    set_item_accessible_text(status_item, row_accessible_text, description=row_plan.status_tooltip)
     table.setItem(row_idx, 2, status_item)
 
     time_item = QTableWidgetItem(row_plan.time_text)
     time_item.setFlags(time_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
     time_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+    set_item_accessible_text(time_item, row_accessible_text)
     table.setItem(row_idx, 3, time_item)
 
     if row_plan.can_apply:
@@ -93,6 +99,11 @@ def add_strategy_result_row(
         apply_btn.setText(tr_fn("page.blockcheck_public.apply", "Применить"))
         apply_btn.setIcon(FluentIcon.ACCEPT)
         apply_btn.setFixedHeight(26)
+        set_control_accessibility(
+            apply_btn,
+            name=f"Применить стратегию {row_plan.strategy_name}",
+            description="Применяет найденную рабочую стратегию к текущему preset.",
+        )
         apply_btn.clicked.connect(
             lambda checked=False, args=result.strategy_args, name=result.strategy_name:
             on_apply_strategy(args, name)
@@ -101,6 +112,13 @@ def add_strategy_result_row(
 
     table.scrollToBottom()
     return row_plan.stored_row
+
+
+def _strategy_result_accessible_text(row_plan) -> str:
+    name = str(getattr(row_plan, "strategy_name", "") or "").strip()
+    status = str(getattr(row_plan, "status_text", "") or "").strip()
+    time_text = str(getattr(row_plan, "time_text", "") or "").strip() or "-"
+    return f"Стратегия {name}, статус {status}, время {time_text}"
 
 
 def apply_finished_scan(
