@@ -172,7 +172,7 @@ def get_selected_source_path(launch_method: str, *, preset_services) -> Path:
 def get_user_presets_dir(launch_method: str, *, preset_services) -> Path:
     method = normalize_launch_method(launch_method, default="")
     engine = engine_for_launch_method(method)
-    return preset_services.app_paths.engine_paths(engine).ensure_directories().user_presets_dir
+    return preset_services.app_paths.engine_paths(engine).user_presets_dir
 
 
 def _open_path_in_system(path: str | Path) -> None:
@@ -184,7 +184,9 @@ def _open_path_in_system(path: str | Path) -> None:
 
 
 def open_user_presets_folder(launch_method: str, *, preset_services) -> None:
-    presets_dir = get_user_presets_dir(launch_method, preset_services=preset_services)
+    method = normalize_launch_method(launch_method, default="")
+    engine = engine_for_launch_method(method)
+    presets_dir = preset_services.app_paths.engine_paths(engine).ensure_directories().user_presets_dir
     presets_dir.mkdir(parents=True, exist_ok=True)
     _open_path_in_system(presets_dir)
 

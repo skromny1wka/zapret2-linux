@@ -99,6 +99,19 @@ class UserPresetsRowsWorkerArchitectureTests(unittest.TestCase):
 
         self.assertNotIn("Path(path).exists()", source)
 
+    def test_watcher_start_does_not_create_preset_dirs_on_gui_thread(self) -> None:
+        import presets.commands as commands
+        import presets.user_presets_runtime_service as runtime_service
+        from app.feature_facades.presets import PresetsFeature
+
+        watcher_source = inspect.getsource(runtime_service.UserPresetsRuntimeService.start_watching_presets)
+        path_source = inspect.getsource(commands.get_user_presets_dir)
+        metadata_source = inspect.getsource(PresetsFeature._preset_list_metadata_entries)
+
+        self.assertNotIn(".mkdir(", watcher_source)
+        self.assertNotIn("ensure_directories()", path_source)
+        self.assertIn("ensure_directories()", metadata_source)
+
     def test_runtime_service_does_not_keep_legacy_active_marker_settings_read_api(self) -> None:
         import presets.user_presets_runtime_service as runtime_service
 

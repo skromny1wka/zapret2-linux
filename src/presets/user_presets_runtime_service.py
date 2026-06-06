@@ -530,7 +530,6 @@ class UserPresetsRuntimeService:
                 return
 
             presets_dir = adapter.presets_dir()
-            presets_dir.mkdir(parents=True, exist_ok=True)
 
             if not self._file_watcher:
                 from PyQt6.QtCore import QFileSystemWatcher
@@ -545,10 +544,21 @@ class UserPresetsRuntimeService:
                 self._file_watcher = watcher
 
             dir_path = str(presets_dir)
+            directory_watched = True
             if dir_path not in self._file_watcher.directories():
-                self._file_watcher.addPath(dir_path)
+                directory_watched = bool(self._file_watcher.addPath(dir_path))
+            if not directory_watched:
+                self._ui_dirty = True
+                if (
+                    not self.__dict__.get("_watcher_directory_prepare_requested", False)
+                    and not self.__dict__.get("_watcher_directory_prepare_retry_from_metadata", False)
+                ):
+                    self._watcher_directory_prepare_requested = True
+                    self.load_presets(page)
+                return
 
             self.sync_watched_preset_files(page)
+            self._watcher_directory_prepare_requested = False
             self._watcher_active = True
         except Exception as e:
             log(f"Ошибка запуска мониторинга пресетов: {e}", "DEBUG")
@@ -763,9 +773,14 @@ class UserPresetsRuntimeService:
         if self.__dict__.get("_metadata_load_pending_page") is not None:
             return
         page = self._resolve_page(page)
-        adapter = self._resolve_adapter()
         self._cached_presets_metadata = dict(all_presets)
         self._cached_folder_state = dict(folder_state or {})
+        if self.__dict__.pop("_watcher_directory_prepare_requested", False) and not self._watcher_active:
+            self._watcher_directory_prepare_retry_from_metadata = True
+            try:
+                self.start_watching_presets(page)
+            finally:
+                self._watcher_directory_prepare_retry_from_metadata = False
         self._schedule_watched_preset_files_sync(page, set(all_presets.keys()))
         if not page.isVisible():
             self._ui_dirty = True
