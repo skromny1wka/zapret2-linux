@@ -1372,6 +1372,14 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertFalse(model.index(row, 0).data(ProfileListModel.EnabledRole))
         self.assertEqual(model.index(row, 0).data(ProfileListModel.StrategyNameRole), "Выключен")
 
+    def test_profile_model_profile_row_lookup_uses_cached_visible_index(self) -> None:
+        from profile.ui import profile_list_model
+
+        source = inspect.getsource(profile_list_model.ProfileListModel._row_index_for_profile_key)
+
+        self.assertIn("_profile_row_by_key", source)
+        self.assertNotIn("for index, row in enumerate", source)
+
     def test_profile_model_skips_replacing_identical_profile_row(self) -> None:
         from profile.ui.profile_list_model import ProfileListModel
 

@@ -50,6 +50,7 @@ class ProfileListModel(QAbstractListModel):
         self._all_items: tuple[ProfileDisplayItem, ...] = ()
         self._rows: list[dict[str, Any]] = []
         self._profile_items: dict[str, ProfileDisplayItem] = {}
+        self._profile_row_by_key: dict[str, int] = {}
         self._group_expanded: dict[str, bool] = {}
         self._active_profile_types: set[str] = {"all"}
         self._search_query = ""
@@ -100,7 +101,7 @@ class ProfileListModel(QAbstractListModel):
             self._group_expanded = next_group_expanded
             self._active_profile_types = next_active_profile_types
             self._search_query = next_search_query
-            self._rows = next_rows
+            self._set_rows(next_rows)
             self._emit_data_changed_for_rows(changed_rows)
             return
         self.beginResetModel()
@@ -109,7 +110,7 @@ class ProfileListModel(QAbstractListModel):
         self._group_expanded = next_group_expanded
         self._active_profile_types = next_active_profile_types
         self._search_query = next_search_query
-        self._rows = next_rows
+        self._set_rows(next_rows)
         self.endResetModel()
 
     def update_profiles(
@@ -139,7 +140,7 @@ class ProfileListModel(QAbstractListModel):
             self._all_items = display_items
             self._profile_items = next_profile_items
             self._group_expanded = next_group_expanded
-            self._rows = next_rows
+            self._set_rows(next_rows)
             self._emit_data_changed_for_rows(changed_rows)
             return True
 
@@ -150,7 +151,7 @@ class ProfileListModel(QAbstractListModel):
             self._all_items = display_items
             self._profile_items = next_profile_items
             self._group_expanded = next_group_expanded
-            self._rows = next_rows
+            self._set_rows(next_rows)
             self.endInsertRows()
             self._emit_data_changed_for_rows(changed_rows)
             return True
@@ -162,7 +163,7 @@ class ProfileListModel(QAbstractListModel):
             self._all_items = display_items
             self._profile_items = next_profile_items
             self._group_expanded = next_group_expanded
-            self._rows = next_rows
+            self._set_rows(next_rows)
             self.endRemoveRows()
             self._emit_data_changed_for_rows(changed_rows)
             return True
@@ -173,7 +174,7 @@ class ProfileListModel(QAbstractListModel):
         self._group_expanded = next_group_expanded
         self._active_profile_types = active
         self._search_query = normalized_search
-        self._rows = next_rows
+        self._set_rows(next_rows)
         self.endResetModel()
         return True
 
@@ -193,13 +194,13 @@ class ProfileListModel(QAbstractListModel):
         if old_ids == next_ids:
             changed_rows = tuple(index for index, row in enumerate(next_rows) if self._rows[index] != row)
             self._active_profile_types = active
-            self._rows = next_rows
+            self._set_rows(next_rows)
             self._emit_data_changed_for_rows(changed_rows)
             return
 
         self.beginResetModel()
         self._active_profile_types = active
-        self._rows = next_rows
+        self._set_rows(next_rows)
         self.endResetModel()
 
     def set_search_query(self, query: str) -> None:
@@ -218,13 +219,13 @@ class ProfileListModel(QAbstractListModel):
         if old_ids == next_ids:
             changed_rows = tuple(index for index, row in enumerate(next_rows) if self._rows[index] != row)
             self._search_query = normalized
-            self._rows = next_rows
+            self._set_rows(next_rows)
             self._emit_data_changed_for_rows(changed_rows)
             return
 
         self.beginResetModel()
         self._search_query = normalized
-        self._rows = next_rows
+        self._set_rows(next_rows)
         self.endResetModel()
 
     def set_group_expanded(self, group_key: str, expanded: bool) -> None:
@@ -243,7 +244,7 @@ class ProfileListModel(QAbstractListModel):
         if old_ids == next_ids:
             changed_rows = tuple(index for index, row in enumerate(next_rows) if self._rows[index] != row)
             self._group_expanded = next_group_expanded
-            self._rows = next_rows
+            self._set_rows(next_rows)
             self._emit_data_changed_for_rows(changed_rows)
             return
 
@@ -259,7 +260,7 @@ class ProfileListModel(QAbstractListModel):
                 insert_count = len(next_rows) - len(self._rows)
                 self.beginInsertRows(QModelIndex(), old_group_index + 1, old_group_index + insert_count)
                 self._group_expanded = next_group_expanded
-                self._rows = next_rows
+                self._set_rows(next_rows)
                 self.endInsertRows()
                 self._emit_data_changed_for_rows(changed_rows)
                 return
@@ -267,14 +268,14 @@ class ProfileListModel(QAbstractListModel):
                 remove_count = len(self._rows) - len(next_rows)
                 self.beginRemoveRows(QModelIndex(), old_group_index + 1, old_group_index + remove_count)
                 self._group_expanded = next_group_expanded
-                self._rows = next_rows
+                self._set_rows(next_rows)
                 self.endRemoveRows()
                 self._emit_data_changed_for_rows(changed_rows)
                 return
 
         self.beginResetModel()
         self._group_expanded = next_group_expanded
-        self._rows = next_rows
+        self._set_rows(next_rows)
         self.endResetModel()
 
     def set_all_groups_expanded(self, expanded: bool) -> tuple[str, ...]:
@@ -293,7 +294,7 @@ class ProfileListModel(QAbstractListModel):
         self.beginResetModel()
         for group_key in group_keys:
             self._group_expanded[group_key] = expanded_value
-        self._rows = self._build_rows()
+        self._set_rows(self._build_rows())
         self.endResetModel()
         return changed_group_keys
 
@@ -324,7 +325,7 @@ class ProfileListModel(QAbstractListModel):
             self._all_items = next_items
             self._profile_items = {entry.key: entry for entry in self._all_items}
             self._group_expanded = next_group_expanded
-            self._rows = next_rows
+            self._set_rows(next_rows)
             self._emit_data_changed_for_rows(changed_rows)
             return True
 
@@ -340,13 +341,14 @@ class ProfileListModel(QAbstractListModel):
             row_index = self._row_index_for_profile_key(source_key)
             if row_index >= 0:
                 self._rows[row_index] = _row_for_profile(replacement)
+                self._rebuild_visible_profile_row_index()
                 model_index = self.index(row_index, 0)
                 self.dataChanged.emit(model_index, model_index, _profile_data_roles())
                 return True
 
         self.beginResetModel()
         self._group_expanded = next_group_expanded
-        self._rows = next_rows
+        self._set_rows(next_rows)
         self.endResetModel()
         return True
 
@@ -369,7 +371,7 @@ class ProfileListModel(QAbstractListModel):
             self._all_items = next_items
             self._profile_items = next_profile_items
             self._group_expanded = next_group_expanded
-            self._rows = next_rows
+            self._set_rows(next_rows)
             self._emit_data_changed_for_rows(changed_rows)
             return True
 
@@ -380,7 +382,7 @@ class ProfileListModel(QAbstractListModel):
             self._all_items = next_items
             self._profile_items = next_profile_items
             self._group_expanded = next_group_expanded
-            self._rows = next_rows
+            self._set_rows(next_rows)
             self.endInsertRows()
             self._emit_data_changed_for_rows(changed_rows)
             return True
@@ -389,7 +391,7 @@ class ProfileListModel(QAbstractListModel):
         self._all_items = next_items
         self._profile_items = next_profile_items
         self._group_expanded = next_group_expanded
-        self._rows = next_rows
+        self._set_rows(next_rows)
         self.endResetModel()
         return True
 
@@ -433,7 +435,7 @@ class ProfileListModel(QAbstractListModel):
             changed_rows = tuple(index for index, row in enumerate(next_rows) if self._rows[index] != row)
             self._all_items = next_items
             self._profile_items = next_profile_items
-            self._rows = next_rows
+            self._set_rows(next_rows)
             self._emit_data_changed_for_rows(changed_rows)
             return True
 
@@ -443,7 +445,7 @@ class ProfileListModel(QAbstractListModel):
             self.beginRemoveRows(QModelIndex(), remove_index, remove_index)
             self._all_items = next_items
             self._profile_items = next_profile_items
-            self._rows = next_rows
+            self._set_rows(next_rows)
             self.endRemoveRows()
             self._emit_data_changed_for_rows(changed_rows)
             return True
@@ -451,7 +453,7 @@ class ProfileListModel(QAbstractListModel):
         self.beginResetModel()
         self._all_items = next_items
         self._profile_items = next_profile_items
-        self._rows = next_rows
+        self._set_rows(next_rows)
         self.endResetModel()
         return True
 
@@ -541,7 +543,7 @@ class ProfileListModel(QAbstractListModel):
                 self._all_items = next_items_tuple
                 self._profile_items = {item.key: item for item in self._all_items}
                 self._group_expanded = next_group_expanded
-                self._rows = next_rows
+                self._set_rows(next_rows)
                 self.endMoveRows()
                 self._emit_data_changed_for_rows(changed_rows)
                 return True
@@ -550,7 +552,7 @@ class ProfileListModel(QAbstractListModel):
         self._all_items = next_items_tuple
         self._profile_items = {item.key: item for item in self._all_items}
         self._group_expanded = next_group_expanded
-        self._rows = next_rows
+        self._set_rows(next_rows)
         self.endResetModel()
         return True
 
@@ -589,7 +591,7 @@ class ProfileListModel(QAbstractListModel):
             self._all_items = next_items_tuple
             self._profile_items = next_profile_items
             self._group_expanded = next_group_expanded
-            self._rows = next_rows
+            self._set_rows(next_rows)
             self._emit_data_changed_for_rows(changed_rows)
             return True
 
@@ -597,7 +599,7 @@ class ProfileListModel(QAbstractListModel):
         self._all_items = next_items_tuple
         self._profile_items = next_profile_items
         self._group_expanded = next_group_expanded
-        self._rows = next_rows
+        self._set_rows(next_rows)
         self.endResetModel()
         return True
 
@@ -702,6 +704,17 @@ class ProfileListModel(QAbstractListModel):
             search_query=self._search_query,
         )
 
+    def _set_rows(self, rows: list[dict[str, Any]]) -> None:
+        self._rows = rows
+        self._rebuild_visible_profile_row_index()
+
+    def _rebuild_visible_profile_row_index(self) -> None:
+        self._profile_row_by_key = {
+            str(row.get("key") or ""): index
+            for index, row in enumerate(self._rows)
+            if str(row.get("kind") or "") == "profile" and str(row.get("key") or "")
+        }
+
     def _emit_data_changed_for_rows(self, rows: tuple[int, ...]) -> None:
         for row_index in rows:
             if row_index < 0 or row_index >= len(self._rows):
@@ -718,10 +731,7 @@ class ProfileListModel(QAbstractListModel):
 
     def _row_index_for_profile_key(self, profile_key: str) -> int:
         key = str(profile_key or "").strip()
-        for index, row in enumerate(self._rows):
-            if str(row.get("kind") or "") == "profile" and str(row.get("key") or "") == key:
-                return index
-        return -1
+        return int(self._profile_row_by_key.get(key, -1))
 
 
 def _single_inserted_row_index(
