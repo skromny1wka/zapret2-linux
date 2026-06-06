@@ -78,6 +78,27 @@ class UpdateStatefulCoreDescription:
     check_orchestration_candidates: tuple[str, ...]
 
 
+_UPDATER_CLEANUP_RUNTIME_POLICIES = (
+    ("server_worker", "server_worker", False),
+    ("server_retry_without_dpi_worker", "server_retry_without_dpi_worker", True),
+    ("dpi_restart_worker", "dpi_restart_worker", True),
+    ("version_worker", "version_worker", False),
+    ("auto_check_load_worker", "auto_check_load_worker", False),
+    ("auto_check_save_worker", "auto_check_save_worker", True),
+    ("update_channel_open_worker", "update_channel_open_worker", False),
+    ("cache_invalidate_worker", "cache_invalidate_worker", False),
+    ("server_check_gate_worker", "server_check_gate_worker", False),
+)
+_UPDATER_CLEANUP_BLOCKING_BY_PREFIX = {
+    warning_prefix: blocking
+    for _name, warning_prefix, blocking in _UPDATER_CLEANUP_RUNTIME_POLICIES
+}
+
+
+def _updater_cleanup_blocking(warning_prefix: str) -> bool:
+    return bool(_UPDATER_CLEANUP_BLOCKING_BY_PREFIX.get(str(warning_prefix or ""), False))
+
+
 class UpdatePageView(Protocol):
     def get_ui_language(self) -> str: ...
     def window(self): ...
@@ -958,7 +979,7 @@ class UpdatePageRuntime:
 
     def _teardown_server_worker(self) -> None:
         self._server_worker_runtime.stop(
-            blocking=False,
+            blocking=_updater_cleanup_blocking("server_worker"),
             log_fn=log,
             warning_prefix="server_worker",
         )
@@ -966,7 +987,7 @@ class UpdatePageRuntime:
 
     def _teardown_server_retry_without_dpi_worker(self) -> None:
         self._server_retry_without_dpi_runtime.stop(
-            blocking=True,
+            blocking=_updater_cleanup_blocking("server_retry_without_dpi_worker"),
             log_fn=log,
             warning_prefix="server_retry_without_dpi_worker",
         )
@@ -975,7 +996,7 @@ class UpdatePageRuntime:
     def _teardown_dpi_restart_worker(self) -> None:
         self._dpi_restart_after = ""
         self._dpi_restart_runtime.stop(
-            blocking=True,
+            blocking=_updater_cleanup_blocking("dpi_restart_worker"),
             log_fn=log,
             warning_prefix="dpi_restart_worker",
         )
@@ -983,7 +1004,7 @@ class UpdatePageRuntime:
 
     def _teardown_version_worker(self) -> None:
         self._version_worker_runtime.stop(
-            blocking=False,
+            blocking=_updater_cleanup_blocking("version_worker"),
             log_fn=log,
             warning_prefix="version_worker",
         )
@@ -993,7 +1014,7 @@ class UpdatePageRuntime:
         self._auto_check_save_pending = None
         self._auto_check_save_start_scheduled = False
         self._auto_check_save_runtime.stop(
-            blocking=True,
+            blocking=_updater_cleanup_blocking("auto_check_save_worker"),
             log_fn=log,
             warning_prefix="auto_check_save_worker",
         )
@@ -1003,7 +1024,7 @@ class UpdatePageRuntime:
         self._auto_check_load_pending = False
         self._auto_check_load_start_scheduled = False
         self._auto_check_load_runtime.stop(
-            blocking=False,
+            blocking=_updater_cleanup_blocking("auto_check_load_worker"),
             log_fn=log,
             warning_prefix="auto_check_load_worker",
         )
@@ -1013,7 +1034,7 @@ class UpdatePageRuntime:
         self._update_channel_open_pending = ""
         self._update_channel_open_start_scheduled = False
         self._update_channel_open_runtime.stop(
-            blocking=False,
+            blocking=_updater_cleanup_blocking("update_channel_open_worker"),
             log_fn=log,
             warning_prefix="update_channel_open_worker",
         )
@@ -1023,7 +1044,7 @@ class UpdatePageRuntime:
         self._cache_invalidate_pending_context = None
         self._cache_invalidate_start_scheduled = False
         self._cache_invalidate_runtime.stop(
-            blocking=False,
+            blocking=_updater_cleanup_blocking("cache_invalidate_worker"),
             log_fn=log,
             warning_prefix="cache_invalidate_worker",
         )
@@ -1033,7 +1054,7 @@ class UpdatePageRuntime:
         self._server_check_gate_pending = None
         self._server_check_gate_start_scheduled = False
         self._server_check_gate_runtime.stop(
-            blocking=False,
+            blocking=_updater_cleanup_blocking("server_check_gate_worker"),
             log_fn=log,
             warning_prefix="server_check_gate_worker",
         )
