@@ -170,6 +170,7 @@ def create_preset_runtime_coordinator(
     get_launch_method,
     get_active_preset_path,
     refresh_after_switch,
+    get_preset_source_path_by_file_name=None,
 ):
     from core.runtime.preset_runtime_coordinator import PresetRuntimeCoordinator
 
@@ -179,6 +180,7 @@ def create_preset_runtime_coordinator(
         ui_state_store=ui_state_store,
         get_launch_method=get_launch_method,
         get_active_preset_path=get_active_preset_path,
+        get_preset_source_path_by_file_name=get_preset_source_path_by_file_name,
         refresh_after_switch=refresh_after_switch,
         request_selected_source_preset_apply=lambda launch_method, reason, preset_file_name: request_selected_source_preset_apply(
             runtime_feature=runtime_feature,

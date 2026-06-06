@@ -15,6 +15,30 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls._app = QApplication.instance() or QApplication([])
 
+    def test_runtime_command_passes_preset_source_resolver_to_coordinator(self) -> None:
+        from winws_runtime.runtime import commands as runtime_commands
+
+        resolver = lambda method, file_name: f"{method}/{file_name}"
+        runtime_feature = SimpleNamespace(
+            dependencies=SimpleNamespace(presets_feature=object()),
+        )
+
+        with patch(
+            "core.runtime.preset_runtime_coordinator.PresetRuntimeCoordinator",
+            side_effect=lambda *args, **kwargs: SimpleNamespace(args=args, kwargs=kwargs),
+        ):
+            coordinator = runtime_commands.create_preset_runtime_coordinator(
+                object(),
+                runtime_feature=runtime_feature,
+                ui_state_store=object(),
+                get_launch_method=lambda: "zapret2",
+                get_active_preset_path=lambda: "",
+                get_preset_source_path_by_file_name=resolver,
+                refresh_after_switch=lambda: None,
+            )
+
+        self.assertIs(coordinator.kwargs["get_preset_source_path_by_file_name"], resolver)
+
     def test_saving_active_preset_uses_content_apply_not_preset_switch(self) -> None:
         from core.runtime.preset_runtime_coordinator import PresetRuntimeCoordinator
         from settings.mode import ZAPRET2_MODE
