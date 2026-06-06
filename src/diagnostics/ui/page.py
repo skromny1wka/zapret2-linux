@@ -27,6 +27,7 @@ from diagnostics.ui.runtime_helpers import (
     apply_worker_update,
     cleanup_connection_runtime,
     finish_connection_test,
+    release_worker_resources,
     refresh_test_combo_items,
     set_connection_status,
     start_connection_test,
@@ -208,6 +209,7 @@ class ConnectionTestPage(BasePage):
     def _bind_connection_test_worker(self, worker) -> None:
         worker.update_signal.connect(self._on_worker_update)
         worker.finished_signal.connect(self._on_worker_finished)
+        worker.finished.connect(lambda _worker=worker: release_worker_resources(_worker))
 
     def _on_connection_test_worker_finished(self, _request_id: int, _thread) -> None:
         pass
@@ -259,18 +261,6 @@ class ConnectionTestPage(BasePage):
         self._finish_mode = state["finish_mode"]
         self.is_testing = state["is_testing"]
         self.stop_check_timer = state["stop_check_timer"]
-
-    @staticmethod
-    def _release_worker_resources(worker) -> None:
-        if worker is None:
-            return
-        release = getattr(worker, "release_resources", None)
-        if not callable(release):
-            return
-        try:
-            release()
-        except Exception:
-            pass
 
     # ──────────────────────────────────────────────────────────────
     # DNS и поддержка

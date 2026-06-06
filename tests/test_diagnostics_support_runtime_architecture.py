@@ -6,9 +6,64 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from diagnostics.ui.page import ConnectionTestPage
+import diagnostics.ui.runtime_helpers as diagnostics_runtime_helpers
 
 
 class DiagnosticsSupportRuntimeArchitectureTests(unittest.TestCase):
+    def test_connection_cleanup_requests_stop_without_waiting_for_worker(self) -> None:
+        worker = object()
+        runtime = SimpleNamespace(
+            worker=worker,
+            is_running=Mock(return_value=True),
+            stop=Mock(),
+            cancel=Mock(),
+        )
+
+        with patch.object(diagnostics_runtime_helpers, "release_worker_resources") as release:
+            state = diagnostics_runtime_helpers.cleanup_connection_runtime(
+                cleanup_in_progress=False,
+                finish_mode="completed",
+                stop_check_timer=None,
+                runtime=runtime,
+                log_debug=Mock(),
+                log_warning=Mock(),
+            )
+
+        runtime.stop.assert_called_once()
+        self.assertIs(runtime.stop.call_args.kwargs["blocking"], False)
+        release.assert_not_called()
+        runtime.cancel.assert_called_once()
+        self.assertFalse(state["is_testing"])
+
+    def test_connection_worker_releases_resources_when_worker_finishes(self) -> None:
+        class _Signal:
+            def __init__(self) -> None:
+                self._callbacks = []
+
+            def connect(self, callback) -> None:
+                self._callbacks.append(callback)
+
+            def emit(self) -> None:
+                for callback in list(self._callbacks):
+                    callback()
+
+        worker = SimpleNamespace(
+            update_signal=_Signal(),
+            finished_signal=_Signal(),
+            finished=_Signal(),
+        )
+        page = ConnectionTestPage.__new__(ConnectionTestPage)
+        page._on_worker_update = Mock()
+        page._on_worker_finished = Mock()
+
+        with patch("diagnostics.ui.page.release_worker_resources") as release:
+            ConnectionTestPage._bind_connection_test_worker(page, worker)
+            release.assert_not_called()
+
+            worker.finished.emit()
+
+        release.assert_called_once_with(worker)
+
     def test_support_prepare_queues_latest_request_while_worker_runs(self) -> None:
         class _Runtime:
             def is_running(self) -> bool:

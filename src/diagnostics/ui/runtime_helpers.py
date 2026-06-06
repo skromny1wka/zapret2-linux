@@ -323,13 +323,14 @@ def cleanup_connection_runtime(
     if cleanup_plan.should_quit_thread and thread_running:
         log_debug("Останавливаем connection test worker...")
     runtime.stop(
-        blocking=True,
+        blocking=False,
         wait_timeout_ms=cleanup_plan.wait_timeout_ms,
         terminate_wait_ms=cleanup_plan.terminate_wait_ms,
         log_fn=lambda text, level="DEBUG": log_warning(text) if str(level).upper() == "WARNING" else log_debug(text),
         warning_prefix="connection_test_worker",
     )
-    release_worker_resources(worker)
+    if not thread_running:
+        release_worker_resources(worker)
     runtime.cancel()
     return {
         "cleanup_in_progress": True,
