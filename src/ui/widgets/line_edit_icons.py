@@ -11,7 +11,19 @@ from PyQt6.QtCore import QObject, QSize, Qt, QTimer, QEvent
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QLineEdit, QToolButton
 
+from ui.accessibility import set_control_accessibility
 from ui.theme import get_theme_tokens, get_cached_qta_pixmap
+
+
+def _find_clear_button(line_edit: QLineEdit) -> QToolButton | None:
+    btn = line_edit.findChild(QToolButton, "qt_clear_button")
+    if btn is not None:
+        return btn
+    for candidate in line_edit.findChildren(QToolButton):
+        action = candidate.defaultAction()
+        if action is not None and action.objectName() == "_q_qlineeditclearaction":
+            return candidate
+    return None
 
 
 class _ClearButtonUpdater(QObject):
@@ -49,7 +61,7 @@ class _ClearButtonUpdater(QObject):
         if self._cleanup_in_progress or self._line_edit is None:
             return
         try:
-            btn = self._line_edit.findChild(QToolButton, "qt_clear_button")
+            btn = _find_clear_button(self._line_edit)
             if not btn:
                 return
 
@@ -66,6 +78,11 @@ class _ClearButtonUpdater(QObject):
             btn.setIcon(QIcon(pixmap))
             btn.setIconSize(QSize(self._size, self._size))
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            set_control_accessibility(
+                btn,
+                name="Очистить поле ввода",
+                description="Удаляет введенный текст из этого поля.",
+            )
             btn.setStyleSheet(f"""
                 QToolButton#qt_clear_button {{
                     background: transparent;
