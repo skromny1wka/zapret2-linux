@@ -114,7 +114,7 @@ class SubscriptionManager:
         """Останавливает фоновые потоки менеджера подписки при закрытии приложения."""
         self._cleanup_in_progress = True
         self._subscription_runtime.stop(
-            blocking=True,
+            blocking=False,
             log_fn=log,
             warning_prefix="Поток подписки",
         )

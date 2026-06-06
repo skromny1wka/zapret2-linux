@@ -56,6 +56,23 @@ class PremiumWorkerArchitectureTests(unittest.TestCase):
         self.assertNotIn("moveToThread", manager_start_source)
         self.assertNotIn("self._subscription_thread.start()", manager_start_source)
 
+    def test_subscription_manager_cleanup_does_not_wait_for_worker(self) -> None:
+        manager = subscription_manager.SubscriptionManager.__new__(subscription_manager.SubscriptionManager)
+        manager._cleanup_in_progress = False
+        manager._subscription_runtime = SimpleNamespace(stop=Mock(), cancel=Mock())
+        manager._subscription_worker = object()
+
+        manager.cleanup()
+
+        self.assertTrue(manager._cleanup_in_progress)
+        manager._subscription_runtime.stop.assert_called_once_with(
+            blocking=False,
+            log_fn=subscription_manager.log,
+            warning_prefix="Поток подписки",
+        )
+        manager._subscription_runtime.cancel.assert_called_once_with()
+        self.assertIsNone(manager._subscription_worker)
+
     def test_premium_page_action_tasks_use_shared_worker_runtime(self) -> None:
         page_init_source = inspect.getsource(PremiumPage.__init__)
         start_source = inspect.getsource(PremiumPage._start_worker_thread)
