@@ -10,6 +10,10 @@ def _list_file_entries_count(text: str) -> int:
     return sum(1 for line in str(text or "").splitlines() if line.strip())
 
 
+def _profile_setup_load_result(payload):
+    return ProfileSetupLoadResult(payload=payload)
+
+
 class ProfileSetupLoadResult:
     def __init__(self, *, payload, apply_signature=None) -> None:
         self.payload = payload
@@ -37,7 +41,7 @@ class ProfileSetupLoadWorker(QThread):
             log(f"ProfileSetupLoadWorker: не удалось загрузить profile setup: {exc}", "ERROR")
             self.failed.emit(self._request_id, str(exc))
             return
-        self.loaded.emit(self._request_id, ProfileSetupLoadResult(payload=payload))
+        self.loaded.emit(self._request_id, _profile_setup_load_result(payload))
 
 
 class ProfileListFileLoadWorker(QThread):
@@ -126,7 +130,7 @@ class ProfileListFileSaveWorker(QThread):
             log(f"ProfileListFileSaveWorker: не удалось сохранить файл списка profile: {exc}", "ERROR")
             self.failed.emit(self._request_id, str(exc))
             return
-        self.saved.emit(self._request_id, state, payload)
+        self.saved.emit(self._request_id, state, _profile_setup_load_result(payload))
 
 
 class ProfileSettingsSaveWorker(QThread):
@@ -170,7 +174,7 @@ class ProfileSettingsSaveWorker(QThread):
             log(f"ProfileSettingsSaveWorker: не удалось сохранить настройки profile: {exc}", "ERROR")
             self.failed.emit(self._request_id, str(exc))
             return
-        self.saved.emit(self._request_id, str(profile_key or ""), payload)
+        self.saved.emit(self._request_id, str(profile_key or ""), _profile_setup_load_result(payload))
 
 
 class ProfileRawTextSaveWorker(QThread):
@@ -196,7 +200,7 @@ class ProfileRawTextSaveWorker(QThread):
             log(f"ProfileRawTextSaveWorker: не удалось сохранить сырой текст profile: {exc}", "ERROR")
             self.failed.emit(self._request_id, str(exc))
             return
-        self.saved.emit(self._request_id, str(profile_key or ""), payload)
+        self.saved.emit(self._request_id, str(profile_key or ""), _profile_setup_load_result(payload))
 
 
 class ProfileEnabledSaveWorker(QThread):
@@ -243,7 +247,7 @@ class ProfileEnabledSaveWorker(QThread):
                 payload = self._load_profile(clean_profile_key)
             except Exception as exc:
                 log(f"ProfileEnabledSaveWorker: не удалось обновить payload profile: {exc}", "DEBUG")
-        self.saved.emit(self._request_id, clean_profile_key, self._enabled, payload)
+        self.saved.emit(self._request_id, clean_profile_key, self._enabled, _profile_setup_load_result(payload))
 
 
 class ProfilePresetProfileActionWorker(QThread):
@@ -616,7 +620,13 @@ class ProfileStrategyApplyWorker(QThread):
             payload = self._load_profile(str(profile_key))
         except Exception as exc:
             log(f"ProfileStrategyApplyWorker: не удалось загрузить обновлённый profile payload: {exc}", "DEBUG")
-        self.applied.emit(self._request_id, self._profile_key, str(profile_key), self._strategy_id, payload)
+        self.applied.emit(
+            self._request_id,
+            self._profile_key,
+            str(profile_key),
+            self._strategy_id,
+            _profile_setup_load_result(payload),
+        )
 
 
 class ProfileStrategyFeedbackSaveWorker(QThread):

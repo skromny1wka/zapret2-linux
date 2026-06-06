@@ -922,6 +922,13 @@ def _profile_setup_apply_signature_from_worker_result(result):
     return tuple(apply_signature) if apply_signature is not None else None
 
 
+def _profile_setup_payload_and_apply_signature(result):
+    return (
+        _profile_setup_payload_from_worker_result(result),
+        _profile_setup_apply_signature_from_worker_result(result),
+    )
+
+
 def _list_file_entries_count(text: str) -> int:
     return len([
         line
@@ -2268,8 +2275,7 @@ class ProfileSetupPageBase(BasePage):
             return
         if self.__dict__.get("_setup_load_dirty"):
             return
-        apply_signature = _profile_setup_apply_signature_from_worker_result(payload)
-        payload = _profile_setup_payload_from_worker_result(payload)
+        payload, apply_signature = _profile_setup_payload_and_apply_signature(payload)
         if payload is None:
             set_widget_text_if_changed(
                 self._summary,
@@ -2738,6 +2744,7 @@ class ProfileSetupPageBase(BasePage):
             return
         if self.__dict__.get("_pending_list_file_save"):
             return
+        payload, apply_signature = _profile_setup_payload_and_apply_signature(payload)
         if state is not None:
             self._apply_list_file_editor_state(state)
         if self._list_file_status_label is not None:
@@ -2749,7 +2756,7 @@ class ProfileSetupPageBase(BasePage):
             pass
         else:
             self._payload = payload
-            self._schedule_profile_setup_payload_apply(payload)
+            self._schedule_profile_setup_payload_apply(payload, apply_signature=apply_signature)
             self._on_profile_changed_callback(self._profile_key, "list_file", getattr(payload, "item", None))
         InfoBar.success(
             title="Список сохранён",
@@ -3070,6 +3077,7 @@ class ProfileSetupPageBase(BasePage):
             return
         if self._pending_settings_save:
             return
+        payload, apply_signature = _profile_setup_payload_and_apply_signature(payload)
         new_key = str(profile_key or "").strip()
         old_key = str(self._profile_key or "").strip()
         if new_key:
@@ -3081,7 +3089,7 @@ class ProfileSetupPageBase(BasePage):
         if self.__dict__.get("_payload") is payload and (not new_key or new_key == old_key):
             return
         self._payload = payload
-        self._schedule_profile_setup_payload_apply(payload)
+        self._schedule_profile_setup_payload_apply(payload, apply_signature=apply_signature)
         self._on_profile_changed_callback(self._profile_key, "settings", getattr(payload, "item", None))
 
     def _on_settings_save_failed(self, request_id: int, error: str) -> None:
@@ -3146,6 +3154,7 @@ class ProfileSetupPageBase(BasePage):
             return
         if self.__dict__.get("_pending_raw_profile_save"):
             return
+        payload, apply_signature = _profile_setup_payload_and_apply_signature(payload)
         old_key = str(self._profile_key or "").strip()
         new_key = str(profile_key or "").strip()
         if new_key:
@@ -3157,7 +3166,7 @@ class ProfileSetupPageBase(BasePage):
             pass
         else:
             self._payload = payload
-            self._schedule_profile_setup_payload_apply(payload)
+            self._schedule_profile_setup_payload_apply(payload, apply_signature=apply_signature)
             self._on_profile_changed_callback(self._profile_key, "raw_profile", getattr(payload, "item", None))
         InfoBar.success(
             title="Profile сохранён",
@@ -3243,6 +3252,7 @@ class ProfileSetupPageBase(BasePage):
             return
         if self.__dict__.get("_pending_enabled_save") is not None:
             return
+        payload, apply_signature = _profile_setup_payload_and_apply_signature(payload)
         old_key = str(self._profile_key or "").strip()
         new_key = str(profile_key or "").strip()
         if payload is not None:
@@ -3251,7 +3261,7 @@ class ProfileSetupPageBase(BasePage):
             if new_key:
                 self._profile_key = new_key
             self._payload = payload
-            self._schedule_profile_setup_payload_apply(payload)
+            self._schedule_profile_setup_payload_apply(payload, apply_signature=apply_signature)
             self._on_profile_changed_callback(
                 self._profile_key,
                 "enabled" if enabled else "disabled",
@@ -3432,11 +3442,13 @@ class ProfileSetupPageBase(BasePage):
             self._on_profile_changed_callback(self._profile_key, "strategy", item)
             return
         if payload is not None:
+            payload, apply_signature = _profile_setup_payload_and_apply_signature(payload)
             branch_id = str(getattr(self, "_strategy_apply_runtime_branch_id", "") or "").strip()
             if branch_id:
                 payload = _payload_with_strategy_branch(payload, branch_id)
+                apply_signature = None
             self._payload = payload
-            self._schedule_profile_setup_payload_apply(payload)
+            self._schedule_profile_setup_payload_apply(payload, apply_signature=apply_signature)
             self._on_profile_changed_callback(
                 self._profile_key,
                 "strategy",

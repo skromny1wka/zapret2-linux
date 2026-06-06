@@ -3668,7 +3668,10 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             raw_text="--new\n",
         )
         load_profile.assert_called_once_with("profile-2")
-        self.assertEqual(saved, [(7, "profile-2", payload)])
+        self.assertEqual(len(saved), 1)
+        self.assertEqual(saved[0][:2], (7, "profile-2"))
+        self.assertIs(saved[0][2].payload, payload)
+        self.assertTrue(saved[0][2].apply_signature)
 
     def test_raw_profile_save_finish_passes_updated_item_to_preset_page(self) -> None:
         item = SimpleNamespace(key="profile-2")
@@ -3814,7 +3817,10 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             filter_value="lists/youtube.txt",
         )
         load_profile.assert_called_once_with("profile-2")
-        self.assertEqual(saved, [(8, "profile-2", False, payload)])
+        self.assertEqual(len(saved), 1)
+        self.assertEqual(saved[0][:3], (8, "profile-2", False))
+        self.assertIs(saved[0][3].payload, payload)
+        self.assertTrue(saved[0][3].apply_signature)
 
     def test_enabled_save_finish_updates_detail_without_reload(self) -> None:
         item = ProfileListItem(
@@ -4131,7 +4137,10 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             text="example.com",
         )
         load_profile.assert_called_once_with("profile-1")
-        self.assertEqual(saved, [(3, state, payload)])
+        self.assertEqual(len(saved), 1)
+        self.assertEqual(saved[0][:2], (3, state))
+        self.assertIs(saved[0][2].payload, payload)
+        self.assertTrue(saved[0][2].apply_signature)
 
     def test_list_file_save_finish_passes_updated_item_to_preset_page(self) -> None:
         item = SimpleNamespace(key="profile-1")
@@ -4534,7 +4543,34 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             out_range="a",
         )
         load_profile.assert_called_once_with("profile-2")
-        self.assertEqual(saved, [(4, "profile-2", payload)])
+        self.assertEqual(len(saved), 1)
+        self.assertEqual(saved[0][:2], (4, "profile-2"))
+        self.assertIs(saved[0][2].payload, payload)
+        self.assertTrue(saved[0][2].apply_signature)
+
+    def test_settings_save_finish_passes_worker_signature_to_deferred_apply(self) -> None:
+        item = SimpleNamespace(key="profile-2")
+        payload = SimpleNamespace(item=item)
+        result = SimpleNamespace(payload=payload, apply_signature=("settings", "profile-2"))
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._settings_save_request_id = 4
+        page._pending_settings_save = None
+        page._profile_key = "profile-1"
+        page._payload = None
+        page.reload_current_profile = Mock()
+        page._schedule_profile_setup_payload_apply = Mock()
+        page._on_profile_changed_callback = Mock()
+
+        ProfileSetupPageBase._on_settings_save_finished(page, 4, "profile-2", result)
+
+        self.assertEqual(page._profile_key, "profile-2")
+        page.reload_current_profile.assert_not_called()
+        self.assertIs(page._payload, payload)
+        page._schedule_profile_setup_payload_apply.assert_called_once_with(
+            payload,
+            apply_signature=("settings", "profile-2"),
+        )
+        page._on_profile_changed_callback.assert_called_once_with("profile-2", "settings", item)
 
     def test_settings_save_finish_passes_updated_item_to_preset_page(self) -> None:
         item = SimpleNamespace(key="profile-2")
@@ -5209,7 +5245,10 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             strategy_id="tls_fake",
         )
         load_profile.assert_called_once_with("profile-1")
-        self.assertEqual(applied, [(9, "template:profile-1", "profile-1", "tls_fake", payload)])
+        self.assertEqual(len(applied), 1)
+        self.assertEqual(applied[0][:4], (9, "template:profile-1", "profile-1", "tls_fake"))
+        self.assertIs(applied[0][4].payload, payload)
+        self.assertTrue(applied[0][4].apply_signature)
 
     def test_strategy_feedback_updates_payload_without_reloading_profile(self) -> None:
         class _Signal:
