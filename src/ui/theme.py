@@ -1143,7 +1143,7 @@ class ThemeManager:
             for _, runtime in list(self._active_theme_build_jobs.items()):
                 try:
                     runtime.stop(
-                        blocking=True,
+                        blocking=False,
                         wait_timeout_ms=1000,
                         log_fn=log,
                         warning_prefix="theme build worker",

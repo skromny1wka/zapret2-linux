@@ -99,6 +99,41 @@ class ThemeManagerPersistenceTests(unittest.TestCase):
         self.assertIn("failed_signal.connect(thread.quit)", runtime_source)
         self.assertIn("failed_signal.connect(worker.deleteLater)", runtime_source)
 
+    def test_cleanup_does_not_wait_for_theme_build_workers(self) -> None:
+        import ui.theme as theme
+
+        build_runtime = SimpleNamespace(stop=Mock(), cancel=Mock())
+        persist_runtime = SimpleNamespace(stop=Mock(), cancel=Mock())
+        manager = theme.ThemeManager.__new__(theme.ThemeManager)
+        manager._cleanup_in_progress = False
+        manager._active_theme_build_jobs = {1: build_runtime}
+        manager._cleanup_theme_build_thread = Mock()
+        manager._theme_persist_pending = "dark"
+        manager._theme_persist_start_scheduled = True
+        manager._theme_persist_runtime_worker = object()
+        manager._theme_persist_runtime = persist_runtime
+
+        theme.ThemeManager.cleanup(manager)
+
+        self.assertTrue(manager._cleanup_in_progress)
+        build_runtime.stop.assert_called_once_with(
+            blocking=False,
+            wait_timeout_ms=1000,
+            log_fn=theme.log,
+            warning_prefix="theme build worker",
+        )
+        build_runtime.cancel.assert_called_once_with()
+        persist_runtime.stop.assert_called_once_with(
+            blocking=True,
+            wait_timeout_ms=1000,
+            log_fn=theme.log,
+            warning_prefix="theme persist worker",
+        )
+        persist_runtime.cancel.assert_called_once_with()
+        self.assertIsNone(manager._theme_persist_pending)
+        self.assertFalse(manager._theme_persist_start_scheduled)
+        self.assertIsNone(manager._theme_persist_runtime_worker)
+
 
 if __name__ == "__main__":
     unittest.main()
