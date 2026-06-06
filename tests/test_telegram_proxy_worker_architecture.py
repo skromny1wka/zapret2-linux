@@ -7,6 +7,22 @@ from telegram_proxy import commands as telegram_proxy_commands
 from telegram_proxy import workers as telegram_proxy_workers
 import app.feature_facades.telegram_proxy as telegram_proxy_feature_module
 from app.feature_facades.telegram_proxy import TelegramProxyFeature
+from telegram_proxy.ui.worker_state import TelegramProxyPageWorkerState
+
+
+def _set_state(page, name: str, *, runtime=None, pending: bool = False, start_scheduled: bool = False):
+    runtime_attr = f"_{name}_runtime"
+    state_attr = f"_{name}_state"
+    if runtime is None:
+        runtime = page.__dict__.get(runtime_attr, SimpleNamespace(is_running=Mock(return_value=False)))
+    setattr(page, runtime_attr, runtime)
+    state = TelegramProxyPageWorkerState(
+        runtime=runtime,
+        pending=bool(pending),
+        start_scheduled=bool(start_scheduled),
+    )
+    setattr(page, state_attr, state)
+    return state
 
 
 class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
@@ -528,9 +544,9 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
 
         page = TelegramProxyPage.__new__(TelegramProxyPage)
         page._cleanup_in_progress = False
-        page._auto_deeplink_pending = True
         page._auto_deeplink_runtime = Mock()
         page._auto_deeplink_runtime.is_current.return_value = True
+        _set_state(page, "auto_deeplink", runtime=page._auto_deeplink_runtime, pending=True)
         page._on_open_in_telegram = Mock()
         page._append_log_line = Mock()
         single_shot = Mock()
@@ -547,9 +563,9 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
 
         page = TelegramProxyPage.__new__(TelegramProxyPage)
         page._cleanup_in_progress = False
-        page._auto_deeplink_pending = True
         page._auto_deeplink_runtime = Mock()
         page._auto_deeplink_runtime.is_current.return_value = True
+        _set_state(page, "auto_deeplink", runtime=page._auto_deeplink_runtime, pending=True)
 
         with patch.object(telegram_proxy_page, "log") as log_mock:
             TelegramProxyPage._on_auto_deeplink_failed(page, 6, "old deeplink failed")
@@ -583,8 +599,7 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
 
         page = TelegramProxyPage.__new__(TelegramProxyPage)
         page._cleanup_in_progress = False
-        page._relay_check_pending = True
-        page._relay_check_start_scheduled = False
+        _set_state(page, "relay_check", pending=True)
         page._start_relay_check_worker = Mock()
         single_shot = Mock(side_effect=lambda _delay, _callback: None)
 
@@ -598,7 +613,7 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
         single_shot.call_args.args[1]()
 
         page._start_relay_check_worker.assert_called_once_with()
-        self.assertFalse(page._relay_check_pending)
+        self.assertFalse(page._relay_check_state.pending)
 
     def test_ensure_hosts_pending_restarts_after_event_loop_turn(self) -> None:
         import telegram_proxy.ui.page as telegram_proxy_page
@@ -606,8 +621,7 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
 
         page = TelegramProxyPage.__new__(TelegramProxyPage)
         page._cleanup_in_progress = False
-        page._ensure_hosts_pending = True
-        page._ensure_hosts_start_scheduled = False
+        _set_state(page, "ensure_hosts", pending=True)
         page._start_ensure_hosts_worker = Mock()
         single_shot = Mock(side_effect=lambda _delay, _callback: None)
 
@@ -621,7 +635,7 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
         single_shot.call_args.args[1]()
 
         page._start_ensure_hosts_worker.assert_called_once_with()
-        self.assertFalse(page._ensure_hosts_pending)
+        self.assertFalse(page._ensure_hosts_state.pending)
 
 
 if __name__ == "__main__":

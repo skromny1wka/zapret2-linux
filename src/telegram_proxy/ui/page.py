@@ -52,6 +52,7 @@ from telegram_proxy.ui.settings_save_flow import merge_restart_request
 from telegram_proxy.ui.settings_build import (
     build_telegram_proxy_settings_panel,
 )
+from telegram_proxy.ui.worker_state import TelegramProxyPageWorkerState
 from ui.fluent_widgets import (
     enable_setting_card_group_auto_height,
     insert_widget_into_setting_card_group,
@@ -120,20 +121,15 @@ class TelegramProxyPage(BasePage):
         self._upstream_restart_timer = None
         self._diag_runtime = OneShotWorkerRuntime()
         self._proxy_start_runtime = OneShotWorkerRuntime()
-        self._proxy_start_pending = False
-        self._proxy_start_start_scheduled = False
+        self._proxy_start_state = TelegramProxyPageWorkerState(self._proxy_start_runtime)
         self._proxy_stop_runtime = OneShotWorkerRuntime()
-        self._proxy_stop_pending = False
-        self._proxy_stop_start_scheduled = False
+        self._proxy_stop_state = TelegramProxyPageWorkerState(self._proxy_stop_runtime)
         self._restart_stop_runtime = OneShotWorkerRuntime()
-        self._restart_stop_pending = False
-        self._restart_stop_start_scheduled = False
+        self._restart_stop_state = TelegramProxyPageWorkerState(self._restart_stop_runtime)
         self._relay_check_runtime = OneShotWorkerRuntime()
-        self._relay_check_pending = False
-        self._relay_check_start_scheduled = False
+        self._relay_check_state = TelegramProxyPageWorkerState(self._relay_check_runtime)
         self._ensure_hosts_runtime = OneShotWorkerRuntime()
-        self._ensure_hosts_pending = False
-        self._ensure_hosts_start_scheduled = False
+        self._ensure_hosts_state = TelegramProxyPageWorkerState(self._ensure_hosts_runtime)
         self._settings_save_runtime = OneShotWorkerRuntime()
         self._open_log_file_runtime = OneShotWorkerRuntime()
         self._open_log_file_pending: list[str] = []
@@ -145,8 +141,7 @@ class TelegramProxyPage(BasePage):
         self._log_line_pending: list[str] = []
         self._log_line_start_scheduled = False
         self._auto_deeplink_runtime = OneShotWorkerRuntime()
-        self._auto_deeplink_pending = False
-        self._auto_deeplink_start_scheduled = False
+        self._auto_deeplink_state = TelegramProxyPageWorkerState(self._auto_deeplink_runtime)
         self._settings_save_pending: list[dict[str, object]] = []
         self._settings_save_start_scheduled = False
         self._settings_save_restart_pending = ""
@@ -176,6 +171,13 @@ class TelegramProxyPage(BasePage):
 
     def _proxy_manager(self):
         return self._telegram_proxy.get_proxy_manager()
+
+    def _worker_state(self, state_attr: str, runtime_attr: str) -> TelegramProxyPageWorkerState:
+        state = self.__dict__.get(state_attr)
+        if state is None:
+            state = TelegramProxyPageWorkerState(self.__dict__.get(runtime_attr))
+            self.__dict__[state_attr] = state
+        return state
 
     def create_initial_state_worker(self, request_id: int):
         return self._telegram_proxy.create_page_initial_state_worker(request_id, parent=self)
@@ -608,16 +610,10 @@ class TelegramProxyPage(BasePage):
         return self._telegram_proxy.create_auto_deeplink_worker(request_id, parent=self)
 
     def _request_auto_deeplink_check(self) -> None:
-        if (
-            self._auto_deeplink_runtime.is_running()
-            or self.__dict__.get("_auto_deeplink_start_scheduled", False)
-        ):
-            self._auto_deeplink_pending = True
-            return
-        self._start_auto_deeplink_worker()
+        self._worker_state("_auto_deeplink_state", "_auto_deeplink_runtime").start_or_mark_pending(self._start_auto_deeplink_worker)
 
     def _start_auto_deeplink_worker(self) -> None:
-        self._auto_deeplink_pending = False
+        self._worker_state("_auto_deeplink_state", "_auto_deeplink_runtime").pending = False
         def bind_worker(worker) -> None:
             worker.completed.connect(self._on_auto_deeplink_checked)
             worker.failed.connect(self._on_auto_deeplink_failed)
@@ -634,7 +630,7 @@ class TelegramProxyPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_auto_deeplink_pending", False):
+        if self._worker_state("_auto_deeplink_state", "_auto_deeplink_runtime").pending:
             return
         if not should_open:
             return
@@ -647,35 +643,33 @@ class TelegramProxyPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_auto_deeplink_pending", False):
+        if self._worker_state("_auto_deeplink_state", "_auto_deeplink_runtime").pending:
             return
         log(f"Telegram Proxy auto deeplink check failed: {error}", "WARNING")
 
     def _on_auto_deeplink_worker_finished(self, _worker) -> None:
         if not self._is_current_worker_finish(self.__dict__.get("_auto_deeplink_runtime"), _worker):
             return
-        if self.__dict__.get("_auto_deeplink_pending", False) and not self.__dict__.get(
-            "_cleanup_in_progress",
-            False,
-        ):
-            self._schedule_auto_deeplink_worker_start()
+        self._worker_state("_auto_deeplink_state", "_auto_deeplink_runtime").schedule_after_finish(
+            _worker,
+            is_current_worker_finish=self._is_current_worker_finish,
+            schedule_next=self._schedule_auto_deeplink_worker_start,
+            cleanup_in_progress=self._cleanup_in_progress,
+        )
 
     def _schedule_auto_deeplink_worker_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        if self.__dict__.get("_auto_deeplink_start_scheduled", False):
-            self._auto_deeplink_pending = True
-            return
-        self._auto_deeplink_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_auto_deeplink_worker_start)
+        self._worker_state("_auto_deeplink_state", "_auto_deeplink_runtime").schedule_start(
+            QTimer.singleShot,
+            self._start_auto_deeplink_worker,
+        )
 
     def _run_scheduled_auto_deeplink_worker_start(self) -> None:
-        self._auto_deeplink_start_scheduled = False
-        pending = bool(self.__dict__.get("_auto_deeplink_pending", False))
-        self._auto_deeplink_pending = False
-        if not pending or self.__dict__.get("_cleanup_in_progress", False):
-            return
-        self._start_auto_deeplink_worker()
+        self._worker_state("_auto_deeplink_state", "_auto_deeplink_runtime").run_scheduled(
+            self._start_auto_deeplink_worker,
+            cleanup_in_progress=self._cleanup_in_progress,
+        )
 
     # -- Log display (throttled via QTimer, no trimming) --
 
@@ -891,12 +885,9 @@ class TelegramProxyPage(BasePage):
     def _restart_if_running(self):
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        if (
-            self._restart_stop_runtime.is_running()
-            or self.__dict__.get("_restart_stop_start_scheduled", False)
-        ):
-            self._restart_stop_pending = True
-            return
+        self._worker_state("_restart_stop_state", "_restart_stop_runtime").start_or_mark_pending(self._start_restart_stop_worker)
+
+    def _start_restart_stop_worker(self) -> None:
         mgr = self._proxy_manager()
         restart_proxy_if_running(
             page=self,
@@ -920,28 +911,26 @@ class TelegramProxyPage(BasePage):
     def _on_restart_stop_worker_finished(self, _worker) -> None:
         if not self._is_current_worker_finish(self.__dict__.get("_restart_stop_runtime"), _worker):
             return
-        if self.__dict__.get("_restart_stop_pending", False) and not self.__dict__.get(
-            "_cleanup_in_progress",
-            False,
-        ):
-            self._schedule_restart_stop_worker_start()
+        self._worker_state("_restart_stop_state", "_restart_stop_runtime").schedule_after_finish(
+            _worker,
+            is_current_worker_finish=self._is_current_worker_finish,
+            schedule_next=self._schedule_restart_stop_worker_start,
+            cleanup_in_progress=self._cleanup_in_progress,
+        )
 
     def _schedule_restart_stop_worker_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        if self.__dict__.get("_restart_stop_start_scheduled", False):
-            self._restart_stop_pending = True
-            return
-        self._restart_stop_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_restart_stop_worker_start)
+        self._worker_state("_restart_stop_state", "_restart_stop_runtime").schedule_start(
+            QTimer.singleShot,
+            self._restart_if_running,
+        )
 
     def _run_scheduled_restart_stop_worker_start(self) -> None:
-        self._restart_stop_start_scheduled = False
-        pending = bool(self.__dict__.get("_restart_stop_pending", False))
-        self._restart_stop_pending = False
-        if not pending or self.__dict__.get("_cleanup_in_progress", False):
-            return
-        self._restart_if_running()
+        self._worker_state("_restart_stop_state", "_restart_stop_runtime").run_scheduled(
+            self._restart_if_running,
+            cleanup_in_progress=self._cleanup_in_progress,
+        )
 
     def _schedule_upstream_restart(self):
         """Debounced proxy restart for SpinBox valueChanged signals."""
@@ -1088,19 +1077,12 @@ class TelegramProxyPage(BasePage):
     def _request_proxy_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        runtime = self.__dict__.get("_proxy_start_runtime")
-        if (
-            (runtime is not None and runtime.is_running())
-            or self.__dict__.get("_proxy_start_start_scheduled", False)
-        ):
-            self._proxy_start_pending = True
-            return
-        self._start_proxy_worker()
+        self._worker_state("_proxy_start_state", "_proxy_start_runtime").start_or_mark_pending(self._start_proxy_worker)
 
     def _start_proxy_worker(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        self._proxy_start_pending = False
+        self._worker_state("_proxy_start_state", "_proxy_start_runtime").pending = False
         mgr = self._proxy_manager()
         start_proxy_runtime(
             page=self,
@@ -1136,45 +1118,37 @@ class TelegramProxyPage(BasePage):
     def _on_proxy_start_worker_finished(self, _worker) -> None:
         if not self._is_current_worker_finish(self.__dict__.get("_proxy_start_runtime"), _worker):
             return
-        if self.__dict__.get("_proxy_start_pending", False) and not self.__dict__.get(
-            "_cleanup_in_progress",
-            False,
-        ):
-            self._schedule_proxy_start_worker_start()
+        self._worker_state("_proxy_start_state", "_proxy_start_runtime").schedule_after_finish(
+            _worker,
+            is_current_worker_finish=self._is_current_worker_finish,
+            schedule_next=self._schedule_proxy_start_worker_start,
+            cleanup_in_progress=self._cleanup_in_progress,
+        )
 
     def _schedule_proxy_start_worker_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        if self.__dict__.get("_proxy_start_start_scheduled", False):
-            self._proxy_start_pending = True
-            return
-        self._proxy_start_start_scheduled = True
         try:
-            QTimer.singleShot(0, self._run_scheduled_proxy_start_worker_start)
+            self._worker_state("_proxy_start_state", "_proxy_start_runtime").schedule_start(
+                QTimer.singleShot,
+                self._start_proxy_worker,
+            )
         except Exception:
             self._run_scheduled_proxy_start_worker_start()
 
     def _run_scheduled_proxy_start_worker_start(self) -> None:
-        self._proxy_start_start_scheduled = False
-        pending = bool(self.__dict__.get("_proxy_start_pending", False))
-        self._proxy_start_pending = False
-        if not pending or self.__dict__.get("_cleanup_in_progress", False):
-            return
-        self._start_proxy_worker()
+        self._worker_state("_proxy_start_state", "_proxy_start_runtime").run_scheduled(
+            self._start_proxy_worker,
+            cleanup_in_progress=self._cleanup_in_progress,
+        )
 
     def _check_relay_after_start(self):
         if self._cleanup_in_progress:
             return
-        if (
-            self._relay_check_runtime.is_running()
-            or self.__dict__.get("_relay_check_start_scheduled", False)
-        ):
-            self._relay_check_pending = True
-            return
-        self._start_relay_check_worker()
+        self._worker_state("_relay_check_state", "_relay_check_runtime").start_or_mark_pending(self._start_relay_check_worker)
 
     def _start_relay_check_worker(self) -> None:
-        self._relay_check_pending = False
+        self._worker_state("_relay_check_state", "_relay_check_runtime").pending = False
         mgr = self._proxy_manager()
         start_relay_check(
             page=self,
@@ -1192,25 +1166,29 @@ class TelegramProxyPage(BasePage):
     def _on_relay_check_worker_finished(self, _worker) -> None:
         if not self._is_current_worker_finish(self.__dict__.get("_relay_check_runtime"), _worker):
             return
-        if self.__dict__.get("_relay_check_pending", False):
-            self._schedule_relay_check_worker_start()
+        self._worker_state("_relay_check_state", "_relay_check_runtime").schedule_after_finish(
+            _worker,
+            is_current_worker_finish=self._is_current_worker_finish,
+            schedule_next=self._schedule_relay_check_worker_start,
+            cleanup_in_progress=self._cleanup_in_progress,
+        )
 
     def _schedule_relay_check_worker_start(self) -> None:
-        if self.__dict__.get("_relay_check_start_scheduled", False):
+        if self.__dict__.get("_cleanup_in_progress", False):
             return
-        self._relay_check_start_scheduled = True
         try:
-            QTimer.singleShot(0, self._run_scheduled_relay_check_worker_start)
+            self._worker_state("_relay_check_state", "_relay_check_runtime").schedule_start(
+                QTimer.singleShot,
+                self._start_relay_check_worker,
+            )
         except Exception:
             self._run_scheduled_relay_check_worker_start()
 
     def _run_scheduled_relay_check_worker_start(self) -> None:
-        self._relay_check_start_scheduled = False
-        pending = bool(self.__dict__.get("_relay_check_pending", False))
-        self._relay_check_pending = False
-        if self.__dict__.get("_cleanup_in_progress", False) or not pending:
-            return
-        self._start_relay_check_worker()
+        self._worker_state("_relay_check_state", "_relay_check_runtime").run_scheduled(
+            self._start_relay_check_worker,
+            cleanup_in_progress=self._cleanup_in_progress,
+        )
 
     @pyqtSlot()
     def _apply_relay_result(self):
@@ -1232,19 +1210,12 @@ class TelegramProxyPage(BasePage):
     def _request_proxy_stop(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        runtime = self.__dict__.get("_proxy_stop_runtime")
-        if (
-            (runtime is not None and runtime.is_running())
-            or self.__dict__.get("_proxy_stop_start_scheduled", False)
-        ):
-            self._proxy_stop_pending = True
-            return
-        self._start_proxy_stop_worker()
+        self._worker_state("_proxy_stop_state", "_proxy_stop_runtime").start_or_mark_pending(self._start_proxy_stop_worker)
 
     def _start_proxy_stop_worker(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        self._proxy_stop_pending = False
+        self._worker_state("_proxy_stop_state", "_proxy_stop_runtime").pending = False
         mgr = self._proxy_manager()
         if not bool(getattr(mgr, "is_running", False)):
             return
@@ -1264,31 +1235,29 @@ class TelegramProxyPage(BasePage):
     def _on_proxy_stop_worker_finished(self, _worker) -> None:
         if not self._is_current_worker_finish(self.__dict__.get("_proxy_stop_runtime"), _worker):
             return
-        if self.__dict__.get("_proxy_stop_pending", False) and not self.__dict__.get(
-            "_cleanup_in_progress",
-            False,
-        ):
-            self._schedule_proxy_stop_worker_start()
+        self._worker_state("_proxy_stop_state", "_proxy_stop_runtime").schedule_after_finish(
+            _worker,
+            is_current_worker_finish=self._is_current_worker_finish,
+            schedule_next=self._schedule_proxy_stop_worker_start,
+            cleanup_in_progress=self._cleanup_in_progress,
+        )
 
     def _schedule_proxy_stop_worker_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        if self.__dict__.get("_proxy_stop_start_scheduled", False):
-            self._proxy_stop_pending = True
-            return
-        self._proxy_stop_start_scheduled = True
         try:
-            QTimer.singleShot(0, self._run_scheduled_proxy_stop_worker_start)
+            self._worker_state("_proxy_stop_state", "_proxy_stop_runtime").schedule_start(
+                QTimer.singleShot,
+                self._start_proxy_stop_worker,
+            )
         except Exception:
             self._run_scheduled_proxy_stop_worker_start()
 
     def _run_scheduled_proxy_stop_worker_start(self) -> None:
-        self._proxy_stop_start_scheduled = False
-        pending = bool(self.__dict__.get("_proxy_stop_pending", False))
-        self._proxy_stop_pending = False
-        if not pending or self.__dict__.get("_cleanup_in_progress", False):
-            return
-        self._start_proxy_stop_worker()
+        self._worker_state("_proxy_stop_state", "_proxy_stop_runtime").run_scheduled(
+            self._start_proxy_stop_worker,
+            cleanup_in_progress=self._cleanup_in_progress,
+        )
 
     def _on_status_changed(self, running: bool):
         mgr = self._proxy_manager()
@@ -1592,16 +1561,10 @@ class TelegramProxyPage(BasePage):
 
     def _ensure_telegram_hosts(self):
         """Проверяет и добавляет Telegram-записи в hosts через worker."""
-        if (
-            self._ensure_hosts_runtime.is_running()
-            or self.__dict__.get("_ensure_hosts_start_scheduled", False)
-        ):
-            self._ensure_hosts_pending = True
-            return
-        self._start_ensure_hosts_worker()
+        self._worker_state("_ensure_hosts_state", "_ensure_hosts_runtime").start_or_mark_pending(self._start_ensure_hosts_worker)
 
     def _start_ensure_hosts_worker(self) -> None:
-        self._ensure_hosts_pending = False
+        self._worker_state("_ensure_hosts_state", "_ensure_hosts_runtime").pending = False
         def bind_worker(worker) -> None:
             worker.completed.connect(self._on_telegram_hosts_ensured)
 
@@ -1628,8 +1591,12 @@ class TelegramProxyPage(BasePage):
     def _on_ensure_hosts_worker_finished(self, _worker) -> None:
         if not self._is_current_worker_finish(self.__dict__.get("_ensure_hosts_runtime"), _worker):
             return
-        if self.__dict__.get("_ensure_hosts_pending", False) and not self.__dict__.get("_cleanup_in_progress", False):
-            self._schedule_ensure_hosts_worker_start()
+        self._worker_state("_ensure_hosts_state", "_ensure_hosts_runtime").schedule_after_finish(
+            _worker,
+            is_current_worker_finish=self._is_current_worker_finish,
+            schedule_next=self._schedule_ensure_hosts_worker_start,
+            cleanup_in_progress=self._cleanup_in_progress,
+        )
 
     def _is_current_worker_finish(self, runtime, worker) -> bool:
         if self.__dict__.get("_cleanup_in_progress", False):
@@ -1648,19 +1615,16 @@ class TelegramProxyPage(BasePage):
     def _schedule_ensure_hosts_worker_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        if self.__dict__.get("_ensure_hosts_start_scheduled", False):
-            self._ensure_hosts_pending = True
-            return
-        self._ensure_hosts_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_ensure_hosts_worker_start)
+        self._worker_state("_ensure_hosts_state", "_ensure_hosts_runtime").schedule_start(
+            QTimer.singleShot,
+            self._start_ensure_hosts_worker,
+        )
 
     def _run_scheduled_ensure_hosts_worker_start(self) -> None:
-        self._ensure_hosts_start_scheduled = False
-        pending = bool(self.__dict__.get("_ensure_hosts_pending", False))
-        self._ensure_hosts_pending = False
-        if not pending or self.__dict__.get("_cleanup_in_progress", False):
-            return
-        self._start_ensure_hosts_worker()
+        self._worker_state("_ensure_hosts_state", "_ensure_hosts_runtime").run_scheduled(
+            self._start_ensure_hosts_worker,
+            cleanup_in_progress=self._cleanup_in_progress,
+        )
 
     def showEvent(self, event):
         started_at = time.perf_counter()
@@ -1712,8 +1676,7 @@ class TelegramProxyPage(BasePage):
             warning_prefix="telegram proxy hosts worker",
         )
         self._ensure_hosts_runtime.cancel()
-        self._ensure_hosts_pending = False
-        self._ensure_hosts_start_scheduled = False
+        self._worker_state("_ensure_hosts_state", "_ensure_hosts_runtime").reset()
         self._initial_state_runtime.stop(
             blocking=False,
             log_fn=log,
@@ -1726,8 +1689,7 @@ class TelegramProxyPage(BasePage):
             warning_prefix="telegram proxy auto deeplink worker",
         )
         self._auto_deeplink_runtime.cancel()
-        self._auto_deeplink_pending = False
-        self._auto_deeplink_start_scheduled = False
+        self._worker_state("_auto_deeplink_state", "_auto_deeplink_runtime").reset()
         self._log_line_runtime.stop(
             blocking=False,
             log_fn=log,
@@ -1760,32 +1722,28 @@ class TelegramProxyPage(BasePage):
             warning_prefix="telegram proxy start worker",
         )
         self._proxy_start_runtime.cancel()
-        self._proxy_start_pending = False
-        self._proxy_start_start_scheduled = False
+        self._worker_state("_proxy_start_state", "_proxy_start_runtime").reset()
         self._proxy_stop_runtime.stop(
             blocking=False,
             log_fn=log,
             warning_prefix="telegram proxy stop worker",
         )
         self._proxy_stop_runtime.cancel()
-        self._proxy_stop_pending = False
-        self._proxy_stop_start_scheduled = False
+        self._worker_state("_proxy_stop_state", "_proxy_stop_runtime").reset()
         self._restart_stop_runtime.stop(
             blocking=False,
             log_fn=log,
             warning_prefix="telegram proxy restart stop worker",
         )
         self._restart_stop_runtime.cancel()
-        self._restart_stop_pending = False
-        self._restart_stop_start_scheduled = False
+        self._worker_state("_restart_stop_state", "_restart_stop_runtime").reset()
         self._relay_check_runtime.stop(
             blocking=False,
             log_fn=log,
             warning_prefix="telegram proxy relay check worker",
         )
         self._relay_check_runtime.cancel()
-        self._relay_check_pending = False
-        self._relay_check_start_scheduled = False
+        self._worker_state("_relay_check_state", "_relay_check_runtime").reset()
         if self._upstream_restart_timer is not None:
             self._upstream_restart_timer.stop()
             self._upstream_restart_timer.deleteLater()

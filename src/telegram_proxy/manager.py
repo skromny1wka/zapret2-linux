@@ -125,31 +125,9 @@ def get_proxy_manager() -> TelegramProxyManager:
 
 def build_upstream_proxy_config_from_settings() -> Optional[UpstreamProxyConfig]:
     try:
-        from settings.store import (
-            get_tg_proxy_upstream_enabled,
-            get_tg_proxy_upstream_host,
-            get_tg_proxy_upstream_mode,
-            get_tg_proxy_upstream_pass,
-            get_tg_proxy_upstream_port,
-            get_tg_proxy_upstream_user,
-        )
+        import telegram_proxy.settings as telegram_proxy_settings
 
-        if not get_tg_proxy_upstream_enabled():
-            return None
-
-        up_host = get_tg_proxy_upstream_host()
-        up_port = get_tg_proxy_upstream_port()
-        if not up_host or up_port <= 0:
-            return None
-
-        return UpstreamProxyConfig(
-            enabled=True,
-            host=up_host,
-            port=up_port,
-            mode=get_tg_proxy_upstream_mode(),
-            username=get_tg_proxy_upstream_user(),
-            password=get_tg_proxy_upstream_pass(),
-        )
+        return telegram_proxy_settings.build_upstream_config()
     except Exception:
         return None
 
