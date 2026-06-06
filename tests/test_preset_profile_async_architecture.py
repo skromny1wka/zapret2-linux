@@ -491,6 +491,12 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("find_preset_row", source)
         self.assertNotIn("for row in range", source)
 
+    def test_user_presets_ensure_current_index_uses_model_first_preset_row(self) -> None:
+        source = inspect.getsource(UserPresetsRuntimeService.ensure_preset_list_current_index)
+
+        self.assertIn("first_preset_row", source)
+        self.assertNotIn("for row in range", source)
+
     def test_user_presets_current_index_skips_already_selected_row(self) -> None:
         class _Index:
             def __init__(self, row: int) -> None:
@@ -683,6 +689,44 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertTrue(model.set_rows(rows))
         self.assertFalse(model.set_rows([dict(row) for row in rows]))
         self.assertTrue(model.set_rows([{**rows[0], "name": "First updated"}]))
+
+    def test_preset_model_tracks_first_visible_preset_row(self) -> None:
+        model = PresetListModel()
+        model.set_rows([
+            {
+                "kind": "folder",
+                "folder_key": "common",
+                "text": "Общие",
+                "count": 2,
+                "is_collapsed": False,
+            },
+            {
+                "kind": "preset",
+                "file_name": "first.txt",
+                "name": "First",
+                "folder_key": "common",
+            },
+            {
+                "kind": "preset",
+                "file_name": "second.txt",
+                "name": "Second",
+                "folder_key": "common",
+            },
+        ])
+
+        self.assertEqual(model.first_preset_row(), 1)
+
+        model.set_rows([
+            {
+                "kind": "folder",
+                "folder_key": "empty",
+                "text": "Нет",
+                "count": 0,
+                "is_collapsed": False,
+            }
+        ])
+
+        self.assertEqual(model.first_preset_row(), -1)
 
     def test_preset_model_updates_stable_rows_without_full_reset(self) -> None:
         model = PresetListModel()

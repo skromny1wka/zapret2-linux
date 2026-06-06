@@ -464,11 +464,18 @@ class UserPresetsRuntimeService:
         kind_role = getattr(model_type, "KindRole", None)
         if current.isValid() and str(current.data(kind_role) or "") == "preset":
             return
-        for row in range(page._presets_model.rowCount()):
-            index = page._presets_model.index(row, 0)
-            if str(index.data(kind_role) or "") == "preset":
-                page.presets_list.setCurrentIndex(index)
-                break
+        first_preset_row = getattr(page._presets_model, "first_preset_row", None)
+        if not callable(first_preset_row):
+            return
+        try:
+            row = int(first_preset_row())
+        except (TypeError, ValueError):
+            return
+        if row < 0:
+            return
+        index = page._presets_model.index(row, 0)
+        if index.isValid():
+            page.presets_list.setCurrentIndex(index)
 
     def try_apply_single_preset_metadata_update(
         self,

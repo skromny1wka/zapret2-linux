@@ -29,6 +29,7 @@ class PresetListModel(QAbstractListModel):
         self._rows: list[dict[str, object]] = []
         self._preset_row_by_file_name: dict[str, int] = {}
         self._active_preset_file_names: set[str] = set()
+        self._first_preset_row = -1
 
     def set_rows(self, rows: list[dict[str, object]]) -> bool:
         next_rows = list(rows)
@@ -80,9 +81,12 @@ class PresetListModel(QAbstractListModel):
     def _rebuild_row_index(self) -> None:
         self._preset_row_by_file_name = {}
         self._active_preset_file_names = set()
+        self._first_preset_row = -1
         for row_index, row in enumerate(self._rows):
             if str(row.get("kind") or "") != "preset":
                 continue
+            if self._first_preset_row < 0:
+                self._first_preset_row = row_index
             file_name = str(row.get("file_name") or "").strip()
             if not file_name:
                 continue
@@ -100,6 +104,9 @@ class PresetListModel(QAbstractListModel):
         for file_name in self._active_preset_file_names:
             return str(file_name or "").strip()
         return ""
+
+    def first_preset_row(self) -> int:
+        return int(self._first_preset_row)
 
     def move_preset(
         self,
