@@ -841,6 +841,8 @@ class LogsPage(BasePage):
 
     def _on_logs_overview_finished(self, request_id: int, thread) -> None:
         _ = thread
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
         QTimer.singleShot(500, self._stop_refresh_animation)
         if (
             self._logs_overview_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress)
@@ -913,6 +915,7 @@ class LogsPage(BasePage):
                 log_fn=log,
                 warning_prefix="Logs overview worker",
             )
+            self._logs_overview_runtime.cancel()
         except Exception as exc:
             log(f"Ошибка остановки worker обзора логов: {exc}", "DEBUG")
 
@@ -1191,11 +1194,11 @@ class LogsPage(BasePage):
         )
             
     def cleanup(self):
-        """Очистка при закрытии - блокирующий режим"""
+        """Очистка фоновых задач при закрытии страницы логов."""
         self._cleanup_in_progress = True
         self._logs_overview_restart_scheduled = False
         self._spin_timer.stop()
-        self._stop_logs_overview_worker(blocking=True)
+        self._stop_logs_overview_worker(blocking=False)
         self._stop_support_prepare_worker(blocking=False)
         self._open_folder_pending = False
         self._open_folder_start_scheduled = False

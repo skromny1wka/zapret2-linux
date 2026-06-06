@@ -3396,7 +3396,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
     def test_logs_cleanup_stops_overview_worker(self) -> None:
         cleanup_source = inspect.getsource(LogsPage.cleanup)
 
-        self.assertIn("_stop_logs_overview_worker(blocking=True)", cleanup_source)
+        self.assertIn("_stop_logs_overview_worker(blocking=False)", cleanup_source)
+        self.assertIn("_stop_tail_worker(blocking=True)", cleanup_source)
 
     def test_logs_support_bundle_prepares_through_worker(self) -> None:
         support_worker = importlib.import_module("log.support_worker")

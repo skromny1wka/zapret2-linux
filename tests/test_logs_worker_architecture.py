@@ -123,6 +123,35 @@ class LogsWorkerArchitectureTests(unittest.TestCase):
 
         page._refresh_logs_list.assert_called_once_with(run_cleanup=True)
 
+    def test_logs_overview_finish_during_cleanup_does_not_schedule_ui_updates(self) -> None:
+        page = logs_page.LogsPage.__new__(logs_page.LogsPage)
+        page._cleanup_in_progress = True
+        page._logs_overview_pending_cleanup = True
+        page._logs_overview_runtime = SimpleNamespace(is_current=Mock(return_value=True))
+        page._refresh_logs_list = Mock()
+        page._stop_refresh_animation = Mock()
+        single_shot = Mock()
+
+        with patch.object(logs_page, "QTimer", SimpleNamespace(singleShot=single_shot)):
+            logs_page.LogsPage._on_logs_overview_finished(page, 7, object())
+
+        single_shot.assert_not_called()
+        page._refresh_logs_list.assert_not_called()
+        page._stop_refresh_animation.assert_not_called()
+
+    def test_stop_logs_overview_worker_cancels_runtime_after_stop_request(self) -> None:
+        page = logs_page.LogsPage.__new__(logs_page.LogsPage)
+        page._logs_overview_runtime = Mock()
+
+        logs_page.LogsPage._stop_logs_overview_worker(page, blocking=False)
+
+        page._logs_overview_runtime.stop.assert_called_once_with(
+            blocking=False,
+            log_fn=logs_page.log,
+            warning_prefix="Logs overview worker",
+        )
+        page._logs_overview_runtime.cancel.assert_called_once()
+
     def test_support_prepare_pending_restarts_after_event_loop_turn(self) -> None:
         page = logs_page.LogsPage.__new__(logs_page.LogsPage)
         page._cleanup_in_progress = False
@@ -258,7 +287,7 @@ class LogsWorkerArchitectureTests(unittest.TestCase):
         self.assertFalse(page._open_folder_pending)
         self.assertFalse(page._open_folder_start_scheduled)
         page._spin_timer.stop.assert_called_once()
-        page._stop_logs_overview_worker.assert_called_once_with(blocking=True)
+        page._stop_logs_overview_worker.assert_called_once_with(blocking=False)
         page._stop_support_prepare_worker.assert_called_once_with(blocking=False)
         page._open_folder_runtime.stop.assert_called_once_with(
             blocking=False,
