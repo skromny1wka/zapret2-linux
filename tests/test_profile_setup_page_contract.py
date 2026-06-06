@@ -3630,7 +3630,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         ProfileSetupPageBase._on_raw_profile_save_clicked(page)
 
         page.create_profile_raw_text_save_worker.assert_not_called()
-        self.assertEqual(page._pending_raw_profile_save, ("profile-1", "--new\n--lua-desync=split"))
+        self.assertEqual(page._pending_raw_profile_save, ("profile-1", None))
 
         runtime.running = False
         callbacks = []

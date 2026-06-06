@@ -1030,7 +1030,7 @@ class ProfileSetupPageBase(BasePage):
         self._raw_profile_save_runtime = OneShotWorkerRuntime()
         self._raw_profile_save_request_id = 0
         self._raw_profile_save_runtime_worker = None
-        self._pending_raw_profile_save: tuple[str, str] | None = None
+        self._pending_raw_profile_save: tuple[str, str | None] | None = None
         self._enabled_save_runtime = OneShotWorkerRuntime()
         self._enabled_save_request_id = 0
         self._enabled_save_runtime_worker = None
@@ -1219,7 +1219,7 @@ class ProfileSetupPageBase(BasePage):
             self._pending_raw_profile_save = None
             self._start_raw_profile_save_worker(
                 str(operation.get("profile_key") or ""),
-                str(operation.get("text") or ""),
+                self._resolve_raw_profile_save_text(operation.get("text")),
             )
             return True
         if kind == "enabled_save":
@@ -3129,20 +3129,27 @@ class ProfileSetupPageBase(BasePage):
     def _on_raw_profile_save_clicked(self) -> None:
         if self._loading or not self._profile_key or self._raw_profile_text is None:
             return
-        self._request_raw_profile_save(self._profile_key, self._raw_profile_text.toPlainText())
+        self._request_raw_profile_save(self._profile_key, None)
 
-    def _request_raw_profile_save(self, profile_key: str, raw_text: str) -> None:
+    def _resolve_raw_profile_save_text(self, raw_text) -> str:
+        if raw_text is not None:
+            return str(raw_text or "")
+        editor = self.__dict__.get("_raw_profile_text")
+        if editor is None:
+            return ""
+        return str(editor.toPlainText() or "")
+
+    def _request_raw_profile_save(self, profile_key: str, raw_text: str | None) -> None:
         profile_key = str(profile_key or "").strip()
         if not profile_key:
             return
-        raw_text = str(raw_text or "")
         if self._profile_setup_write_is_running():
             self._pending_raw_profile_save = (profile_key, raw_text)
             self._queue_profile_setup_write_operation(
                 {"kind": "raw_profile_save", "profile_key": profile_key, "text": raw_text}
             )
             return
-        self._start_raw_profile_save_worker(profile_key, raw_text)
+        self._start_raw_profile_save_worker(profile_key, self._resolve_raw_profile_save_text(raw_text))
 
     def _start_raw_profile_save_worker(self, profile_key: str, raw_text: str) -> None:
         runtime = self._worker_runtime("_raw_profile_save_runtime")
@@ -3216,7 +3223,7 @@ class ProfileSetupPageBase(BasePage):
                 {
                     "kind": "raw_profile_save",
                     "profile_key": str(profile_key or ""),
-                    "text": str(raw_text or ""),
+                    "text": raw_text,
                 }
             )
 
