@@ -7,6 +7,7 @@ from qfluentwidgets import CaptionLabel, FlowLayout, StrongBodyLabel, SubtitleLa
 
 from app.ui_texts import tr as tr_catalog
 from presets.ui.control.top_summary_plan import build_premium_summary, build_profiles_value
+from ui.accessibility import set_control_accessibility
 
 
 def set_visible_if_changed(widget, visible: bool) -> bool:
@@ -62,6 +63,7 @@ class ControlTopSummaryItem(QWidget):
 
         if self._clickable:
             self.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -98,11 +100,27 @@ class ControlTopSummaryItem(QWidget):
         set_text_if_changed(self._value_label, value_text)
         set_text_if_changed(self._details_label, details_text)
         set_visible_if_changed(self._details_label, bool(details_text.strip()))
+        accessible_parts = []
+        if caption_text.strip():
+            accessible_parts.append(f"{caption_text}: {value_text}")
+        elif value_text.strip():
+            accessible_parts.append(value_text)
+        if details_text.strip():
+            accessible_parts.append(details_text)
+        if accessible_parts:
+            set_control_accessibility(self, name=", ".join(accessible_parts))
 
     def mousePressEvent(self, event):  # noqa: N802
         if self._clickable and event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit()
         super().mousePressEvent(event)
+
+    def keyPressEvent(self, event):  # noqa: N802
+        if self._clickable and event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
+            self.clicked.emit()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     def _refresh_icon(self, tokens=None) -> None:
         from ui.theme import get_cached_qta_pixmap, get_theme_tokens

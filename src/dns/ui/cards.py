@@ -21,6 +21,7 @@ from qfluentwidgets import (
 )
 
 from ui.fluent_widgets import SettingsCard, set_tooltip
+from ui.accessibility import set_control_accessibility
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens
 from ui.theme_refresh import ThemeRefreshBinding
 from app.ui_texts import tr as tr_catalog
@@ -71,7 +72,9 @@ class DNSProviderCard(SettingsCard):
         self.setObjectName("dnsCard")
         self.setProperty("selected", False)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._setup_ui()
+        self._refresh_accessibility()
         self._theme_refresh = ThemeRefreshBinding(self, self._apply_theme_refresh)
 
     @staticmethod
@@ -199,6 +202,7 @@ class DNSProviderCard(SettingsCard):
     def set_selected(self, selected: bool):
         self._is_selected = selected
         self.setProperty("selected", bool(selected))
+        self._refresh_accessibility()
         style = self.style()
         if style is not None:
             try:
@@ -217,6 +221,28 @@ class DNSProviderCard(SettingsCard):
         if event.button() == Qt.MouseButton.LeftButton:
             self.selected.emit(self.name, self.data)
         super().mousePressEvent(event)
+
+    def keyPressEvent(self, event):  # noqa: N802
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
+            self.selected.emit(self.name, self.data)
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def _refresh_accessibility(self) -> None:
+        selected_text = "выбран" if self._is_selected else "не выбран"
+        description = str(self.data.get("desc", "") or "").strip()
+        ip_text = self._provider_ip_text()
+        parts = [f"DNS {self.name}", selected_text]
+        if description:
+            parts.append(description)
+        if ip_text and ip_text != "-":
+            parts.append(ip_text)
+        set_control_accessibility(
+            self,
+            name=", ".join(parts),
+            description="Нажмите Enter или пробел, чтобы выбрать этого DNS-провайдера.",
+        )
 
     def _apply_theme_refresh(self, tokens=None, force: bool = False) -> None:
         _ = force
@@ -237,7 +263,9 @@ class AdapterCard(SettingsCard):
         self.dns_label = None
         self._name_label = None
         self._network_icon_label = None
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._setup_ui()
+        self._refresh_accessibility()
         self._theme_refresh = ThemeRefreshBinding(self, self._apply_theme_styles)
 
     def _setup_ui(self):
@@ -342,9 +370,11 @@ class AdapterCard(SettingsCard):
             ipv6 = self._normalize_dns_list(dns_v6 or [])
             dns_text = self._format_dns_text(ipv4, ipv6)
             self.dns_label.setText(dns_text)
+            self._refresh_accessibility()
 
     def _toggle_checkbox(self):
         self.checkbox.setChecked(not self.checkbox.isChecked())
+        self._refresh_accessibility()
 
     def _update_check_icon(self, state=None):
         _ = state
@@ -353,3 +383,27 @@ class AdapterCard(SettingsCard):
             self.check_icon.setPixmap(get_cached_qta_pixmap('mdi.checkbox-marked', color=tokens.accent_hex, size=18))
         else:
             self.check_icon.setPixmap(get_cached_qta_pixmap('mdi.checkbox-blank-outline', color=tokens.fg_faint, size=18))
+        self._refresh_accessibility()
+
+    def keyPressEvent(self, event):  # noqa: N802
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
+            self._toggle_checkbox()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def _refresh_accessibility(self) -> None:
+        checked_text = "выбран" if self.checkbox.isChecked() else "не выбран"
+        dns_text = ""
+        try:
+            dns_text = str(self.dns_label.text() or "").strip() if self.dns_label is not None else ""
+        except Exception:
+            dns_text = ""
+        parts = [f"Сетевой адаптер {self.adapter_name}", checked_text]
+        if dns_text:
+            parts.append(f"DNS {dns_text}")
+        set_control_accessibility(
+            self,
+            name=", ".join(parts),
+            description="Нажмите Enter или пробел, чтобы включить или исключить этот адаптер.",
+        )
