@@ -1208,4 +1208,4 @@ class LogsPage(BasePage):
             warning_prefix="Logs open folder worker",
         )
         self._open_folder_runtime.cancel()
-        self._stop_tail_worker(blocking=True)
+        self._stop_tail_worker(blocking=False)

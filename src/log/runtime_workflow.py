@@ -79,3 +79,4 @@ def stop_tail_worker(*, tail_runtime, blocking: bool, log_fn, warning_prefix: st
         log_fn=log_fn,
         warning_prefix=warning_prefix,
     )
+    tail_runtime.cancel()

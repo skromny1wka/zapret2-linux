@@ -8,6 +8,7 @@ from unittest.mock import Mock, patch
 from app.feature_facades.logs import LogsFeature
 import log.ui.page as logs_page
 import log.open_folder_worker as open_folder_worker
+import log.runtime_workflow as log_runtime_workflow
 import log.support_worker as support_worker
 
 
@@ -152,6 +153,23 @@ class LogsWorkerArchitectureTests(unittest.TestCase):
         )
         page._logs_overview_runtime.cancel.assert_called_once()
 
+    def test_stop_tail_worker_cancels_runtime_after_stop_request(self) -> None:
+        tail_runtime = Mock()
+
+        log_runtime_workflow.stop_tail_worker(
+            tail_runtime=tail_runtime,
+            blocking=False,
+            log_fn=logs_page.log,
+            warning_prefix="Log tail worker",
+        )
+
+        tail_runtime.stop.assert_called_once_with(
+            blocking=False,
+            log_fn=logs_page.log,
+            warning_prefix="Log tail worker",
+        )
+        tail_runtime.cancel.assert_called_once()
+
     def test_support_prepare_pending_restarts_after_event_loop_turn(self) -> None:
         page = logs_page.LogsPage.__new__(logs_page.LogsPage)
         page._cleanup_in_progress = False
@@ -295,7 +313,7 @@ class LogsWorkerArchitectureTests(unittest.TestCase):
             warning_prefix="Logs open folder worker",
         )
         page._open_folder_runtime.cancel.assert_called_once()
-        page._stop_tail_worker.assert_called_once_with(blocking=True)
+        page._stop_tail_worker.assert_called_once_with(blocking=False)
 
 
 if __name__ == "__main__":
