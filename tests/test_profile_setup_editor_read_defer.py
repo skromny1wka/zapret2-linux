@@ -13,6 +13,9 @@ class _RawTextEditor:
         self.read_calls += 1
         return self._text
 
+    def isReadOnly(self) -> bool:  # noqa: N802
+        return False
+
 
 class _Runtime:
     def __init__(self, *, running: bool) -> None:
@@ -22,7 +25,60 @@ class _Runtime:
         return self.running
 
 
+class _StartRuntime(_Runtime):
+    def __init__(self) -> None:
+        super().__init__(running=False)
+
+    def start_qthread_worker(self, *, worker_factory, **_kwargs):
+        worker = worker_factory(0)
+        return 0, worker
+
+
 class ProfileSetupEditorReadDeferTests(unittest.TestCase):
+    def test_list_file_validation_while_worker_runs_defers_editor_read(self) -> None:
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._loading = False
+        page._cleanup_in_progress = False
+        page._list_file_kind = "hostlist"
+        page._list_file_text = _RawTextEditor("latest.example")
+        page._list_file_validation_timer = None
+        page._list_file_validation_runtime = _Runtime(running=True)
+        page._list_file_validation_request_id = 0
+        page._list_file_validation_start_scheduled = False
+        page._pending_list_file_validation = None
+        page._list_file_status_label = Mock()
+        page.create_profile_list_file_validation_worker = Mock(return_value=object())
+
+        ProfileSetupPageBase._on_list_file_text_changed(page)
+
+        self.assertEqual(page._list_file_text.read_calls, 0)
+        self.assertEqual(page._pending_list_file_validation, {"kind": "hostlist", "text": None})
+        page.create_profile_list_file_validation_worker.assert_not_called()
+
+        page._list_file_validation_runtime.running = False
+        callbacks = []
+        with patch(
+            "profile.ui.profile_setup_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            ProfileSetupPageBase._on_list_file_validation_worker_finished(page, object())
+
+        self.assertEqual(page._list_file_text.read_calls, 0)
+        self.assertEqual(len(callbacks), 1)
+
+        page._list_file_validation_runtime = _StartRuntime()
+        callbacks[0]()
+
+        self.assertEqual(page._list_file_text.read_calls, 1)
+        page.create_profile_list_file_validation_worker.assert_called_once_with(
+            1,
+            kind="hostlist",
+            text="latest.example",
+            parent=page,
+        )
+
     def test_raw_profile_save_while_worker_runs_defers_editor_read(self) -> None:
         from profile.ui.profile_setup_page import ProfileSetupPageBase
 

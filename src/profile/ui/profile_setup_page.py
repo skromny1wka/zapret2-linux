@@ -2600,11 +2600,9 @@ class ProfileSetupPageBase(BasePage):
     def _run_scheduled_list_file_validation(self) -> None:
         if self._loading or self._list_file_text is None:
             return
-        text = self._list_file_text.toPlainText()
-        self._list_file_text_snapshot = text
         self._request_list_file_validation({
             "kind": self._list_file_kind,
-            "text": text,
+            "text": None,
         })
 
     def _request_list_file_validation(self, request: dict) -> None:
@@ -2614,7 +2612,22 @@ class ProfileSetupPageBase(BasePage):
             return
         self._start_list_file_validation_worker(request)
 
+    def _resolve_list_file_validation_request(self, request: dict) -> dict[str, str]:
+        request = dict(request or {})
+        raw_text = request.get("text")
+        if raw_text is None:
+            editor = self.__dict__.get("_list_file_text")
+            text = str(editor.toPlainText() or "") if editor is not None else ""
+        else:
+            text = str(raw_text or "")
+        self._list_file_text_snapshot = text
+        return {
+            "kind": str(request.get("kind") or ""),
+            "text": text,
+        }
+
     def _start_list_file_validation_worker(self, request: dict) -> None:
+        request = self._resolve_list_file_validation_request(request)
         runtime = self._worker_runtime("_list_file_validation_runtime")
         self._list_file_validation_request_id = int(getattr(self, "_list_file_validation_request_id", 0) or 0) + 1
         request_id = self._list_file_validation_request_id
