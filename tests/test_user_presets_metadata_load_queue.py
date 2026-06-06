@@ -361,6 +361,66 @@ class UserPresetsMetadataLoadQueueTests(unittest.TestCase):
         service.schedule_presets_reload.assert_not_called()
         log_mock.assert_not_called()
 
+    def test_store_switch_defers_dirty_list_reload_after_local_active_marker_update(self) -> None:
+        from presets.user_presets_runtime_service import UserPresetsRuntimeAdapter, UserPresetsRuntimeService
+
+        page = SimpleNamespace(isVisible=lambda: True)
+        page.refresh_presets_view_if_possible = Mock(
+            side_effect=AssertionError("preset switch must not rebuild the list inline")
+        )
+        adapter = UserPresetsRuntimeAdapter(
+            bulk_reset_running=lambda: False,
+            read_single_metadata=lambda _name: None,
+            selected_source_file_name=lambda: "Next.txt",
+            presets_dir=lambda: None,
+            cached_metadata=lambda: {},
+            load_all_metadata=lambda: {},
+            load_folder_state=lambda: {},
+            build_rows_plan=lambda _metadata, _folder_state: object(),
+            apply_rows_plan=lambda _plan, _started_at: None,
+        )
+        service = UserPresetsRuntimeService()
+        service.attach_page(page, adapter)
+        service._ui_dirty = True
+        service.apply_active_preset_marker_for_file = Mock(return_value=True)
+        service.schedule_presets_reload = Mock()
+
+        service.on_store_switched("Next.txt", page)
+
+        service.apply_active_preset_marker_for_file.assert_called_once_with("Next.txt", page=page)
+        page.refresh_presets_view_if_possible.assert_not_called()
+        service.schedule_presets_reload.assert_called_once_with(page)
+
+    def test_store_switch_defers_dirty_list_reload_after_optimistic_marker(self) -> None:
+        from presets.user_presets_runtime_service import UserPresetsRuntimeAdapter, UserPresetsRuntimeService
+
+        page = SimpleNamespace(isVisible=lambda: True)
+        page.refresh_presets_view_if_possible = Mock(
+            side_effect=AssertionError("preset switch must not rebuild the list inline")
+        )
+        adapter = UserPresetsRuntimeAdapter(
+            bulk_reset_running=lambda: False,
+            read_single_metadata=lambda _name: None,
+            selected_source_file_name=lambda: "Next.txt",
+            presets_dir=lambda: None,
+            cached_metadata=lambda: {},
+            load_all_metadata=lambda: {},
+            load_folder_state=lambda: {},
+            build_rows_plan=lambda _metadata, _folder_state: object(),
+            apply_rows_plan=lambda _plan, _started_at: None,
+        )
+        service = UserPresetsRuntimeService()
+        service.attach_page(page, adapter)
+        service._ui_dirty = True
+        service.apply_active_preset_marker_for_file = Mock(return_value=False)
+        service.schedule_presets_reload = Mock()
+
+        service.on_store_switched("Next.txt", page)
+
+        service.apply_active_preset_marker_for_file.assert_called_once_with("Next.txt", page=page)
+        page.refresh_presets_view_if_possible.assert_not_called()
+        service.schedule_presets_reload.assert_called_once_with(page)
+
     def test_metadata_loaded_defers_watcher_sync_after_rows_request(self) -> None:
         from presets.user_presets_runtime_service import UserPresetsRuntimeAdapter, UserPresetsRuntimeService
 

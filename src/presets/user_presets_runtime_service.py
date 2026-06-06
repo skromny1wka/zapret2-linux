@@ -520,7 +520,7 @@ class UserPresetsRuntimeService:
             return
         self._ui_dirty = True
         if page.isVisible():
-            page.refresh_presets_view_if_possible()
+            self.schedule_presets_reload(page)
 
     def start_watching_presets(self, page=None) -> None:
         page = self._resolve_page(page)
