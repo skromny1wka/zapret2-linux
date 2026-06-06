@@ -53,6 +53,8 @@ class Win11ToggleRow(FluentSettingCard):
         self._desc_label = None
         self._icon_label = None
         self._switch_button = None
+        self._accessible_title = str(title or "")
+        self._accessible_description = str(description or "")
 
         initial_tokens = get_theme_tokens()
         FluentSettingCard.__init__(
@@ -81,11 +83,16 @@ class Win11ToggleRow(FluentSettingCard):
 
         if self._switch_button is not None:
             try:
-                signal = getattr(self._switch_button, "toggled", None) or getattr(self._switch_button, "checkedChanged", None)
+                signal = getattr(self._switch_button, "toggled", None) or getattr(
+                    self._switch_button,
+                    "checkedChanged",
+                    None,
+                )
                 if signal is not None:
-                    signal.connect(self.toggled.emit)
+                    signal.connect(self._on_switch_toggled)
             except Exception:
                 pass
+        self._update_toggle_accessibility()
         self._theme_refresh = ThemeRefreshBinding(
             self,
             self._apply_theme_refresh,
@@ -139,6 +146,7 @@ class Win11ToggleRow(FluentSettingCard):
         toggle.setChecked(next_checked)
         if block_signals:
             toggle.blockSignals(False)
+        self._update_toggle_accessibility()
 
     def isChecked(self) -> bool:
         toggle = getattr(self, "_switch_button", None)
@@ -164,9 +172,28 @@ class Win11ToggleRow(FluentSettingCard):
         try:
             self.setTitle(next_title)
             self.setContent(next_description)
+            self._accessible_title = next_title
+            self._accessible_description = next_description
             self._last_win11_toggle_texts_key = text_key
+            self._update_toggle_accessibility()
         except Exception:
             pass
+
+    def _on_switch_toggled(self, checked: bool) -> None:
+        self._update_toggle_accessibility()
+        self.toggled.emit(bool(checked))
+
+    def _update_toggle_accessibility(self) -> None:
+        state = "включено" if self.isChecked() else "выключено"
+        title = str(self.__dict__.get("_accessible_title", "") or "").strip()
+        description = str(self.__dict__.get("_accessible_description", "") or "")
+        name = f"{title}, {state}".strip(", ")
+        set_control_accessibility(self, name=name, description=description)
+        set_state_text(self, name)
+        toggle = self.__dict__.get("_switch_button")
+        if toggle is not None:
+            set_control_accessibility(toggle, name=name, description=description)
+            set_state_text(toggle, name)
 
 
 class Win11RadioOption(QWidget):

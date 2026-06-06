@@ -118,6 +118,35 @@ class Win11ToggleRowTests(unittest.TestCase):
         self.assertEqual(switch.block_calls, [True, False])
         self.assertTrue(switch.checked)
 
+    def test_toggle_row_has_screen_reader_text_for_switch_state(self) -> None:
+        from ui.widgets.win11_controls import Win11ToggleRow
+
+        row = Win11ToggleRow(
+            "fa5s.bolt",
+            "Автозапуск DPI",
+            "Запускать DPI после старта программы",
+        )
+
+        self.assertEqual(row.accessibleName(), "Автозапуск DPI, выключено")
+        self.assertEqual(row.property("screenReaderStateText"), "Автозапуск DPI, выключено")
+        self.assertIn("Запускать DPI после старта программы", row.accessibleDescription())
+        self.assertEqual(row._switch_button.accessibleName(), "Автозапуск DPI, выключено")
+
+    def test_toggle_row_updates_screen_reader_state_after_set_checked(self) -> None:
+        from ui.widgets.win11_controls import Win11ToggleRow
+
+        row = Win11ToggleRow(
+            "fa5s.bolt",
+            "Автозапуск DPI",
+            "Запускать DPI после старта программы",
+        )
+
+        row.setChecked(True)
+
+        self.assertEqual(row.accessibleName(), "Автозапуск DPI, включено")
+        self.assertEqual(row.property("screenReaderStateText"), "Автозапуск DPI, включено")
+        self.assertEqual(row._switch_button.accessibleName(), "Автозапуск DPI, включено")
+
     def test_set_texts_skips_duplicate_title_and_description(self) -> None:
         from ui.widgets.win11_controls import Win11ToggleRow
 
