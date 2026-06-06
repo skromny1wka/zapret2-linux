@@ -128,6 +128,31 @@ class PresetSubpageUiGuardTests(unittest.TestCase):
 
         page._schedule_pending_raw_preset_load_start.assert_not_called()
 
+    def test_raw_preset_cleanup_does_not_wait_for_load_worker(self) -> None:
+        from presets.ui.common.preset_subpage_base import PresetRawEditorPage
+
+        page = PresetRawEditorPage.__new__(PresetRawEditorPage)
+        page._raw_load_runtime = SimpleNamespace(stop=Mock(), cancel=Mock())
+        page._raw_save_runtime = SimpleNamespace(stop=Mock(), cancel=Mock())
+        page._raw_activate_runtime = SimpleNamespace(stop=Mock(), cancel=Mock())
+        page._raw_action_runtime = SimpleNamespace(stop=Mock(), cancel=Mock())
+
+        PresetRawEditorPage._stop_raw_worker_runtimes(page)
+
+        page._raw_load_runtime.stop.assert_called_once_with(
+            blocking=False,
+            warning_prefix="raw preset load worker",
+        )
+        page._raw_load_runtime.cancel.assert_called_once_with()
+
+        for runtime, prefix in (
+            (page._raw_save_runtime, "raw preset save worker"),
+            (page._raw_activate_runtime, "raw preset activate worker"),
+            (page._raw_action_runtime, "raw preset action worker"),
+        ):
+            runtime.stop.assert_called_once_with(blocking=True, warning_prefix=prefix)
+            runtime.cancel.assert_called_once_with()
+
     def test_raw_preset_load_skips_duplicate_plain_text_update(self) -> None:
         from presets.ui.common.preset_subpage_base import PresetRawEditorPage
 
