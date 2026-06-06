@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from ui.accessibility import set_state_text
+
 
 def render_send_status_label(*, label, text: str, tone: str, theme_tokens) -> None:
     if label is None:
@@ -14,6 +16,7 @@ def render_send_status_label(*, label, text: str, tone: str, theme_tokens) -> No
     if not normalized_text:
         label.setStyleSheet("")
         return
+    set_state_text(label, normalized_text)
 
     color = theme_tokens.accent_hex
     if normalized_tone == "error":
@@ -72,16 +75,16 @@ def compute_errors_text_height(*, text_edit, min_height: int, max_height: int) -
 
 def append_error(*, errors_text, errors_count_label, tr_fn, current_count: int, text: str) -> int:
     next_count = int(current_count) + 1
-    errors_count_label.setText(
-        tr_fn("page.logs.errors.count", "Ошибок: {count}").format(count=next_count)
-    )
+    count_text = tr_fn("page.logs.errors.count", "Ошибок: {count}").format(count=next_count)
+    errors_count_label.setText(count_text)
+    set_state_text(errors_count_label, count_text)
     errors_text.append(text)
     return next_count
 
 
 def clear_errors(*, errors_text, errors_count_label, tr_fn) -> int:
     errors_text.clear()
-    errors_count_label.setText(
-        tr_fn("page.logs.errors.count", "Ошибок: {count}").format(count=0)
-    )
+    count_text = tr_fn("page.logs.errors.count", "Ошибок: {count}").format(count=0)
+    errors_count_label.setText(count_text)
+    set_state_text(errors_count_label, count_text)
     return 0

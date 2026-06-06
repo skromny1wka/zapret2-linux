@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from qfluentwidgets import FluentIcon
 
+from ui.accessibility import set_control_accessibility
 from ui.fluent_widgets import set_tooltip
 from ui.theme import get_cached_qta_pixmap
 
@@ -55,6 +56,19 @@ def build_logs_send_tab(
     send_layout.setSpacing(16)
 
     orchestra_mode_container = qwidget_cls()
+    set_control_accessibility(
+        orchestra_mode_container,
+        name=tr_catalog_fn(
+            "page.logs.send.accessibility.orchestra.name",
+            language=ui_language,
+            default="Подсказка для режима оркестратора",
+        ),
+        description=tr_catalog_fn(
+            "page.logs.send.accessibility.orchestra.description",
+            language=ui_language,
+            default="В режиме оркестратора нужно проверять основной лог и файл orchestra.",
+        ),
+    )
     orchestra_layout = qhbox_layout_cls(orchestra_mode_container)
     orchestra_layout.setContentsMargins(12, 8, 12, 8)
     orchestra_layout.setSpacing(8)
@@ -100,6 +114,15 @@ def build_logs_send_tab(
         )
     )
     send_desc_label.setWordWrap(True)
+    set_control_accessibility(
+        send_desc_label,
+        name=tr_catalog_fn(
+            "page.logs.send.accessibility.description.name",
+            language=ui_language,
+            default="Описание подготовки обращения",
+        ),
+        description=send_desc_label.text(),
+    )
     send_layout.addWidget(send_desc_label)
 
     info_container = qwidget_cls()
@@ -117,10 +140,32 @@ def build_logs_send_tab(
         )
     )
     send_info_label.setWordWrap(True)
+    set_control_accessibility(
+        send_info_label,
+        name=tr_catalog_fn(
+            "page.logs.send.accessibility.info.name",
+            language=ui_language,
+            default="Что будет подготовлено",
+        ),
+        description=send_info_label.text(),
+    )
     info_layout.addWidget(send_info_label, 1)
     send_layout.addWidget(info_container)
 
     send_status_label = caption_label_cls()
+    set_control_accessibility(
+        send_status_label,
+        name=tr_catalog_fn(
+            "page.logs.send.accessibility.status.name",
+            language=ui_language,
+            default="Статус подготовки обращения",
+        ),
+        description=tr_catalog_fn(
+            "page.logs.send.accessibility.status.description",
+            language=ui_language,
+            default="Здесь показывается результат подготовки обращения в поддержку.",
+        ),
+    )
     send_layout.addWidget(send_status_label)
 
     send_card.add_layout(send_layout)
@@ -145,6 +190,19 @@ def build_logs_send_tab(
             default="Собрать ZIP из свежих логов, скопировать шаблон обращения и открыть GitHub Discussions.",
         )
     )
+    set_control_accessibility(
+        send_log_btn,
+        name=tr_catalog_fn(
+            "page.logs.send.accessibility.prepare.name",
+            language=ui_language,
+            default="Подготовить обращение в поддержку",
+        ),
+        description=tr_catalog_fn(
+            "page.logs.send.action.send.description",
+            language=ui_language,
+            default="Собрать ZIP из свежих логов, скопировать шаблон обращения и открыть GitHub Discussions.",
+        ),
+    )
     send_log_btn.clicked.connect(on_prepare_support)
     send_actions_bar.add_button(send_log_btn)
 
@@ -159,6 +217,19 @@ def build_logs_send_tab(
             language=ui_language,
             default="Открыть папку logs, где лежат логи и подготовленные support bundles.",
         )
+    )
+    set_control_accessibility(
+        open_logs_folder_btn,
+        name=tr_catalog_fn(
+            "page.logs.send.accessibility.folder.name",
+            language=ui_language,
+            default="Открыть папку логов и обращений",
+        ),
+        description=tr_catalog_fn(
+            "page.logs.send.action.folder.description",
+            language=ui_language,
+            default="Открыть папку logs, где лежат логи и подготовленные support bundles.",
+        ),
     )
     open_logs_folder_btn.clicked.connect(on_open_folder)
     send_actions_bar.add_button(open_logs_folder_btn)

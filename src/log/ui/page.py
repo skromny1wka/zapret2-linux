@@ -24,6 +24,7 @@ import qtawesome as qta
 import re
 import time
 
+from ui.accessibility import set_control_accessibility, set_state_text
 from ui.pages.base_page import BasePage, ScrollBlockingTextEdit
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.fluent_widgets import QuickActionsBar, SettingsCard, set_tooltip
@@ -320,6 +321,14 @@ class LogsPage(BasePage):
         )
         self.tabs_pivot.setCurrentItem("logs")
         self.tabs_pivot.setItemFontSize(13)
+        set_control_accessibility(
+            self.tabs_pivot,
+            name=tr_catalog("page.logs.accessibility.tabs.name", default="Вкладки страницы логов"),
+            description=tr_catalog(
+                "page.logs.accessibility.tabs.description",
+                default="Переключение между просмотром логов и подготовкой обращения в поддержку.",
+            ),
+        )
         self.add_widget(self.tabs_pivot)
 
         # ═══════════════════════════════════════════════════════════
@@ -457,11 +466,15 @@ class LogsPage(BasePage):
             try:
                 self.errors_title_label.setText(tr_catalog("page.logs.errors.title", language=self._ui_language, default="Ошибки и предупреждения"))
                 self.clear_errors_btn.setText(tr_catalog("page.logs.button.clear", language=self._ui_language, default="Очистить"))
-                self.errors_count_label.setText(
-                    tr_catalog("page.logs.errors.count", language=self._ui_language, default="Ошибок: {count}").format(
-                        count=max(0, int(self._errors_count))
-                    )
+                errors_count_text = tr_catalog(
+                    "page.logs.errors.count",
+                    language=self._ui_language,
+                    default="Ошибок: {count}",
+                ).format(
+                    count=max(0, int(self._errors_count))
                 )
+                self.errors_count_label.setText(errors_count_text)
+                set_state_text(self.errors_count_label, errors_count_text)
             except Exception:
                 pass
 
@@ -567,6 +580,7 @@ class LogsPage(BasePage):
             self.stats_label.setText(
                 tr_catalog("page.logs.stats.loading", language=self._ui_language, default="📊 Загрузка...")
             )
+            set_state_text(self.stats_label, self.stats_label.text())
         except Exception:
             pass
 
@@ -823,7 +837,7 @@ class LogsPage(BasePage):
         if not self._logs_overview_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
             return
         log(f"Ошибка обновления обзора логов: {error}", "ERROR")
-        self.stats_label.setText(f"Ошибка статистики: {error}")
+        self._set_stats_text(f"Ошибка статистики: {error}")
 
     def _on_logs_overview_finished(self, request_id: int, thread) -> None:
         _ = thread
@@ -863,13 +877,34 @@ class LogsPage(BasePage):
                 if entry["is_current"]:
                     current_index = entry["index"]
                 self.log_combo.addItem(entry["display"], userData=entry["path"])
+            set_control_accessibility(
+                self.log_combo,
+                name=tr_catalog(
+                    "page.logs.accessibility.log_combo.name",
+                    language=self._ui_language,
+                    default="Выбор файла лога",
+                ),
+                description=tr_catalog(
+                    "page.logs.accessibility.log_combo.count_description",
+                    language=self._ui_language,
+                    default="Доступных файлов логов: {count}.",
+                ).format(count=len(state.entries)),
+            )
             self.log_combo.setCurrentIndex(current_index)
         finally:
             self.log_combo.blockSignals(False)
 
     def _apply_logs_stats_state(self, stats) -> None:
         plan = self._logs.build_stats_text_plan(stats, language=self._ui_language)
-        self.stats_label.setText(plan.text)
+        self._set_stats_text(plan.text)
+
+    def _set_info_text(self, text: str) -> None:
+        self.info_label.setText(text)
+        set_state_text(self.info_label, text)
+
+    def _set_stats_text(self, text: str) -> None:
+        self.stats_label.setText(text)
+        set_state_text(self.stats_label, text)
 
     def _stop_logs_overview_worker(self, blocking: bool = False) -> None:
         try:
@@ -936,7 +971,7 @@ class LogsPage(BasePage):
             set_tail_signature_fn=lambda value: setattr(self, "_tail_file_signature", value),
             stop_worker_fn=self._stop_tail_worker,
             build_tail_start_plan_fn=self._logs.build_tail_start_plan,
-            set_info_text_fn=self.info_label.setText,
+            set_info_text_fn=self._set_info_text,
             clear_log_view_fn=self.log_text.clear,
             tail_runtime=self._tail_runtime,
             parent=self,
@@ -1003,7 +1038,7 @@ class LogsPage(BasePage):
         text = self.log_text.toPlainText()
         if text:
             QApplication.clipboard().setText(text)
-            self.info_label.setText(
+            self._set_info_text(
                 tr_catalog(
                     "page.logs.info.copied",
                     language=self._ui_language,
@@ -1011,7 +1046,7 @@ class LogsPage(BasePage):
                 )
             )
         else:
-            self.info_label.setText(
+            self._set_info_text(
                 tr_catalog(
                     "page.logs.info.empty",
                     language=self._ui_language,
@@ -1022,7 +1057,7 @@ class LogsPage(BasePage):
     def _clear_view(self):
         """Очищает вид (не файл)"""
         self.log_text.clear()
-        self.info_label.setText(
+        self._set_info_text(
             tr_catalog(
                 "page.logs.info.view_cleared",
                 language=self._ui_language,
@@ -1147,7 +1182,7 @@ class LogsPage(BasePage):
             tr_fn=lambda key, default: tr_catalog(key, language=self._ui_language, default=default),
         )
         self._update_errors_text_height()
-        self.info_label.setText(
+        self._set_info_text(
             tr_catalog(
                 "page.logs.info.errors_cleared",
                 language=self._ui_language,
