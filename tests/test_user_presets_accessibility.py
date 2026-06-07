@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import QApplication, QVBoxLayout, QWidget
 from qfluentwidgets import FluentIcon, LineEdit, PrimaryToolButton, StrongBodyLabel
 
 from presets.ui.common.user_presets_build import build_user_presets_page_shell
+from presets.ui.common.user_presets_dialogs import CreatePresetDialog, RenamePresetDialog, ResetAllPresetsDialog
 from presets.ui.common.user_presets_page_lifecycle import apply_user_presets_language
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens
 
@@ -61,6 +62,13 @@ class UserPresetsAccessibilityTests(unittest.TestCase):
         )
         return parent, widgets
 
+    def _dialog_parent(self) -> QWidget:
+        parent = QWidget()
+        parent.resize(640, 480)
+        parent.show()
+        self.addCleanup(parent.deleteLater)
+        return parent
+
     def test_toolbar_controls_have_screen_reader_text(self) -> None:
         _parent, widgets = self._build_widgets()
 
@@ -91,6 +99,44 @@ class UserPresetsAccessibilityTests(unittest.TestCase):
         )
 
         self._assert_accessibility(widgets)
+
+    def test_create_preset_dialog_has_screen_reader_text(self) -> None:
+        dialog = CreatePresetDialog([], self._dialog_parent())
+        self.addCleanup(dialog.deleteLater)
+
+        self.assertEqual(dialog.nameEdit.accessibleName(), "Название нового пресета")
+        self.assertIn("Например Игры", dialog.nameEdit.accessibleDescription())
+        if hasattr(dialog, "_source_seg"):
+            self.assertEqual(dialog._source_seg.accessibleName(), "Основа нового пресета, выбрано: Текущий пресет")
+            self.assertIn("Выберите", dialog._source_seg.accessibleDescription())
+            dialog._source_seg.setCurrentItem("standard")
+            self.assertEqual(dialog._source_seg.accessibleName(), "Основа нового пресета, выбрано: Встроенный пресет")
+        self.assertEqual(dialog.yesButton.accessibleName(), "Создать пресет")
+        self.assertIn("Сохраняет текущие настройки", dialog.yesButton.accessibleDescription())
+        self.assertEqual(dialog.cancelButton.accessibleName(), "Отменить создание пресета")
+
+        self.assertFalse(dialog.validate())
+
+        self.assertEqual(dialog.warningLabel.accessibleName(), "Ошибка: Введите название.")
+        self.assertEqual(dialog.warningLabel.property("screenReaderStateText"), "Ошибка: Введите название.")
+
+    def test_rename_preset_dialog_has_screen_reader_text(self) -> None:
+        dialog = RenamePresetDialog("Дом", ["Дом"], self._dialog_parent())
+        self.addCleanup(dialog.deleteLater)
+
+        self.assertEqual(dialog.nameEdit.accessibleName(), "Новое название пресета")
+        self.assertIn("Текущее имя: Дом", dialog.nameEdit.accessibleDescription())
+        self.assertEqual(dialog.yesButton.accessibleName(), "Переименовать пресет")
+        self.assertIn("Меняет имя пресета", dialog.yesButton.accessibleDescription())
+        self.assertEqual(dialog.cancelButton.accessibleName(), "Отменить переименование пресета")
+
+    def test_reset_presets_dialog_has_screen_reader_text(self) -> None:
+        dialog = ResetAllPresetsDialog(self._dialog_parent())
+        self.addCleanup(dialog.deleteLater)
+
+        self.assertEqual(dialog.yesButton.accessibleName(), "Вернуть встроенные пресеты")
+        self.assertIn("Изменения во встроенных пресетах будут потеряны", dialog.yesButton.accessibleDescription())
+        self.assertEqual(dialog.cancelButton.accessibleName(), "Отменить возврат встроенных пресетов")
 
     def _assert_accessibility(self, widgets) -> None:
         expected = {

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from PyQt6.QtWidgets import QHBoxLayout
 
+from ui.accessibility import set_control_accessibility, set_state_text
 from ui.fluent_widgets import style_semantic_caption_label
 from app.ui_texts import tr as tr_catalog
 from qfluentwidgets import BodyLabel, CaptionLabel, LineEdit, MessageBoxBase, SubtitleLabel
@@ -88,7 +89,7 @@ class CreatePresetDialog(PresetDialogTextMixin, MessageBoxBase):
                 self._tr(self._dialog_key("dialog.create.source.standard"), "Встроенного пресета"),
             )
             self._source_seg.setCurrentItem("current")
-            self._source_seg.currentItemChanged.connect(lambda k: setattr(self, "_source", k))
+            self._source_seg.currentItemChanged.connect(self._on_source_changed)
             source_row.addWidget(self._source_seg)
         except Exception:
             pass
@@ -107,17 +108,59 @@ class CreatePresetDialog(PresetDialogTextMixin, MessageBoxBase):
         self.yesButton.setText(self._tr(self._dialog_key("dialog.create.button.create"), "Создать"))
         self.cancelButton.setText(self._tr(self._dialog_key("dialog.button.cancel"), "Отмена"))
         self.widget.setMinimumWidth(420)
+        self._install_accessibility()
 
     def validate(self) -> bool:
         name = self.nameEdit.text().strip()
         if not name:
-            self.warningLabel.setText(
+            self._show_warning(
                 self._tr(self._dialog_key("dialog.validation.enter_name"), "Введите название.")
             )
             self.warningLabel.show()
             return False
         self.warningLabel.hide()
         return True
+
+    def _install_accessibility(self) -> None:
+        set_control_accessibility(
+            self.nameEdit,
+            name="Название нового пресета",
+            description="Например Игры, YouTube или Дом. Так пресет будет называться в списке.",
+        )
+        if hasattr(self, "_source_seg"):
+            self._update_source_accessibility()
+            set_control_accessibility(
+                self._source_seg,
+                description="Выберите, из чего создать новый пресет: из текущих настроек или из встроенного пресета.",
+            )
+        set_control_accessibility(
+            self.yesButton,
+            name="Создать пресет",
+            description="Сохраняет текущие настройки как отдельный пресет.",
+        )
+        set_control_accessibility(
+            self.cancelButton,
+            name="Отменить создание пресета",
+            description="Закрывает окно без создания пресета.",
+        )
+
+    def _on_source_changed(self, key: str) -> None:
+        self._source = key
+        self._update_source_accessibility()
+
+    def _update_source_accessibility(self) -> None:
+        selected = {
+            "current": "Текущий пресет",
+            "standard": "Встроенный пресет",
+        }.get(str(self._source or "").strip(), "не выбрано")
+        set_control_accessibility(
+            self._source_seg,
+            name=f"Основа нового пресета, выбрано: {selected}",
+        )
+
+    def _show_warning(self, text: str) -> None:
+        self.warningLabel.setText(text)
+        set_state_text(self.warningLabel, f"Ошибка: {text}")
 
 
 class RenamePresetDialog(PresetDialogTextMixin, MessageBoxBase):
@@ -183,11 +226,12 @@ class RenamePresetDialog(PresetDialogTextMixin, MessageBoxBase):
         self.yesButton.setText(self._tr(self._dialog_key("dialog.rename.button"), "Переименовать"))
         self.cancelButton.setText(self._tr(self._dialog_key("dialog.button.cancel"), "Отмена"))
         self.widget.setMinimumWidth(420)
+        self._install_accessibility()
 
     def validate(self) -> bool:
         name = self.nameEdit.text().strip()
         if not name:
-            self.warningLabel.setText(
+            self._show_warning(
                 self._tr(self._dialog_key("dialog.validation.enter_name"), "Введите название.")
             )
             self.warningLabel.show()
@@ -197,6 +241,27 @@ class RenamePresetDialog(PresetDialogTextMixin, MessageBoxBase):
             return True
         self.warningLabel.hide()
         return True
+
+    def _install_accessibility(self) -> None:
+        set_control_accessibility(
+            self.nameEdit,
+            name="Новое название пресета",
+            description=f"Текущее имя: {self._current_name}. Введите новое имя для списка пресетов.",
+        )
+        set_control_accessibility(
+            self.yesButton,
+            name="Переименовать пресет",
+            description="Меняет имя пресета в списке.",
+        )
+        set_control_accessibility(
+            self.cancelButton,
+            name="Отменить переименование пресета",
+            description="Закрывает окно без изменения имени.",
+        )
+
+    def _show_warning(self, text: str) -> None:
+        self.warningLabel.setText(text)
+        set_state_text(self.warningLabel, f"Ошибка: {text}")
 
 
 class ResetAllPresetsDialog(PresetDialogTextMixin, MessageBoxBase):
@@ -240,3 +305,13 @@ class ResetAllPresetsDialog(PresetDialogTextMixin, MessageBoxBase):
             tr_presets_dialog(self._dialog_key("dialog.button.cancel"), self._ui_language, "Отмена")
         )
         self.widget.setMinimumWidth(380)
+        set_control_accessibility(
+            self.yesButton,
+            name="Вернуть встроенные пресеты",
+            description="Изменения во встроенных пресетах будут потеряны. Пользовательские пресеты останутся.",
+        )
+        set_control_accessibility(
+            self.cancelButton,
+            name="Отменить возврат встроенных пресетов",
+            description="Закрывает окно без возврата встроенных пресетов.",
+        )
