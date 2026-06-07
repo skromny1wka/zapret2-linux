@@ -343,6 +343,15 @@ class UpdaterSettingsWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("create_server_full_check_gate_worker", runtime_source)
         self.assertNotIn("UpdateRateLimiter", runtime_source)
 
+    def test_server_check_gate_queue_state_lives_in_state_object(self) -> None:
+        init_source = inspect.getsource(update_page_runtime.UpdatePageRuntime.__init__)
+        finished_source = inspect.getsource(update_page_runtime.UpdatePageRuntime._on_server_check_gate_worker_finished)
+        state_source = inspect.getsource(update_page_runtime.UpdateLatestValueWorkerState)
+
+        self.assertIn("_server_check_gate_state = UpdateLatestValueWorkerState", init_source)
+        self.assertIn("schedule_pending_after_finish", finished_source)
+        self.assertIn("def schedule_pending_after_finish", state_source)
+
     def test_full_server_check_starts_rate_limit_gate_worker(self) -> None:
         runtime = update_page_runtime.UpdatePageRuntime.__new__(update_page_runtime.UpdatePageRuntime)
         runtime._cleanup_in_progress = False

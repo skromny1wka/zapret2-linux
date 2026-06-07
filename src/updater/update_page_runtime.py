@@ -219,8 +219,7 @@ class UpdatePageRuntime:
         self._auto_check_save_state = UpdateLatestValueWorkerState(self._auto_check_save_runtime, empty_value=None)
         self._cache_invalidate_state = UpdateLatestValueWorkerState(self._cache_invalidate_runtime, empty_value=None)
         self._update_channel_open_state = UpdateLatestValueWorkerState(self._update_channel_open_runtime, empty_value="")
-        self._server_check_gate_pending: bool | None = None
-        self._server_check_gate_start_scheduled = False
+        self._server_check_gate_state = UpdateLatestValueWorkerState(self._server_check_gate_runtime, empty_value=None)
         self._auto_check_user_changed = False
         self._dpi_restart_after = ""
 
@@ -340,6 +339,33 @@ class UpdatePageRuntime:
     @_cache_invalidate_start_scheduled.setter
     def _cache_invalidate_start_scheduled(self, value: bool) -> None:
         self._cache_invalidate_state_obj().start_scheduled = bool(value)
+
+    def _server_check_gate_state_obj(self) -> UpdateLatestValueWorkerState:
+        state = self.__dict__.get("_server_check_gate_state")
+        if state is None:
+            state = UpdateLatestValueWorkerState(
+                self.__dict__.get("_server_check_gate_runtime"),
+                empty_value=None,
+            )
+            self.__dict__["_server_check_gate_state"] = state
+        return state
+
+    @property
+    def _server_check_gate_pending(self) -> bool | None:
+        pending = self._server_check_gate_state_obj().pending
+        return None if pending is None else bool(pending)
+
+    @_server_check_gate_pending.setter
+    def _server_check_gate_pending(self, value: bool | None) -> None:
+        self._server_check_gate_state_obj().pending = None if value is None else bool(value)
+
+    @property
+    def _server_check_gate_start_scheduled(self) -> bool:
+        return bool(self._server_check_gate_state_obj().start_scheduled)
+
+    @_server_check_gate_start_scheduled.setter
+    def _server_check_gate_start_scheduled(self, value: bool) -> None:
+        self._server_check_gate_state_obj().start_scheduled = bool(value)
 
     @staticmethod
     def build_responsibility_map() -> UpdateResponsibilityMap:
@@ -593,14 +619,13 @@ class UpdatePageRuntime:
         self._continue_start_checks(telegram_only=True, keep_existing_rows=False)
 
     def _request_server_check_gate(self, *, skip_rate_limit: bool) -> None:
-        if (
-            self._server_check_gate_runtime.is_running()
-            or self.__dict__.get("_server_check_gate_start_scheduled", False)
-        ):
-            self._server_check_gate_pending = bool(skip_rate_limit)
-            return
-        self._server_check_gate_pending = None
-        self._start_server_check_gate_worker(skip_rate_limit=bool(skip_rate_limit))
+        self._server_check_gate_state_obj().request_or_start(
+            bool(skip_rate_limit),
+            lambda pending: self._start_server_check_gate_worker(skip_rate_limit=bool(pending)),
+        )
+
+    def _server_check_gate_has_pending(self) -> bool:
+        return self._server_check_gate_state_obj().has_pending()
 
     def _start_server_check_gate_worker(self, *, skip_rate_limit: bool) -> None:
         self._server_check_gate_runtime.start_qthread_worker(
@@ -620,7 +645,7 @@ class UpdatePageRuntime:
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_server_check_gate_pending") is not None:
+        if self._server_check_gate_has_pending():
             return
         message = str(getattr(result, "message", "") or "")
         if message:
@@ -636,35 +661,34 @@ class UpdatePageRuntime:
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_server_check_gate_pending") is not None:
+        if self._server_check_gate_has_pending():
             return
         log(f"Не удалось проверить лимит полной проверки VPS: {error}", "WARNING")
         self._continue_start_checks(telegram_only=True, keep_existing_rows=True)
 
     def _on_server_check_gate_worker_finished(self, _worker) -> None:
-        if not self._is_current_worker_finish(self.__dict__.get("_server_check_gate_runtime"), _worker):
-            return
-        if self._cleanup_in_progress:
-            return
-        pending = self.__dict__.get("_server_check_gate_pending")
-        if pending is not None:
-            self._schedule_server_check_gate_start(bool(pending))
+        self._server_check_gate_state_obj().schedule_pending_after_finish(
+            _worker,
+            is_current_worker_finish=self._is_current_worker_finish,
+            single_shot=QTimer.singleShot,
+            run_scheduled=self._run_scheduled_server_check_gate_start,
+            cleanup_in_progress=self._cleanup_in_progress,
+        )
 
     def _schedule_server_check_gate_start(self, skip_rate_limit: bool) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         self._server_check_gate_pending = bool(skip_rate_limit)
-        if self.__dict__.get("_server_check_gate_start_scheduled", False):
-            return
-        self._server_check_gate_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_server_check_gate_start)
+        self._server_check_gate_state_obj().schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_server_check_gate_start,
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
 
     def _run_scheduled_server_check_gate_start(self) -> None:
-        self._server_check_gate_start_scheduled = False
-        if self.__dict__.get("_cleanup_in_progress", False):
-            return
-        pending = self.__dict__.get("_server_check_gate_pending")
-        self._server_check_gate_pending = None
+        pending = self._server_check_gate_state_obj().take_pending_for_scheduled_start(
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
         if pending is None:
             return
         self._request_server_check_gate(skip_rate_limit=bool(pending))
@@ -1212,8 +1236,7 @@ class UpdatePageRuntime:
         self._cache_invalidate_runtime.cancel()
 
     def _teardown_server_check_gate_worker(self) -> None:
-        self._server_check_gate_pending = None
-        self._server_check_gate_start_scheduled = False
+        self._server_check_gate_state_obj().reset()
         self._server_check_gate_runtime.stop(
             blocking=_updater_cleanup_blocking("server_check_gate_worker"),
             log_fn=log,
