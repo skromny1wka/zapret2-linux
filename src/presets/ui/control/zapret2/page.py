@@ -93,6 +93,7 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         runtime_actions,
         create_program_settings_save_worker,
         create_program_settings_load_worker,
+        create_program_settings_system_status_load_worker,
         create_program_settings_admin_check_worker,
         attach_program_settings_runtime,
         publish_program_settings_snapshot,
@@ -125,6 +126,9 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         self._runtime_actions = runtime_actions
         self._create_program_settings_save_worker = create_program_settings_save_worker
         self._create_program_settings_load_worker = create_program_settings_load_worker
+        self._create_program_settings_system_status_load_worker = (
+            create_program_settings_system_status_load_worker
+        )
         self._create_program_settings_admin_check_worker = create_program_settings_admin_check_worker
         self._attach_program_settings_runtime_fn = attach_program_settings_runtime
         self._publish_program_settings_snapshot = publish_program_settings_snapshot
@@ -666,13 +670,14 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
 
     def _sync_program_settings(self) -> None:
         self._request_program_settings_load()
+        self._request_program_settings_system_status_load()
 
     def _attach_program_settings_runtime(self) -> None:
         self._attach_program_settings_runtime_fn(
             self,
             apply_snapshot_fn=self._apply_program_settings_snapshot,
         )
-        self._sync_program_settings()
+        self._request_program_settings_system_status_load()
 
     def _apply_program_settings_snapshot(self, snapshot) -> None:
         if self._cleanup_in_progress:

@@ -50,7 +50,6 @@ class LaunchRuntimeService:
         *,
         launch_method: str = "",
         dpi_autostart_enabled: bool = False,
-        gui_autostart_enabled: bool = False,
         launch_supported: bool = False,
     ) -> AppUiState:
         """Создаёт начальный UI-state с runtime-полями через runtime-контракт."""
@@ -63,7 +62,6 @@ class LaunchRuntimeService:
             launch_running=False,
             launch_busy=preparing_manual_launch,
             launch_busy_text="Подготовка запуска..." if preparing_manual_launch else "",
-            autostart_enabled=bool(gui_autostart_enabled),
         )
 
     @staticmethod

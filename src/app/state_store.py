@@ -15,7 +15,6 @@ class AppUiState:
     launch_last_error: str = ""
     last_status_message: str = ""
     current_strategy_summary: str = ""
-    autostart_enabled: bool = False
     subscription_is_premium: bool = False
     subscription_days_remaining: int | None = None
     garland_enabled: bool = False
@@ -108,9 +107,6 @@ class MainWindowStateStore:
     def set_last_status_message(self, message: str) -> bool:
         return self.update(last_status_message=str(message or ""))
 
-    def set_autostart(self, enabled: bool) -> bool:
-        return self.update(autostart_enabled=bool(enabled))
-
     def set_subscription(self, is_premium: bool, days_remaining: int | None = None) -> bool:
         normalized_days = None if not is_premium else days_remaining
         return self.update(
@@ -165,9 +161,3 @@ class AppRuntimeState:
 
     def last_launch_error(self) -> str:
         return str(self.snapshot().launch_last_error or "").strip()
-
-    def is_autostart_enabled(self) -> bool:
-        return bool(self.snapshot().autostart_enabled)
-
-    def set_autostart(self, enabled: bool) -> bool:
-        return bool(self._store_ref.set_autostart(bool(enabled)))

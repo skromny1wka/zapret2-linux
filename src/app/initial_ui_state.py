@@ -51,7 +51,10 @@ def build_initial_ui_state() -> AppUiState:
         store_warmed_editor_smooth_scroll_enabled(appearance.get("editor_smooth_scroll_enabled"))
         store_warmed_sidebar_icon_style(appearance.get("sidebar_icon_style"))
         store_warmed_premium_effects(appearance.get("garland_enabled"), appearance.get("snowflakes_enabled"))
-        from core.runtime.program_settings_runtime_service import store_warmed_hide_to_tray_on_minimize_close
+        from core.runtime.program_settings_runtime_service import (
+            store_warmed_hide_to_tray_on_minimize_close,
+            store_warmed_program_settings_fast_snapshot,
+        )
 
         store_warmed_hide_to_tray_on_minimize_close(window.get("hide_to_tray_on_minimize_close"))
         from ui.navigation.sidebar_state import store_warmed_sidebar_expanded
@@ -63,12 +66,21 @@ def build_initial_ui_state() -> AppUiState:
 
         dpi_autostart_enabled = bool(program.get("dpi_autostart", True))
         gui_autostart_enabled = bool(program.get("gui_autostart_enabled", False))
+        hide_to_tray_on_minimize_close = bool(window.get("hide_to_tray_on_minimize_close", False))
+        defender_disabled = bool(program.get("defender_disabled", False))
+        max_blocked = bool(program.get("max_blocked", False))
+        store_warmed_program_settings_fast_snapshot(
+            auto_dpi_enabled=dpi_autostart_enabled,
+            gui_autostart_enabled=gui_autostart_enabled,
+            hide_to_tray_on_minimize_close=hide_to_tray_on_minimize_close,
+            defender_disabled=defender_disabled,
+            max_blocked=max_blocked,
+        )
         launch_method = normalize_launch_method(program.get("strategy_launch_method"), default="")
 
         return LaunchRuntimeService.build_initial_ui_state(
             launch_method=launch_method,
             dpi_autostart_enabled=dpi_autostart_enabled,
-            gui_autostart_enabled=gui_autostart_enabled,
             launch_supported=launch_method in ALL_LAUNCH_METHODS,
         )
     except Exception:

@@ -773,11 +773,6 @@ def check_ui_state_store_writer_ownership(files: list[Path]) -> list[Problem]:
             {"src/main/window_state_actions.py"},
         ),
         (
-            re.compile(r"\.set_autostart\s*\("),
-            "autostart state должен писать только autostart feature/AppRuntimeState",
-            {"src/app/feature_facades/autostart.py", "src/app/state_store.py"},
-        ),
-        (
             re.compile(r"\.bump_active_preset_revision\b"),
             "active preset revision должен писать только preset runtime coordinator",
             {"src/core/runtime/preset_runtime_coordinator.py"},

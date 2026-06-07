@@ -3602,6 +3602,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
         self.assertIn("_request_program_settings_load", zapret1_sync_source)
         self.assertIn("_request_program_settings_load", zapret2_sync_source)
+        self.assertIn("_request_program_settings_system_status_load", zapret1_sync_source)
+        self.assertIn("_request_program_settings_system_status_load", zapret2_sync_source)
         self.assertNotIn("refresh_program_settings_snapshot", zapret1_sync_source)
         self.assertNotIn("refresh_program_settings_snapshot", zapret2_sync_source)
         self.assertIn("create_program_settings_load_worker", shared_source)
@@ -3610,7 +3612,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("worker.start()", inspect.getsource(control_page_shared.ControlPageActionMixin._request_program_settings_load))
         self.assertIn("load_program_settings_snapshot", worker_source)
         self.assertIn("publish_program_settings_snapshot", shared_source)
-        self.assertIn("emit_initial=False", attach_source)
+        self.assertIn("emit_initial=True", attach_source)
 
     def test_zapret2_control_initial_store_snapshot_is_applied_immediately(self) -> None:
         helper_source = inspect.getsource(control_page_shared.bind_control_ui_state_store)

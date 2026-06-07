@@ -434,6 +434,10 @@ def set_defender_disabled_memory(value: bool) -> bool:
     return _set_bool(("program", "defender_disabled"), value)
 
 
+def get_defender_disabled_memory() -> bool:
+    return _get_bool(("program", "defender_disabled"), False)
+
+
 def get_window_geometry() -> dict[str, Any]:
     data = read_settings()
     return copy.deepcopy(
@@ -1188,6 +1192,7 @@ __all__ = [
     "get_dns_crash_count",
     "get_dpi_autostart",
     "get_editor_smooth_scroll_enabled",
+    "get_defender_disabled_memory",
     "get_follow_windows_accent",
     "get_force_dns_enabled",
     "get_folders_settings",

@@ -848,7 +848,6 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         state = LaunchRuntimeService.build_initial_ui_state(
             launch_method="zapret2_mode",
             dpi_autostart_enabled=False,
-            gui_autostart_enabled=False,
             launch_supported=True,
         )
 
@@ -864,7 +863,6 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         state = LaunchRuntimeService.build_initial_ui_state(
             launch_method="zapret2_mode",
             dpi_autostart_enabled=True,
-            gui_autostart_enabled=False,
             launch_supported=True,
         )
 
@@ -1727,7 +1725,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         )
         window.setMinimumSize = Mock()
         features = SimpleNamespace(
-            runtime=object(),
+            runtime=SimpleNamespace(snapshot=Mock()),
             premium=object(),
             telegram_proxy=object(),
             tray=object(),
@@ -2133,7 +2131,14 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             log_startup_metric=Mock(),
         )
         features = SimpleNamespace(
-            runtime=SimpleNamespace(configure_notifications=Mock()),
+            runtime=SimpleNamespace(
+                configure_notifications=Mock(),
+                is_available=Mock(return_value=True),
+                cancel_start_after_conflict_prompt=Mock(),
+                execute_windivert_autofix=Mock(),
+                prepare_launch_conflict_resolution=Mock(),
+                continue_start_after_conflict_resolution=Mock(),
+            ),
             tray=SimpleNamespace(
                 show_notification_if_available=Mock(),
                 configure=Mock(),
