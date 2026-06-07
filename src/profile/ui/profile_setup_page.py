@@ -1084,6 +1084,7 @@ class ProfileSetupPageBase(BasePage):
         self._update_user_profile_button = None
         self._delete_user_profile_button = None
         self._raw_profile_text = None
+        self._raw_profile_text_cache: str | None = None
         self._raw_profile_save_button = None
         self._list_file_title = None
         self._list_file_base_title = None
@@ -1504,12 +1505,23 @@ class ProfileSetupPageBase(BasePage):
         if self._match_text is not None:
             set_plain_text_if_changed(self._match_text, _match_tab_text(payload))
         if self._raw_profile_text is not None:
-            set_plain_text_if_changed(self._raw_profile_text, str(getattr(payload, "raw_profile_text", "") or ""))
+            self._set_raw_profile_text_from_payload(str(getattr(payload, "raw_profile_text", "") or ""))
             raw_editable = bool(getattr(item, "in_preset", False))
             set_read_only_if_changed(self._raw_profile_text, not raw_editable)
         if self._raw_profile_save_button is not None:
             set_widget_enabled_if_changed(self._raw_profile_save_button, bool(getattr(item, "in_preset", False)))
         self._apply_feedback_buttons(payload)
+
+    def _set_raw_profile_text_from_payload(self, text: str) -> None:
+        value = str(text or "")
+        if self.__dict__.get("_raw_profile_text_cache") == value:
+            return
+        editor = self.__dict__.get("_raw_profile_text")
+        if editor is None:
+            self._raw_profile_text_cache = value
+            return
+        set_plain_text_if_changed(editor, value)
+        self._raw_profile_text_cache = value
 
     def _request_list_file_editor_state(self) -> None:
         if not self._editor_tab_built or not self._profile_key:

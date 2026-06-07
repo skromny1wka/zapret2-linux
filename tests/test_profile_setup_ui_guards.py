@@ -883,12 +883,12 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
 
         ProfileSetupPageBase._run_scheduled_list_file_validation(page)
 
-        self.assertEqual(page._list_file_text.plain_text_read_calls, ["user.example\nsecond.example"])
-        self.assertEqual(page._list_file_text_snapshot, "user.example\nsecond.example")
+        self.assertEqual(page._list_file_text.plain_text_read_calls, [])
+        self.assertEqual(page._list_file_text_snapshot, "")
         self.assertEqual(page._list_file_user_entries_count, 0)
         page._request_list_file_validation.assert_called_once_with({
             "kind": "hostlist",
-            "text": "user.example\nsecond.example",
+            "text": None,
         })
 
     def test_list_file_validation_result_updates_entries_count_from_worker(self) -> None:
@@ -1174,16 +1174,77 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         page._match_tab_built = True
         page._match_text = _PlainTextWidget(_match_tab_text(payload))
         page._raw_profile_text = _PlainTextWidget(payload.raw_profile_text, read_only=False)
+        page._raw_profile_text_cache = payload.raw_profile_text
         page._raw_profile_save_button = _BoolWidget(enabled=True)
         page._apply_feedback_buttons = Mock()
 
         ProfileSetupPageBase._apply_match_tab_payload(page)
 
         self.assertEqual(page._match_text.plain_text_calls, [])
+        self.assertEqual(page._raw_profile_text.plain_text_read_calls, [])
         self.assertEqual(page._raw_profile_text.plain_text_calls, [])
         self.assertEqual(page._raw_profile_text.read_only_calls, [])
         self.assertEqual(page._raw_profile_save_button.enabled_calls, [])
         page._apply_feedback_buttons.assert_called_once_with(payload)
+
+    def test_match_tab_payload_uses_cached_raw_profile_text(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        raw_text = "--new\n--lua-desync=fake"
+        payload = SimpleNamespace(
+            item=SimpleNamespace(
+                in_preset=True,
+                strategy_id="tls_fake",
+                strategy_name="Fake TLS",
+            ),
+            strategy_entries={},
+            match_summary="hostlist: youtube.txt",
+            raw_profile_text=raw_text,
+        )
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._payload = payload
+        page._match_tab_built = True
+        page._match_text = None
+        page._raw_profile_text = _PlainTextWidget(raw_text, read_only=False)
+        page._raw_profile_text_cache = raw_text
+        page._raw_profile_save_button = _BoolWidget(enabled=True)
+        page._apply_feedback_buttons = Mock()
+
+        ProfileSetupPageBase._apply_match_tab_payload(page)
+
+        self.assertEqual(page._raw_profile_text.plain_text_read_calls, [])
+        self.assertEqual(page._raw_profile_text.plain_text_calls, [])
+        page._apply_feedback_buttons.assert_called_once_with(payload)
+
+    def test_match_tab_payload_sets_raw_profile_text_without_reading_editor(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        raw_text = "--new\n--lua-desync=fake"
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._payload = SimpleNamespace(
+            item=SimpleNamespace(in_preset=True, strategy_id="tls_fake", strategy_name="Fake TLS"),
+            strategy_entries={},
+            match_summary="hostlist: youtube.txt",
+            raw_profile_text=raw_text,
+        )
+        page._match_tab_built = True
+        page._match_text = None
+        page._raw_profile_text = _PlainTextWidget("--old\n", read_only=False)
+        page._raw_profile_text_cache = "--old\n"
+        page._raw_profile_save_button = _BoolWidget(enabled=True)
+        page._apply_feedback_buttons = Mock()
+
+        ProfileSetupPageBase._apply_match_tab_payload(page)
+
+        self.assertEqual(page._raw_profile_text.plain_text_read_calls, [])
+        self.assertEqual(page._raw_profile_text.plain_text_calls, [raw_text])
+        self.assertEqual(page._raw_profile_text_cache, raw_text)
 
     def test_raw_profile_save_skips_duplicate_button_disable(self) -> None:
         from unittest.mock import Mock
