@@ -464,7 +464,7 @@ class DNSCheckPage(BasePage):
         if file_path:
             self._start_save_results_worker(
                 file_path=file_path,
-                plain_text=self.result_text.toPlainText(),
+                plain_text=None,
             )
 
     def create_dns_check_save_worker(self, request_id: int, *, file_path: str, plain_text: str):
@@ -475,13 +475,14 @@ class DNSCheckPage(BasePage):
             parent=self,
         )
 
-    def _start_save_results_worker(self, *, file_path: str, plain_text: str) -> None:
+    def _start_save_results_worker(self, *, file_path: str, plain_text: str | None) -> None:
         if self._save_runtime.is_running() or self.__dict__.get("_save_results_start_scheduled", False):
             self._save_results_pending = {
                 "file_path": str(file_path or ""),
-                "plain_text": str(plain_text or ""),
+                "plain_text": None if plain_text is None else str(plain_text or ""),
             }
             return
+        plain_text = self._resolve_save_results_text(plain_text)
         self._save_runtime.start_qthread_worker(
             worker_factory=lambda request_id: self.create_dns_check_save_worker(
                 request_id,
@@ -494,6 +495,14 @@ class DNSCheckPage(BasePage):
 
     def _bind_save_results_worker(self, worker) -> None:
         worker.saved.connect(self._on_save_results_finished)
+
+    def _resolve_save_results_text(self, plain_text: str | None) -> str:
+        if plain_text is not None:
+            return str(plain_text or "")
+        result_text = self.__dict__.get("result_text")
+        if result_text is None:
+            return ""
+        return str(result_text.toPlainText() or "")
 
     def _on_save_results_finished(self, request_id: int, plan) -> None:
         if not self._save_runtime.is_current(
@@ -555,7 +564,7 @@ class DNSCheckPage(BasePage):
             return
         self._start_save_results_worker(
             file_path=str(pending.get("file_path") or ""),
-            plain_text=str(pending.get("plain_text") or ""),
+            plain_text=None if pending.get("plain_text") is None else str(pending.get("plain_text") or ""),
         )
     
     def cleanup(self):

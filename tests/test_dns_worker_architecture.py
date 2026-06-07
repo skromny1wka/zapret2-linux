@@ -12,6 +12,16 @@ from dns.ui.dns_check_page import DNSCheckPage
 from dns.ui.page import NetworkPage
 
 
+class _PlainTextResult:
+    def __init__(self, text: str) -> None:
+        self._text = str(text)
+        self.read_calls = 0
+
+    def toPlainText(self) -> str:  # noqa: N802
+        self.read_calls += 1
+        return self._text
+
+
 class DnsWorkerArchitectureTests(unittest.TestCase):
     def test_network_action_workers_receive_feature_action_callables(self) -> None:
         feature_source = inspect.getsource(build_dns_feature)
@@ -876,6 +886,19 @@ class DnsWorkerArchitectureTests(unittest.TestCase):
 
         page._save_runtime.start_qthread_worker.assert_not_called()
         self.assertEqual(page._save_results_pending, {"file_path": "first.txt", "plain_text": "latest"})
+
+    def test_dns_check_save_while_worker_runs_defers_result_text_read(self) -> None:
+        page = DNSCheckPage.__new__(DNSCheckPage)
+        page._save_runtime = SimpleNamespace(is_running=Mock(return_value=True), start_qthread_worker=Mock())
+        page._save_results_pending = None
+        page._save_results_start_scheduled = False
+        page.result_text = _PlainTextResult("latest dns report")
+
+        DNSCheckPage._start_save_results_worker(page, file_path="first.txt", plain_text=None)
+
+        self.assertEqual(page.result_text.read_calls, 0)
+        page._save_runtime.start_qthread_worker.assert_not_called()
+        self.assertEqual(page._save_results_pending, {"file_path": "first.txt", "plain_text": None})
 
     def test_dns_check_pending_save_hides_previous_save_result(self) -> None:
         import dns.ui.dns_check_page as dns_check_page
