@@ -191,10 +191,60 @@ def should_try_cloudflare(config: CloudflareFallbackConfig | None) -> bool:
     return bool(config.worker_enabled and config.worker_domains)
 
 
-def build_cloudflare_domains(dc: int, config: CloudflareFallbackConfig) -> list[str]:
+class CloudflareDomainBalancer:
+    """Keeps the last working Cloudflare base domain first for each Telegram DC."""
+
+    __slots__ = ("_active_by_dc", "_domains")
+
+    def __init__(self) -> None:
+        self._active_by_dc: dict[int, str] = {}
+        self._domains: tuple[str, ...] = ()
+
+    def reset(self) -> None:
+        self._active_by_dc.clear()
+        self._domains = ()
+
+    def ordered_domains(self, dc: int, domains: tuple[str, ...]) -> list[str]:
+        self._sync_domains(domains)
+        active = self._active_by_dc.get(int(dc))
+        if active not in self._domains:
+            active = None
+        if active is None:
+            return list(self._domains)
+        return [active, *(domain for domain in self._domains if domain != active)]
+
+    def record_success(self, dc: int, domain: str) -> bool:
+        normalized = str(domain or "").strip().lower()
+        prefix = f"kws{int(dc)}."
+        base_domain = normalized[len(prefix):] if normalized.startswith(prefix) else normalized
+        if base_domain not in self._domains:
+            return False
+        previous = self._active_by_dc.get(int(dc))
+        self._active_by_dc[int(dc)] = base_domain
+        return previous != base_domain
+
+    def _sync_domains(self, domains: tuple[str, ...]) -> None:
+        if self._domains == domains:
+            return
+        self._domains = domains
+        valid = set(domains)
+        self._active_by_dc = {
+            dc: domain
+            for dc, domain in self._active_by_dc.items()
+            if domain in valid
+        }
+
+
+def build_cloudflare_domains(
+    dc: int,
+    config: CloudflareFallbackConfig,
+    *,
+    balancer: CloudflareDomainBalancer | None = None,
+) -> list[str]:
     result: list[str] = []
     domains = config.domains or AUTO_CLOUDFLARE_DOMAINS
-    for base_domain in domains:
+    ordered_domains = balancer.ordered_domains(dc, domains) if balancer is not None else list(domains)
+    for base_domain in ordered_domains:
         result.append(f"kws{int(dc)}.{base_domain}")
     return result
 
@@ -309,6 +359,7 @@ __all__ = [
     "CloudflareCheckEntry",
     "CloudflareCheckResult",
     "CloudflareDnsRecord",
+    "CloudflareDomainBalancer",
     "CloudflareFallbackConfig",
     "build_cfproxy_dns_records_text",
     "build_cfworker_code",

@@ -37,6 +37,7 @@ from telegram_proxy.proxy.dc_map import (
 )
 from telegram_proxy.proxy import socks5
 from telegram_proxy.proxy.cloudflare import (
+    CloudflareDomainBalancer,
     CloudflareFallbackConfig,
     build_cloudflare_domains,
     build_worker_path,
@@ -108,6 +109,7 @@ class TelegramWSProxy:
         self._on_log = on_log
         self._upstream = upstream_config or UpstreamProxyConfig()
         self._cloudflare = cloudflare_config or CloudflareFallbackConfig()
+        self._cloudflare_domain_balancer = CloudflareDomainBalancer()
         self._mtproxy_secret = normalize_secret(mtproxy_secret)
         self._servers: list[asyncio.Server] = []
         self._tasks: set[asyncio.Task] = set()
@@ -144,6 +146,7 @@ class TelegramWSProxy:
         self._dc_upstream_required = set()
         self._ws_blacklist = set()
         self._dc_cooldown = {}
+        self._cloudflare_domain_balancer.reset()
         # Reset semaphore for fresh event loop
         reset_wss_semaphore()
 
@@ -714,7 +717,11 @@ class TelegramWSProxy:
                     )
 
         if self._cloudflare.enabled and self._cloudflare.domains:
-            for domain in build_cloudflare_domains(dc, self._cloudflare):
+            for domain in build_cloudflare_domains(
+                dc,
+                self._cloudflare,
+                balancer=self._cloudflare_domain_balancer,
+            ):
                 try:
                     self._log(f"[{label}] DC{dc}{media_tag} -> Cloudflare wss://{domain}{WSS_PATH}")
                     ws = await RawWebSocket.connect(
@@ -724,6 +731,7 @@ class TelegramWSProxy:
                         timeout=CONNECT_TIMEOUT,
                     )
                     self.stats.cloudflare_connections += 1
+                    self._cloudflare_domain_balancer.record_success(dc, domain)
                     await ws.send(init)
                     if relay_wss_fn is None:
                         await self._relay_wss(client_reader, client_writer, ws, splitter, label, dc=dc)

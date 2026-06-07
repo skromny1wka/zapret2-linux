@@ -103,6 +103,47 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
         self.assertEqual(build_cloudflare_domains(4, config), ["kws4.example.com"])
         self.assertEqual(build_worker_path("149.154.167.91", 4), "/apiws?dst=149.154.167.91&dc=4")
 
+    def test_cloudflare_domain_balancer_keeps_successful_domain_first(self) -> None:
+        from telegram_proxy.proxy.cloudflare import (
+            CloudflareDomainBalancer,
+            CloudflareFallbackConfig,
+            build_cloudflare_domains,
+        )
+
+        config = CloudflareFallbackConfig(
+            enabled=True,
+            domains=("first.example.com", "fast.example.com", "last.example.com"),
+        )
+        balancer = CloudflareDomainBalancer()
+
+        self.assertEqual(
+            build_cloudflare_domains(4, config, balancer=balancer),
+            [
+                "kws4.first.example.com",
+                "kws4.fast.example.com",
+                "kws4.last.example.com",
+            ],
+        )
+
+        balancer.record_success(4, "kws4.fast.example.com")
+
+        self.assertEqual(
+            build_cloudflare_domains(4, config, balancer=balancer),
+            [
+                "kws4.fast.example.com",
+                "kws4.first.example.com",
+                "kws4.last.example.com",
+            ],
+        )
+        self.assertEqual(
+            build_cloudflare_domains(2, config, balancer=balancer),
+            [
+                "kws2.first.example.com",
+                "kws2.fast.example.com",
+                "kws2.last.example.com",
+            ],
+        )
+
     def test_cloudflare_guides_include_dns_records_and_worker_code(self) -> None:
         from telegram_proxy.proxy.cloudflare import build_cfproxy_dns_records_text, build_cfworker_code
 
@@ -166,6 +207,75 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
 
         self.assertIn("_cloudflare_fallback", source)
         self.assertLess(source.index("_cloudflare_fallback"), source.index("_tcp_fallback"))
+
+    def test_wss_proxy_remembers_successful_cloudflare_domain(self) -> None:
+        from telegram_proxy.proxy.cloudflare import CloudflareFallbackConfig
+        from telegram_proxy.wss_proxy import TelegramWSProxy
+
+        class _Ws:
+            async def send(self, data):
+                return None
+
+        calls: list[str] = []
+
+        async def fake_connect(host, domain, path="/apiws", timeout=10.0):
+            calls.append(domain)
+            if domain == "kws4.first.example.com":
+                raise OSError("dead domain")
+            return _Ws()
+
+        async def fake_relay(*args, **kwargs):
+            return None
+
+        proxy = TelegramWSProxy(
+            cloudflare_config=CloudflareFallbackConfig(
+                enabled=True,
+                domains=("first.example.com", "fast.example.com"),
+            )
+        )
+        proxy._relay_wss = fake_relay
+
+        with (
+            patch("telegram_proxy.wss_proxy.RawWebSocket.connect", side_effect=fake_connect),
+            patch("telegram_proxy.wss_proxy.log.warning"),
+        ):
+            first_ok = asyncio.run(
+                proxy._cloudflare_fallback(
+                    None,
+                    None,
+                    "149.154.167.91",
+                    443,
+                    b"x" * 64,
+                    False,
+                    "test",
+                    4,
+                    False,
+                )
+            )
+            second_ok = asyncio.run(
+                proxy._cloudflare_fallback(
+                    None,
+                    None,
+                    "149.154.167.91",
+                    443,
+                    b"x" * 64,
+                    False,
+                    "test",
+                    4,
+                    False,
+                )
+            )
+
+        self.assertTrue(first_ok)
+        self.assertTrue(second_ok)
+        self.assertEqual(
+            calls,
+            [
+                "kws4.first.example.com",
+                "kws4.fast.example.com",
+                "kws4.fast.example.com",
+            ],
+        )
 
 
 if __name__ == "__main__":
