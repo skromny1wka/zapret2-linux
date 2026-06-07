@@ -1,0 +1,37 @@
+"""Accessibility helpers for About page controls."""
+
+from __future__ import annotations
+
+from ui.accessibility import set_control_accessibility
+
+
+def apply_about_buttons_accessibility(*, tr_fn, update_btn=None, premium_btn=None) -> None:
+    """Задаёт понятные имена кнопок вкладки «О программе» для экранного диктора."""
+
+    if update_btn is not None:
+        set_control_accessibility(
+            update_btn,
+            name=tr_fn(
+                "page.about.action.update_settings.accessible_name",
+                "Открыть настройки обновлений",
+            ),
+            description=tr_fn(
+                "page.about.action.update_settings.description",
+                "Открывает страницу настройки автоматической проверки обновлений.",
+            ),
+        )
+    if premium_btn is not None:
+        set_control_accessibility(
+            premium_btn,
+            name=tr_fn(
+                "page.about.action.premium_vpn.accessible_name",
+                "Открыть Premium и VPN",
+            ),
+            description=tr_fn(
+                "page.about.action.premium_vpn.description",
+                "Открывает страницу Premium, VPN и управления подпиской.",
+            ),
+        )
+
+
+__all__ = ["apply_about_buttons_accessibility"]

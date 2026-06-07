@@ -7,6 +7,7 @@ from collections.abc import Callable
 
 from PyQt6.QtWidgets import QLabel, QHBoxLayout, QVBoxLayout
 
+from ui.pages.about_page_accessibility import apply_about_buttons_accessibility
 from ui.fluent_widgets import SettingsCard
 from qfluentwidgets import CaptionLabel, FluentIcon, PrimaryPushButton, PushButton, StrongBodyLabel, SubtitleLabel
 from ui.theme import get_cached_qta_pixmap
@@ -65,6 +66,7 @@ def build_about_page_about_content(
         tr_fn("page.about.button.update_settings", "Настройка обновлений"),
         icon=FluentIcon.SYNC,
     )
+    apply_about_buttons_accessibility(tr_fn=tr_fn, update_btn=update_btn)
     update_btn.clicked.connect(on_open_updates)
     version_layout.addWidget(update_btn)
 
@@ -110,6 +112,7 @@ def build_about_page_about_content(
         tr_fn("page.about.button.premium_vpn", "Premium и VPN"),
         icon=FluentIcon.HEART,
     )
+    apply_about_buttons_accessibility(tr_fn=tr_fn, premium_btn=premium_btn)
     premium_btn.clicked.connect(on_open_premium)
     sub_btns.addWidget(premium_btn)
     sub_btns.addStretch()

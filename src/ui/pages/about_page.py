@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
 
 from .base_page import BasePage
 import about.plans as about_page_plans
+from ui.pages.about_page_accessibility import apply_about_buttons_accessibility
 from ui.pages.about_page_about_build import build_about_page_about_content
 from ui.pages.about_page_help_build import build_about_page_help_content
 from ui.pages.about_page_kvn_build import build_about_page_kvn_content
@@ -275,6 +276,10 @@ class AboutPage(BasePage):
             self.update_btn.setText(
                 tr_catalog("page.about.button.update_settings", language=self._ui_language, default="Настройка обновлений")
             )
+            apply_about_buttons_accessibility(
+                tr_fn=lambda key, default: tr_catalog(key, language=self._ui_language, default=default),
+                update_btn=self.update_btn,
+            )
 
             self.about_section_subscription_label.setText(
                 tr_catalog("page.about.section.subscription", language=self._ui_language, default="Подписка")
@@ -288,6 +293,10 @@ class AboutPage(BasePage):
             )
             self.premium_btn.setText(
                 tr_catalog("page.about.button.premium_vpn", language=self._ui_language, default="Premium и VPN")
+            )
+            apply_about_buttons_accessibility(
+                tr_fn=lambda key, default: tr_catalog(key, language=self._ui_language, default=default),
+                premium_btn=self.premium_btn,
             )
         except Exception:
             pass

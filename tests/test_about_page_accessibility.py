@@ -1,0 +1,86 @@
+from __future__ import annotations
+
+import os
+import unittest
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+from PyQt6.QtWidgets import QApplication, QVBoxLayout, QWidget
+
+from ui.pages.about_page_about_build import build_about_page_about_content
+from ui.pages.about_page import AboutPage
+from ui.theme import get_theme_tokens
+
+
+class AboutPageAccessibilityTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._app = QApplication.instance() or QApplication([])
+
+    def test_about_buttons_have_screen_reader_names(self) -> None:
+        parent = QWidget()
+        layout = QVBoxLayout(parent)
+
+        widgets = build_about_page_about_content(
+            layout,
+            tr_fn=lambda _key, default: default,
+            tokens=get_theme_tokens(),
+            app_version="9.9.9",
+            make_section_label=lambda text: QWidget(),
+            on_open_updates=lambda: None,
+            on_open_premium=lambda: None,
+        )
+
+        self.assertEqual(widgets.update_btn.accessibleName(), "Открыть настройки обновлений")
+        self.assertIn("автоматической проверки", widgets.update_btn.accessibleDescription())
+        self.assertEqual(widgets.premium_btn.accessibleName(), "Открыть Premium и VPN")
+        self.assertIn("Premium", widgets.premium_btn.accessibleDescription())
+
+    def test_about_language_refresh_keeps_screen_reader_names(self) -> None:
+        page = AboutPage.__new__(AboutPage)
+        page._ui_language = "ru"
+        page.about_section_version_label = _TextWidget()
+        page.about_app_name_label = _TextWidget()
+        page.about_version_value_label = _TextWidget()
+        page.update_btn = _TextWidget()
+        page.about_section_subscription_label = _TextWidget()
+        page.sub_desc_label = _TextWidget()
+        page.premium_btn = _TextWidget()
+        page._current_subscription_state = lambda: (False, None)
+        page.update_subscription_status = lambda *_args: None
+
+        AboutPage._retranslate_about_tab(page)
+
+        self.assertEqual(page.update_btn.accessible_name, "Открыть настройки обновлений")
+        self.assertIn("автоматической проверки", page.update_btn.accessible_description)
+        self.assertEqual(page.premium_btn.accessible_name, "Открыть Premium и VPN")
+        self.assertIn("Premium", page.premium_btn.accessible_description)
+
+
+class _TextWidget:
+    def __init__(self) -> None:
+        self.text_value = ""
+        self.accessible_name = ""
+        self.accessible_description = ""
+
+    def setText(self, text: str) -> None:  # noqa: N802
+        self.text_value = str(text)
+
+    def text(self) -> str:
+        return self.text_value
+
+    def accessibleName(self) -> str:  # noqa: N802
+        return self.accessible_name
+
+    def setAccessibleName(self, text: str) -> None:  # noqa: N802
+        self.accessible_name = str(text)
+
+    def accessibleDescription(self) -> str:  # noqa: N802
+        return self.accessible_description
+
+    def setAccessibleDescription(self, text: str) -> None:  # noqa: N802
+        self.accessible_description = str(text)
+
+
+if __name__ == "__main__":
+    unittest.main()
