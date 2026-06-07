@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from collections.abc import Callable
 
 from qfluentwidgets import SettingCardGroup, PushSettingCard, PrimaryPushSettingCard
+from ui.pages.about_page_support_accessibility import set_support_card_accessibility
 from ui.theme import get_themed_qta_icon
 
 
@@ -41,6 +42,14 @@ def build_about_page_support_content(
             "Основной канал поддержки. Здесь можно задать вопрос, описать проблему и приложить материалы вручную.",
         ),
     )
+    set_support_card_accessibility(
+        discussions_card,
+        action_name=tr_fn("page.about.support.discussions.accessible_name", "Открыть GitHub Discussions"),
+        description=tr_fn(
+            "page.about.support.discussions.desc",
+            "Основной канал поддержки. Здесь можно задать вопрос, описать проблему и приложить материалы вручную.",
+        ),
+    )
     discussions_card.clicked.connect(on_open_discussions)
     discussions_group.addSettingCard(discussions_card)
     layout.addWidget(discussions_group)
@@ -56,6 +65,11 @@ def build_about_page_support_content(
         tr_fn("page.about.support.telegram.title", "Telegram"),
         tr_fn("page.about.support.telegram.desc", "Быстрые вопросы и общение с сообществом"),
     )
+    set_support_card_accessibility(
+        telegram_card,
+        action_name=tr_fn("page.about.support.telegram.accessible_name", "Открыть Telegram"),
+        description=tr_fn("page.about.support.telegram.desc", "Быстрые вопросы и общение с сообществом"),
+    )
     telegram_card.clicked.connect(on_open_telegram)
 
     discord_card = PushSettingCard(
@@ -63,6 +77,11 @@ def build_about_page_support_content(
         get_themed_qta_icon("fa5b.discord", color="#5865F2"),
         tr_fn("page.about.support.discord.title", "Discord"),
         tr_fn("page.about.support.discord.desc", "Обсуждение и живое общение"),
+    )
+    set_support_card_accessibility(
+        discord_card,
+        action_name=tr_fn("page.about.support.discord.accessible_name", "Открыть Discord"),
+        description=tr_fn("page.about.support.discord.desc", "Обсуждение и живое общение"),
     )
     discord_card.clicked.connect(on_open_discord)
 
