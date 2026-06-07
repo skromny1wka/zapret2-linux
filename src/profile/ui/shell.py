@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from PyQt6.QtWidgets import QWidget, QVBoxLayout
 
+from profile.ui.shell_accessibility import apply_profile_shell_accessibility
 from ui.fluent_widgets import set_tooltip
 from ui.presets_menu.toolbar import PresetsToolbarLayout
 from qfluentwidgets import FluentIcon, PrimaryPushButton, PrimaryToolButton, PushButton, SearchLineEdit
@@ -59,14 +60,19 @@ def build_profile_shell(
         FluentIcon.ADD,
     )
     add_profile_btn.clicked.connect(on_add_user_profile)
+    add_profile_description = tr_fn(
+        _toolbar_key("add.description"),
+        "Добавить новый пользовательский profile в общий список.",
+    )
     set_tooltip(
         add_profile_btn,
-        tr_fn(
-            _toolbar_key("add.description"),
-            "Добавить новый пользовательский profile в общий список.",
-        )
+        add_profile_description,
     )
 
+    request_hint = tr_fn(
+        request_hint_key,
+        f"Хотите добавить новый сайт или сервис в {engine_label}? Откройте готовую форму на GitHub и опишите, что нужно добавить в hostlist или ipset.",
+    )
     request_btn = PrimaryPushButton(
         tr_fn(request_button_key, "ОТКРЫТЬ ФОРМУ НА GITHUB"),
         icon=FluentIcon.GITHUB,
@@ -74,12 +80,13 @@ def build_profile_shell(
     request_btn.clicked.connect(on_open_profile_request_form)
     set_tooltip(
         request_btn,
-        tr_fn(
-            request_hint_key,
-            f"Хотите добавить новый сайт или сервис в {engine_label}? Откройте готовую форму на GitHub и опишите, что нужно добавить в hostlist или ipset.",
-        )
+        request_hint,
     )
 
+    expand_description = tr_fn(
+        _toolbar_key("expand.description"),
+        "Развернуть все группы профилей в списке.",
+    )
     expand_btn = PushButton(
         tr_fn(_toolbar_key("expand"), "Развернуть"),
         icon=FluentIcon.FULL_SCREEN,
@@ -87,12 +94,13 @@ def build_profile_shell(
     expand_btn.clicked.connect(on_expand_all)
     set_tooltip(
         expand_btn,
-        tr_fn(
-            _toolbar_key("expand.description"),
-            "Развернуть все группы профилей в списке.",
-        )
+        expand_description,
     )
 
+    collapse_description = tr_fn(
+        _toolbar_key("collapse.description"),
+        "Свернуть все группы профилей в списке.",
+    )
     collapse_btn = PushButton(
         tr_fn(_toolbar_key("collapse"), "Свернуть"),
         icon=FluentIcon.BACK_TO_WINDOW,
@@ -100,12 +108,13 @@ def build_profile_shell(
     collapse_btn.clicked.connect(on_collapse_all)
     set_tooltip(
         collapse_btn,
-        tr_fn(
-            _toolbar_key("collapse.description"),
-            "Свернуть все группы профилей в списке.",
-        )
+        collapse_description,
     )
 
+    order_description = tr_fn(
+        _toolbar_key("order.description"),
+        "Открыть отдельный список для изменения реального порядка профилей внутри файла пресета.",
+    )
     order_btn = PushButton(
         tr_fn(_toolbar_key("order"), "Порядок в пресете"),
         icon=FluentIcon.MENU,
@@ -113,12 +122,13 @@ def build_profile_shell(
     order_btn.clicked.connect(on_open_profile_order)
     set_tooltip(
         order_btn,
-        tr_fn(
-            _toolbar_key("order.description"),
-            "Открыть отдельный список для изменения реального порядка профилей внутри файла пресета.",
-        )
+        order_description,
     )
 
+    info_description = tr_fn(
+        _toolbar_key("info.description"),
+        f"Показать краткое объяснение по работе режима профилей {engine_label}.",
+    )
     info_btn = PushButton(
         tr_fn(_toolbar_key("info"), "Что это такое?"),
         icon=FluentIcon.QUESTION,
@@ -126,20 +136,29 @@ def build_profile_shell(
     info_btn.clicked.connect(on_show_info_popup)
     set_tooltip(
         info_btn,
-        tr_fn(
-            _toolbar_key("info.description"),
-            f"Показать краткое объяснение по работе режима профилей {engine_label}.",
-        )
+        info_description,
     )
 
+    search_placeholder = tr_fn(_toolbar_key("search.placeholder"), "Поиск профиля по имени, портам и т.д.")
     profile_search_input = SearchLineEdit(content_parent)
-    profile_search_input.setPlaceholderText(
-        tr_fn(_toolbar_key("search.placeholder"), "Поиск профиля по имени, портам и т.д.")
-    )
+    profile_search_input.setPlaceholderText(search_placeholder)
     profile_search_input.setClearButtonEnabled(True)
     profile_search_input.setFixedHeight(34)
     profile_search_input.setProperty("noDrag", True)
     profile_search_input.textChanged.connect(on_profile_search_text_changed)
+    apply_profile_shell_accessibility(
+        add_profile_btn=add_profile_btn,
+        request_btn=request_btn,
+        expand_btn=expand_btn,
+        collapse_btn=collapse_btn,
+        order_btn=order_btn,
+        info_btn=info_btn,
+        profile_search_input=profile_search_input,
+        tr_fn=tr_fn,
+        toolbar_key=_toolbar_key,
+        request_hint=request_hint,
+        engine_label=engine_label,
+    )
 
     toolbar_actions_bar.set_buttons([
         add_profile_btn,
