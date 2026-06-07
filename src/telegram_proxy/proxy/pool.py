@@ -5,7 +5,7 @@ import logging
 import time
 from typing import Optional
 
-from telegram_proxy.dc_map import (
+from telegram_proxy.proxy.dc_map import (
     WSS_DOMAINS,
     WSS_PATH,
     WSS_RELAY_IP,

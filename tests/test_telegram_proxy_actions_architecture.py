@@ -29,11 +29,11 @@ class TelegramProxyActionsArchitectureTests(unittest.TestCase):
         manager_source = inspect.getsource(telegram_manager.build_upstream_proxy_config_from_settings)
         commands_source = inspect.getsource(telegram_commands.build_upstream_config)
 
-        self.assertIn("telegram_proxy.settings", manager_source)
+        self.assertIn("telegram_proxy.config.settings", manager_source)
         self.assertIn("build_upstream_config", manager_source)
         self.assertNotIn("get_tg_proxy_upstream_enabled", manager_source)
         self.assertNotIn("get_tg_proxy_upstream_host", manager_source)
-        self.assertIn("telegram_proxy.settings", commands_source)
+        self.assertIn("telegram_proxy.config.settings", commands_source)
 
     def test_wss_proxy_is_split_into_focused_modules(self) -> None:
         transport = importlib.import_module("telegram_proxy.proxy.transport")
@@ -78,11 +78,39 @@ class TelegramProxyActionsArchitectureTests(unittest.TestCase):
         self.assertTrue((proxy_root / "stats.py").exists())
         self.assertTrue((proxy_root / "mtproto.py").exists())
         self.assertTrue((proxy_root / "pool.py").exists())
+        self.assertTrue((proxy_root / "dc_map.py").exists())
+        self.assertTrue((proxy_root / "socks5.py").exists())
 
         self.assertFalse((telegram_proxy_root / "raw_websocket.py").exists())
         self.assertFalse((telegram_proxy_root / "relay.py").exists())
         self.assertFalse((telegram_proxy_root / "routing.py").exists())
         self.assertFalse((telegram_proxy_root / "stats.py").exists())
+        self.assertFalse((telegram_proxy_root / "dc_map.py").exists())
+        self.assertFalse((telegram_proxy_root / "socks5.py").exists())
+
+    def test_config_and_diagnostics_live_in_focused_packages(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        telegram_proxy_root = root / "src" / "telegram_proxy"
+        config_root = telegram_proxy_root / "config"
+        diagnostics_root = telegram_proxy_root / "diagnostics"
+
+        settings = importlib.import_module("telegram_proxy.config.settings")
+        upstream_catalog = importlib.import_module("telegram_proxy.config.upstream_catalog")
+        diagnostics_runner = importlib.import_module("telegram_proxy.diagnostics.runner")
+
+        self.assertTrue((config_root / "__init__.py").exists())
+        self.assertTrue((config_root / "settings.py").exists())
+        self.assertTrue((config_root / "upstream_catalog.py").exists())
+        self.assertTrue((diagnostics_root / "__init__.py").exists())
+        self.assertTrue((diagnostics_root / "runner.py").exists())
+
+        self.assertTrue(hasattr(settings, "build_upstream_config"))
+        self.assertTrue(hasattr(upstream_catalog, "UpstreamCatalog"))
+        self.assertTrue(hasattr(diagnostics_runner, "run_all"))
+
+        self.assertFalse((telegram_proxy_root / "settings.py").exists())
+        self.assertFalse((telegram_proxy_root / "upstream_catalog.py").exists())
+        self.assertFalse((telegram_proxy_root / "diagnostics.py").exists())
 
 
 if __name__ == "__main__":

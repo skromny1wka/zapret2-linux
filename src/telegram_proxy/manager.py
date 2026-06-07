@@ -125,7 +125,7 @@ def get_proxy_manager() -> TelegramProxyManager:
 
 def build_upstream_proxy_config_from_settings() -> Optional[UpstreamProxyConfig]:
     try:
-        import telegram_proxy.settings as telegram_proxy_settings
+        import telegram_proxy.config.settings as telegram_proxy_settings
 
         return telegram_proxy_settings.build_upstream_config()
     except Exception:

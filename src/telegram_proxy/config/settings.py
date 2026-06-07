@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from telegram_proxy.upstream_catalog import UpstreamCatalog
+from telegram_proxy.config.upstream_catalog import UpstreamCatalog
 
 
 @dataclass(slots=True)

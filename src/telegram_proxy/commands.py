@@ -40,7 +40,7 @@ def start_proxy_if_enabled_async() -> bool:
 
 def get_start_config() -> TelegramProxyStartConfig:
     from settings.store import get_tg_proxy_host, get_tg_proxy_port
-    from telegram_proxy.settings import build_upstream_config
+    from telegram_proxy.config.settings import build_upstream_config
 
     return TelegramProxyStartConfig(
         host=str(get_tg_proxy_host() or "127.0.0.1"),
@@ -51,7 +51,7 @@ def get_start_config() -> TelegramProxyStartConfig:
 
 
 def build_upstream_config():
-    from telegram_proxy.settings import build_upstream_config as _build_upstream_config
+    from telegram_proxy.config.settings import build_upstream_config as _build_upstream_config
 
     return _build_upstream_config()
 
@@ -68,13 +68,13 @@ def append_log_line(message: str) -> None:
 
 
 def consume_auto_deeplink_request() -> bool:
-    import telegram_proxy.settings as telegram_proxy_settings
+    import telegram_proxy.config.settings as telegram_proxy_settings
 
     return bool(telegram_proxy_settings.consume_auto_deeplink_request())
 
 
 def load_page_initial_state():
-    import telegram_proxy.settings as telegram_proxy_settings
+    import telegram_proxy.config.settings as telegram_proxy_settings
 
     return telegram_proxy_settings.load_page_initial_state()
 
@@ -88,7 +88,7 @@ def save_settings_action(
     password: str = "",
     enabled: bool = False,
 ):
-    import telegram_proxy.settings as telegram_proxy_settings
+    import telegram_proxy.config.settings as telegram_proxy_settings
 
     action_name = str(action or "").strip()
     if action_name == "host":

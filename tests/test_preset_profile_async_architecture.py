@@ -87,7 +87,7 @@ import telegram_proxy.ui.diagnostics_workflow as telegram_diag_workflow
 import telegram_proxy.ui.proxy_runtime_workflow as telegram_runtime_workflow
 import telegram_proxy.ui.page as telegram_page
 import telegram_proxy.commands as telegram_proxy_commands
-import telegram_proxy.settings as telegram_proxy_settings
+import telegram_proxy.config.settings as telegram_proxy_settings
 import telegram_proxy.ui.settings_build as telegram_proxy_settings_build
 from app.feature_facades.telegram_proxy import TelegramProxyFeature
 import telegram_proxy.ui.upstream_workflow as telegram_upstream_workflow
@@ -2469,7 +2469,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("load_page_initial_state", worker_source)
 
     def test_telegram_proxy_initial_state_plan_reads_settings_once(self) -> None:
-        from telegram_proxy.upstream_catalog import UpstreamCatalog
+        from telegram_proxy.config.upstream_catalog import UpstreamCatalog
 
         catalog = UpstreamCatalog(build_presets=[
             {
@@ -2497,7 +2497,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         }
 
         with (
-            patch("telegram_proxy.upstream_catalog.UpstreamCatalog.load_from_runtime", return_value=catalog),
+            patch("telegram_proxy.config.upstream_catalog.UpstreamCatalog.load_from_runtime", return_value=catalog),
             patch("settings.store.read_settings", return_value=data) as read_settings,
         ):
             plan = telegram_proxy_settings.load_page_initial_state()
@@ -2572,7 +2572,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("_auto_deeplink_worker =", page_source)
         self.assertNotIn("worker.start()", start_source)
         self.assertIn("create_auto_deeplink_worker", feature_source)
-        self.assertIn("telegram_proxy.settings", command_source)
+        self.assertIn("telegram_proxy.config.settings", command_source)
         self.assertIn("consume_auto_deeplink_request", worker_source)
 
     def test_dns_check_save_runs_through_worker(self) -> None:

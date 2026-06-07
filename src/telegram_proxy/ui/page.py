@@ -64,7 +64,7 @@ from ui.fluent_widgets import (
 from log.log import log
 
 import telegram_proxy.ui.page_runtime as telegram_proxy_page_runtime
-import telegram_proxy.settings as telegram_proxy_settings
+import telegram_proxy.config.settings as telegram_proxy_settings
 from qfluentwidgets import (
     BodyLabel,
     CaptionLabel,

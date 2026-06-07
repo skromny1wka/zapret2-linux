@@ -23,7 +23,7 @@ import logging
 import time
 from typing import Optional, Callable
 
-from telegram_proxy.dc_map import (
+from telegram_proxy.proxy.dc_map import (
     ip_to_dc,
     is_telegram_ip,
     ws_domains_for_dc,
@@ -34,7 +34,7 @@ from telegram_proxy.dc_map import (
     WSS_PATH,
     # TRANSPARENT_PORT_BASE,  # Transparent mode removed
 )
-from telegram_proxy import socks5
+from telegram_proxy.proxy import socks5
 from telegram_proxy.proxy.mtproto import (
     MsgSplitter as _MsgSplitter,
     dc_from_init as _dc_from_init,

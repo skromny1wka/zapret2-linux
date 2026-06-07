@@ -10,7 +10,7 @@ from os import urandom
 
 from log.log import log
 from settings.mode import ENGINE_WINWS2
-import telegram_proxy.settings as telegram_proxy_settings
+import telegram_proxy.config.settings as telegram_proxy_settings
 from utils.windows_process_probe import iter_process_records_winapi
 
 DC_TARGETS = [
