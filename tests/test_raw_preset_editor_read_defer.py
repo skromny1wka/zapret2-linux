@@ -39,7 +39,7 @@ class RawPresetEditorReadDeferTests(unittest.TestCase):
         page._cleanup_in_progress = False
         page._preset_path = "C:/Zapret/Dev/presets/winws2/Default.txt"
         page._preset_file_name = "Default.txt"
-        page._raw_editor_text_snapshot = ""
+        page._raw_editor_text_snapshot = None
         page.editor = _RawTextEditor("--new\n--filter-tcp=443\n")
         page._raw_save_runtime = _Runtime(running=False)
         page._raw_activate_runtime = _Runtime(running=False)
@@ -67,7 +67,7 @@ class RawPresetEditorReadDeferTests(unittest.TestCase):
         page._cleanup_in_progress = False
         page._preset_path = "C:/Zapret/Dev/presets/winws2/Default.txt"
         page._preset_file_name = "Default.txt"
-        page._raw_editor_text_snapshot = ""
+        page._raw_editor_text_snapshot = None
         page.editor = _RawTextEditor("--new\n--filter-tcp=443\n")
         page._raw_save_runtime = _Runtime(running=False)
         page._raw_activate_runtime = _Runtime(running=False)
