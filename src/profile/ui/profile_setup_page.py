@@ -1096,7 +1096,9 @@ class ProfileSetupPageBase(BasePage):
         self._list_file_status_label = None
         self._list_file_save_button = None
         self._list_file_kind = ""
+        self._list_file_base_text_snapshot = ""
         self._list_file_text_snapshot = ""
+        self._list_file_text_dirty = True
         self._list_file_user_entries_count = 0
         self._list_file_base_entries_count = 0
         self._list_file_normal_style = ""
@@ -2537,7 +2539,8 @@ class ProfileSetupPageBase(BasePage):
         invalid_lines = tuple(getattr(state, "invalid_lines", ()) or ())
         self._list_file_kind = kind
         visible_user_text = user_text if editable else text
-        self._list_file_text_snapshot = visible_user_text
+        base_text_changed = self.__dict__.get("_list_file_base_text_snapshot", "") != base_text
+        user_text_changed = self.__dict__.get("_list_file_text_snapshot", "") != visible_user_text
         self._list_file_base_entries_count = _list_file_entries_count(base_text) if editable else 0
         self._list_file_user_entries_count = _list_file_entries_count(visible_user_text)
 
@@ -2556,13 +2559,15 @@ class ProfileSetupPageBase(BasePage):
             set_widget_visible_if_changed(self._list_file_base_text, editable)
             self._list_file_base_text.blockSignals(True)
             try:
-                set_plain_text_if_changed(self._list_file_base_text, base_text)
+                if base_text_changed:
+                    self._list_file_base_text.setPlainText(base_text)
                 if kind == "ipset":
                     set_placeholder_text_if_changed(self._list_file_base_text, "В базе пока нет IP или подсетей.")
                 else:
                     set_placeholder_text_if_changed(self._list_file_base_text, "В базе пока нет доменов.")
             finally:
                 self._list_file_base_text.blockSignals(False)
+        self._list_file_base_text_snapshot = base_text
         if self._list_file_user_title is not None:
             set_widget_visible_if_changed(self._list_file_user_title, editable)
             set_widget_text_if_changed(
@@ -2572,7 +2577,8 @@ class ProfileSetupPageBase(BasePage):
         if self._list_file_text is not None:
             self._list_file_text.blockSignals(True)
             try:
-                set_plain_text_if_changed(self._list_file_text, user_text if editable else text)
+                if user_text_changed:
+                    self._list_file_text.setPlainText(visible_user_text)
                 set_read_only_if_changed(self._list_file_text, not editable)
                 if kind == "ipset":
                     set_placeholder_text_if_changed(self._list_file_text, "IP или подсети по одному на строку:\n1.2.3.4\n10.0.0.0/8")
@@ -2580,6 +2586,8 @@ class ProfileSetupPageBase(BasePage):
                     set_placeholder_text_if_changed(self._list_file_text, "Домены по одному на строку:\nexample.com\nsub.example.org")
             finally:
                 self._list_file_text.blockSignals(False)
+        self._list_file_text_snapshot = visible_user_text
+        self._list_file_text_dirty = False
         if self._list_file_save_button is not None:
             set_widget_enabled_if_changed(self._list_file_save_button, editable and not invalid_lines)
         if self._list_file_status_label is not None:
@@ -2600,6 +2608,7 @@ class ProfileSetupPageBase(BasePage):
     def _on_list_file_text_changed(self) -> None:
         if self._loading or self._list_file_text is None:
             return
+        self._list_file_text_dirty = True
         timer = self.__dict__.get("_list_file_validation_timer")
         if timer is not None:
             try:
@@ -2631,11 +2640,15 @@ class ProfileSetupPageBase(BasePage):
         request = dict(request or {})
         raw_text = request.get("text")
         if raw_text is None:
-            editor = self.__dict__.get("_list_file_text")
-            text = str(editor.toPlainText() or "") if editor is not None else ""
+            if not bool(self.__dict__.get("_list_file_text_dirty", True)):
+                text = str(self.__dict__.get("_list_file_text_snapshot", "") or "")
+            else:
+                editor = self.__dict__.get("_list_file_text")
+                text = str(editor.toPlainText() or "") if editor is not None else ""
         else:
             text = str(raw_text or "")
         self._list_file_text_snapshot = text
+        self._list_file_text_dirty = False
         return {
             "kind": str(request.get("kind") or ""),
             "text": text,

@@ -584,6 +584,8 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         page._list_file_base_text = _PlainTextWidget("base.example")
         page._list_file_user_title = None
         page._list_file_text = _PlainTextWidget("user.example", read_only=False)
+        page._list_file_base_text_snapshot = "base.example"
+        page._list_file_text_snapshot = "user.example"
         page._list_file_save_button = _BoolWidget(enabled=True)
         page._list_file_status_label = _TextWidget("Записей всего: 2 • ваших: 1")
         page._render_list_file_validation = Mock()
@@ -604,7 +606,9 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         ProfileSetupPageBase._apply_list_file_editor_state(page, state)
 
         self.assertEqual(page._list_file_base_text.plain_text_calls, [])
+        self.assertEqual(page._list_file_base_text.plain_text_read_calls, [])
         self.assertEqual(page._list_file_text.plain_text_calls, [])
+        self.assertEqual(page._list_file_text.plain_text_read_calls, [])
         self.assertEqual(page._list_file_text.read_only_calls, [])
         self.assertEqual(page._list_file_status_label.calls, [])
 
@@ -890,6 +894,25 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
             "kind": "hostlist",
             "text": None,
         })
+
+    def test_list_file_validation_uses_snapshot_when_editor_is_unchanged(self) -> None:
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._list_file_text = _PlainTextWidget("user.example\nsecond.example")
+        page._list_file_text_snapshot = "user.example\nsecond.example"
+        page._list_file_text_dirty = False
+
+        request = ProfileSetupPageBase._resolve_list_file_validation_request(
+            page,
+            {"kind": "hostlist", "text": None},
+        )
+
+        self.assertEqual(request, {
+            "kind": "hostlist",
+            "text": "user.example\nsecond.example",
+        })
+        self.assertEqual(page._list_file_text.plain_text_read_calls, [])
 
     def test_list_file_validation_result_updates_entries_count_from_worker(self) -> None:
         from unittest.mock import Mock
