@@ -20,347 +20,48 @@ The relay reads the DC id from the init packet and routes internally.
 
 import asyncio
 import logging
-import struct
 import time
 from typing import Optional, Callable
 
 from telegram_proxy.dc_map import (
     ip_to_dc,
-    ip_to_dc_media,
-    dc_to_tcp_endpoint,
     is_telegram_ip,
     ws_domains_for_dc,
     # transparent_port_to_dc,  # Transparent mode removed (WinDivert loopback limitation)
     IP_TO_DC,
     WSS_DOMAINS,
     WSS_RELAY_IP,
-    WSS_RELAY_IPS,
     WSS_PATH,
     # TRANSPARENT_PORT_BASE,  # Transparent mode removed
 )
 from telegram_proxy import socks5
-from telegram_proxy.raw_websocket import RawWebSocket, WsHandshakeError
-from telegram_proxy.relay import RELAY_BUFFER, relay_tcp, relay_wss
-from telegram_proxy.routing import UpstreamProxyConfig, check_relay_reachable, should_route_upstream
-from telegram_proxy.stats import ProxyStats
+from telegram_proxy.proxy.mtproto import (
+    MsgSplitter as _MsgSplitter,
+    dc_from_init as _dc_from_init,
+    is_http_transport as _is_http_transport,
+    patch_init_dc as _patch_init_dc,
+)
+from telegram_proxy.proxy.pool import (
+    WsPool as _WsPool,
+    get_wss_semaphore as _get_wss_semaphore,
+    relay_ip_for_domain as _relay_ip_for_domain,
+    reset_wss_semaphore,
+)
+from telegram_proxy.proxy.relay import RELAY_BUFFER, relay_tcp, relay_wss
+from telegram_proxy.proxy.routing import UpstreamProxyConfig, check_relay_reachable, should_route_upstream
+from telegram_proxy.proxy.stats import ProxyStats
+from telegram_proxy.proxy.transport import RawWebSocket, WsHandshakeError
 
 log = logging.getLogger("tg_proxy")
 
 # WebSocket / TCP connect timeout
 CONNECT_TIMEOUT = 10.0
 
-# Max retry attempts for WSS connection per domain
-MAX_RETRIES = 1
-
-# WebSocket connection pool settings
-_WS_POOL_SIZE = 4        # connections per (dc, is_media) key
-_WS_POOL_MAX_AGE = 120.0  # seconds before evicting idle connections
-
 # DC fail cooldown (seconds)
 DC_FAIL_COOLDOWN = 10.0
 
 # How long to wait for first server response before declaring DC blocked
 _RECV_ZERO_TIMEOUT = 8.0
-
-# Max concurrent WSS handshakes — prevents TLS flood that kills the network
-_MAX_CONCURRENT_WSS = 4
-_wss_semaphore: Optional[asyncio.Semaphore] = None
-
-
-def _get_wss_semaphore() -> asyncio.Semaphore:
-    """Lazy-init semaphore (must be created inside an event loop)."""
-    global _wss_semaphore
-    if _wss_semaphore is None:
-        _wss_semaphore = asyncio.Semaphore(_MAX_CONCURRENT_WSS)
-    return _wss_semaphore
-
-# ---- MTProto init packet parsing ----
-
-
-def _dc_from_init(data: bytes) -> tuple[Optional[int], bool]:
-    """Extract DC id from the 64-byte MTProto obfuscation init packet.
-
-    The init packet structure:
-    - bytes 0-7: random padding
-    - bytes 8-39: AES-CTR encryption key (32 bytes)
-    - bytes 40-55: AES-CTR IV (16 bytes)
-    - bytes 56-63: encrypted payload containing protocol + dc_id
-
-    We derive the AES-CTR keystream and decrypt bytes 56-63 to read:
-    - bytes 0-3 of decrypted: protocol id (0xEFEFEFEF, 0xEEEEEEEE, 0xDDDDDDDD)
-    - bytes 4-5 of decrypted: dc_id (signed int16, negative = media DC)
-
-    Returns (dc_id, is_media). dc_id is None if extraction fails.
-    """
-    if len(data) < 64:
-        return None, False
-
-    try:
-        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-        key = bytes(data[8:40])
-        iv = bytes(data[40:56])
-        cipher = Cipher(algorithms.AES(key), modes.CTR(iv))
-        encryptor = cipher.encryptor()
-        keystream = encryptor.update(b"\x00" * 64) + encryptor.finalize()
-        plain = bytes(a ^ b for a, b in zip(data[56:64], keystream[56:64]))
-
-        proto = struct.unpack("<I", plain[0:4])[0]
-        dc_raw = struct.unpack("<h", plain[4:6])[0]
-
-        log.debug("dc_from_init: proto=0x%08X dc_raw=%d", proto, dc_raw)
-
-        if proto in (0xEFEFEFEF, 0xEEEEEEEE, 0xDDDDDDDD):
-            dc = abs(dc_raw)
-            if 1 <= dc <= 1000:
-                return dc, (dc_raw < 0)
-    except ImportError:
-        log.warning("cryptography library not installed -- cannot parse MTProto init")
-    except Exception as exc:
-        log.debug("DC extraction failed: %s", exc)
-
-    return None, False
-
-
-def _patch_init_dc(data: bytes, dc: int) -> bytes:
-    """Patch dc_id in the 64-byte MTProto init packet.
-
-    Some clients (Android with useSecret=0) leave bytes 60-61 as random.
-    The WS relay needs a valid dc_id to route correctly.
-    """
-    if len(data) < 64:
-        return data
-    try:
-        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-        new_dc = struct.pack("<h", dc)
-        key_raw = bytes(data[8:40])
-        iv = bytes(data[40:56])
-        cipher = Cipher(algorithms.AES(key_raw), modes.CTR(iv))
-        enc = cipher.encryptor()
-        ks = enc.update(b"\x00" * 64) + enc.finalize()
-        patched = bytearray(data[:64])
-        patched[60] = ks[60] ^ new_dc[0]
-        patched[61] = ks[61] ^ new_dc[1]
-        log.debug("init patched: dc_id -> %d", dc)
-        if len(data) > 64:
-            return bytes(patched) + data[64:]
-        return bytes(patched)
-    except Exception:
-        return data
-
-
-# ---- MTProto message splitter ----
-
-
-class _MsgSplitter:
-    """Splits client TCP data into individual MTProto abridged-protocol
-    messages so each can be sent as a separate WebSocket frame.
-
-    The Telegram WS relay processes one MTProto message per WS frame.
-    Mobile clients batch multiple messages in a single TCP write (e.g.,
-    msgs_ack + req_DH_params). If sent as one WS frame, the relay
-    only processes the first message and the DH handshake never completes.
-
-    IMPORTANT: buffers trailing incomplete messages. If a TCP chunk ends
-    mid-message, the tail is prepended to the next chunk. Sending a
-    partial message as a WS frame causes the relay to drop the connection.
-    """
-
-    def __init__(self, init_data: bytes):
-        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-        key_raw = bytes(init_data[8:40])
-        iv = bytes(init_data[40:56])
-        cipher = Cipher(algorithms.AES(key_raw), modes.CTR(iv))
-        self._dec = cipher.encryptor()
-        self._dec.update(b"\x00" * 64)  # Skip the init packet itself
-
-    def split(self, chunk: bytes) -> list[bytes]:
-        """Find message boundaries, split into separate WS frames.
-
-        If only 0 or 1 complete message found, returns [chunk] as-is.
-        If multiple messages found, splits at boundaries.
-        Trailing data (partial message) is appended to the LAST
-        complete message frame — the relay handles this correctly.
-        """
-        plain = self._dec.update(chunk)
-        boundaries: list[int] = []
-        pos = 0
-        while pos < len(plain):
-            first = plain[pos]
-            if first == 0x7F:
-                if pos + 4 > len(plain):
-                    break
-                msg_len = (
-                    struct.unpack_from("<I", plain, pos + 1)[0] & 0xFFFFFF
-                ) * 4
-                pos += 4
-            else:
-                msg_len = first * 4
-                pos += 1
-            if msg_len == 0 or pos + msg_len > len(plain):
-                break
-            pos += msg_len
-            boundaries.append(pos)
-
-        if len(boundaries) <= 1:
-            return [chunk]
-
-        # Multiple messages: split, trailing data goes with last frame
-        parts: list[bytes] = []
-        prev = 0
-        for i, b in enumerate(boundaries):
-            if i == len(boundaries) - 1:
-                # Last boundary: include any trailing data
-                parts.append(chunk[prev:])
-            else:
-                parts.append(chunk[prev:b])
-            prev = b
-        return parts
-
-
-def _relay_ip_for_domain(domain: str) -> str:
-    """Get the relay IP for a WSS domain, with fallback."""
-    return WSS_RELAY_IPS.get(domain, WSS_RELAY_IP)
-
-
-# ---- HTTP transport detection ----
-
-
-def _is_http_transport(data: bytes) -> bool:
-    """Check if data looks like HTTP (not MTProto)."""
-    return (data[:5] == b"POST " or data[:4] == b"GET " or
-            data[:5] == b"HEAD " or data[:8] == b"OPTIONS ")
-
-
-# ---- WebSocket connection pool ----
-
-
-class _WsPool:
-    """Pre-opened WebSocket connection pool.
-
-    Maintains up to _WS_POOL_SIZE idle connections per (dc, is_media) key.
-    When a connection is taken, a background refill task replenishes the pool.
-    Stale (older than _WS_POOL_MAX_AGE) or closed connections are evicted on get().
-    """
-
-    def __init__(self, stats: ProxyStats):
-        # {(dc, is_media): [(RawWebSocket, created_timestamp), ...]}
-        self._idle: dict[tuple[int, bool], list[tuple[RawWebSocket, float]]] = {}
-        self._refilling: set[tuple[int, bool]] = set()
-        self._stats = stats
-
-    async def get(
-        self, dc: int, is_media: bool,
-        target_ip: str, domains: list[str],
-    ) -> Optional[RawWebSocket]:
-        """Return a pooled WebSocket or None if pool is empty.
-
-        Evicts stale/closed entries. Triggers background refill.
-        """
-        key = (dc, is_media)
-        now = time.monotonic()
-
-        bucket = self._idle.get(key, [])
-        while bucket:
-            ws, created = bucket.pop(0)
-            age = now - created
-            if age > _WS_POOL_MAX_AGE or ws._closed:
-                asyncio.create_task(self._quiet_close(ws))
-                continue
-            self._stats.pool_hits += 1
-            media_tag = "m" if is_media else ""
-            log.debug("WS pool hit for DC%d%s (age=%.1fs, left=%d)",
-                      dc, media_tag, age, len(bucket))
-            self._schedule_refill(key, target_ip, domains)
-            return ws
-
-        self._stats.pool_misses += 1
-        self._schedule_refill(key, target_ip, domains)
-        return None
-
-    def _schedule_refill(
-        self, key: tuple[int, bool],
-        target_ip: str, domains: list[str],
-    ) -> None:
-        """Start a background refill if one isn't already running for this key."""
-        if key in self._refilling:
-            return
-        self._refilling.add(key)
-        asyncio.create_task(self._refill(key, target_ip, domains))
-
-    async def _refill(
-        self, key: tuple[int, bool],
-        target_ip: str, domains: list[str],
-    ) -> None:
-        """Open new WebSocket connections until the bucket is full."""
-        dc, is_media = key
-        try:
-            bucket = self._idle.setdefault(key, [])
-            needed = _WS_POOL_SIZE - len(bucket)
-            if needed <= 0:
-                return
-            tasks = [
-                asyncio.create_task(self._connect_one(target_ip, domains))
-                for _ in range(needed)
-            ]
-            for t in tasks:
-                try:
-                    ws = await t
-                    if ws is not None:
-                        bucket.append((ws, time.monotonic()))
-                except Exception:
-                    pass
-            media_tag = "m" if is_media else ""
-            log.debug("WS pool refilled DC%d%s: %d ready",
-                      dc, media_tag, len(bucket))
-        finally:
-            self._refilling.discard(key)
-
-    @staticmethod
-    async def _connect_one(
-        target_ip: str, domains: list[str],
-    ) -> Optional[RawWebSocket]:
-        """Try to open one WebSocket connection, cycling through domains."""
-        sem = _get_wss_semaphore()
-        async with sem:
-            for domain in domains:
-                relay_ip = _relay_ip_for_domain(domain)
-                try:
-                    ws = await RawWebSocket.connect(
-                        relay_ip, domain, WSS_PATH, timeout=8.0,
-                    )
-                    return ws
-                except WsHandshakeError as exc:
-                    if exc.is_redirect:
-                        continue
-                    return None
-                except Exception:
-                    return None
-        return None
-
-    @staticmethod
-    async def _quiet_close(ws: RawWebSocket) -> None:
-        """Close a WebSocket without raising."""
-        try:
-            await ws.close()
-        except Exception:
-            pass
-
-    async def warmup(self) -> None:
-        """Pre-fill pool for all DCs that have working WSS relays."""
-        for dc, domain_list in WSS_DOMAINS.items():
-            for is_media in (False, True):
-                key = (dc, is_media)
-                domains = ws_domains_for_dc(dc, is_media)
-                self._schedule_refill(key, WSS_RELAY_IP, domains)
-        log.info("WS pool warmup started for %d DC(s)", len(WSS_DOMAINS))
-
-    async def close_all(self) -> None:
-        """Close all idle pooled connections (for shutdown)."""
-        for bucket in self._idle.values():
-            for ws, _ in bucket:
-                asyncio.create_task(self._quiet_close(ws))
-        self._idle.clear()
-
 
 # ---- Main proxy class ----
 
@@ -424,8 +125,7 @@ class TelegramWSProxy:
         self._ws_blacklist = set()
         self._dc_cooldown = {}
         # Reset semaphore for fresh event loop
-        global _wss_semaphore
-        _wss_semaphore = asyncio.Semaphore(_MAX_CONCURRENT_WSS)
+        reset_wss_semaphore()
 
         # NOTE: Transparent mode was removed. WinDivert cannot intercept
         # inbound loopback packets (kernel driver limitation), making Lua NAT

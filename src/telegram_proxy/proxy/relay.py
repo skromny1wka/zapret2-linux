@@ -4,8 +4,8 @@ import asyncio
 import time
 from typing import Callable, Optional
 
-from telegram_proxy.raw_websocket import RawWebSocket
-from telegram_proxy.stats import ProxyStats
+from telegram_proxy.proxy.transport import RawWebSocket
+from telegram_proxy.proxy.stats import ProxyStats
 
 
 # Buffer size for relay (128 KB)

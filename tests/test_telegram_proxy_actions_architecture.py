@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import inspect
+from pathlib import Path
 import unittest
 
 import telegram_proxy.actions as telegram_actions
@@ -35,23 +36,53 @@ class TelegramProxyActionsArchitectureTests(unittest.TestCase):
         self.assertIn("telegram_proxy.settings", commands_source)
 
     def test_wss_proxy_is_split_into_focused_modules(self) -> None:
-        raw_websocket = importlib.import_module("telegram_proxy.raw_websocket")
-        routing = importlib.import_module("telegram_proxy.routing")
-        relay = importlib.import_module("telegram_proxy.relay")
-        stats = importlib.import_module("telegram_proxy.stats")
+        transport = importlib.import_module("telegram_proxy.proxy.transport")
+        routing = importlib.import_module("telegram_proxy.proxy.routing")
+        relay = importlib.import_module("telegram_proxy.proxy.relay")
+        stats = importlib.import_module("telegram_proxy.proxy.stats")
+        mtproto = importlib.import_module("telegram_proxy.proxy.mtproto")
+        pool = importlib.import_module("telegram_proxy.proxy.pool")
         wss_proxy = importlib.import_module("telegram_proxy.wss_proxy")
 
-        self.assertIs(wss_proxy.RawWebSocket, raw_websocket.RawWebSocket)
-        self.assertIs(wss_proxy.WsHandshakeError, raw_websocket.WsHandshakeError)
+        self.assertIs(wss_proxy.RawWebSocket, transport.RawWebSocket)
+        self.assertIs(wss_proxy.WsHandshakeError, transport.WsHandshakeError)
         self.assertIs(wss_proxy.UpstreamProxyConfig, routing.UpstreamProxyConfig)
         self.assertIs(wss_proxy.check_relay_reachable, routing.check_relay_reachable)
         self.assertIs(wss_proxy.RELAY_BUFFER, relay.RELAY_BUFFER)
         self.assertIs(wss_proxy.ProxyStats, stats.ProxyStats)
+        self.assertIs(wss_proxy._MsgSplitter, mtproto.MsgSplitter)
+        self.assertIs(wss_proxy._WsPool, pool.WsPool)
 
         wss_source = inspect.getsource(wss_proxy)
+        self.assertNotIn("def _dc_from_init", wss_source)
+        self.assertNotIn("def _patch_init_dc", wss_source)
+        self.assertNotIn("class _MsgSplitter", wss_source)
+        self.assertNotIn("class _WsPool", wss_source)
+        self.assertNotIn("telegram_proxy.raw_websocket", wss_source)
+        self.assertNotIn("telegram_proxy.relay", wss_source)
+        self.assertNotIn("telegram_proxy.routing", wss_source)
+        self.assertNotIn("telegram_proxy.stats", wss_source)
         self.assertIn("relay_tcp(", wss_source)
         self.assertIn("relay_wss(", wss_source)
         self.assertIn("should_route_upstream(", wss_source)
+
+    def test_proxy_network_helpers_live_under_proxy_package(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        telegram_proxy_root = root / "src" / "telegram_proxy"
+        proxy_root = telegram_proxy_root / "proxy"
+
+        self.assertTrue((proxy_root / "__init__.py").exists())
+        self.assertTrue((proxy_root / "transport.py").exists())
+        self.assertTrue((proxy_root / "relay.py").exists())
+        self.assertTrue((proxy_root / "routing.py").exists())
+        self.assertTrue((proxy_root / "stats.py").exists())
+        self.assertTrue((proxy_root / "mtproto.py").exists())
+        self.assertTrue((proxy_root / "pool.py").exists())
+
+        self.assertFalse((telegram_proxy_root / "raw_websocket.py").exists())
+        self.assertFalse((telegram_proxy_root / "relay.py").exists())
+        self.assertFalse((telegram_proxy_root / "routing.py").exists())
+        self.assertFalse((telegram_proxy_root / "stats.py").exists())
 
 
 if __name__ == "__main__":
