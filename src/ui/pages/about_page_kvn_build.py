@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from PyQt6.QtWidgets import QLabel, QVBoxLayout, QFrame
 from qfluentwidgets import SubtitleLabel, SettingCardGroup, SettingCard, PushSettingCard, PrimaryPushSettingCard
+from ui.pages.about_page_kvn_accessibility import set_kvn_card_accessibility
 from ui.theme import get_cached_qta_pixmap, get_themed_qta_icon
 
 
@@ -94,6 +95,11 @@ def build_about_page_kvn_content(
         "Канал Zapret KVN",
         "Новости и обновления",
     )
+    set_kvn_card_accessibility(
+        tg_card,
+        action_name="Открыть канал Zapret KVN",
+        description="Новости и обновления",
+    )
     tg_card.clicked.connect(on_open_kvn_channel)
 
     bot_card = PrimaryPushSettingCard(
@@ -101,6 +107,11 @@ def build_about_page_kvn_content(
         get_themed_qta_icon("fa5s.shopping-cart", color="#f59e0b"),
         "Купить подписку",
         "Оформление через Telegram-бота @zapretvpns_bot",
+    )
+    set_kvn_card_accessibility(
+        bot_card,
+        action_name="Купить подписку Zapret KVN",
+        description="Оформление через Telegram-бота @zapretvpns_bot",
     )
     bot_card.clicked.connect(on_open_kvn_bot)
 
@@ -110,6 +121,11 @@ def build_about_page_kvn_content(
         "Канал BypassBlock",
         "Второй канал с новостями",
     )
+    set_kvn_card_accessibility(
+        bypass_card,
+        action_name="Открыть канал BypassBlock",
+        description="Второй канал с новостями",
+    )
     bypass_card.clicked.connect(on_open_kvn_bypass)
 
     gh_card = PushSettingCard(
@@ -117,6 +133,11 @@ def build_about_page_kvn_content(
         get_themed_qta_icon("fa5b.github", color=tokens.accent_hex),
         "Исходный код",
         "GitHub репозиторий Zapret KVN",
+    )
+    set_kvn_card_accessibility(
+        gh_card,
+        action_name="Открыть исходный код Zapret KVN",
+        description="GitHub репозиторий Zapret KVN",
     )
     gh_card.clicked.connect(on_open_kvn_github)
 
