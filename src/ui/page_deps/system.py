@@ -57,13 +57,24 @@ def build_premium_page_kwargs(*, page_name: PageName, premium_feature, ui_state_
 
 def build_support_page_kwargs(*, page_name: PageName, external_actions_feature) -> dict:
     _ = page_name
-    import about.plans as about_page_plans
+
+    def _create_support_open_action_worker(request_id: int, *, action_name: str, parent=None):
+        import about.commands as about_commands
+
+        actions = {
+            "discussions": about_commands.open_support_discussions,
+            "telegram": lambda: about_commands.open_telegram("zaprethelp"),
+            "discord": lambda: about_commands.open_discord("https://discord.gg/kkcBDG2uws"),
+        }
+        return external_actions_feature.create_external_action_worker(
+            request_id,
+            action_name=action_name,
+            action_fn=actions[str(action_name or "").strip()],
+            parent=parent,
+        )
 
     return {
-        "open_discussions": about_page_plans.open_support_discussions,
-        "open_telegram": lambda: about_page_plans.open_telegram("zaprethelp"),
-        "open_discord": lambda: about_page_plans.open_discord("https://discord.gg/kkcBDG2uws"),
-        "create_open_action_worker": external_actions_feature.create_external_action_worker,
+        "create_open_action_worker": _create_support_open_action_worker,
     }
 
 
@@ -114,22 +125,33 @@ def build_appearance_page_kwargs(
 
 def build_about_page_kwargs(*, page_name: PageName, external_actions_feature, show_page, ui_state_store) -> dict:
     _ = page_name
-    import about.plans as about_page_plans
+
+    def _create_about_open_action_worker(request_id: int, *, action_name: str, parent=None):
+        import about.commands as about_commands
+
+        actions = {
+            "support_discussions": about_commands.open_support_discussions,
+            "support_telegram": lambda: about_commands.open_telegram("zaprethelp"),
+            "support_discord": lambda: about_commands.open_discord("https://discord.gg/kkcBDG2uws"),
+            "forum_for_beginners": lambda: about_commands.open_telegram("bypassblock", post=1359),
+            "help_folder": about_commands.open_help_folder,
+            "telegram_news": lambda: about_commands.open_telegram("bypassblock"),
+            "kvn_channel": lambda: about_commands.open_telegram("vpndiscordyooutube"),
+            "kvn_bot": lambda: about_commands.open_telegram("zapretvpns_bot"),
+            "kvn_bypass": lambda: about_commands.open_telegram("bypassblock"),
+            "kvn_github": lambda: about_commands.open_github("https://github.com/youtubediscord/zapret-kvn"),
+        }
+        return external_actions_feature.create_external_action_worker(
+            request_id,
+            action_name=action_name,
+            action_fn=actions[str(action_name or "").strip()],
+            parent=parent,
+        )
 
     return {
         "open_premium": lambda: show_page(PageName.PREMIUM),
         "open_updates": lambda: show_page(PageName.SERVERS, allow_internal=True),
-        "open_discussions": about_page_plans.open_support_discussions,
-        "open_support_telegram": lambda: about_page_plans.open_telegram("zaprethelp"),
-        "open_support_discord": lambda: about_page_plans.open_discord("https://discord.gg/kkcBDG2uws"),
-        "open_forum_for_beginners": lambda: about_page_plans.open_telegram("bypassblock", post=1359),
-        "open_help_folder": about_page_plans.open_help_folder,
-        "open_telegram_news": lambda: about_page_plans.open_telegram("bypassblock"),
-        "open_kvn_channel": lambda: about_page_plans.open_telegram("vpndiscordyooutube"),
-        "open_kvn_bot": lambda: about_page_plans.open_telegram("zapretvpns_bot"),
-        "open_kvn_bypass": lambda: about_page_plans.open_telegram("bypassblock"),
-        "open_kvn_github": lambda: about_page_plans.open_github("https://github.com/youtubediscord/zapret-kvn"),
-        "create_open_action_worker": external_actions_feature.create_external_action_worker,
+        "create_open_action_worker": _create_about_open_action_worker,
         "ui_state_store": ui_state_store,
     }
 

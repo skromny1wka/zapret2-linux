@@ -32,6 +32,19 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
         self.assertIn("external_actions_feature.create_external_action_worker", about_deps_source)
         self.assertIn("_create_support_open_action_worker", support_source)
         self.assertIn("_create_about_open_action_worker", about_source)
+        self.assertNotIn("_open_discussions_action", support_source)
+        self.assertNotIn("_open_telegram_action", support_source)
+        self.assertNotIn("_open_discord_action", support_source)
+        self.assertNotIn("_open_discussions_action", about_source)
+        self.assertNotIn("_open_support_telegram_action", about_source)
+        self.assertNotIn("_open_support_discord_action", about_source)
+        self.assertNotIn("_open_forum_for_beginners_action", about_source)
+        self.assertNotIn("_open_help_folder_action", about_source)
+        self.assertNotIn("_open_telegram_news_action", about_source)
+        self.assertNotIn("_open_kvn_channel_action", about_source)
+        self.assertNotIn("_open_kvn_bot_action", about_source)
+        self.assertNotIn("_open_kvn_bypass_action", about_source)
+        self.assertNotIn("_open_kvn_github_action", about_source)
         self.assertNotIn("ui.pages.support_open_worker", support_source)
         self.assertNotIn("ui.pages.about_open_worker", about_source)
 
@@ -44,20 +57,15 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
         page._support_open_runtime = _Runtime()
         page._support_open_pending = []
         page._start_support_open_action_worker = Mock()
-        first_action = Mock()
-        second_action = Mock()
-
         SupportPage._request_support_open_action(
             page,
             "telegram",
-            first_action,
             error_key="telegram.error",
             error_default="telegram {error}",
         )
         SupportPage._request_support_open_action(
             page,
             "discord",
-            second_action,
             error_key="discord.error",
             error_default="discord {error}",
         )
@@ -65,8 +73,8 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
         self.assertEqual(
             page._support_open_pending,
             [
-                ("telegram", first_action, "telegram.error", "telegram {error}"),
-                ("discord", second_action, "discord.error", "discord {error}"),
+                ("telegram", "telegram.error", "telegram {error}"),
+                ("discord", "discord.error", "discord {error}"),
             ],
         )
         page._start_support_open_action_worker.assert_not_called()
@@ -80,26 +88,22 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
         page._support_open_runtime = _Runtime()
         page._support_open_pending = []
         page._start_support_open_action_worker = Mock()
-        action = Mock()
-
         SupportPage._request_support_open_action(
             page,
             "telegram",
-            action,
             error_key="telegram.error",
             error_default="telegram {error}",
         )
         SupportPage._request_support_open_action(
             page,
             "telegram",
-            action,
             error_key="telegram.error",
             error_default="telegram {error}",
         )
 
         self.assertEqual(
             page._support_open_pending,
-            [("telegram", action, "telegram.error", "telegram {error}")],
+            [("telegram", "telegram.error", "telegram {error}")],
         )
         page._start_support_open_action_worker.assert_not_called()
 
@@ -107,11 +111,9 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
         import ui.pages.support_page as support_page
 
         page = SupportPage.__new__(SupportPage)
-        first_action = Mock()
-        second_action = Mock()
         page._support_open_pending = [
-            ("telegram", first_action, "telegram.error", "telegram {error}"),
-            ("discord", second_action, "discord.error", "discord {error}"),
+            ("telegram", "telegram.error", "telegram {error}"),
+            ("discord", "discord.error", "discord {error}"),
         ]
         page._start_support_open_action_worker = Mock()
         single_shot = Mock(side_effect=lambda _delay, _callback: None)
@@ -127,23 +129,21 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
 
         page._start_support_open_action_worker.assert_called_once_with(
             "telegram",
-            first_action,
             "telegram.error",
             "telegram {error}",
         )
         self.assertEqual(
             page._support_open_pending,
-            [("discord", second_action, "discord.error", "discord {error}")],
+            [("discord", "discord.error", "discord {error}")],
         )
 
     def test_stale_support_open_worker_finished_does_not_schedule_next_queued_action(self) -> None:
         import ui.pages.support_page as support_page
 
         page = SupportPage.__new__(SupportPage)
-        first_action = Mock()
         page._support_open_runtime = SimpleNamespace(request_id=2)
         page._support_open_pending = [
-            ("telegram", first_action, "telegram.error", "telegram {error}"),
+            ("telegram", "telegram.error", "telegram {error}"),
         ]
         page._start_support_open_action_worker = Mock()
         single_shot = Mock()
@@ -155,7 +155,7 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
         page._start_support_open_action_worker.assert_not_called()
         self.assertEqual(
             page._support_open_pending,
-            [("telegram", first_action, "telegram.error", "telegram {error}")],
+            [("telegram", "telegram.error", "telegram {error}")],
         )
 
     def test_support_open_scheduled_start_queues_next_action(self) -> None:
@@ -165,10 +165,8 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
         page._support_open_start_scheduled = False
         page._support_open_pending = []
         page._start_support_open_action_worker = Mock()
-        first_action = Mock()
-        second_action = Mock()
-        first = ("telegram", first_action, "telegram.error", "telegram {error}")
-        second = ("discord", second_action, "discord.error", "discord {error}")
+        first = ("telegram", "telegram.error", "telegram {error}")
+        second = ("discord", "discord.error", "discord {error}")
         single_shot = Mock(side_effect=lambda _delay, _callback: None)
 
         with patch.object(support_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
@@ -182,7 +180,6 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
 
         page._start_support_open_action_worker.assert_called_once_with(
             "telegram",
-            first_action,
             "telegram.error",
             "telegram {error}",
         )
@@ -191,7 +188,7 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
     def test_support_open_result_is_ignored_when_new_action_is_pending(self) -> None:
         page = SupportPage.__new__(SupportPage)
         page._support_open_runtime = SimpleNamespace(is_current=Mock(return_value=True))
-        page._support_open_pending = [("discord", Mock(), "discord.error", "discord {error}")]
+        page._support_open_pending = [("discord", "discord.error", "discord {error}")]
         page._show_support_open_error = Mock()
 
         SupportPage._on_support_open_action_finished(
@@ -208,7 +205,7 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
     def test_support_open_error_is_ignored_when_new_action_is_pending(self) -> None:
         page = SupportPage.__new__(SupportPage)
         page._support_open_runtime = SimpleNamespace(is_current=Mock(return_value=True))
-        page._support_open_pending = [("discord", Mock(), "discord.error", "discord {error}")]
+        page._support_open_pending = [("discord", "discord.error", "discord {error}")]
         page._show_support_open_error = Mock()
 
         SupportPage._on_support_open_action_failed(
@@ -226,7 +223,7 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
         runtime = Mock()
         page = SupportPage.__new__(SupportPage)
         page._support_open_runtime = runtime
-        page._support_open_pending = [("telegram", Mock(), "telegram.error", "telegram {error}")]
+        page._support_open_pending = [("telegram", "telegram.error", "telegram {error}")]
         page._support_open_start_scheduled = True
 
         SupportPage.cleanup(page)
@@ -249,19 +246,14 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
         page._about_open_runtime = _Runtime()
         page._about_open_pending = []
         page._start_about_open_action_worker = Mock()
-        first_action = Mock()
-        second_action = Mock()
-
         AboutPage._request_about_open_action(
             page,
             "telegram",
-            first_action,
             error_default="telegram {error}",
         )
         AboutPage._request_about_open_action(
             page,
             "github",
-            second_action,
             error_default="github {error}",
             raw_error_message="raw",
         )
@@ -269,8 +261,8 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
         self.assertEqual(
             page._about_open_pending,
             [
-                ("telegram", first_action, "telegram {error}", ""),
-                ("github", second_action, "github {error}", "raw"),
+                ("telegram", "telegram {error}", ""),
+                ("github", "github {error}", "raw"),
             ],
         )
         page._start_about_open_action_worker.assert_not_called()
@@ -284,22 +276,18 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
         page._about_open_runtime = _Runtime()
         page._about_open_pending = []
         page._start_about_open_action_worker = Mock()
-        action = Mock()
-
         AboutPage._request_about_open_action(
             page,
             "telegram",
-            action,
             error_default="telegram {error}",
         )
         AboutPage._request_about_open_action(
             page,
             "telegram",
-            action,
             error_default="telegram {error}",
         )
 
-        self.assertEqual(page._about_open_pending, [("telegram", action, "telegram {error}", "")])
+        self.assertEqual(page._about_open_pending, [("telegram", "telegram {error}", "")])
         page._start_about_open_action_worker.assert_not_called()
 
     def test_about_open_worker_finished_schedules_next_queued_action(self) -> None:
@@ -307,11 +295,9 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
 
         page = AboutPage.__new__(AboutPage)
         page._cleanup_in_progress = False
-        first_action = Mock()
-        second_action = Mock()
         page._about_open_pending = [
-            ("telegram", first_action, "telegram {error}", ""),
-            ("github", second_action, "github {error}", "raw"),
+            ("telegram", "telegram {error}", ""),
+            ("github", "github {error}", "raw"),
         ]
         page._start_about_open_action_worker = Mock()
         single_shot = Mock(side_effect=lambda _delay, _callback: None)
@@ -327,13 +313,12 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
 
         page._start_about_open_action_worker.assert_called_once_with(
             "telegram",
-            first_action,
             "telegram {error}",
             "",
         )
         self.assertEqual(
             page._about_open_pending,
-            [("github", second_action, "github {error}", "raw")],
+            [("github", "github {error}", "raw")],
         )
 
     def test_stale_about_open_worker_finished_does_not_schedule_next_queued_action(self) -> None:
@@ -341,10 +326,9 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
 
         page = AboutPage.__new__(AboutPage)
         page._cleanup_in_progress = False
-        first_action = Mock()
         page._about_open_runtime = SimpleNamespace(request_id=2)
         page._about_open_pending = [
-            ("telegram", first_action, "telegram {error}", ""),
+            ("telegram", "telegram {error}", ""),
         ]
         page._start_about_open_action_worker = Mock()
         single_shot = Mock()
@@ -354,7 +338,7 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
 
         single_shot.assert_not_called()
         page._start_about_open_action_worker.assert_not_called()
-        self.assertEqual(page._about_open_pending, [("telegram", first_action, "telegram {error}", "")])
+        self.assertEqual(page._about_open_pending, [("telegram", "telegram {error}", "")])
 
     def test_about_open_scheduled_start_queues_next_action(self) -> None:
         import ui.pages.about_page as about_page
@@ -364,10 +348,8 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
         page._about_open_start_scheduled = False
         page._about_open_pending = []
         page._start_about_open_action_worker = Mock()
-        first_action = Mock()
-        second_action = Mock()
-        first = ("telegram", first_action, "telegram {error}", "")
-        second = ("github", second_action, "github {error}", "raw")
+        first = ("telegram", "telegram {error}", "")
+        second = ("github", "github {error}", "raw")
         single_shot = Mock(side_effect=lambda _delay, _callback: None)
 
         with patch.object(about_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
@@ -381,7 +363,6 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
 
         page._start_about_open_action_worker.assert_called_once_with(
             "telegram",
-            first_action,
             "telegram {error}",
             "",
         )
@@ -391,7 +372,7 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
         page = AboutPage.__new__(AboutPage)
         page._cleanup_in_progress = False
         page._about_open_runtime = SimpleNamespace(is_current=Mock(return_value=True))
-        page._about_open_pending = [("github", Mock(), "github {error}", "")]
+        page._about_open_pending = [("github", "github {error}", "")]
         page._show_about_open_error = Mock()
 
         AboutPage._on_about_open_action_finished(
@@ -408,7 +389,7 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
         page = AboutPage.__new__(AboutPage)
         page._cleanup_in_progress = False
         page._about_open_runtime = SimpleNamespace(is_current=Mock(return_value=True))
-        page._about_open_pending = [("github", Mock(), "github {error}", "")]
+        page._about_open_pending = [("github", "github {error}", "")]
         page._show_about_open_error = Mock()
 
         AboutPage._on_about_open_action_failed(
@@ -425,7 +406,7 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
         runtime = Mock()
         page = AboutPage.__new__(AboutPage)
         page._about_open_runtime = runtime
-        page._about_open_pending = [("github", Mock(), "github {error}", "")]
+        page._about_open_pending = [("github", "github {error}", "")]
         page._about_open_start_scheduled = True
         page._pending_tab_key = "support"
         page._ui_state_unsubscribe = None

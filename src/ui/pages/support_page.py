@@ -17,7 +17,7 @@ from .base_page import BasePage
 class SupportPage(BasePage):
     """Страница поддержки с одним основным маршрутом через GitHub Discussions."""
 
-    def __init__(self, parent=None, *, open_discussions, open_telegram, open_discord, create_open_action_worker):
+    def __init__(self, parent=None, *, create_open_action_worker):
         super().__init__(
             "Поддержка",
             "GitHub Discussions и каналы сообщества",
@@ -25,12 +25,9 @@ class SupportPage(BasePage):
             title_key="page.support.title",
             subtitle_key="page.support.subtitle",
         )
-        self._open_discussions_action = open_discussions
-        self._open_telegram_action = open_telegram
-        self._open_discord_action = open_discord
         self._create_support_open_action_worker = create_open_action_worker
         self._support_open_runtime = OneShotWorkerRuntime()
-        self._support_open_pending: list[tuple[str, object, str, str]] = []
+        self._support_open_pending: list[tuple[str, str, str]] = []
         self._support_open_start_scheduled = False
 
         self._support_card = None
@@ -172,7 +169,6 @@ class SupportPage(BasePage):
     def _open_support_discussions(self) -> None:
         self._request_support_open_action(
             "discussions",
-            self._open_discussions_action,
             error_key="page.support.error.open_discussions",
             error_default="Не удалось открыть GitHub Discussions:\n{error}",
         )
@@ -180,7 +176,6 @@ class SupportPage(BasePage):
     def _open_telegram_support(self) -> None:
         self._request_support_open_action(
             "telegram",
-            self._open_telegram_action,
             error_key="page.support.error.open_telegram",
             error_default="Не удалось открыть Telegram:\n{error}",
         )
@@ -188,28 +183,25 @@ class SupportPage(BasePage):
     def _open_discord(self) -> None:
         self._request_support_open_action(
             "discord",
-            self._open_discord_action,
             error_key="page.support.error.open_discord",
             error_default="Не удалось открыть Discord:\n{error}",
         )
 
-    def create_support_open_action_worker(self, request_id: int, *, action_name: str, action_fn):
+    def create_support_open_action_worker(self, request_id: int, *, action_name: str):
         return self._create_support_open_action_worker(
             request_id,
             action_name=action_name,
-            action_fn=action_fn,
             parent=self,
         )
 
     def _request_support_open_action(
         self,
         action_name: str,
-        action_fn,
         *,
         error_key: str,
         error_default: str,
     ) -> None:
-        request = (str(action_name or "").strip(), action_fn, str(error_key), str(error_default))
+        request = (str(action_name or "").strip(), str(error_key), str(error_default))
         if self._support_open_runtime.is_running() or self.__dict__.get("_support_open_start_scheduled", False):
             self._queue_support_open_action(request)
             return
@@ -224,7 +216,6 @@ class SupportPage(BasePage):
     def _start_support_open_action_worker(
         self,
         action_name: str,
-        action_fn,
         error_key: str,
         error_default: str,
     ) -> None:
@@ -232,7 +223,6 @@ class SupportPage(BasePage):
             worker_factory=lambda request_id: self.create_support_open_action_worker(
                 request_id,
                 action_name=action_name,
-                action_fn=action_fn,
             ),
             on_loaded=lambda request_id, action_name, result: self._on_support_open_action_finished(
                 request_id,

@@ -17,9 +17,6 @@ class SupportPageAccessibilityTests(unittest.TestCase):
 
     def test_support_cards_have_screen_reader_text(self) -> None:
         page = SupportPage(
-            open_discussions=lambda: None,
-            open_telegram=lambda: None,
-            open_discord=lambda: None,
             create_open_action_worker=lambda *_args, **_kwargs: None,
         )
 
@@ -32,9 +29,6 @@ class SupportPageAccessibilityTests(unittest.TestCase):
 
     def test_language_refresh_keeps_screen_reader_text(self) -> None:
         page = SupportPage(
-            open_discussions=lambda: None,
-            open_telegram=lambda: None,
-            open_discord=lambda: None,
             create_open_action_worker=lambda *_args, **_kwargs: None,
         )
 

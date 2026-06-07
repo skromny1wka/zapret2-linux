@@ -49,16 +49,6 @@ class AboutPage(BasePage):
         *,
         open_premium,
         open_updates,
-        open_discussions,
-        open_support_telegram,
-        open_support_discord,
-        open_forum_for_beginners,
-        open_help_folder,
-        open_telegram_news,
-        open_kvn_channel,
-        open_kvn_bot,
-        open_kvn_bypass,
-        open_kvn_github,
         create_open_action_worker,
         ui_state_store,
     ):
@@ -73,19 +63,9 @@ class AboutPage(BasePage):
         # UI refs (support tab)
         self._open_premium_callback = open_premium
         self._open_updates_callback = open_updates
-        self._open_discussions_action = open_discussions
-        self._open_support_telegram_action = open_support_telegram
-        self._open_support_discord_action = open_support_discord
-        self._open_forum_for_beginners_action = open_forum_for_beginners
-        self._open_help_folder_action = open_help_folder
-        self._open_telegram_news_action = open_telegram_news
-        self._open_kvn_channel_action = open_kvn_channel
-        self._open_kvn_bot_action = open_kvn_bot
-        self._open_kvn_bypass_action = open_kvn_bypass
-        self._open_kvn_github_action = open_kvn_github
         self._create_about_open_action_worker = create_open_action_worker
         self._about_open_runtime = OneShotWorkerRuntime()
-        self._about_open_pending: list[tuple[str, object, str, str]] = []
+        self._about_open_pending: list[tuple[str, str, str]] = []
         self._about_open_start_scheduled = False
         self._support_icon_label: QLabel | None = None
         self._support_discussions_card = None
@@ -400,21 +380,18 @@ class AboutPage(BasePage):
     def _open_support_discussions(self) -> None:
         self._request_about_open_action(
             "support_discussions",
-            self._open_discussions_action,
             error_default="Не удалось открыть GitHub Discussions:\n{error}",
         )
 
     def _open_telegram_support(self) -> None:
         self._request_about_open_action(
             "support_telegram",
-            self._open_support_telegram_action,
             error_default="Не удалось открыть Telegram:\n{error}",
         )
 
     def _open_discord(self) -> None:
         self._request_about_open_action(
             "support_discord",
-            self._open_support_discord_action,
             error_default="Не удалось открыть Discord:\n{error}",
         )
 
@@ -510,14 +487,12 @@ class AboutPage(BasePage):
     def _open_forum_for_beginners(self):
         self._request_about_open_action(
             "forum_for_beginners",
-            self._open_forum_for_beginners_action,
             error_default="Не удалось открыть Telegram:\n{error}",
         )
 
     def _open_help_folder(self):
         self._request_about_open_action(
             "help_folder",
-            self._open_help_folder_action,
             error_default="Не удалось открыть папку:\n{error}",
             raw_error_message="Папка с инструкциями не найдена",
         )
@@ -525,7 +500,6 @@ class AboutPage(BasePage):
     def _open_telegram_news(self):
         self._request_about_open_action(
             "telegram_news",
-            self._open_telegram_news_action,
             error_default="Не удалось открыть Telegram:\n{error}",
         )
 
@@ -551,50 +525,43 @@ class AboutPage(BasePage):
     def _open_kvn_channel(self):
         self._request_about_open_action(
             "kvn_channel",
-            self._open_kvn_channel_action,
             error_default="Не удалось открыть Telegram:\n{error}",
         )
 
     def _open_kvn_bot(self):
         self._request_about_open_action(
             "kvn_bot",
-            self._open_kvn_bot_action,
             error_default="Не удалось открыть Telegram:\n{error}",
         )
 
     def _open_kvn_bypass(self):
         self._request_about_open_action(
             "kvn_bypass",
-            self._open_kvn_bypass_action,
             error_default="Не удалось открыть Telegram:\n{error}",
         )
 
     def _open_kvn_github(self):
         self._request_about_open_action(
             "kvn_github",
-            self._open_kvn_github_action,
             error_default="Не удалось открыть GitHub:\n{error}",
         )
 
-    def create_about_open_action_worker(self, request_id: int, *, action_name: str, action_fn):
+    def create_about_open_action_worker(self, request_id: int, *, action_name: str):
         return self._create_about_open_action_worker(
             request_id,
             action_name=action_name,
-            action_fn=action_fn,
             parent=self,
         )
 
     def _request_about_open_action(
         self,
         action_name: str,
-        action_fn,
         *,
         error_default: str,
         raw_error_message: str = "",
     ) -> None:
         request = (
             str(action_name or "").strip(),
-            action_fn,
             str(error_default),
             str(raw_error_message or ""),
         )
@@ -612,7 +579,6 @@ class AboutPage(BasePage):
     def _start_about_open_action_worker(
         self,
         action_name: str,
-        action_fn,
         error_default: str,
         raw_error_message: str,
     ) -> None:
@@ -620,7 +586,6 @@ class AboutPage(BasePage):
             worker_factory=lambda request_id: self.create_about_open_action_worker(
                 request_id,
                 action_name=action_name,
-                action_fn=action_fn,
             ),
             on_loaded=lambda request_id, _action_name, result: self._on_about_open_action_finished(
                 request_id,
