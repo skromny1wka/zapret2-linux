@@ -286,6 +286,16 @@ class AppearanceWorkerQueueTests(unittest.TestCase):
 
         page._start_rkn_background_options_load_worker.assert_called_once_with()
 
+    def test_rkn_background_options_queue_state_lives_in_state_object(self) -> None:
+        import inspect
+        from ui.pages.appearance_page import AppearancePage
+
+        init_source = inspect.getsource(AppearancePage.__init__)
+        finished_source = inspect.getsource(AppearancePage._on_rkn_background_options_worker_finished)
+
+        self.assertIn("_rkn_background_options_state = LatestValueWorkerState", init_source)
+        self.assertIn("schedule_pending_after_finish", finished_source)
+
     def test_stale_rkn_background_options_worker_finished_does_not_restart_pending_load(self) -> None:
         import ui.pages.appearance_page as appearance_page
         from ui.pages.appearance_page import AppearancePage

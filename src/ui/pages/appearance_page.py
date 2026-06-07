@@ -144,8 +144,10 @@ class AppearancePage(BasePage):
         self._initial_state_load_pending_force = False
         self._initial_state_load_start_scheduled = False
         self._rkn_background_options_runtime = OneShotWorkerRuntime()
-        self._rkn_background_options_pending = False
-        self._rkn_background_options_start_scheduled = False
+        self._rkn_background_options_state = LatestValueWorkerState(
+            self._rkn_background_options_runtime,
+            empty_value=False,
+        )
         self._windows_accent_load_runtime = OneShotWorkerRuntime()
         self._windows_accent_load_state = LatestValueWorkerState(self._windows_accent_load_runtime, empty_value=False)
         self._build_ui()
@@ -998,16 +1000,42 @@ class AppearancePage(BasePage):
     def create_rkn_background_options_load_worker(self, request_id: int):
         return self._appearance.create_rkn_background_options_load_worker(request_id, parent=self)
 
+    def _rkn_background_options_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_rkn_background_options_state")
+        if state is None:
+            state = LatestValueWorkerState(
+                self.__dict__.get("_rkn_background_options_runtime"),
+                empty_value=False,
+            )
+            self.__dict__["_rkn_background_options_state"] = state
+        return state
+
+    @property
+    def _rkn_background_options_pending(self) -> bool:
+        return bool(self._rkn_background_options_state_obj().pending)
+
+    @_rkn_background_options_pending.setter
+    def _rkn_background_options_pending(self, value: bool) -> None:
+        self._rkn_background_options_state_obj().pending = bool(value)
+
+    @property
+    def _rkn_background_options_start_scheduled(self) -> bool:
+        return bool(self._rkn_background_options_state_obj().start_scheduled)
+
+    @_rkn_background_options_start_scheduled.setter
+    def _rkn_background_options_start_scheduled(self, value: bool) -> None:
+        self._rkn_background_options_state_obj().start_scheduled = bool(value)
+
     def _request_rkn_background_options_load(self) -> None:
         if self._cleanup_in_progress:
             return
-        if (
-            self._rkn_background_options_runtime.is_running()
-            or self.__dict__.get("_rkn_background_options_start_scheduled", False)
-        ):
-            self._rkn_background_options_pending = True
-            return
-        self._start_rkn_background_options_load_worker()
+        self._rkn_background_options_state_obj().request_or_start(
+            True,
+            lambda _pending: self._start_rkn_background_options_load_worker(),
+        )
+
+    def _rkn_background_options_has_pending(self) -> bool:
+        return self._rkn_background_options_state_obj().has_pending()
 
     def _start_rkn_background_options_load_worker(self) -> None:
         self._rkn_background_options_runtime.start_qthread_worker(
@@ -1023,7 +1051,7 @@ class AppearancePage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_rkn_background_options_pending", False):
+        if self._rkn_background_options_has_pending():
             return
         data = result if isinstance(result, dict) else {}
         self._apply_rkn_background_options(
@@ -1037,29 +1065,33 @@ class AppearancePage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_rkn_background_options_pending", False):
+        if self._rkn_background_options_has_pending():
             return
         log(f"Ошибка загрузки RKN-фонов: {error}", "WARNING")
         self._apply_rkn_background_options(saved_value=None, options=())
 
     def _on_rkn_background_options_worker_finished(self, _worker) -> None:
-        if not self._is_current_worker_finish(self.__dict__.get("_rkn_background_options_runtime"), _worker):
-            return
-        if self._rkn_background_options_pending and not self._cleanup_in_progress:
-            self._rkn_background_options_pending = False
-            self._schedule_rkn_background_options_load_worker_start()
+        self._rkn_background_options_state_obj().schedule_pending_after_finish(
+            _worker,
+            is_current_worker_finish=self._is_current_worker_finish,
+            single_shot=QTimer.singleShot,
+            run_scheduled=self._run_scheduled_rkn_background_options_load_worker_start,
+            cleanup_in_progress=self._cleanup_in_progress,
+            clear_pending_before_schedule=True,
+        )
 
     def _schedule_rkn_background_options_load_worker_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        if self.__dict__.get("_rkn_background_options_start_scheduled", False):
-            self._rkn_background_options_pending = True
-            return
-        self._rkn_background_options_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_rkn_background_options_load_worker_start)
+        self._rkn_background_options_state_obj().schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_rkn_background_options_load_worker_start,
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+            pending_when_already_scheduled=True,
+        )
 
     def _run_scheduled_rkn_background_options_load_worker_start(self) -> None:
-        self._rkn_background_options_start_scheduled = False
+        self._rkn_background_options_state_obj().start_scheduled = False
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         self._start_rkn_background_options_load_worker()
@@ -1565,7 +1597,7 @@ class AppearancePage(BasePage):
         self._initial_state_load_pending_force = False
         self._initial_state_load_start_scheduled = False
         self._windows_accent_load_state_obj().reset()
-        self._rkn_background_options_start_scheduled = False
+        self._rkn_background_options_state_obj().reset()
         for runtime, name in (
             (self._initial_state_load_runtime, "загрузка оформления"),
             (self._appearance_save_runtime, "сохранение оформления"),
