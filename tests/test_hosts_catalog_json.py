@@ -218,6 +218,77 @@ class HostsCatalogJsonTests(unittest.TestCase):
         service_name = "IP для подмены заблокированных ресурсов"
         self.assertEqual(plan.new_selection.get(service_name), "direct")
 
+    def test_services_catalog_plan_uses_icons_for_current_catalog_service_names(self) -> None:
+        from hosts import page_plans
+
+        youtube_name = "YouTube (иногда может не работать с ним! Отключите тумблер если YouTube не работает с пресетами)"
+        catalog = {
+            "version": 1,
+            "profiles": [
+                {"id": "zapret_dns", "name": "Zapret DNS"},
+                {"id": "direct", "name": "Вкл. (активировать hosts)"},
+            ],
+            "services": [
+                {
+                    "name": "ChatGPT & Sora (OpenAI)",
+                    "mode": "dns",
+                    "domains": [{"host": "chat.openai.com", "ips": {"zapret_dns": "72.56.93.144"}}],
+                },
+                {
+                    "name": "Microsoft (Copilot, Designer, Xbox)",
+                    "mode": "dns",
+                    "domains": [{"host": "copilot.microsoft.com", "ips": {"zapret_dns": "72.56.93.144"}}],
+                },
+                {
+                    "name": "Discord",
+                    "mode": "direct",
+                    "hosts": [{"ip": "1.1.1.1", "host": "discord.com"}],
+                },
+                {
+                    "name": youtube_name,
+                    "mode": "direct",
+                    "hosts": [{"ip": "1.1.1.1", "host": "youtube.com"}],
+                },
+                {
+                    "name": "GitHub",
+                    "mode": "direct",
+                    "hosts": [{"ip": "1.1.1.1", "host": "github.com"}],
+                },
+                {
+                    "name": "Остальное",
+                    "mode": "dns",
+                    "domains": [{"host": "example.com", "ips": {"zapret_dns": "72.56.93.144"}}],
+                },
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            catalog_path = root / "private_zapretgui" / "resources" / "json" / "hosts_catalog.json"
+            catalog_path.parent.mkdir(parents=True, exist_ok=True)
+            catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2), encoding="utf-8")
+            fake_module = root / "public_zapretgui" / "src" / "hosts" / "proxy_domains.py"
+            fake_module.parent.mkdir(parents=True, exist_ok=True)
+            fake_module.write_text("", encoding="utf-8")
+
+            with patch.object(self.proxy_domains, "__file__", str(fake_module)):
+                self.proxy_domains.invalidate_hosts_catalog_cache()
+                plan = page_plans.build_services_catalog_plan(
+                    current_selection={},
+                    active_domains_map={},
+                    direct_title="Direct",
+                    ai_title="AI",
+                    other_title="Other",
+                )
+
+        rows = {row.service_name: row for group in plan.groups for row in group.rows}
+        self.assertEqual(rows["ChatGPT & Sora (OpenAI)"].icon_name, "mdi.robot")
+        self.assertEqual(rows["Microsoft (Copilot, Designer, Xbox)"].icon_name, "fa5b.microsoft")
+        self.assertEqual(rows["Discord"].icon_name, "fa5b.discord")
+        self.assertEqual(rows[youtube_name].icon_name, "fa5b.youtube")
+        self.assertEqual(rows["GitHub"].icon_name, "fa5b.github")
+        self.assertEqual(rows["Остальное"].icon_name, "fa5s.box-open")
+
     def test_services_catalog_plan_keeps_saved_selection_when_hosts_is_empty(self) -> None:
         from hosts import page_plans
 
