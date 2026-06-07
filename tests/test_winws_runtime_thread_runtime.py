@@ -20,11 +20,13 @@ class _Signal:
 class _FakeThread:
     instances = []
 
-    def __init__(self) -> None:
+    def __init__(self, *, running: bool = False) -> None:
         self.started = _Signal()
         self.finished = _Signal()
+        self.running = bool(running)
         self.quit_called = False
         self.wait_called = False
+        self.terminate_called = False
         self.delete_later_called = False
         _FakeThread.instances.append(self)
 
@@ -34,9 +36,15 @@ class _FakeThread:
     def quit(self) -> None:
         self.quit_called = True
 
+    def isRunning(self) -> bool:  # noqa: N802
+        return self.running
+
     def wait(self, *_args) -> bool:
         self.wait_called = True
         return True
+
+    def terminate(self) -> None:
+        self.terminate_called = True
 
     def deleteLater(self) -> None:
         self.delete_later_called = True
@@ -80,6 +88,27 @@ class WinwsRuntimeThreadRuntimeTests(unittest.TestCase):
         self.assertFalse(thread.wait_called)
         self.assertIsNone(owner._thread)
         self.assertIsNone(owner._worker)
+
+    def test_launch_runtime_cleanup_threads_does_not_wait_in_gui_path(self) -> None:
+        from winws_runtime.runtime.lifecycle_feedback import cleanup_threads
+
+        start_thread = _FakeThread(running=True)
+        stop_thread = _FakeThread(running=True)
+        owner = SimpleNamespace(
+            _dpi_start_thread=start_thread,
+            _dpi_stop_thread=stop_thread,
+        )
+
+        cleanup_threads(owner)
+
+        self.assertTrue(start_thread.quit_called)
+        self.assertTrue(stop_thread.quit_called)
+        self.assertFalse(start_thread.wait_called)
+        self.assertFalse(stop_thread.wait_called)
+        self.assertFalse(start_thread.terminate_called)
+        self.assertFalse(stop_thread.terminate_called)
+        self.assertIsNone(owner._dpi_start_thread)
+        self.assertIsNone(owner._dpi_stop_thread)
 
 
 if __name__ == "__main__":

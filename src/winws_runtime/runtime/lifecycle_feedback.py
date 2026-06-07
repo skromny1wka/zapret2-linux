@@ -229,24 +229,10 @@ def cleanup_threads(runtime_owner):
         if runtime_owner._dpi_start_thread and runtime_owner._dpi_start_thread.isRunning():
             log("Останавливаем поток запуска DPI...", "DEBUG")
             runtime_owner._dpi_start_thread.quit()
-            if not runtime_owner._dpi_start_thread.wait(2000):
-                log("⚠ Поток запуска DPI не завершился, принудительно завершаем", "WARNING")
-                try:
-                    runtime_owner._dpi_start_thread.terminate()
-                    runtime_owner._dpi_start_thread.wait(500)
-                except Exception:
-                    pass
 
         if runtime_owner._dpi_stop_thread and runtime_owner._dpi_stop_thread.isRunning():
             log("Останавливаем поток остановки DPI...", "DEBUG")
             runtime_owner._dpi_stop_thread.quit()
-            if not runtime_owner._dpi_stop_thread.wait(2000):
-                log("⚠ Поток остановки DPI не завершился, принудительно завершаем", "WARNING")
-                try:
-                    runtime_owner._dpi_stop_thread.terminate()
-                    runtime_owner._dpi_stop_thread.wait(500)
-                except Exception:
-                    pass
 
         runtime_owner._dpi_start_thread = None
         runtime_owner._dpi_stop_thread = None
