@@ -8,6 +8,7 @@ class ModeControlRefreshRuntime:
         self.additional_settings_load_runtime = OneShotWorkerRuntime()
         self.additional_settings_load_pending = False
         self.additional_settings_load_start_scheduled = False
+        self.additional_settings_reload_after_preset_switch_scheduled = False
         self.additional_settings_save_runtime = OneShotWorkerRuntime()
         self.additional_settings_save_pending: list[tuple[str, bool, str]] = []
         self.additional_settings_save_start_scheduled = False
@@ -106,6 +107,7 @@ class ModeControlRefreshRuntime:
 
     def stop_workers(self, *, log_fn=None) -> None:
         self.additional_settings_load_start_scheduled = False
+        self.additional_settings_reload_after_preset_switch_scheduled = False
         self.additional_settings_save_start_scheduled = False
         self.top_summary_start_scheduled = False
         self.program_settings_load_start_scheduled = False

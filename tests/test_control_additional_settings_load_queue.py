@@ -238,6 +238,58 @@ class ControlAdditionalSettingsLoadQueueTests(unittest.TestCase):
 
         page._apply_additional_settings_state.assert_not_called()
 
+    def test_control_pages_delay_additional_settings_reload_after_active_preset_switch(self) -> None:
+        from app.state_store import AppUiState
+        from presets.ui.control.zapret1.page import Zapret1ModeControlPage
+        from presets.ui.control.zapret2.page import Zapret2ModeControlPage
+
+        for page_cls, module_name in (
+            (Zapret1ModeControlPage, "presets.ui.control.zapret1.page"),
+            (Zapret2ModeControlPage, "presets.ui.control.zapret2.page"),
+        ):
+            with self.subTest(page_cls=page_cls.__name__):
+                runtime, _load_runtime = _make_refresh_runtime(running=False)
+                page = page_cls.__new__(page_cls)
+                page._cleanup_in_progress = False
+                page._refresh_runtime = runtime
+                page.isVisible = Mock(return_value=True)
+                page.run_when_page_ready = Mock()
+                page._schedule_additional_settings_reload = Mock()
+                page._refresh_preset_name = Mock()
+                page._apply_selected_preset_name_fast = Mock()
+                page._refresh_top_summary = Mock()
+                page._apply_top_summary_premium = Mock()
+                page.set_loading = Mock()
+                page.update_status = Mock()
+                page.update_strategy = Mock()
+                page._refresh_last_status_message = Mock()
+
+                callbacks = []
+                with patch(
+                    f"{module_name}.QTimer.singleShot",
+                    side_effect=lambda delay_ms, callback: callbacks.append((delay_ms, callback)),
+                ):
+                    page_cls._on_ui_state_changed(
+                        page,
+                        AppUiState(current_strategy_summary="Профили"),
+                        frozenset({"active_preset_revision"}),
+                    )
+                    page_cls._on_ui_state_changed(
+                        page,
+                        AppUiState(current_strategy_summary="Профили"),
+                        frozenset({"active_preset_revision"}),
+                    )
+
+                page._schedule_additional_settings_reload.assert_not_called()
+                self.assertTrue(runtime.additional_settings_dirty)
+                self.assertTrue(getattr(runtime, "additional_settings_reload_after_preset_switch_scheduled", False))
+                self.assertEqual(len(callbacks), 1)
+
+                callbacks[0][1]()
+
+                self.assertFalse(getattr(runtime, "additional_settings_reload_after_preset_switch_scheduled", False))
+                page._schedule_additional_settings_reload.assert_called_once_with(force=True)
+
 
 if __name__ == "__main__":
     unittest.main()

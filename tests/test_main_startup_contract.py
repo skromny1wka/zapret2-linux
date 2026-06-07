@@ -2059,6 +2059,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
                 control_page._apply_selected_preset_name_fast = Mock()
                 control_page._refresh_preset_name = Mock()
                 control_page._schedule_additional_settings_reload = Mock()
+                control_page._schedule_additional_settings_reload_after_preset_switch = Mock()
                 control_page._apply_pending_mode_refresh_if_ready = Mock()
                 control_page._apply_pending_preset_name_refresh = Mock()
                 control_page._apply_pending_additional_settings_refresh = Mock()
@@ -2077,7 +2078,8 @@ class StartupRuntimeSetupTests(unittest.TestCase):
 
                 control_page._refresh_top_summary.assert_not_called()
                 self.assertTrue(control_page._refresh_runtime.additional_settings_dirty)
-                control_page._schedule_additional_settings_reload.assert_called_once_with(force=True)
+                control_page._schedule_additional_settings_reload.assert_not_called()
+                control_page._schedule_additional_settings_reload_after_preset_switch.assert_called_once_with()
 
     def test_window_page_actions_route_pages_through_adapter(self) -> None:
         from app.page_names import PageName
