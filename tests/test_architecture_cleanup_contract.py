@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import inspect
 from pathlib import Path
+from types import SimpleNamespace
 import unittest
 
 
@@ -71,6 +72,36 @@ class ArchitectureCleanupContractTests(unittest.TestCase):
                     required <= provided,
                     f"{page_name.name}: PageDepsSpec не передаёт {sorted(required - provided)}",
                 )
+
+    def test_window_page_deps_sources_include_all_page_actions(self) -> None:
+        from main.window_page_deps_setup import build_window_page_deps_sources
+        from main.window_page_actions import WindowPageActions
+        from ui.page_composition import PAGE_DEPS_BUILDERS
+
+        required_actions = {
+            action_name
+            for spec in PAGE_DEPS_BUILDERS.values()
+            for action_name in spec.actions
+        }
+        required_features = {
+            feature_name
+            for spec in PAGE_DEPS_BUILDERS.values()
+            for feature_name in spec.features
+        }
+        features = SimpleNamespace(**{name: object() for name in required_features})
+        state = SimpleNamespace(ui=object())
+        page_actions = SimpleNamespace(**{name: object() for name in WindowPageActions.__dataclass_fields__})
+
+        sources = build_window_page_deps_sources(
+            features=features,
+            state=state,
+            page_actions=page_actions,
+        )
+
+        self.assertTrue(
+            required_actions <= set(sources.actions),
+            f"PageDepsSources.actions не содержит {sorted(required_actions - set(sources.actions))}",
+        )
 
     def test_preset_switch_worker_requires_fast_switch_contract(self) -> None:
         source = (SRC_ROOT / "winws_runtime" / "runtime" / "control_workers.py").read_text(encoding="utf-8")
