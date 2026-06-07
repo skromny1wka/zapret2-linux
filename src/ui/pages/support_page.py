@@ -8,6 +8,7 @@ from qfluentwidgets import InfoBar, PrimaryPushSettingCard, PushSettingCard, Set
 
 from app.ui_texts import tr as tr_catalog
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
+from ui.pages.support_page_accessibility import apply_support_page_accessibility
 from ui.theme import get_theme_tokens, get_themed_qta_icon
 
 from .base_page import BasePage
@@ -93,6 +94,7 @@ class SupportPage(BasePage):
 
         self._community_group.addSettingCards([self._tg_card, self._dc_card])
         self.add_widget(self._community_group)
+        apply_support_page_accessibility(self)
 
     def _apply_page_theme(self, tokens=None, force: bool = False) -> None:
         _ = force
@@ -165,6 +167,7 @@ class SupportPage(BasePage):
                 self._dc_card.button.setText(self._tr("page.support.channel.open", "Открыть"))
             except Exception:
                 pass
+        apply_support_page_accessibility(self)
 
     def _open_support_discussions(self) -> None:
         self._request_support_open_action(
