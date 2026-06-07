@@ -53,9 +53,11 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
                 mode="socks5",
                 host="127.0.0.1",
                 upstream_config=None,
+                cloudflare_config=None,
             )),
             set_enabled=Mock(),
             build_upstream_config=Mock(),
+            build_cloudflare_config=Mock(),
             load_page_initial_state=Mock(),
             save_settings_action=Mock(),
             check_relay_reachable=Mock(),
@@ -246,6 +248,7 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
             get_start_config=Mock(),
             set_enabled=lambda value: enabled_values.append(bool(value)),
             build_upstream_config=Mock(),
+            build_cloudflare_config=Mock(),
             load_page_initial_state=Mock(),
             save_settings_action=Mock(),
             check_relay_reachable=Mock(),
@@ -392,12 +395,14 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
         manager = Mock()
         manager.start_proxy.return_value = True
         upstream_config = object()
+        cloudflare_config = object()
         worker = telegram_proxy_workers.TelegramProxyStartWorker(
             manager=manager,
             port=1353,
             mode="socks5",
             host="127.0.0.1",
             build_upstream_config=Mock(return_value=upstream_config),
+            build_cloudflare_config=Mock(return_value=cloudflare_config),
         )
 
         worker.run()
@@ -407,6 +412,7 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
             mode="socks5",
             host="127.0.0.1",
             upstream_config=upstream_config,
+            cloudflare_config=cloudflare_config,
         )
 
     def test_external_links_are_queued_while_worker_runs(self) -> None:

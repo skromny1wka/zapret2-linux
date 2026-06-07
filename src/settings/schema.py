@@ -109,6 +109,10 @@ def default_telegram_proxy() -> dict[str, Any]:
         "upstream_mode": "fallback",
         "upstream_user": "",
         "upstream_pass": "",
+        "cloudflare_enabled": False,
+        "cloudflare_domains": [],
+        "cloudflare_worker_enabled": False,
+        "cloudflare_worker_domains": [],
     }
 
 

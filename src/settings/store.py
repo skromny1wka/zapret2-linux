@@ -27,6 +27,7 @@ from settings.normalize import (
     normalize_askey as _normalize_askey,
     normalize_settings as _normalize_settings,
     normalize_lookup_key as _normalize_lookup_key,
+    unique_domain_list as _unique_domain_list,
     unique_int_list as _unique_int_list,
     unique_str_list as _unique_str_list,
 )
@@ -196,6 +197,16 @@ def _get_str(path: tuple[str, ...], default: str = "") -> str:
 
 def _set_str(path: tuple[str, ...], value: str) -> bool:
     _update_settings(lambda data: _set_path_value(data, path, str(value)))
+    return True
+
+
+def _get_str_list(path: tuple[str, ...]) -> list[str]:
+    value = _get_path_value(read_settings(), path, [])
+    return list(value) if isinstance(value, list) else []
+
+
+def _set_str_list(path: tuple[str, ...], value: object) -> bool:
+    _update_settings(lambda data: _set_path_value(data, path, _unique_domain_list(value)))
     return True
 
 
@@ -926,6 +937,38 @@ def set_tg_proxy_upstream_pass(value: str) -> bool:
     return _set_str(("telegram_proxy", "upstream_pass"), value)
 
 
+def get_tg_proxy_cloudflare_enabled() -> bool:
+    return _get_bool(("telegram_proxy", "cloudflare_enabled"), False)
+
+
+def set_tg_proxy_cloudflare_enabled(value: bool) -> bool:
+    return _set_bool(("telegram_proxy", "cloudflare_enabled"), value)
+
+
+def get_tg_proxy_cloudflare_domains() -> list[str]:
+    return _get_str_list(("telegram_proxy", "cloudflare_domains"))
+
+
+def set_tg_proxy_cloudflare_domains(value: object) -> bool:
+    return _set_str_list(("telegram_proxy", "cloudflare_domains"), value)
+
+
+def get_tg_proxy_cloudflare_worker_enabled() -> bool:
+    return _get_bool(("telegram_proxy", "cloudflare_worker_enabled"), False)
+
+
+def set_tg_proxy_cloudflare_worker_enabled(value: bool) -> bool:
+    return _set_bool(("telegram_proxy", "cloudflare_worker_enabled"), value)
+
+
+def get_tg_proxy_cloudflare_worker_domains() -> list[str]:
+    return _get_str_list(("telegram_proxy", "cloudflare_worker_domains"))
+
+
+def set_tg_proxy_cloudflare_worker_domains(value: object) -> bool:
+    return _set_str_list(("telegram_proxy", "cloudflare_worker_domains"), value)
+
+
 def get_orchestra_strict_detection() -> bool:
     return _get_bool(("orchestra", "settings", "strict_detection"), True)
 
@@ -1229,6 +1272,10 @@ __all__ = [
     "get_strategy_launch_method",
     "get_telega_warning_disabled",
     "get_tg_proxy_deeplink_done",
+    "get_tg_proxy_cloudflare_domains",
+    "get_tg_proxy_cloudflare_enabled",
+    "get_tg_proxy_cloudflare_worker_domains",
+    "get_tg_proxy_cloudflare_worker_enabled",
     "get_tg_proxy_enabled",
     "get_tg_proxy_host",
     "get_tg_proxy_mode",
@@ -1314,6 +1361,10 @@ __all__ = [
     "set_strategy_launch_method",
     "set_telega_warning_disabled",
     "set_tg_proxy_deeplink_done",
+    "set_tg_proxy_cloudflare_domains",
+    "set_tg_proxy_cloudflare_enabled",
+    "set_tg_proxy_cloudflare_worker_domains",
+    "set_tg_proxy_cloudflare_worker_enabled",
     "set_tg_proxy_enabled",
     "set_tg_proxy_host",
     "set_tg_proxy_mode",

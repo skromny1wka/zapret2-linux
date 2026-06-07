@@ -85,6 +85,45 @@ def unique_str_list(value: object) -> list[str]:
     return result
 
 
+def _is_valid_domain(value: str) -> bool:
+    if not value or len(value) > 253:
+        return False
+    if value.startswith(".") or value.endswith("."):
+        return False
+    labels = value.split(".")
+    if len(labels) < 2:
+        return False
+    for label in labels:
+        if not label or len(label) > 63:
+            return False
+        if label[0] == "-" or label[-1] == "-":
+            return False
+        if not all(ch.isalnum() or ch == "-" for ch in label):
+            return False
+    return len(labels[-1]) >= 2 and any(ch.isalpha() for ch in labels[-1])
+
+
+def unique_domain_list(value: object) -> list[str]:
+    if isinstance(value, str):
+        raw_items = value.replace(",", " ").replace(";", " ").split()
+    elif isinstance(value, (list, tuple, set)):
+        raw_items = []
+        for item in value:
+            if isinstance(item, str):
+                raw_items.extend(item.replace(",", " ").replace(";", " ").split())
+    else:
+        raw_items = []
+    result: list[str] = []
+    seen: set[str] = set()
+    for item in raw_items:
+        domain = item.strip().lower()
+        if domain in seen or not _is_valid_domain(domain):
+            continue
+        seen.add(domain)
+        result.append(domain)
+    return result
+
+
 def unique_int_list(value: object) -> list[int]:
     if not isinstance(value, (list, tuple, set)):
         return []
@@ -218,6 +257,13 @@ def normalize_telegram_proxy(data: object) -> dict[str, Any]:
         ),
         "upstream_user": as_clean_str(raw.get("upstream_user"), defaults["upstream_user"]),
         "upstream_pass": as_str(raw.get("upstream_pass"), defaults["upstream_pass"]),
+        "cloudflare_enabled": as_bool(raw.get("cloudflare_enabled"), defaults["cloudflare_enabled"]),
+        "cloudflare_domains": unique_domain_list(raw.get("cloudflare_domains")),
+        "cloudflare_worker_enabled": as_bool(
+            raw.get("cloudflare_worker_enabled"),
+            defaults["cloudflare_worker_enabled"],
+        ),
+        "cloudflare_worker_domains": unique_domain_list(raw.get("cloudflare_worker_domains")),
     }
 
 

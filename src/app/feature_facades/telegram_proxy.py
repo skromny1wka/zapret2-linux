@@ -21,6 +21,7 @@ class TelegramProxyFeature:
     get_start_config: Callable
     set_enabled: Callable
     build_upstream_config: Callable
+    build_cloudflare_config: Callable
     load_page_initial_state: Callable
     save_settings_action: Callable
     check_relay_reachable: Callable
@@ -70,7 +71,17 @@ class TelegramProxyFeature:
         except Exception:
             pass
 
-    def create_start_worker(self, *, manager, port: int, mode: str, host: str, upstream_config=None, parent=None):
+    def create_start_worker(
+        self,
+        *,
+        manager,
+        port: int,
+        mode: str,
+        host: str,
+        upstream_config=None,
+        cloudflare_config=None,
+        parent=None,
+    ):
         from telegram_proxy.runtime.workers import TelegramProxyStartWorker
 
         return TelegramProxyStartWorker(
@@ -79,7 +90,9 @@ class TelegramProxyFeature:
             mode=mode,
             host=host,
             upstream_config=upstream_config,
+            cloudflare_config=cloudflare_config,
             build_upstream_config=self.build_upstream_config,
+            build_cloudflare_config=self.build_cloudflare_config,
             parent=parent,
         )
 
@@ -215,6 +228,7 @@ class TelegramProxyFeature:
                     mode=config.mode,
                     host=config.host,
                     upstream_config=config.upstream_config,
+                    cloudflare_config=config.cloudflare_config,
                 ),
                 on_finished=self._on_tray_toggle_worker_finished,
                 signal_includes_request_id=False,
@@ -317,6 +331,7 @@ def build_telegram_proxy_feature() -> TelegramProxyFeature:
         get_start_config=lambda *args, **kwargs: _commands().get_start_config(*args, **kwargs),
         set_enabled=lambda *args, **kwargs: _public().set_enabled(*args, **kwargs),
         build_upstream_config=lambda *args, **kwargs: _commands().build_upstream_config(*args, **kwargs),
+        build_cloudflare_config=lambda *args, **kwargs: _commands().build_cloudflare_config(*args, **kwargs),
         load_page_initial_state=lambda *args, **kwargs: _commands().load_page_initial_state(*args, **kwargs),
         save_settings_action=lambda *args, **kwargs: _commands().save_settings_action(*args, **kwargs),
         check_relay_reachable=lambda *args, **kwargs: _commands().check_relay_reachable(*args, **kwargs),

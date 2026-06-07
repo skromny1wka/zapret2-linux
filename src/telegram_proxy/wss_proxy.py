@@ -35,6 +35,12 @@ from telegram_proxy.proxy.dc_map import (
     # TRANSPARENT_PORT_BASE,  # Transparent mode removed
 )
 from telegram_proxy.proxy import socks5
+from telegram_proxy.proxy.cloudflare import (
+    CloudflareFallbackConfig,
+    build_cloudflare_domains,
+    build_worker_path,
+    should_try_cloudflare,
+)
 from telegram_proxy.proxy.mtproto import (
     MsgSplitter as _MsgSplitter,
     dc_from_init as _dc_from_init,
@@ -83,12 +89,14 @@ class TelegramWSProxy:
         on_log: Optional[Callable[[str], None]] = None,
         host: str = "127.0.0.1",
         upstream_config: Optional[UpstreamProxyConfig] = None,
+        cloudflare_config: Optional[CloudflareFallbackConfig] = None,
     ):
         self._port = port
         self._mode = mode
         self._host = host
         self._on_log = on_log
         self._upstream = upstream_config or UpstreamProxyConfig()
+        self._cloudflare = cloudflare_config or CloudflareFallbackConfig()
         self._servers: list[asyncio.Server] = []
         self._tasks: set[asyncio.Task] = set()
         self._running = False
@@ -286,6 +294,11 @@ class TelegramWSProxy:
             # Port 80 fallback tested: DC1 partial, DC5 dead. Not reliable.
             if dc not in WSS_DOMAINS:
                 self._log(f"[{label}] DC{dc} -> TCP (no WSS relay for this DC)")
+                if await self._cloudflare_fallback(
+                    reader, writer, target_host, target_port,
+                    init, init_patched, label, dc, is_media,
+                ):
+                    return
                 await self._tcp_fallback(
                     reader, writer, target_host, target_port,
                     init, label, dc, is_media,
@@ -335,6 +348,11 @@ class TelegramWSProxy:
         # Check WS blacklist
         if dc_key in self._ws_blacklist:
             log.debug("[%s] DC%d%s WS blacklisted -> TCP", label, dc, media_tag)
+            if await self._cloudflare_fallback(
+                client_reader, client_writer, target_host, target_port,
+                init, init_patched, label, dc, is_media,
+            ):
+                return
             await self._tcp_fallback(
                 client_reader, client_writer, target_host, target_port,
                 init, label, dc, is_media,
@@ -346,6 +364,11 @@ class TelegramWSProxy:
         if now < fail_until:
             log.debug("[%s] DC%d%s WS cooldown (%.0fs) -> TCP",
                       label, dc, media_tag, fail_until - now)
+            if await self._cloudflare_fallback(
+                client_reader, client_writer, target_host, target_port,
+                init, init_patched, label, dc, is_media,
+            ):
+                return
             await self._tcp_fallback(
                 client_reader, client_writer, target_host, target_port,
                 init, label, dc, is_media,
@@ -410,6 +433,12 @@ class TelegramWSProxy:
                 )
                 return
 
+            if await self._cloudflare_fallback(
+                client_reader, client_writer, target_host, target_port,
+                init, init_patched, label, dc, is_media,
+            ):
+                return
+
             await self._tcp_fallback(
                 client_reader, client_writer, target_host, target_port,
                 init, label, dc, is_media,
@@ -436,6 +465,86 @@ class TelegramWSProxy:
 
         # Bidirectional bridge
         await self._relay_wss(client_reader, client_writer, ws, splitter, label, dc=dc)
+
+    async def _cloudflare_fallback(
+        self,
+        client_reader: asyncio.StreamReader,
+        client_writer: asyncio.StreamWriter,
+        target_host: str,
+        target_port: int,
+        init: bytes,
+        init_patched: bool,
+        label: str,
+        dc: int,
+        is_media: bool,
+    ) -> bool:
+        """Try Cloudflare Worker/domain fallback before plain TCP fallback."""
+        if not should_try_cloudflare(self._cloudflare):
+            return False
+
+        media_tag = " media" if is_media else ""
+        splitter = None
+        if init_patched:
+            try:
+                splitter = _MsgSplitter(init)
+            except Exception:
+                pass
+
+        if self._cloudflare.worker_enabled and self._cloudflare.worker_domains:
+            path = build_worker_path(target_host, dc)
+            for worker_domain in self._cloudflare.worker_domains:
+                try:
+                    self._log(
+                        f"[{label}] DC{dc}{media_tag} -> Cloudflare Worker "
+                        f"{worker_domain}{path}"
+                    )
+                    ws = await RawWebSocket.connect(
+                        worker_domain,
+                        worker_domain,
+                        path=path,
+                        timeout=CONNECT_TIMEOUT,
+                    )
+                    self.stats.cloudflare_connections += 1
+                    self.stats.cloudflare_worker_connections += 1
+                    await ws.send(init)
+                    await self._relay_wss(client_reader, client_writer, ws, splitter, label, dc=dc)
+                    return True
+                except Exception as exc:
+                    log.warning(
+                        "[%s] DC%d%s Cloudflare Worker %s failed: %s",
+                        label,
+                        dc,
+                        media_tag,
+                        worker_domain,
+                        exc,
+                    )
+
+        if self._cloudflare.enabled and self._cloudflare.domains:
+            for domain in build_cloudflare_domains(dc, self._cloudflare):
+                try:
+                    self._log(f"[{label}] DC{dc}{media_tag} -> Cloudflare wss://{domain}{WSS_PATH}")
+                    ws = await RawWebSocket.connect(
+                        domain,
+                        domain,
+                        path=WSS_PATH,
+                        timeout=CONNECT_TIMEOUT,
+                    )
+                    self.stats.cloudflare_connections += 1
+                    await ws.send(init)
+                    await self._relay_wss(client_reader, client_writer, ws, splitter, label, dc=dc)
+                    return True
+                except Exception as exc:
+                    log.warning(
+                        "[%s] DC%d%s Cloudflare domain %s failed: %s",
+                        label,
+                        dc,
+                        media_tag,
+                        domain,
+                        exc,
+                    )
+
+        self.stats.cloudflare_failures += 1
+        return False
 
     async def _tcp_fallback(
         self,

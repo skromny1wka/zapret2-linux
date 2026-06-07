@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from telegram_proxy.config.upstream_catalog import UpstreamCatalog
+from telegram_proxy.proxy.cloudflare import CloudflareFallbackConfig, normalize_domain_list
 
 
 @dataclass(slots=True)
@@ -16,6 +17,10 @@ class TelegramProxySettingsState:
     upstream_password: str
     upstream_mode: str
     upstream_preset_index: int
+    cloudflare_enabled: bool
+    cloudflare_domains: tuple[str, ...]
+    cloudflare_worker_enabled: bool
+    cloudflare_worker_domains: tuple[str, ...]
 
 
 @dataclass(slots=True)
@@ -39,6 +44,10 @@ def default_state() -> TelegramProxySettingsState:
         upstream_password="",
         upstream_mode="fallback",
         upstream_preset_index=0,
+        cloudflare_enabled=False,
+        cloudflare_domains=(),
+        cloudflare_worker_enabled=False,
+        cloudflare_worker_domains=(),
     )
 
 def validate_host(host: str) -> bool:
@@ -90,6 +99,8 @@ def _settings_state_from_data(data: dict, upstream_catalog: UpstreamCatalog) -> 
     upstream_user = str(raw.get("upstream_user") or "").strip()
     upstream_password = str(raw.get("upstream_pass") or "")
     upstream_mode = str(raw.get("upstream_mode") or "fallback").strip().lower() or "fallback"
+    cloudflare_domains = normalize_domain_list(raw.get("cloudflare_domains"))
+    cloudflare_worker_domains = normalize_domain_list(raw.get("cloudflare_worker_domains"))
 
     return TelegramProxySettingsState(
         host=normalize_host(raw.get("host")),
@@ -106,6 +117,10 @@ def _settings_state_from_data(data: dict, upstream_catalog: UpstreamCatalog) -> 
             username=upstream_user,
             password=upstream_password,
         ),
+        cloudflare_enabled=bool(raw.get("cloudflare_enabled", False)),
+        cloudflare_domains=cloudflare_domains,
+        cloudflare_worker_enabled=bool(raw.get("cloudflare_worker_enabled", False)),
+        cloudflare_worker_domains=cloudflare_worker_domains,
     )
 
 
@@ -179,6 +194,28 @@ def set_upstream_fields(host: str, port: int, user: str, password: str) -> None:
         set_tg_proxy_upstream_pass(str(password or ""))
     except Exception:
         pass
+
+
+def build_cloudflare_config() -> CloudflareFallbackConfig:
+    try:
+        from settings.store import (
+            get_tg_proxy_cloudflare_domains,
+            get_tg_proxy_cloudflare_enabled,
+            get_tg_proxy_cloudflare_worker_domains,
+            get_tg_proxy_cloudflare_worker_enabled,
+        )
+
+        domains = normalize_domain_list(get_tg_proxy_cloudflare_domains())
+        worker_domains = normalize_domain_list(get_tg_proxy_cloudflare_worker_domains())
+        return CloudflareFallbackConfig(
+            enabled=bool(get_tg_proxy_cloudflare_enabled()) and bool(domains),
+            domains=domains,
+            worker_enabled=bool(get_tg_proxy_cloudflare_worker_enabled()) and bool(worker_domains),
+            worker_domains=worker_domains,
+        )
+    except Exception:
+        return CloudflareFallbackConfig()
+
 
 def load_upstream_test_target() -> tuple[str, int] | None:
     try:

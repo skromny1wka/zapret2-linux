@@ -14,6 +14,9 @@ class ProxyStats:
     bytes_received: int = 0
     wss_connections: int = 0
     tcp_fallback_connections: int = 0
+    cloudflare_connections: int = 0
+    cloudflare_worker_connections: int = 0
+    cloudflare_failures: int = 0
     failed_connections: int = 0
     pool_hits: int = 0
     pool_misses: int = 0

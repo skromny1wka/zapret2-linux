@@ -8,7 +8,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from typing import Optional, Callable
 
 from telegram_proxy import TelegramProxyRuntime
-from telegram_proxy.wss_proxy import ProxyStats, UpstreamProxyConfig
+from telegram_proxy.wss_proxy import CloudflareFallbackConfig, ProxyStats, UpstreamProxyConfig
 from telegram_proxy.proxy_logger import get_proxy_logger
 
 _shared_proxy_manager: Optional["TelegramProxyManager"] = None
@@ -58,7 +58,8 @@ class TelegramProxyManager(QThread):
         return self._proxy_logger
 
     def start_proxy(self, port: int = 1353, mode: str = "socks5", host: str = "127.0.0.1",
-                    upstream_config: Optional[UpstreamProxyConfig] = None) -> bool:
+                    upstream_config: Optional[UpstreamProxyConfig] = None,
+                    cloudflare_config: Optional[CloudflareFallbackConfig] = None) -> bool:
         """Start the proxy. Thread-safe, non-blocking."""
         if self.is_running:
             return False
@@ -69,6 +70,7 @@ class TelegramProxyManager(QThread):
             on_log=self._on_log,
             host=host,
             upstream_config=upstream_config,
+            cloudflare_config=cloudflare_config,
         )
         ok = self._runtime.start()
         if ok:
@@ -98,10 +100,17 @@ class TelegramProxyManager(QThread):
                 self._runtime = None
 
     def restart_proxy(self, port: int = 1353, mode: str = "socks5", host: str = "127.0.0.1",
-                      upstream_config: Optional[UpstreamProxyConfig] = None) -> bool:
+                      upstream_config: Optional[UpstreamProxyConfig] = None,
+                      cloudflare_config: Optional[CloudflareFallbackConfig] = None) -> bool:
         """Restart with new config."""
         self.stop_proxy()
-        return self.start_proxy(port, mode, host, upstream_config=upstream_config)
+        return self.start_proxy(
+            port,
+            mode,
+            host,
+            upstream_config=upstream_config,
+            cloudflare_config=cloudflare_config,
+        )
 
     def cleanup(self) -> None:
         """Called on app exit."""
@@ -132,6 +141,15 @@ def build_upstream_proxy_config_from_settings() -> Optional[UpstreamProxyConfig]
         return None
 
 
+def build_cloudflare_proxy_config_from_settings() -> CloudflareFallbackConfig:
+    try:
+        import telegram_proxy.config.settings as telegram_proxy_settings
+
+        return telegram_proxy_settings.build_cloudflare_config()
+    except Exception:
+        return CloudflareFallbackConfig()
+
+
 def start_proxy_if_enabled_async() -> bool:
     try:
         from settings.store import (
@@ -153,6 +171,7 @@ def start_proxy_if_enabled_async() -> bool:
         port = get_tg_proxy_port()
         host = get_tg_proxy_host()
         upstream_config = build_upstream_proxy_config_from_settings()
+        cloudflare_config = build_cloudflare_proxy_config_from_settings()
 
         def _start() -> None:
             try:
@@ -161,6 +180,7 @@ def start_proxy_if_enabled_async() -> bool:
                     mode="socks5",
                     host=host,
                     upstream_config=upstream_config,
+                    cloudflare_config=cloudflare_config,
                 )
             except Exception:
                 pass
