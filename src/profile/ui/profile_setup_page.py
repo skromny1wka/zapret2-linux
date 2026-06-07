@@ -3174,10 +3174,7 @@ class ProfileSetupPageBase(BasePage):
         cached = self.__dict__.get("_raw_profile_text_cache")
         if cached is not None:
             return str(cached or "")
-        editor = self.__dict__.get("_raw_profile_text")
-        if editor is None:
-            return ""
-        return str(editor.toPlainText() or "")
+        return ""
 
     def _request_raw_profile_save(self, profile_key: str, raw_text: str | None) -> None:
         profile_key = str(profile_key or "").strip()
@@ -3195,6 +3192,9 @@ class ProfileSetupPageBase(BasePage):
         runtime = self._worker_runtime("_raw_profile_save_runtime")
         self._raw_profile_save_request_id += 1
         request_id = self._raw_profile_save_request_id
+        if raw_text is None and self.__dict__.get("_raw_profile_text_cache") is None:
+            editor = self.__dict__.get("_raw_profile_text")
+            raw_text = str(editor.toPlainText() or "") if editor is not None else ""
         raw_text = self._resolve_raw_profile_save_text(raw_text)
         if self._raw_profile_save_button is not None:
             set_widget_enabled_if_changed(self._raw_profile_save_button, False)
