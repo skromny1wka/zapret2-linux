@@ -43,6 +43,7 @@ from telegram_proxy.ui.runtime_helpers import (
     refresh_pivot_texts,
     refresh_status_texts,
 )
+from telegram_proxy.ui.text_plan import TELEGRAM_PROXY_SETTINGS_TEXT
 from telegram_proxy.ui.upstream_workflow import (
     handle_upstream_preset_changed,
     handle_upstream_toggle,
@@ -113,7 +114,7 @@ class TelegramProxyPage(BasePage):
     def __init__(self, parent=None, *, telegram_proxy_feature, get_zapret_running):
         super().__init__(
             "Telegram Proxy",
-            "Маршрутизация трафика Telegram через WebSocket для обхода ЗАМЕДЛЕНИЯ (не поддерживает полный блок) по IP",
+            TELEGRAM_PROXY_SETTINGS_TEXT.page_subtitle,
             parent,
         )
         self._telegram_proxy = telegram_proxy_feature
@@ -345,6 +346,7 @@ class TelegramProxyPage(BasePage):
         self._stats_label = widgets.stats_label
         self._setup_section_label = widgets.setup_section_label
         self._setup_desc_label = widgets.setup_desc_label
+        self._setup_fallback_label = widgets.setup_fallback_label
         self._setup_card = widgets.setup_card
         self._setup_open_btn = widgets.setup_open_btn
         self._setup_copy_btn = widgets.setup_copy_btn
@@ -479,6 +481,7 @@ class TelegramProxyPage(BasePage):
             upstream_card=getattr(self, "_upstream_card", None),
             manual_section_label=getattr(self, "_manual_section_label", None),
             setup_desc_label=getattr(self, "_setup_desc_label", None),
+            setup_fallback_label=getattr(self, "_setup_fallback_label", None),
             host_label=getattr(self, "_host_label", None),
             port_label=getattr(self, "_port_label", None),
             upstream_desc_label=getattr(self, "_upstream_desc_label", None),

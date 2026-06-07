@@ -14,6 +14,7 @@ from ui.fluent_widgets import (
     insert_widget_into_setting_card_group,
     set_tooltip,
 )
+from telegram_proxy.ui.text_plan import TELEGRAM_PROXY_SETTINGS_TEXT
 
 
 @dataclass(slots=True)
@@ -25,6 +26,7 @@ class TelegramProxySettingsPanelWidgets:
     stats_label: object
     setup_section_label: object
     setup_desc_label: object
+    setup_fallback_label: object
     setup_card: object
     setup_open_btn: object
     setup_copy_btn: object
@@ -82,6 +84,7 @@ def build_telegram_proxy_settings_panel(
     on_open_mtproxy,
     upstream_catalog,
 ) -> TelegramProxySettingsPanelWidgets:
+    text = TELEGRAM_PROXY_SETTINGS_TEXT
     status_card = SettingsCard()
 
     status_header = QHBoxLayout()
@@ -101,13 +104,10 @@ def build_telegram_proxy_settings_panel(
     status_card.add_widget(stats_label)
     layout.addWidget(status_card)
 
-    setup_section_label = strong_body_label_cls("Быстрая настройка Telegram")
+    setup_section_label = strong_body_label_cls(text.setup_title)
     layout.addWidget(setup_section_label)
 
-    setup_desc_label = caption_label_cls(
-        "Нажмите кнопку ниже - Telegram автоматически добавит прокси. "
-        "Настройка требуется один раз.\nЕсли Telegram не открывается попробуйте скопировать ссылку и отправить в любой чат Telegram или кому-то в ЛС — после чего нажмите на отправленную ссылку и подтвердите добавление прокси в Telegram клиент.\nРекомендуем полностью ПЕРЕЗАПУСТИТЬ клиент для более корректного работа прокси после включения Zapret 2 GUI!"
-    )
+    setup_desc_label = caption_label_cls(text.setup_description)
     setup_desc_label.setWordWrap(True)
     layout.addWidget(setup_desc_label)
 
@@ -127,7 +127,11 @@ def build_telegram_proxy_settings_panel(
 
     layout.addWidget(setup_card)
 
-    settings_card = setting_card_group_cls("Настройки", content_parent)
+    setup_fallback_label = caption_label_cls(text.setup_fallback)
+    setup_fallback_label.setWordWrap(True)
+    layout.addWidget(setup_fallback_label)
+
+    settings_card = setting_card_group_cls(text.settings_title, content_parent)
     settings_host_row = QWidget(settings_card)
 
     host_port_row = QHBoxLayout(settings_host_row)
@@ -161,8 +165,8 @@ def build_telegram_proxy_settings_panel(
 
     auto_deeplink_toggle = win11_toggle_row_cls(
         "mdi.telegram",
-        "Авто-настройка Telegram",
-        "При первом запуске прокси автоматически открыть ссылку настройки в Telegram",
+        text.auto_setup_title,
+        text.auto_setup_description,
     )
     auto_deeplink_toggle.setChecked(True)
     settings_card.addSettingCard(auto_deeplink_toggle)
@@ -170,36 +174,31 @@ def build_telegram_proxy_settings_panel(
 
     layout.addWidget(settings_card)
 
-    upstream_card = setting_card_group_cls("Внешний прокси (upstream)", content_parent)
+    upstream_card = setting_card_group_cls(text.upstream_title, content_parent)
 
-    upstream_desc_label = caption_label_cls(
-        "SOCKS5 прокси-сервер для DC заблокированных вашим провайдером.\n"
-        "Используется как резервный канал когда WSS relay и прямое подключение не работают."
-    )
+    upstream_desc_label = caption_label_cls("")
     upstream_desc_label.setWordWrap(True)
+    upstream_desc_label.setVisible(False)
     insert_widget_into_setting_card_group(upstream_card, 1, upstream_desc_label)
 
     upstream_toggle = win11_toggle_row_cls(
         "mdi.server-network",
-        "Использовать внешний прокси",
-        "Маршрутизировать заблокированные DC через внешний SOCKS5 прокси",
+        text.upstream_toggle_title,
+        text.upstream_toggle_description,
     )
     upstream_toggle.setChecked(False)
     upstream_card.addSettingCard(upstream_toggle)
 
     upstream_preset_row = win11_combo_row_cls(
         icon_name="mdi.server-network",
-        title="Сервер",
-        description="Выберите сервер из списка или переключитесь на ручной ввод",
+        title=text.upstream_preset_title,
+        description=text.upstream_preset_description,
         items=upstream_catalog.items(),
     )
     upstream_preset_row.combo.setFixedWidth(250)
     upstream_card.addSettingCard(upstream_preset_row)
 
-    upstream_catalog_hint = caption_label_cls(
-        "В этой сборке список предустановленных прокси не загружен. "
-        "Доступен только ручной ввод."
-    )
+    upstream_catalog_hint = caption_label_cls(text.upstream_catalog_missing)
     upstream_catalog_hint.setWordWrap(True)
     upstream_catalog_hint.setVisible(False)
     insert_widget_into_setting_card_group(upstream_card, 2, upstream_catalog_hint)
@@ -258,8 +257,8 @@ def build_telegram_proxy_settings_panel(
 
     upstream_mode_toggle = win11_toggle_row_cls(
         "mdi.swap-horizontal",
-        "Весь трафик через прокси",
-        "Если выключено — только заблокированные DC. Если включено — весь трафик Telegram.",
+        text.upstream_mode_title,
+        text.upstream_mode_description,
     )
     upstream_mode_toggle.setChecked(True)
     upstream_card.addSettingCard(upstream_mode_toggle)
@@ -267,7 +266,8 @@ def build_telegram_proxy_settings_panel(
 
     layout.addWidget(upstream_card)
 
-    manual_section_label = strong_body_label_cls("Ручная настройка")
+    manual_section_label = strong_body_label_cls(text.manual_hidden_title)
+    manual_section_label.setVisible(False)
     layout.addWidget(manual_section_label)
 
     instructions_card = SettingsCard()
@@ -284,6 +284,7 @@ def build_telegram_proxy_settings_panel(
     instructions_card.add_widget(manual_host_port_label)
 
     layout.addWidget(instructions_card)
+    instructions_card.setVisible(False)
     layout.addStretch()
 
     return TelegramProxySettingsPanelWidgets(
@@ -294,6 +295,7 @@ def build_telegram_proxy_settings_panel(
         stats_label=stats_label,
         setup_section_label=setup_section_label,
         setup_desc_label=setup_desc_label,
+        setup_fallback_label=setup_fallback_label,
         setup_card=setup_card,
         setup_open_btn=setup_open_btn,
         setup_copy_btn=setup_copy_btn,

@@ -5,6 +5,7 @@ from __future__ import annotations
 import telegram_proxy.ui.page_runtime as telegram_proxy_page_runtime
 from qfluentwidgets import FluentIcon
 from ui.fluent_widgets import set_tooltip
+from telegram_proxy.ui.text_plan import TELEGRAM_PROXY_SETTINGS_TEXT
 
 
 def refresh_pivot_texts(pivot) -> None:
@@ -73,6 +74,7 @@ def apply_ui_texts(
     upstream_card,
     manual_section_label,
     setup_desc_label,
+    setup_fallback_label,
     host_label,
     port_label,
     upstream_desc_label,
@@ -106,34 +108,33 @@ def apply_ui_texts(
     update_manual_instructions_callback,
 ) -> None:
     try:
+        text = TELEGRAM_PROXY_SETTINGS_TEXT
         refresh_pivot_texts_callback()
         refresh_status_texts_callback()
 
         if setup_section_label is not None:
-            setup_section_label.setText("Быстрая настройка Telegram")
+            setup_section_label.setText(text.setup_title)
         title_label = getattr(settings_card, "titleLabel", None)
         if title_label is not None:
-            title_label.setText("Настройки")
+            title_label.setText(text.settings_title)
         title_label = getattr(upstream_card, "titleLabel", None)
         if title_label is not None:
-            title_label.setText("Внешний прокси (upstream)")
+            title_label.setText(text.upstream_title)
         if manual_section_label is not None:
-            manual_section_label.setText("Ручная настройка")
+            manual_section_label.setText(text.manual_hidden_title)
+            manual_section_label.setVisible(False)
 
         if setup_desc_label is not None:
-            setup_desc_label.setText(
-                "Нажмите кнопку ниже - Telegram автоматически добавит прокси. "
-                "Настройка требуется один раз.\nЕсли Telegram не открывается попробуйте скопировать ссылку и отправить в любой чат Telegram или кому-то в ЛС — после чего нажмите на отправленную ссылку и подтвердите добавление прокси в Telegram клиент.\nРекомендуем полностью ПЕРЕЗАПУСТИТЬ клиент для более корректного работа прокси после включения Zapret 2 GUI!"
-            )
+            setup_desc_label.setText(text.setup_description)
+        if setup_fallback_label is not None:
+            setup_fallback_label.setText(text.setup_fallback)
         if host_label is not None:
             host_label.setText("Адрес:")
         if port_label is not None:
             port_label.setText("Порт:")
         if upstream_desc_label is not None:
-            upstream_desc_label.setText(
-                "SOCKS5 прокси-сервер для DC заблокированных вашим провайдером.\n"
-                "Используется как резервный канал когда WSS relay и прямое подключение не работают."
-            )
+            upstream_desc_label.setText("")
+            upstream_desc_label.setVisible(False)
         if upstream_host_label is not None:
             upstream_host_label.setText("Хост:")
         if upstream_port_label is not None:
@@ -147,12 +148,9 @@ def apply_ui_texts(
         if instr1_label is not None:
             instr1_label.setText("Если автоматическая настройка не сработала:")
         if instr2_label is not None:
-            instr2_label.setText("  Telegram -> Настройки -> Продвинутые -> Тип соединения -> Прокси")
+            instr2_label.setText(text.manual_path)
         if diag_desc_label is not None:
-            diag_desc_label.setText(
-                "Проверка соединений к Telegram DC, WSS relay эндпоинтов (kws1-kws5), "
-                "SOCKS5 прокси и определение типа блокировки."
-            )
+            diag_desc_label.setText(text.diag_description)
 
         if setup_open_btn is not None:
             setup_open_btn.setText("Открыть")
@@ -198,28 +196,25 @@ def apply_ui_texts(
 
         if auto_deeplink_toggle is not None:
             auto_deeplink_toggle.set_texts(
-                "Авто-настройка Telegram",
-                "При первом запуске прокси автоматически открыть ссылку настройки в Telegram",
+                text.auto_setup_title,
+                text.auto_setup_description,
             )
         if upstream_toggle is not None:
             upstream_toggle.set_texts(
-                "Использовать внешний прокси",
-                "Маршрутизировать заблокированные DC через внешний SOCKS5 прокси",
+                text.upstream_toggle_title,
+                text.upstream_toggle_description,
             )
         if upstream_preset_row is not None:
             upstream_preset_row.set_texts(
-                "Сервер",
-                "Выберите сервер из списка или переключитесь на ручной ввод",
+                text.upstream_preset_title,
+                text.upstream_preset_description,
             )
         if upstream_catalog_hint is not None:
-            upstream_catalog_hint.setText(
-                "В этой сборке список предустановленных прокси не загружен. "
-                "Доступен только ручной ввод."
-            )
+            upstream_catalog_hint.setText(text.upstream_catalog_missing)
         if upstream_mode_toggle is not None:
             upstream_mode_toggle.set_texts(
-                "Весь трафик через прокси",
-                "Если выключено — только заблокированные DC. Если включено — весь трафик Telegram.",
+                text.upstream_mode_title,
+                text.upstream_mode_description,
             )
 
         update_manual_instructions_callback()
