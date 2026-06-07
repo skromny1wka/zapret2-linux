@@ -18,9 +18,6 @@ if TYPE_CHECKING:
 class ControlPageWindowsFeatureMixin:
     """Общие обработчики служебных Windows-функций на страницах управления."""
 
-    def _is_program_settings_snapshot_apply_in_progress(self) -> bool:
-        return bool(getattr(self, "_program_settings_snapshot_apply_in_progress", False))
-
     def _show_windows_feature_action_result(self, plan, toggle=None) -> None:
         from qfluentwidgets import InfoBar
 
@@ -43,8 +40,6 @@ class ControlPageWindowsFeatureMixin:
         )
 
     def _on_defender_toggled(self, disable: bool) -> None:
-        if self._is_program_settings_snapshot_apply_in_progress():
-            return
         self._request_defender_admin_check(bool(disable))
 
     def create_program_settings_admin_check_worker(self, request_id: int):
@@ -186,8 +181,6 @@ class ControlPageWindowsFeatureMixin:
             return False
 
     def _on_max_blocker_toggled(self, enable: bool) -> None:
-        if self._is_program_settings_snapshot_apply_in_progress():
-            return
         import presets.ui.control.control_runtime as control_runtime
 
         start_plan = control_runtime.build_max_block_toggle_start_plan(
@@ -203,3 +196,94 @@ class ControlPageWindowsFeatureMixin:
             self._set_status(start_plan.start_status)
 
         self._request_program_settings_save("max_block", bool(enable))
+
+    def _on_internet_cleanup_clicked(self) -> None:
+        import presets.ui.control.control_runtime as control_runtime
+
+        start_plan = control_runtime.build_internet_cleanup_start_plan(language=self._ui_language)
+        for dialog_plan in start_plan.confirmations:
+            if not self._confirm_windows_feature_action(dialog_plan):
+                return
+
+        if start_plan.start_status:
+            self._set_status(start_plan.start_status)
+
+        self._request_internet_cleanup()
+
+    def _internet_cleanup_button(self):
+        card = getattr(self, "internet_cleanup_card", None)
+        return getattr(card, "button", None)
+
+    def _set_internet_cleanup_enabled(self, enabled: bool) -> None:
+        button = self._internet_cleanup_button()
+        if button is not None:
+            try:
+                button.setEnabled(bool(enabled))
+            except Exception:
+                pass
+        card = getattr(self, "internet_cleanup_card", None)
+        if card is not None:
+            try:
+                card.setEnabled(bool(enabled))
+            except Exception:
+                pass
+
+    def _ensure_internet_cleanup_runtime(self) -> OneShotWorkerRuntime:
+        runtime = self.__dict__.get("_internet_cleanup_runtime")
+        if runtime is None:
+            from ui.one_shot_worker_runtime import OneShotWorkerRuntime
+
+            runtime = OneShotWorkerRuntime()
+            self._internet_cleanup_runtime = runtime
+        return runtime
+
+    def _request_internet_cleanup(self) -> None:
+        runtime = self._ensure_internet_cleanup_runtime()
+        if runtime.is_running():
+            self._set_status("Сброс сети Windows уже выполняется...")
+            return
+        self._set_internet_cleanup_enabled(False)
+        self._start_internet_cleanup_worker()
+
+    def _start_internet_cleanup_worker(self) -> None:
+        from windows_features.internet_cleanup import InternetCleanupWorker
+
+        runtime = self._ensure_internet_cleanup_runtime()
+        runtime.start_qthread_worker(
+            worker_factory=lambda request_id: InternetCleanupWorker(request_id, parent=self),
+            on_loaded=self._on_internet_cleanup_finished,
+            on_failed=self._on_internet_cleanup_failed,
+            on_finished=self._on_internet_cleanup_worker_finished,
+            bind_worker=lambda worker: worker.status.connect(self._on_internet_cleanup_status),
+        )
+
+    def _on_internet_cleanup_status(self, request_id: int, message: str) -> None:
+        runtime = self._ensure_internet_cleanup_runtime()
+        if not runtime.is_current(request_id, cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False))):
+            return
+        self._set_status(str(message or ""))
+
+    def _on_internet_cleanup_finished(self, request_id: int, result) -> None:
+        runtime = self._ensure_internet_cleanup_runtime()
+        if not runtime.is_current(request_id, cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False))):
+            return
+        self._show_windows_feature_action_result(result)
+
+    def _on_internet_cleanup_failed(self, request_id: int, error: str) -> None:
+        runtime = self._ensure_internet_cleanup_runtime()
+        if not runtime.is_current(request_id, cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False))):
+            return
+        from windows_features.internet_cleanup import build_internet_cleanup_error_result
+
+        self._show_windows_feature_action_result(build_internet_cleanup_error_result(str(error or "")))
+
+    def _on_internet_cleanup_worker_finished(self, worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_internet_cleanup_runtime"), worker):
+            return
+        self._set_internet_cleanup_enabled(True)
+
+    def _stop_internet_cleanup_worker(self) -> None:
+        runtime = self.__dict__.get("_internet_cleanup_runtime")
+        if runtime is not None:
+            runtime.stop(blocking=False, warning_prefix="Internet cleanup worker")
+            runtime.cancel()

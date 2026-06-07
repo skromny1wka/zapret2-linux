@@ -27,6 +27,7 @@ class Zapret2SettingsBuildWidgets:
     extra_section_label: object | None
     extra_card: object
     test_card: object
+    internet_cleanup_card: object
     folder_card: object
     docs_card: object
 
@@ -48,6 +49,7 @@ def build_winws2_pages_settings_sections(
     on_wssize_toggled,
     on_debug_log_toggled,
     on_open_connection_test,
+    on_open_internet_cleanup,
     on_open_folder,
     on_open_docs,
 ) -> Zapret2SettingsBuildWidgets:
@@ -150,6 +152,18 @@ def build_winws2_pages_settings_sections(
         on_click=on_open_connection_test,
         parent=content_parent,
     )
+    internet_cleanup_card = build_push_setting_card_common(
+        push_setting_card_cls=push_setting_card_cls,
+        button_text=tr_fn("page.control.internet_cleanup.button", "Сбросить"),
+        icon=get_themed_qta_icon("fa5s.network-wired", color="#4cc38a"),
+        title_text=tr_fn("page.control.internet_cleanup.title", "Сбросить сеть Windows"),
+        content_text=tr_fn(
+            "page.control.internet_cleanup.desc",
+            "Очистить DNS, proxy, Winsock и сетевые параметры. Может понадобиться перезагрузка",
+        ),
+        on_click=on_open_internet_cleanup,
+        parent=content_parent,
+    )
     folder_card = build_push_setting_card_common(
         push_setting_card_cls=push_setting_card_cls,
         button_text=tr_fn("page.winws2_control.button.open", "Открыть"),
@@ -169,6 +183,7 @@ def build_winws2_pages_settings_sections(
         parent=content_parent,
     )
     extra_card.addSettingCard(test_card)
+    extra_card.addSettingCard(internet_cleanup_card)
     extra_card.addSettingCard(folder_card)
     extra_card.addSettingCard(docs_card)
     enable_setting_card_group_auto_height(extra_card)
@@ -189,6 +204,7 @@ def build_winws2_pages_settings_sections(
         extra_section_label=extra_section_label,
         extra_card=extra_card,
         test_card=test_card,
+        internet_cleanup_card=internet_cleanup_card,
         folder_card=folder_card,
         docs_card=docs_card,
     )

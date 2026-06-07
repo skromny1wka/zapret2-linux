@@ -134,9 +134,11 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         self.last_status_message_label = None
         self.extra_card = None
         self.test_btn = None
+        self.internet_cleanup_btn = None
         self.folder_btn = None
         self.docs_btn = None
         self.test_card = None
+        self.internet_cleanup_card = None
         self.folder_card = None
         self.docs_card = None
         self._build_ui()
@@ -235,6 +237,7 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             on_wssize_toggled=self._on_wssize_toggled,
             on_debug_log_toggled=self._on_debug_log_toggled,
             on_open_connection_test=self._open_connection_test,
+            on_open_internet_cleanup=self._on_internet_cleanup_clicked,
             on_open_folder=self._open_folder,
             on_open_docs=self._open_docs,
         )
@@ -271,9 +274,11 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         self.add_spacing(16)
         self.extra_card = section_widgets.extra_card
         self.test_card = section_widgets.test_card
+        self.internet_cleanup_card = section_widgets.internet_cleanup_card
         self.folder_card = section_widgets.folder_card
         self.docs_card = section_widgets.docs_card
         self.test_btn = self.test_card.button
+        self.internet_cleanup_btn = self.internet_cleanup_card.button
         self.folder_btn = self.folder_card.button
         self.docs_btn = self.docs_card.button
         self.add_widget(self.extra_card)
@@ -803,6 +808,7 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             defender_toggle=self.defender_toggle,
             max_block_toggle=self.max_block_toggle,
             test_card=self.test_card,
+            internet_cleanup_card=self.internet_cleanup_card,
             folder_card=self.folder_card,
             docs_card=self.docs_card,
             additional_settings_card=self.additional_settings_card,
@@ -819,5 +825,6 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         self._cleanup_in_progress = True
         self._refresh_runtime.stop_workers(log_fn=log)
         self._stop_defender_admin_check_worker()
+        self._stop_internet_cleanup_worker()
         self._stop_external_open_url_worker()
         cleanup_control_page_subscriptions(self)

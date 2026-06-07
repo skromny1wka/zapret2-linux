@@ -64,6 +64,7 @@ def apply_winws1_pages_language(
     defender_toggle,
     max_block_toggle,
     test_card,
+    internet_cleanup_card,
     folder_card,
     docs_card,
     additional_settings_card,
@@ -116,6 +117,20 @@ def apply_winws1_pages_language(
     )
     test_card.button.setText(
         tr_catalog("page.winws1_control.button.open", language=language, default="Открыть")
+    )
+
+    internet_cleanup_card.setTitle(
+        tr_catalog("page.control.internet_cleanup.title", language=language, default="Сбросить сеть Windows")
+    )
+    internet_cleanup_card.setContent(
+        tr_catalog(
+            "page.control.internet_cleanup.desc",
+            language=language,
+            default="Очистить DNS, proxy, Winsock и сетевые параметры. Может понадобиться перезагрузка",
+        )
+    )
+    internet_cleanup_card.button.setText(
+        tr_catalog("page.control.internet_cleanup.button", language=language, default="Сбросить")
     )
 
     folder_card.setTitle(

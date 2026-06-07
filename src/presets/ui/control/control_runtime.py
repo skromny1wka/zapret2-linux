@@ -315,3 +315,35 @@ def build_max_block_toggle_start_plan(*, enable: bool, language: str) -> Control
         ),
         start_status="",
     )
+
+
+def build_internet_cleanup_start_plan(*, language: str) -> ControlToggleActionStartPlan:
+    from app.ui_texts import tr as tr_catalog
+
+    return ControlToggleActionStartPlan(
+        blocked=False,
+        blocked_title="",
+        blocked_content="",
+        blocked_revert_checked=None,
+        confirmations=(
+            ControlConfirmationDialogPlan(
+                title=tr_catalog(
+                    "page.control.dialog.internet_cleanup.title",
+                    language=language,
+                    default="Сброс сети Windows",
+                ),
+                content=(
+                    "Выполнить очистку сетевых настроек Windows?\n\n"
+                    "Что будет сделано:\n"
+                    "• Сброс TCP/IP, IPv4 и IPv6\n"
+                    "• Сброс Winsock\n"
+                    "• Сброс WinHTTP proxy\n"
+                    "• Очистка DNS-кэша\n"
+                    "• Настройка динамических TCP-портов\n\n"
+                    "После сброса может понадобиться перезагрузка Windows."
+                ),
+                revert_checked=False,
+            ),
+        ),
+        start_status="Сброс сети Windows...",
+    )
