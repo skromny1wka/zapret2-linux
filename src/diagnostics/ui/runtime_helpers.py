@@ -6,6 +6,7 @@ from PyQt6.QtCore import QTimer
 
 import diagnostics.page_plans as connection_page_plans
 from app.ui_texts import tr as tr_catalog
+from ui.accessibility import set_control_accessibility
 from ui.fluent_widgets import set_tooltip
 
 
@@ -281,13 +282,39 @@ def apply_connection_language(
             default="Запустить выбранный сценарий диагностики для Discord и YouTube.",
         )
     )
+    set_control_accessibility(
+        start_btn,
+        name=tr_catalog(
+            "page.connection.action.start.accessible_name",
+            language=language,
+            default="Запустить диагностический тест",
+        ),
+        description=tr_catalog(
+            "page.connection.action.start.description",
+            language=language,
+            default="Запустить выбранный сценарий диагностики для Discord и YouTube.",
+        ),
+    )
     set_tooltip(
         stop_btn,
         tr_catalog(
             "page.connection.action.stop.description",
             language=language,
-            default="Остановить текущий тест, если он уже запущен.",
+            default="Останавливает текущий тест, если он уже запущен.",
         )
+    )
+    set_control_accessibility(
+        stop_btn,
+        name=tr_catalog(
+            "page.connection.action.stop.accessible_name",
+            language=language,
+            default="Остановить диагностический тест",
+        ),
+        description=tr_catalog(
+            "page.connection.action.stop.description",
+            language=language,
+            default="Останавливает текущий тест, если он уже запущен.",
+        ),
     )
     set_tooltip(
         send_log_btn,
@@ -296,6 +323,19 @@ def apply_connection_language(
             language=language,
             default="Собрать архив логов и открыть готовое обращение в GitHub Discussions.",
         )
+    )
+    set_control_accessibility(
+        send_log_btn,
+        name=tr_catalog(
+            "page.connection.action.support.accessible_name",
+            language=language,
+            default="Подготовить обращение с логами",
+        ),
+        description=tr_catalog(
+            "page.connection.action.support.description",
+            language=language,
+            default="Собрать архив логов и открыть готовое обращение в GitHub Discussions.",
+        ),
     )
 
 

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from PyQt6.QtWidgets import QWidget, QHBoxLayout
 from qfluentwidgets import FluentIcon
 
+from ui.accessibility import set_control_accessibility
 from ui.fluent_widgets import QuickActionsBar, SettingsCard, set_tooltip
 from diagnostics.ui.components import ConnectionStatusBadge, ScrollBlockingConnectionTextEdit
 from ui.log_limits import DIAGNOSTICS_LOG_VIEW_MAX_LINES, apply_text_line_limit
@@ -134,6 +135,14 @@ def build_connection_controls(
             "Запустить выбранный сценарий диагностики для Discord и YouTube.",
         )
     )
+    set_control_accessibility(
+        start_btn,
+        name=tr_fn("page.connection.action.start.accessible_name", "Запустить диагностический тест"),
+        description=tr_fn(
+            "page.connection.action.start.description",
+            "Запустить выбранный сценарий диагностики для Discord и YouTube.",
+        ),
+    )
     start_btn.clicked.connect(on_start)
     actions_bar.add_button(start_btn)
 
@@ -145,8 +154,16 @@ def build_connection_controls(
         stop_btn,
         tr_fn(
             "page.connection.action.stop.description",
-            "Остановить текущий тест, если он уже запущен.",
+            "Останавливает текущий тест, если он уже запущен.",
         )
+    )
+    set_control_accessibility(
+        stop_btn,
+        name=tr_fn("page.connection.action.stop.accessible_name", "Остановить диагностический тест"),
+        description=tr_fn(
+            "page.connection.action.stop.description",
+            "Останавливает текущий тест, если он уже запущен.",
+        ),
     )
     stop_btn.clicked.connect(on_stop)
     stop_btn.setEnabled(False)
@@ -162,6 +179,14 @@ def build_connection_controls(
             "page.connection.action.support.description",
             "Собрать архив логов и открыть готовое обращение в GitHub Discussions.",
         )
+    )
+    set_control_accessibility(
+        send_log_btn,
+        name=tr_fn("page.connection.action.support.accessible_name", "Подготовить обращение с логами"),
+        description=tr_fn(
+            "page.connection.action.support.description",
+            "Собрать архив логов и открыть готовое обращение в GitHub Discussions.",
+        ),
     )
     send_log_btn.clicked.connect(on_support)
     send_log_btn.setEnabled(False)

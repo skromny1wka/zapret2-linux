@@ -1,0 +1,85 @@
+from __future__ import annotations
+
+import os
+import unittest
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+from PyQt6.QtWidgets import QApplication, QVBoxLayout, QWidget
+from qfluentwidgets import BodyLabel, CaptionLabel, ComboBox, ProgressBar, PushButton
+
+from diagnostics.ui.build import build_connection_controls
+from diagnostics.ui.runtime_helpers import apply_connection_language
+
+
+class DiagnosticsControlsAccessibilityTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._app = QApplication.instance() or QApplication([])
+
+    def test_connection_action_buttons_have_screen_reader_names(self) -> None:
+        parent = QWidget()
+        layout = QVBoxLayout(parent)
+
+        widgets = build_connection_controls(
+            container_layout=layout,
+            content_parent=parent,
+            tr_fn=lambda _key, default: default,
+            combo_cls=ComboBox,
+            body_label_cls=BodyLabel,
+            caption_label_cls=CaptionLabel,
+            progress_bar_cls=ProgressBar,
+            push_button_cls=PushButton,
+            on_start=lambda: None,
+            on_stop=lambda: None,
+            on_support=lambda: None,
+        )
+
+        self.assertEqual(widgets.start_btn.accessibleName(), "Запустить диагностический тест")
+        self.assertIn("Discord и YouTube", widgets.start_btn.accessibleDescription())
+        self.assertEqual(widgets.stop_btn.accessibleName(), "Остановить диагностический тест")
+        self.assertIn("Останавливает текущий тест", widgets.stop_btn.accessibleDescription())
+        self.assertEqual(widgets.send_log_btn.accessibleName(), "Подготовить обращение с логами")
+        self.assertIn("архив логов", widgets.send_log_btn.accessibleDescription())
+
+    def test_connection_language_refresh_keeps_screen_reader_descriptions(self) -> None:
+        parent = QWidget()
+        layout = QVBoxLayout(parent)
+        hero_title = BodyLabel()
+        hero_subtitle = BodyLabel()
+
+        widgets = build_connection_controls(
+            container_layout=layout,
+            content_parent=parent,
+            tr_fn=lambda _key, default: default,
+            combo_cls=ComboBox,
+            body_label_cls=BodyLabel,
+            caption_label_cls=CaptionLabel,
+            progress_bar_cls=ProgressBar,
+            push_button_cls=PushButton,
+            on_start=lambda: None,
+            on_stop=lambda: None,
+            on_support=lambda: None,
+        )
+
+        apply_connection_language(
+            language="ru",
+            controls_card=widgets.controls_card,
+            actions_title_label=widgets.actions_title_label,
+            hero_title=hero_title,
+            hero_subtitle=hero_subtitle,
+            test_select_label=widgets.test_select_label,
+            refresh_test_combo_items_callback=lambda: None,
+            start_btn=widgets.start_btn,
+            stop_btn=widgets.stop_btn,
+            send_log_btn=widgets.send_log_btn,
+        )
+
+        self.assertEqual(widgets.start_btn.accessibleName(), "Запустить диагностический тест")
+        self.assertEqual(widgets.stop_btn.accessibleName(), "Остановить диагностический тест")
+        self.assertIn("Останавливает текущий тест", widgets.stop_btn.accessibleDescription())
+        self.assertEqual(widgets.send_log_btn.accessibleName(), "Подготовить обращение с логами")
+
+
+if __name__ == "__main__":
+    unittest.main()
