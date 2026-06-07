@@ -22,6 +22,7 @@ from qfluentwidgets import (
 )
 
 from ui.pages.base_page import BasePage
+from ui.accessibility import set_control_accessibility
 from ui.fluent_widgets import set_tooltip
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens
@@ -89,6 +90,7 @@ class WhitelistDomainRow(QFrame):
             delete_btn.clicked.connect(self._on_delete_clicked)
             layout.addWidget(delete_btn)
 
+        self._update_accessibility()
         self._apply_theme()
 
     def refresh_theme(self) -> None:
@@ -138,6 +140,26 @@ class WhitelistDomainRow(QFrame):
             parent = parent.parent()
         if parent:
             parent._on_row_delete_requested(self.domain)
+
+    def _update_accessibility(self) -> None:
+        if self.is_default:
+            set_control_accessibility(
+                self,
+                name=f"Системный домен белого списка: {self.domain}",
+                description="Системный домен нельзя удалить.",
+            )
+        else:
+            set_control_accessibility(
+                self,
+                name=f"Домен белого списка: {self.domain}",
+                description="Этот домен не обрабатывается оркестратором.",
+            )
+        if self._delete_btn is not None:
+            set_control_accessibility(
+                self._delete_btn,
+                name=f"Удалить {self.domain} из белого списка",
+                description="Удаляет пользовательский домен из белого списка.",
+            )
 
 
 class OrchestraWhitelistPage(BasePage):
@@ -288,6 +310,7 @@ class OrchestraWhitelistPage(BasePage):
         self._domain_rows: list[WhitelistDomainRow] = []
 
         self.layout.addWidget(domains_card, 1)
+        self._install_accessibility()
 
     def _apply_page_theme(self, tokens=None, force: bool = False) -> None:
         _ = force
@@ -382,9 +405,37 @@ class OrchestraWhitelistPage(BasePage):
                 "Удалить все пользовательские домены (системные останутся)",
             ),
         )
+        self._install_accessibility()
 
         if self._runtime_initialized:
             self._sync_whitelist_view(refresh=True)
+
+    def _install_accessibility(self) -> None:
+        set_control_accessibility(
+            self.restart_warning,
+            name="Предупреждение: изменения белого списка применятся после перезапуска оркестратора",
+            description="Если оркестратор запущен, изменения вступят в силу после его перезапуска.",
+        )
+        set_control_accessibility(
+            self.domain_input,
+            name="Домен для белого списка",
+            description="Введите домен, который оркестратор не должен обрабатывать.",
+        )
+        set_control_accessibility(
+            self.add_btn,
+            name="Добавить домен в белый список",
+            description="Добавляет введённый домен в белый список.",
+        )
+        set_control_accessibility(
+            self.search_input,
+            name="Поиск по белому списку",
+            description="Фильтрует домены белого списка по введённому тексту.",
+        )
+        set_control_accessibility(
+            self.clear_user_btn,
+            name="Очистить пользовательские домены белого списка",
+            description="Удаляет все пользовательские домены. Системные домены останутся.",
+        )
 
     def on_page_activated(self) -> None:
         if not self._runtime_initialized:

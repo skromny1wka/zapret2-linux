@@ -26,6 +26,7 @@ from qfluentwidgets import (
 )
 
 from ui.pages.base_page import BasePage
+from ui.accessibility import set_control_accessibility
 from ui.fluent_widgets import set_tooltip
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens
@@ -136,6 +137,7 @@ class BlockedDomainRow(QFrame):
             delete_btn.clicked.connect(self._on_delete_clicked)
             layout.addWidget(delete_btn)
 
+        self._update_accessibility(strategy)
         self._apply_theme()
 
     def refresh_theme(self) -> None:
@@ -188,6 +190,7 @@ class BlockedDomainRow(QFrame):
         if parent:
             parent._on_row_strategy_changed(self.hostname, self.original_strategy, new_value, self.askey)
             self.original_strategy = new_value  # Обновляем для следующих изменений
+        self._update_accessibility(new_value)
 
     def _on_add_clicked(self):
         """При клике на + - заполняем форму для добавления новой блокировки этого домена"""
@@ -204,6 +207,35 @@ class BlockedDomainRow(QFrame):
             parent = parent.parent()
         if parent:
             parent._on_row_delete_requested(self.hostname, self.original_strategy, self.askey)
+
+    def _update_accessibility(self, strategy: int | None = None) -> None:
+        selected_strategy = int(strategy if strategy is not None else self.original_strategy)
+        proto_text = str(self.askey or "").upper()
+        if self.is_default:
+            name = f"Системная заблокированная стратегия: {self.hostname}, {proto_text}, стратегия {selected_strategy}"
+            description = "Системную блокировку нельзя изменить."
+        else:
+            name = f"Заблокированная стратегия: {self.hostname}, {proto_text}, стратегия {selected_strategy}"
+            description = "Оркестратор не будет использовать эту стратегию для домена."
+        set_control_accessibility(self, name=name, description=description)
+        if hasattr(self, "strat_spin"):
+            set_control_accessibility(
+                self.strat_spin,
+                name=f"Заблокированная стратегия для {self.hostname} {proto_text}, выбрано: {selected_strategy}",
+                description="Стрелками вверх и вниз можно изменить номер заблокированной стратегии.",
+            )
+        if self._add_btn is not None:
+            set_control_accessibility(
+                self._add_btn,
+                name=f"Добавить ещё одну блокировку для {self.hostname} {proto_text}",
+                description="Заполняет форму этим доменом, чтобы добавить ещё одну заблокированную стратегию.",
+            )
+        if self._delete_btn is not None:
+            set_control_accessibility(
+                self._delete_btn,
+                name=f"Разблокировать {self.hostname} {proto_text}, стратегия {selected_strategy}",
+                description="Удаляет эту блокировку стратегии.",
+            )
 
 
 class OrchestraBlockedPage(BasePage):
@@ -393,6 +425,7 @@ class OrchestraBlockedPage(BasePage):
         self._blocked_rows: list[BlockedDomainRow] = []
 
         self.layout.addWidget(list_card)
+        self._install_accessibility()
 
     def _apply_page_theme(self, tokens=None, force: bool = False) -> None:
         _ = force
@@ -477,9 +510,67 @@ class OrchestraBlockedPage(BasePage):
                 "Удалить все пользовательские блокировки (системные останутся)",
             ),
         )
+        self._install_accessibility()
 
         if self._runtime_initialized:
             self._refresh_data()
+
+    def _install_accessibility(self) -> None:
+        set_control_accessibility(
+            self.domain_input,
+            name="Домен для блокировки стратегии",
+            description="Введите домен, например example.com.",
+        )
+        set_control_accessibility(
+            self.proto_combo,
+            description="Выберите протокол: TCP или UDP.",
+        )
+        set_control_accessibility(
+            self.strat_spin,
+            description="Выберите номер стратегии, которую оркестратор не должен использовать.",
+        )
+        set_control_accessibility(
+            self.block_btn,
+            name="Заблокировать стратегию для домена",
+            description="Добавляет выбранную стратегию в чёрный список для указанного домена.",
+        )
+        set_control_accessibility(
+            self.search_input,
+            name="Поиск по заблокированным доменам",
+            description="Фильтрует чёрный список по введённому тексту.",
+        )
+        set_control_accessibility(
+            self.refresh_btn,
+            name="Обновить чёрный список стратегий",
+            description="Перечитывает заблокированные стратегии из настроек.",
+        )
+        set_control_accessibility(
+            self.unblock_all_btn,
+            name="Очистить пользовательские блокировки",
+            description="Удаляет все пользовательские блокировки. Системные блокировки останутся.",
+        )
+        self._update_accessibility_state()
+        try:
+            self.proto_combo.currentIndexChanged.disconnect(self._update_accessibility_state)
+        except Exception:
+            pass
+        try:
+            self.strat_spin.valueChanged.disconnect(self._update_accessibility_state)
+        except Exception:
+            pass
+        self.proto_combo.currentIndexChanged.connect(self._update_accessibility_state)
+        self.strat_spin.valueChanged.connect(self._update_accessibility_state)
+
+    def _update_accessibility_state(self, *_args) -> None:
+        selected_proto = str(self.proto_combo.currentText() or "").strip() or "не выбрано"
+        set_control_accessibility(
+            self.proto_combo,
+            name=f"Протокол блокировки стратегии, выбрано: {selected_proto}",
+        )
+        set_control_accessibility(
+            self.strat_spin,
+            name=f"Номер блокируемой стратегии, выбрано: {self.strat_spin.value()}",
+        )
 
     def on_page_activated(self) -> None:
         self._run_runtime_init_once()

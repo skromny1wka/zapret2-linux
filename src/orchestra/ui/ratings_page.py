@@ -16,6 +16,7 @@ from qfluentwidgets import (
 )
 
 from ui.pages.base_page import BasePage
+from ui.accessibility import set_control_accessibility, set_state_text
 from ui.fluent_widgets import set_tooltip
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.smooth_scroll import apply_editor_smooth_scroll_preference
@@ -143,6 +144,7 @@ class OrchestraRatingsPage(BasePage):
         history_layout.addWidget(self.history_text)
 
         self.layout.addWidget(history_card)
+        self._install_accessibility()
 
     def _apply_page_theme(self, tokens=None, force: bool = False) -> None:
         _ = force
@@ -199,8 +201,8 @@ class OrchestraRatingsPage(BasePage):
             filter_text=self.filter_input.text(),
             tr_fn=self._tr,
         )
-        self.stats_label.setText(plan.stats_text)
         self.history_text.setPlainText(plan.history_text)
+        self._set_stats_text(plan.stats_text)
 
     def cleanup(self) -> None:
         self._cleanup_in_progress = True
@@ -227,19 +229,43 @@ class OrchestraRatingsPage(BasePage):
             self._tr("page.orchestra.ratings.filter.placeholder", "Поиск по домену...")
         )
         set_tooltip(self.refresh_btn, self._tr("page.orchestra.ratings.button.refresh", "Обновить"))
+        self._install_accessibility()
 
         if self._no_runner:
-            self.stats_label.setText(
+            self._set_stats_text(
                 self._tr("page.orchestra.ratings.status.not_initialized", "Оркестратор не инициализирован")
             )
             self.history_text.setPlainText("")
             return
 
         if not self._has_loaded_once:
-            self.stats_label.setText(self._tr("page.orchestra.ratings.stats.loading", "Загрузка..."))
+            self._set_stats_text(self._tr("page.orchestra.ratings.stats.loading", "Загрузка..."))
             self.history_text.setPlainText(
                 self._tr("page.orchestra.ratings.history.placeholder", "История стратегий появится после обучения...")
             )
             return
 
         self._render_history()
+
+    def _install_accessibility(self) -> None:
+        set_control_accessibility(
+            self.filter_input,
+            name="Фильтр рейтингов по домену",
+            description="Введите часть домена, чтобы оставить в истории только подходящие записи.",
+        )
+        set_control_accessibility(
+            self.refresh_btn,
+            name="Обновить рейтинги стратегий",
+            description="Загружает свежую историю обучения оркестратора.",
+        )
+        set_control_accessibility(
+            self.history_text,
+            name="История рейтингов стратегий",
+            description="Здесь показаны результаты обучения оркестратора по доменам и стратегиям.",
+        )
+        self._set_stats_text(self.stats_label.text())
+
+    def _set_stats_text(self, text: str) -> None:
+        value = str(text or "").strip()
+        self.stats_label.setText(value)
+        set_state_text(self.stats_label, f"Статистика рейтингов: {value}")

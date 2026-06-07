@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ui.pages.base_page import BasePage
+from ui.accessibility import set_control_accessibility
 from ui.fluent_widgets import set_tooltip
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from qfluentwidgets import (
@@ -98,6 +99,7 @@ class LockedDomainRow(QFrame):
         delete_btn.clicked.connect(self._on_delete_clicked)
         layout.addWidget(delete_btn)
 
+        self._update_accessibility()
         self._apply_theme()
 
     def refresh_theme(self) -> None:
@@ -127,6 +129,7 @@ class LockedDomainRow(QFrame):
 
     def _on_strategy_changed(self, value: int):
         """При изменении стратегии - уведомляем родителя для автосохранения"""
+        self._update_accessibility(value)
         parent = self.parent()
         while parent and not isinstance(parent, OrchestraLockedPage):
             parent = parent.parent()
@@ -140,6 +143,26 @@ class LockedDomainRow(QFrame):
             parent = parent.parent()
         if parent:
             parent._on_row_delete_requested(self.domain, self.proto)
+
+    def _update_accessibility(self, strategy: int | None = None) -> None:
+        selected_strategy = int(strategy if strategy is not None else self.strat_spin.value())
+        proto_text = str(self.proto or "").upper()
+        set_control_accessibility(
+            self,
+            name=f"Залоченная стратегия: {self.domain}, {proto_text}, стратегия {selected_strategy}",
+            description="Стратегия зафиксирована для этого домена.",
+        )
+        set_control_accessibility(
+            self.strat_spin,
+            name=f"Стратегия для {self.domain} {proto_text}, выбрано: {selected_strategy}",
+            description="Стрелками вверх и вниз можно изменить номер стратегии. Изменение сохранится автоматически.",
+        )
+        if self._delete_btn is not None:
+            set_control_accessibility(
+                self._delete_btn,
+                name=f"Разлочить {self.domain} {proto_text}",
+                description="Убирает фиксацию стратегии для этого домена.",
+            )
 
 
 class OrchestraLockedPage(BasePage):
@@ -325,6 +348,7 @@ class OrchestraLockedPage(BasePage):
         self._domain_rows = {}
 
         self.layout.addWidget(list_card)
+        self._install_accessibility()
 
     def _apply_page_theme(self, tokens=None, force: bool = False) -> None:
         _ = force
@@ -385,9 +409,67 @@ class OrchestraLockedPage(BasePage):
             self.refresh_btn,
             self._tr("page.orchestra.locked.button.refresh.tooltip", "Обновить"),
         )
+        self._install_accessibility()
 
         if self._runtime_initialized:
             self._refresh_data()
+
+    def _install_accessibility(self) -> None:
+        set_control_accessibility(
+            self.domain_input,
+            name="Домен для залочки стратегии",
+            description="Введите домен, например example.com.",
+        )
+        set_control_accessibility(
+            self.proto_combo,
+            description="Выберите протокол: TCP или UDP.",
+        )
+        set_control_accessibility(
+            self.strat_spin,
+            description="Выберите номер стратегии. Стрелки вверх и вниз меняют значение.",
+        )
+        set_control_accessibility(
+            self.lock_btn,
+            name="Залочить стратегию для домена",
+            description="Фиксирует выбранную стратегию для указанного домена.",
+        )
+        set_control_accessibility(
+            self.search_input,
+            name="Поиск по залоченным доменам",
+            description="Фильтрует список залоченных доменов по введённому тексту.",
+        )
+        set_control_accessibility(
+            self.refresh_btn,
+            name="Обновить список залоченных стратегий",
+            description="Перечитывает список залоченных стратегий из настроек.",
+        )
+        set_control_accessibility(
+            self.unlock_all_btn,
+            name="Разлочить все стратегии",
+            description="Удаляет все ручные фиксации стратегий.",
+        )
+        self._update_accessibility_state()
+        try:
+            self.proto_combo.currentIndexChanged.disconnect(self._update_accessibility_state)
+        except Exception:
+            pass
+        try:
+            self.strat_spin.valueChanged.disconnect(self._update_accessibility_state)
+        except Exception:
+            pass
+        self.proto_combo.currentIndexChanged.connect(self._update_accessibility_state)
+        self.strat_spin.valueChanged.connect(self._update_accessibility_state)
+
+    def _update_accessibility_state(self, *_args) -> None:
+        selected_proto = str(self.proto_combo.currentText() or "").strip() or "не выбрано"
+        set_control_accessibility(
+            self.proto_combo,
+            name=f"Протокол залочки стратегии, выбрано: {selected_proto}",
+        )
+        set_control_accessibility(
+            self.strat_spin,
+            name=f"Номер стратегии для залочки, выбрано: {self.strat_spin.value()}",
+        )
 
     def on_page_activated(self) -> None:
         self._run_runtime_init_once()
