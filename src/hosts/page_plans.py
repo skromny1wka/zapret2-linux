@@ -294,11 +294,6 @@ def infer_profile_from_hosts(
     if not normalized_active or not available_profiles:
         return None
 
-    best_profile: str | None = None
-    best_matches = -1
-    best_present = -1
-    best_total = 0
-
     for profile_name in available_profiles:
         try:
             domain_map = get_service_domain_ip_map(service_name, profile_name) or {}
@@ -308,50 +303,39 @@ def infer_profile_from_hosts(
             continue
 
         total = len(domain_map)
-        present = 0
         matches = 0
         for domain, ip in domain_map.items():
             active_ip = normalized_active.get(str(domain or "").casefold())
             if active_ip is None:
                 continue
-            present += 1
             if (active_ip or "").strip().casefold() == (ip or "").strip().casefold():
                 matches += 1
 
         if total and matches == total:
             return profile_name
 
-        if matches > best_matches or (matches == best_matches and present > best_present):
-            best_profile = profile_name
-            best_matches = matches
-            best_present = present
-            best_total = total
-
-    if not best_profile:
-        return None
-
-    if len(available_profiles) == 1 and best_present > 0:
-        return best_profile
-
-    if best_total and best_matches > 0 and (best_matches / best_total) >= 0.6:
-        return best_profile
-
     return None
 
 
 def infer_direct_toggle_from_hosts(service_name: str, active_domains_map: dict[str, str]) -> bool:
-    from hosts.proxy_domains import get_service_domain_names
+    from hosts.proxy_domains import get_service_domains
 
     normalized_active = _normalize_active_domains_map(active_domains_map)
     if not normalized_active:
         return False
     try:
-        for domain in (get_service_domain_names(service_name) or []):
-            if str(domain or "").strip().casefold() in normalized_active:
-                return True
+        domain_map = get_service_domains(service_name) or {}
     except Exception:
-        pass
-    return False
+        return False
+    if not domain_map:
+        return False
+    for domain, ip in domain_map.items():
+        active_ip = normalized_active.get(str(domain or "").casefold())
+        if active_ip is None:
+            return False
+        if (active_ip or "").strip().casefold() != (ip or "").strip().casefold():
+            return False
+    return True
 
 
 def build_selection_sync_plan(

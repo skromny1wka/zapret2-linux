@@ -207,6 +207,51 @@ class HostsCatalogJsonTests(unittest.TestCase):
 
         self.assertEqual(plan.new_selection.get("ChatGPT"), "zapret_dns")
 
+    def test_services_catalog_plan_does_not_select_dns_profile_from_partial_hosts_match(self) -> None:
+        from hosts import page_plans
+
+        catalog = {
+            "version": 1,
+            "profiles": [
+                {"id": "zapret_dns", "name": "Zapret DNS"},
+                {"id": "direct", "name": "Вкл. (активировать hosts)"},
+            ],
+            "services": [
+                {
+                    "name": "Two Domain Service",
+                    "mode": "dns",
+                    "domains": [
+                        {"host": "one.example", "ips": {"zapret_dns": "1.1.1.1"}},
+                        {"host": "two.example", "ips": {"zapret_dns": "2.2.2.2"}},
+                    ],
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            catalog_path = root / "private_zapretgui" / "resources" / "json" / "hosts_catalog.json"
+            catalog_path.parent.mkdir(parents=True, exist_ok=True)
+            catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2), encoding="utf-8")
+            fake_module = root / "public_zapretgui" / "src" / "hosts" / "proxy_domains.py"
+            fake_module.parent.mkdir(parents=True, exist_ok=True)
+            fake_module.write_text("", encoding="utf-8")
+
+            with patch.object(self.proxy_domains, "__file__", str(fake_module)):
+                self.proxy_domains.invalidate_hosts_catalog_cache()
+
+                plan = page_plans.build_services_catalog_plan(
+                    current_selection={},
+                    active_domains_map={"one.example": "1.1.1.1"},
+                    direct_title="Direct",
+                    ai_title="AI",
+                    other_title="Other",
+                )
+
+        rows = [row for group in plan.groups for row in group.rows if row.service_name == "Two Domain Service"]
+        self.assertEqual(rows[0].selected_profile, None)
+        self.assertNotIn("Two Domain Service", plan.new_selection)
+
     def test_services_catalog_plan_matches_direct_domains_case_insensitively(self) -> None:
         from hosts import page_plans
 
@@ -233,6 +278,52 @@ class HostsCatalogJsonTests(unittest.TestCase):
 
         service_name = "IP для подмены заблокированных ресурсов"
         self.assertEqual(plan.new_selection.get(service_name), "direct")
+
+    def test_services_catalog_plan_does_not_enable_direct_service_from_partial_hosts_match(self) -> None:
+        from hosts import page_plans
+
+        catalog = {
+            "version": 1,
+            "profiles": [
+                {"id": "zapret_dns", "name": "Zapret DNS"},
+                {"id": "direct", "name": "Вкл. (активировать hosts)"},
+            ],
+            "services": [
+                {
+                    "name": "Direct Two Domain Service",
+                    "mode": "direct",
+                    "hosts": [
+                        {"ip": "1.1.1.1", "host": "one.example"},
+                        {"ip": "2.2.2.2", "host": "two.example"},
+                    ],
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            catalog_path = root / "private_zapretgui" / "resources" / "json" / "hosts_catalog.json"
+            catalog_path.parent.mkdir(parents=True, exist_ok=True)
+            catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2), encoding="utf-8")
+            fake_module = root / "public_zapretgui" / "src" / "hosts" / "proxy_domains.py"
+            fake_module.parent.mkdir(parents=True, exist_ok=True)
+            fake_module.write_text("", encoding="utf-8")
+
+            with patch.object(self.proxy_domains, "__file__", str(fake_module)):
+                self.proxy_domains.invalidate_hosts_catalog_cache()
+
+                plan = page_plans.build_services_catalog_plan(
+                    current_selection={},
+                    active_domains_map={"one.example": "1.1.1.1"},
+                    direct_title="Direct",
+                    ai_title="AI",
+                    other_title="Other",
+                )
+
+        rows = [row for group in plan.groups for row in group.rows if row.service_name == "Direct Two Domain Service"]
+        self.assertEqual(rows[0].selected_profile, None)
+        self.assertFalse(rows[0].toggle_checked)
+        self.assertNotIn("Direct Two Domain Service", plan.new_selection)
 
     def test_services_catalog_plan_uses_icons_for_current_catalog_service_names(self) -> None:
         from hosts import page_plans
