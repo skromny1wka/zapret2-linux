@@ -67,7 +67,7 @@ class _FakeWorker:
 
 
 class WinwsRuntimeThreadRuntimeTests(unittest.TestCase):
-    def test_worker_thread_cleanup_does_not_wait_in_finish_slot(self) -> None:
+    def test_worker_thread_cleanup_keeps_thread_until_qthread_finishes(self) -> None:
         from winws_runtime.runtime.thread_runtime import start_worker_thread
 
         owner = SimpleNamespace()
@@ -86,10 +86,14 @@ class WinwsRuntimeThreadRuntimeTests(unittest.TestCase):
 
         self.assertTrue(thread.quit_called)
         self.assertFalse(thread.wait_called)
-        self.assertIsNone(owner._thread)
         self.assertIsNone(owner._worker)
+        self.assertIs(owner._thread, thread)
 
-    def test_launch_runtime_cleanup_threads_does_not_wait_in_gui_path(self) -> None:
+        thread.finished.emit()
+
+        self.assertIsNone(owner._thread)
+
+    def test_launch_runtime_cleanup_threads_keeps_running_threads_owned(self) -> None:
         from winws_runtime.runtime.lifecycle_feedback import cleanup_threads
 
         start_thread = _FakeThread(running=True)
@@ -107,8 +111,8 @@ class WinwsRuntimeThreadRuntimeTests(unittest.TestCase):
         self.assertFalse(stop_thread.wait_called)
         self.assertFalse(start_thread.terminate_called)
         self.assertFalse(stop_thread.terminate_called)
-        self.assertIsNone(owner._dpi_start_thread)
-        self.assertIsNone(owner._dpi_stop_thread)
+        self.assertIs(owner._dpi_start_thread, start_thread)
+        self.assertIs(owner._dpi_stop_thread, stop_thread)
 
 
 if __name__ == "__main__":

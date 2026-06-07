@@ -226,16 +226,18 @@ def on_stop_and_exit_finished(runtime_owner):
 def cleanup_threads(runtime_owner):
     """Очищает все потоки при закрытии приложения."""
     try:
-        if runtime_owner._dpi_start_thread and runtime_owner._dpi_start_thread.isRunning():
-            log("Останавливаем поток запуска DPI...", "DEBUG")
-            runtime_owner._dpi_start_thread.quit()
-
-        if runtime_owner._dpi_stop_thread and runtime_owner._dpi_stop_thread.isRunning():
-            log("Останавливаем поток остановки DPI...", "DEBUG")
-            runtime_owner._dpi_stop_thread.quit()
-
-        runtime_owner._dpi_start_thread = None
-        runtime_owner._dpi_stop_thread = None
+        for thread_attr, log_message in (
+            ("_dpi_start_thread", "Останавливаем поток запуска DPI..."),
+            ("_dpi_stop_thread", "Останавливаем поток остановки DPI..."),
+        ):
+            thread = getattr(runtime_owner, thread_attr, None)
+            if thread is None:
+                continue
+            if thread.isRunning():
+                log(log_message, "DEBUG")
+                thread.quit()
+            else:
+                setattr(runtime_owner, thread_attr, None)
 
     except Exception as e:
         log(f"Ошибка при очистке потоков DPI runtime: {e}", "❌ ERROR")
