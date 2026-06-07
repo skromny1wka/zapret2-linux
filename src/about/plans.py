@@ -2,16 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from about.commands import (
-    AboutActionResult,
-    open_discord,
-    open_github,
-    open_help_folder,
-    open_support_discussions,
-    open_telegram,
-)
-
-
 
 @dataclass(slots=True)
 class AboutTabSwitchPlan:

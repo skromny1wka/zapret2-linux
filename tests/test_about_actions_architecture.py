@@ -18,6 +18,12 @@ class AboutActionsArchitectureTests(unittest.TestCase):
         plans_source = inspect.getsource(about_plans)
         commands_source = inspect.getsource(about_commands)
 
+        self.assertNotIn("about.commands", plans_source)
+        self.assertNotIn("open_support_discussions", plans_source)
+        self.assertNotIn("open_telegram", plans_source)
+        self.assertNotIn("open_discord", plans_source)
+        self.assertNotIn("open_github", plans_source)
+        self.assertNotIn("open_help_folder", plans_source)
         self.assertNotIn("subprocess", plans_source)
         self.assertNotIn("webbrowser.open", plans_source)
         self.assertIn("open_help_folder", commands_source)
