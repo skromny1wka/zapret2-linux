@@ -1,5 +1,17 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime
+import os
+
+from log.log import global_logger
+
+
+@dataclass(slots=True)
+class BlockcheckRunLogState:
+    path: str | None
+    created: bool
+
 
 def create_blockcheck_worker(
     *,
@@ -73,16 +85,53 @@ def run_user_domain_action(action: str, domain: str):
     raise ValueError(f"Неизвестное действие домена BlockCheck: {action_name}")
 
 
-def start_blockcheck_run_log(mode: str, extra_domains: list[str]):
-    from blockcheck.page_runtime import start_run_log
+def make_blockcheck_run_log_path(mode: str) -> str:
+    from config.config import LOGS_FOLDER
 
-    return start_run_log(mode, extra_domains)
+    log_dir = LOGS_FOLDER
+    try:
+        active_log = getattr(global_logger, "log_file", None)
+        if isinstance(active_log, str) and active_log.strip():
+            resolved_dir = os.path.dirname(active_log)
+            if resolved_dir:
+                log_dir = resolved_dir
+    except Exception:
+        pass
+
+    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    raw_mode = str(mode or "full").strip().lower()
+    safe_mode = "".join(ch if (ch.isalnum() or ch in ("_", "-")) else "_" for ch in raw_mode) or "full"
+    return os.path.join(log_dir, f"blockcheck_run_{ts}_{safe_mode}.log")
+
+
+def start_blockcheck_run_log(mode: str, extra_domains: list[str]):
+    path = make_blockcheck_run_log_path(mode)
+    try:
+        log_dir = os.path.dirname(path)
+        os.makedirs(log_dir, exist_ok=True)
+        with open(path, "w", encoding="utf-8-sig") as f:
+            f.write(f"=== Blockcheck Run Log ({datetime.now():%Y-%m-%d %H:%M:%S}) ===\n")
+            f.write(f"Mode: {mode}\n")
+            f.write(f"Extra domains: {len(extra_domains)}\n")
+            if extra_domains:
+                f.write(f"Domains: {', '.join(extra_domains)}\n")
+            f.write("=" * 60 + "\n\n")
+        return BlockcheckRunLogState(path=path, created=True)
+    except Exception:
+        return BlockcheckRunLogState(path=None, created=False)
 
 
 def append_blockcheck_run_log(path: str | None, message: str) -> None:
-    from blockcheck.page_runtime import append_run_log
-
-    append_run_log(path, message)
+    if not path:
+        return
+    try:
+        text = str(message or "")
+        if not text.endswith("\n"):
+            text += "\n"
+        with open(path, "a", encoding="utf-8-sig") as f:
+            f.write(text)
+    except Exception:
+        pass
 
 
 def build_quick_target_menu_plan(*, scan_protocol: str, current_value: str):

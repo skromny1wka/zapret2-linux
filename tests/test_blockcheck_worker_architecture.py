@@ -5,6 +5,7 @@ import unittest
 
 from app.feature_facades.blockcheck import BlockcheckFeature
 import blockcheck.commands as blockcheck_commands
+import blockcheck.page_runtime as blockcheck_page_runtime
 import blockcheck.strategy_scan_worker as strategy_scan_worker
 import blockcheck.worker as blockcheck_worker
 import blockcheck.strategy_apply_worker as strategy_apply_worker
@@ -59,6 +60,17 @@ class BlockcheckWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("_start_run_log", worker_source)
         self.assertIn("_append_run_log_action", worker_source)
         self.assertNotIn("blockcheck.commands", worker_source)
+
+    def test_blockcheck_run_log_file_io_lives_in_commands_not_page_runtime(self) -> None:
+        commands_source = inspect.getsource(blockcheck_commands)
+        page_runtime_source = inspect.getsource(blockcheck_page_runtime)
+
+        self.assertIn("def start_blockcheck_run_log", commands_source)
+        self.assertIn("def append_blockcheck_run_log", commands_source)
+        self.assertIn("with open(", commands_source)
+
+        self.assertNotIn("with open(", page_runtime_source)
+        self.assertNotIn("os.makedirs(", page_runtime_source)
 
     def test_strategy_scan_worker_receives_log_actions_as_callables(self) -> None:
         feature_source = inspect.getsource(BlockcheckFeature.create_strategy_scan_worker)
