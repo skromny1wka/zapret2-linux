@@ -153,12 +153,11 @@ def build_hosts_adobe_section(
 ) -> HostsAdobeWidgets:
     adobe_card = SettingsCard()
 
-    adobe_desc_label = CaptionLabel(
-        tr_fn(
-            "page.hosts.adobe.description",
-            "⚠️ Блокирует серверы проверки активации Adobe. Включите, если у вас установлена пиратская версия.",
-        )
+    adobe_description = tr_fn(
+        "page.hosts.adobe.description",
+        "⚠️ Блокирует серверы проверки активации Adobe. Включите, если у вас установлена пиратская версия.",
     )
+    adobe_desc_label = CaptionLabel(adobe_description)
     adobe_desc_label.setWordWrap(True)
     adobe_card.add_widget(adobe_desc_label)
 
@@ -170,11 +169,29 @@ def build_hosts_adobe_section(
     icon_label.setPixmap(get_cached_qta_pixmap('fa5s.puzzle-piece', color='#ff0000', size=20))
     adobe_layout.addWidget(icon_label)
 
-    adobe_title_label = StrongBodyLabel(tr_fn("page.hosts.adobe.title", "Блокировка Adobe"))
+    adobe_title = tr_fn("page.hosts.adobe.title", "Блокировка Adobe")
+    adobe_title_label = StrongBodyLabel(adobe_title)
     adobe_layout.addWidget(adobe_title_label, 1)
 
     adobe_switch = switch_button_cls()
     adobe_switch.setChecked(adobe_active)
+    _update_adobe_switch_accessibility(
+        adobe_switch,
+        title=adobe_title,
+        description=adobe_description,
+        checked=adobe_active,
+    )
+    try:
+        adobe_switch.checkedChanged.connect(
+            lambda checked: _update_adobe_switch_accessibility(
+                adobe_switch,
+                title=adobe_title,
+                description=adobe_description,
+                checked=checked,
+            )
+        )
+    except Exception:
+        pass
     adobe_switch.checkedChanged.connect(on_toggle_adobe)
     adobe_layout.addWidget(adobe_switch)
 
@@ -184,4 +201,13 @@ def build_hosts_adobe_section(
         description_label=adobe_desc_label,
         title_label=adobe_title_label,
         switch=adobe_switch,
+    )
+
+
+def _update_adobe_switch_accessibility(switch, *, title: str, description: str, checked: bool) -> None:
+    state = "включено" if bool(checked) else "выключено"
+    set_control_accessibility(
+        switch,
+        name=f"{title}, {state}",
+        description=description,
     )

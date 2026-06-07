@@ -8,6 +8,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtWidgets import QApplication
 
 from hosts.ui.sections_build import build_hosts_status_section
+from hosts.ui.sections_build import build_hosts_adobe_section
+from qfluentwidgets import SwitchButton
 
 
 class HostsStatusAccessibilityTests(unittest.TestCase):
@@ -27,6 +29,21 @@ class HostsStatusAccessibilityTests(unittest.TestCase):
         self.assertIn("Удаляет активные домены", widgets.clear_button.accessibleDescription())
         self.assertEqual(widgets.open_hosts_button.accessibleName(), "Открыть файл hosts")
         self.assertIn("Открывает системный файл hosts", widgets.open_hosts_button.accessibleDescription())
+
+    def test_adobe_switch_reads_current_state(self) -> None:
+        widgets = build_hosts_adobe_section(
+            tr_fn=lambda _key, default, **_kwargs: default,
+            adobe_active=False,
+            on_toggle_adobe=lambda _checked: None,
+            switch_button_cls=SwitchButton,
+        )
+
+        self.assertEqual(widgets.switch.accessibleName(), "Блокировка Adobe, выключено")
+        self.assertIn("Блокирует серверы проверки активации Adobe", widgets.switch.accessibleDescription())
+
+        widgets.switch.setChecked(True)
+
+        self.assertEqual(widgets.switch.accessibleName(), "Блокировка Adobe, включено")
 
 
 if __name__ == "__main__":
