@@ -49,6 +49,21 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
         self.assertTrue(config.worker_enabled)
         self.assertEqual(config.worker_domains, ("demo.workers.dev",))
 
+    def test_cloudflare_enabled_without_custom_domains_uses_builtin_auto_pool(self) -> None:
+        import telegram_proxy.config.settings as telegram_proxy_settings
+        from telegram_proxy.proxy.cloudflare import AUTO_CLOUDFLARE_DOMAINS
+
+        with (
+            patch("settings.store.get_tg_proxy_cloudflare_enabled", return_value=True),
+            patch("settings.store.get_tg_proxy_cloudflare_domains", return_value=[]),
+            patch("settings.store.get_tg_proxy_cloudflare_worker_enabled", return_value=False),
+            patch("settings.store.get_tg_proxy_cloudflare_worker_domains", return_value=[]),
+        ):
+            config = telegram_proxy_settings.build_cloudflare_config()
+
+        self.assertTrue(config.enabled)
+        self.assertEqual(config.domains, AUTO_CLOUDFLARE_DOMAINS)
+
     def test_cloudflare_settings_are_saved_through_runtime_command(self) -> None:
         import telegram_proxy.runtime.commands as commands
 
@@ -84,7 +99,7 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
         )
 
         self.assertTrue(should_try_cloudflare(config))
-        self.assertEqual(build_cloudflare_domains(4, config), ["kws4.example.com", "kws4-1.example.com"])
+        self.assertEqual(build_cloudflare_domains(4, config), ["kws4.example.com"])
         self.assertEqual(build_worker_path("149.154.167.91", 4), "/apiws?dst=149.154.167.91&dc=4")
 
     def test_wss_proxy_uses_cloudflare_before_plain_tcp_fallback(self) -> None:

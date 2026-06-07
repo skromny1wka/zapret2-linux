@@ -201,7 +201,7 @@ def apply_ui_texts(
         if mtproxy_secret_edit is not None:
             mtproxy_secret_edit.setPlaceholderText("32 символа: 0-9 и a-f")
         if cloudflare_domains_edit is not None:
-            cloudflare_domains_edit.setPlaceholderText("example.com, backup.example.com")
+            cloudflare_domains_edit.setPlaceholderText("Пусто = авто, или example.com, backup.example.com")
         if cloudflare_worker_domains_edit is not None:
             cloudflare_worker_domains_edit.setPlaceholderText("worker-name.workers.dev")
         if upstream_host_edit is not None:

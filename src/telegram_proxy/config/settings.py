@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from telegram_proxy.config.upstream_catalog import UpstreamCatalog
-from telegram_proxy.proxy.cloudflare import CloudflareFallbackConfig, normalize_domain_list
+from telegram_proxy.proxy.cloudflare import AUTO_CLOUDFLARE_DOMAINS, CloudflareFallbackConfig, normalize_domain_list
 from telegram_proxy.proxy.mtproxy import build_mtproxy_link, generate_secret, normalize_secret
 
 
@@ -289,9 +289,12 @@ def build_cloudflare_config() -> CloudflareFallbackConfig:
         )
 
         domains = normalize_domain_list(get_tg_proxy_cloudflare_domains())
+        cloudflare_enabled = bool(get_tg_proxy_cloudflare_enabled())
+        if cloudflare_enabled and not domains:
+            domains = AUTO_CLOUDFLARE_DOMAINS
         worker_domains = normalize_domain_list(get_tg_proxy_cloudflare_worker_domains())
         return CloudflareFallbackConfig(
-            enabled=bool(get_tg_proxy_cloudflare_enabled()) and bool(domains),
+            enabled=cloudflare_enabled and bool(domains),
             domains=domains,
             worker_enabled=bool(get_tg_proxy_cloudflare_worker_enabled()) and bool(worker_domains),
             worker_domains=worker_domains,

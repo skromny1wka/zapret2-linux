@@ -12,6 +12,25 @@ class CloudflareFallbackConfig:
     worker_domains: tuple[str, ...] = ()
 
 
+AUTO_CLOUDFLARE_DOMAINS: tuple[str, ...] = (
+    "sorokdva.co.uk",
+    "sorokodin.co.uk",
+    "lovetrue.co.uk",
+    "pyatdesyatdva.co.uk",
+    "noskomnadzor.co.uk",
+    "pomogite.co.uk",
+    "cakeisalie.co.uk",
+    "havegreatday.co.uk",
+    "pclead.co.uk",
+    "offshor.co.uk",
+    "kartoshka.co.uk",
+    "notelega.co.uk",
+    "nebally.co.uk",
+    "pyatdesyatodin.co.uk",
+    "ebally.co.uk",
+)
+
+
 def _is_valid_domain(value: str) -> bool:
     if not value or len(value) > 253:
         return False
@@ -55,16 +74,16 @@ def normalize_domain_list(value: object) -> tuple[str, ...]:
 def should_try_cloudflare(config: CloudflareFallbackConfig | None) -> bool:
     if config is None:
         return False
-    if config.enabled and config.domains:
+    if config.enabled and (config.domains or AUTO_CLOUDFLARE_DOMAINS):
         return True
     return bool(config.worker_enabled and config.worker_domains)
 
 
 def build_cloudflare_domains(dc: int, config: CloudflareFallbackConfig) -> list[str]:
     result: list[str] = []
-    for base_domain in config.domains:
+    domains = config.domains or AUTO_CLOUDFLARE_DOMAINS
+    for base_domain in domains:
         result.append(f"kws{int(dc)}.{base_domain}")
-        result.append(f"kws{int(dc)}-1.{base_domain}")
     return result
 
 
@@ -73,6 +92,7 @@ def build_worker_path(dst: str, dc: int) -> str:
 
 
 __all__ = [
+    "AUTO_CLOUDFLARE_DOMAINS",
     "CloudflareFallbackConfig",
     "build_cloudflare_domains",
     "build_worker_path",
