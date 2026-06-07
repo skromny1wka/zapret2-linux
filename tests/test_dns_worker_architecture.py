@@ -6,7 +6,8 @@ from types import SimpleNamespace
 from unittest.mock import ANY, Mock, patch
 
 from app.feature_facades.dns import build_dns_feature
-from dns import dns_check_worker, dns_worker, page_workers
+from dns import commands as dns_commands
+from dns import dns_check_plans, dns_check_worker, dns_worker, page_workers
 import dns.ui.page as network_page
 from dns.ui.dns_check_page import DNSCheckPage
 from dns.ui.page import NetworkPage
@@ -99,6 +100,16 @@ class DnsWorkerArchitectureTests(unittest.TestCase):
         self.assertNotIn("from dns import commands", worker_source)
         self.assertNotIn("from dns.commands import", worker_source)
         self.assertNotIn("dns_commands.", worker_source)
+
+    def test_dns_check_save_action_lives_in_commands_not_plans(self) -> None:
+        plans_source = inspect.getsource(dns_check_plans)
+        commands_source = inspect.getsource(dns_commands.save_dns_check_results)
+
+        self.assertNotIn("def save_results_text", plans_source)
+        self.assertNotIn("open(", plans_source)
+        self.assertNotIn("os.startfile", plans_source)
+        self.assertIn("open(", commands_source)
+        self.assertIn("os.startfile", commands_source)
 
     def test_network_page_uses_one_shot_runtime_for_action_workers(self) -> None:
         page_source = inspect.getsource(NetworkPage)

@@ -88,9 +88,44 @@ def run_dns_poisoning_check(*, log_callback=None, should_stop=None) -> dict:
 
 
 def save_dns_check_results(*, file_path: str, plain_text: str):
-    from dns.dns_check_plans import save_results_text
+    import os
+    from datetime import datetime
 
-    return save_results_text(file_path=file_path, plain_text=plain_text)
+    from dns.dns_check_plans import DNSSaveResultPlan
+
+    target_path = str(file_path or "").strip()
+    if not target_path:
+        return DNSSaveResultPlan(
+            success=False,
+            title="Ошибка",
+            content="Не указан путь для сохранения файла.",
+        )
+
+    try:
+        with open(target_path, "w", encoding="utf-8") as f:
+            f.write("DNS CHECK RESULTS\n")
+            f.write(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write("=" * 60 + "\n\n")
+            f.write(str(plain_text or ""))
+
+        folder = os.path.dirname(target_path) or None
+        if folder and hasattr(os, "startfile"):
+            try:
+                os.startfile(folder)  # type: ignore[attr-defined]
+            except Exception:
+                folder = None
+
+        return DNSSaveResultPlan(
+            success=True,
+            title="Сохранено",
+            content=f"Результаты сохранены в:\n{target_path}",
+        )
+    except Exception as e:
+        return DNSSaveResultPlan(
+            success=False,
+            title="Ошибка",
+            content=f"Не удалось сохранить файл:\n{str(e)}",
+        )
 
 
 def run_quick_dns_check():

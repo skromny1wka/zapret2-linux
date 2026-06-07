@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -102,38 +101,3 @@ def build_cleanup_plan(*, has_thread: bool, thread_running: bool) -> DNSCheckCle
 
 def build_save_default_filename() -> str:
     return f"dns_check_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-
-def save_results_text(*, file_path: str, plain_text: str) -> DNSSaveResultPlan:
-    target_path = str(file_path or "").strip()
-    if not target_path:
-        return DNSSaveResultPlan(
-            success=False,
-            title="Ошибка",
-            content="Не указан путь для сохранения файла.",
-        )
-
-    try:
-        with open(target_path, "w", encoding="utf-8") as f:
-            f.write("DNS CHECK RESULTS\n")
-            f.write(f"Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write("=" * 60 + "\n\n")
-            f.write(str(plain_text or ""))
-
-        folder = os.path.dirname(target_path) or None
-        if folder and hasattr(os, "startfile"):
-            try:
-                os.startfile(folder)  # type: ignore[attr-defined]
-            except Exception:
-                folder = None
-
-        return DNSSaveResultPlan(
-            success=True,
-            title="Сохранено",
-            content=f"Результаты сохранены в:\n{target_path}",
-        )
-    except Exception as e:
-        return DNSSaveResultPlan(
-            success=False,
-            title="Ошибка",
-            content=f"Не удалось сохранить файл:\n{str(e)}",
-        )
