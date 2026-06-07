@@ -825,17 +825,9 @@ class PresetRawEditorPage(BasePage):
             return False
         if self._preset_path is None:
             return False
-        if self._raw_preset_write_is_running():
-            return self._request_raw_preset_save(
-                file_name=self._preset_file_name,
-                source_text=None,
-                publish_content_changed=publish_content_changed,
-            )
-        source_text = self.editor.toPlainText()
-        self._raw_editor_text_snapshot = str(source_text or "")
         return self._request_raw_preset_save(
             file_name=self._preset_file_name,
-            source_text=source_text,
+            source_text=None,
             publish_content_changed=publish_content_changed,
         )
 
