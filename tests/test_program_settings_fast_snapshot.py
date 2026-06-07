@@ -18,13 +18,20 @@ class ProgramSettingsFastSnapshotTests(unittest.TestCase):
 
         defender_cls = Mock()
         max_blocked = Mock(return_value=True)
+        settings = {
+            "program": {
+                "dpi_autostart": True,
+                "gui_autostart_enabled": True,
+                "defender_disabled": True,
+                "max_blocked": True,
+            },
+            "window": {
+                "hide_to_tray_on_minimize_close": False,
+            },
+        }
 
         with (
-            patch("settings.store.get_dpi_autostart", return_value=True),
-            patch("settings.store.get_gui_autostart_enabled", return_value=True),
-            patch("settings.store.get_hide_to_tray_on_minimize_close", return_value=False),
-            patch("settings.store.get_defender_disabled_memory", return_value=True),
-            patch("settings.store.get_max_blocked", return_value=True),
+            patch("settings.store.read_settings", return_value=settings) as read_settings,
             patch("windows_features.defender_manager.WindowsDefenderManager", defender_cls),
             patch("windows_features.max_blocker.is_max_blocked", max_blocked),
         ):
@@ -35,6 +42,7 @@ class ProgramSettingsFastSnapshotTests(unittest.TestCase):
         self.assertFalse(snapshot.hide_to_tray_on_minimize_close)
         self.assertTrue(snapshot.defender_disabled)
         self.assertTrue(snapshot.max_blocked)
+        read_settings.assert_called_once_with()
         defender_cls.assert_not_called()
         max_blocked.assert_not_called()
 
@@ -42,11 +50,20 @@ class ProgramSettingsFastSnapshotTests(unittest.TestCase):
         from core.runtime.program_settings_runtime_service import ProgramSettingsRuntimeService
 
         service = ProgramSettingsRuntimeService()
+        settings = {
+            "program": {
+                "dpi_autostart": True,
+                "gui_autostart_enabled": False,
+                "defender_disabled": False,
+                "max_blocked": False,
+            },
+            "window": {
+                "hide_to_tray_on_minimize_close": True,
+            },
+        }
 
         with (
-            patch("settings.store.get_dpi_autostart", return_value=True),
-            patch("settings.store.get_gui_autostart_enabled", return_value=False),
-            patch("settings.store.get_hide_to_tray_on_minimize_close", return_value=True),
+            patch("settings.store.read_settings", return_value=settings),
         ):
             fast_snapshot = service.refresh_fast()
 
@@ -73,53 +90,41 @@ class ProgramSettingsFastSnapshotTests(unittest.TestCase):
         self.assertTrue(heavy_snapshot.defender_disabled)
         self.assertTrue(heavy_snapshot.max_blocked)
 
-    def test_startup_warmed_fast_snapshot_is_used_without_settings_read(self) -> None:
-        from core.runtime.program_settings_runtime_service import (
-            ProgramSettingsRuntimeService,
-            store_warmed_program_settings_fast_snapshot,
-        )
+    def test_load_snapshot_refreshes_settings_json_instead_of_old_cached_snapshot(self) -> None:
+        from core.runtime.program_settings_runtime_service import ProgramSettingsRuntimeService
 
-        store_warmed_program_settings_fast_snapshot(
-            auto_dpi_enabled=True,
-            gui_autostart_enabled=True,
-            hide_to_tray_on_minimize_close=False,
-            defender_disabled=True,
-            max_blocked=True,
-        )
         service = ProgramSettingsRuntimeService()
-        store_warmed_program_settings_fast_snapshot(
-            auto_dpi_enabled=None,
-            gui_autostart_enabled=None,
-            hide_to_tray_on_minimize_close=None,
-        )
-
         with (
-            patch("settings.store.get_dpi_autostart", side_effect=AssertionError("settings were reread")),
             patch(
-                "settings.store.get_gui_autostart_enabled",
-                side_effect=AssertionError("settings were reread"),
-            ),
-            patch(
-                "settings.store.get_hide_to_tray_on_minimize_close",
-                side_effect=AssertionError("settings were reread"),
-            ),
-            patch(
-                "settings.store.get_defender_disabled_memory",
-                side_effect=AssertionError("settings were reread"),
-            ),
-            patch("settings.store.get_max_blocked", side_effect=AssertionError("settings were reread")),
-            patch("windows_features.defender_manager.WindowsDefenderManager") as defender_cls,
-            patch("windows_features.max_blocker.is_max_blocked") as max_blocked,
+                "settings.store.read_settings",
+                side_effect=[
+                    {
+                        "program": {
+                            "dpi_autostart": True,
+                            "gui_autostart_enabled": False,
+                            "defender_disabled": False,
+                            "max_blocked": False,
+                        },
+                        "window": {"hide_to_tray_on_minimize_close": False},
+                    },
+                    {
+                        "program": {
+                            "dpi_autostart": True,
+                            "gui_autostart_enabled": True,
+                            "defender_disabled": False,
+                            "max_blocked": False,
+                        },
+                        "window": {"hide_to_tray_on_minimize_close": False},
+                    },
+                ],
+            ) as read_settings,
         ):
-            snapshot = service.load_snapshot()
+            first = service.load_snapshot()
+            second = service.load_snapshot()
 
-        self.assertTrue(snapshot.auto_dpi_enabled)
-        self.assertTrue(snapshot.gui_autostart_enabled)
-        self.assertFalse(snapshot.hide_to_tray_on_minimize_close)
-        self.assertTrue(snapshot.defender_disabled)
-        self.assertTrue(snapshot.max_blocked)
-        defender_cls.assert_not_called()
-        max_blocked.assert_not_called()
+        self.assertFalse(first.gui_autostart_enabled)
+        self.assertTrue(second.gui_autostart_enabled)
+        self.assertEqual(read_settings.call_count, 2)
 
     def test_attach_program_settings_runtime_applies_ready_snapshot_immediately(self) -> None:
         from program_settings.runtime import attach_program_settings_runtime

@@ -133,10 +133,19 @@ class GuiAutostartContractTests(unittest.TestCase):
     def test_gui_autostart_lives_in_program_settings_snapshot(self) -> None:
         from core.runtime.program_settings_runtime_service import ProgramSettingsRuntimeService
 
+        settings = {
+            "program": {
+                "dpi_autostart": True,
+                "gui_autostart_enabled": True,
+                "defender_disabled": False,
+                "max_blocked": False,
+            },
+            "window": {
+                "hide_to_tray_on_minimize_close": False,
+            },
+        }
         with (
-            patch("settings.store.get_dpi_autostart", return_value=True),
-            patch("settings.store.get_gui_autostart_enabled", return_value=True),
-            patch("settings.store.get_hide_to_tray_on_minimize_close", return_value=False),
+            patch("settings.store.read_settings", return_value=settings),
             patch("windows_features.defender_manager.WindowsDefenderManager") as defender_cls,
             patch("windows_features.max_blocker.is_max_blocked", return_value=False),
         ):

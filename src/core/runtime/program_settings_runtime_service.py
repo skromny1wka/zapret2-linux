@@ -17,7 +17,6 @@ class ProgramSettingsSnapshot:
 
 _warmed_hide_to_tray_lock = RLock()
 _warmed_hide_to_tray_on_minimize_close: bool | None = None
-_warmed_program_settings_fast_snapshot: tuple[bool, bool, bool, bool, bool] | None = None
 
 
 def store_warmed_hide_to_tray_on_minimize_close(enabled: bool | None) -> None:
@@ -30,41 +29,6 @@ def store_warmed_hide_to_tray_on_minimize_close(enabled: bool | None) -> None:
 def peek_warmed_hide_to_tray_on_minimize_close() -> bool | None:
     with _warmed_hide_to_tray_lock:
         return _warmed_hide_to_tray_on_minimize_close
-
-
-def store_warmed_program_settings_fast_snapshot(
-    *,
-    auto_dpi_enabled: bool | None,
-    gui_autostart_enabled: bool | None,
-    hide_to_tray_on_minimize_close: bool | None,
-    defender_disabled: bool | None = None,
-    max_blocked: bool | None = None,
-) -> None:
-    """Stores settings.json values already read during startup."""
-
-    global _warmed_program_settings_fast_snapshot
-    with _warmed_hide_to_tray_lock:
-        if (
-            auto_dpi_enabled is None
-            or gui_autostart_enabled is None
-            or hide_to_tray_on_minimize_close is None
-            or defender_disabled is None
-            or max_blocked is None
-        ):
-            _warmed_program_settings_fast_snapshot = None
-            return
-        _warmed_program_settings_fast_snapshot = (
-            bool(auto_dpi_enabled),
-            bool(gui_autostart_enabled),
-            bool(hide_to_tray_on_minimize_close),
-            bool(defender_disabled),
-            bool(max_blocked),
-        )
-
-
-def peek_warmed_program_settings_fast_snapshot() -> tuple[bool, bool, bool, bool, bool] | None:
-    with _warmed_hide_to_tray_lock:
-        return _warmed_program_settings_fast_snapshot
 
 
 class ProgramSettingsRuntimeService:
@@ -80,8 +44,7 @@ class ProgramSettingsRuntimeService:
         self._hide_to_tray_on_minimize_close_cache: bool | None = (
             peek_warmed_hide_to_tray_on_minimize_close()
         )
-        warmed_snapshot = self._snapshot_from_warmed_fast_values()
-        self._snapshot: ProgramSettingsSnapshot | None = warmed_snapshot
+        self._snapshot: ProgramSettingsSnapshot | None = None
         self._subscribers: list[object] = []
 
     @staticmethod
@@ -109,62 +72,12 @@ class ProgramSettingsRuntimeService:
             max_blocked=bool(max_blocked),
         )
 
-    def _snapshot_from_warmed_fast_values(self) -> ProgramSettingsSnapshot | None:
-        warmed = peek_warmed_program_settings_fast_snapshot()
-        if warmed is None:
-            return None
-        (
-            auto_dpi_enabled,
-            gui_autostart_enabled,
-            hide_to_tray_on_minimize_close,
-            defender_disabled,
-            max_blocked,
-        ) = warmed
-        warmed_hide_to_tray = peek_warmed_hide_to_tray_on_minimize_close()
-        if warmed_hide_to_tray is not None:
-            hide_to_tray_on_minimize_close = bool(warmed_hide_to_tray)
-        self._hide_to_tray_on_minimize_close_cache = bool(hide_to_tray_on_minimize_close)
-        return self._build_snapshot(
-            auto_dpi_enabled=auto_dpi_enabled,
-            gui_autostart_enabled=gui_autostart_enabled,
-            hide_to_tray_on_minimize_close=hide_to_tray_on_minimize_close,
-            defender_disabled=defender_disabled,
-            max_blocked=max_blocked,
-        )
-
-    @staticmethod
-    def _read_auto_dpi_enabled() -> bool:
-        try:
-            from settings.store import get_dpi_autostart
-
-            return bool(get_dpi_autostart())
-        except Exception:
-            return False
-
-    @staticmethod
-    def _read_gui_autostart_enabled() -> bool:
-        try:
-            from settings.store import get_gui_autostart_enabled
-
-            return bool(get_gui_autostart_enabled())
-        except Exception:
-            return False
-
     @staticmethod
     def _read_defender_disabled() -> bool:
         try:
             from windows_features.defender_manager import WindowsDefenderManager
 
             return bool(WindowsDefenderManager().is_defender_disabled())
-        except Exception:
-            return False
-
-    @staticmethod
-    def _read_hide_to_tray_on_minimize_close() -> bool:
-        try:
-            from settings.store import get_hide_to_tray_on_minimize_close
-
-            return bool(get_hide_to_tray_on_minimize_close())
         except Exception:
             return False
 
@@ -177,34 +90,26 @@ class ProgramSettingsRuntimeService:
         except Exception:
             return False
 
-    @staticmethod
-    def _read_remembered_defender_disabled() -> bool:
-        try:
-            from settings.store import get_defender_disabled_memory
-
-            return bool(get_defender_disabled_memory())
-        except Exception:
-            return False
-
-    @staticmethod
-    def _read_remembered_max_blocked() -> bool:
-        try:
-            from settings.store import get_max_blocked
-
-            return bool(get_max_blocked())
-        except Exception:
-            return False
-
     def _read_fast_snapshot(self) -> ProgramSettingsSnapshot:
-        auto_dpi_enabled = self._read_auto_dpi_enabled()
-        gui_autostart_enabled = self._read_gui_autostart_enabled()
-        hide_to_tray_on_minimize_close = self._read_hide_to_tray_on_minimize_close()
+        try:
+            from settings.store import read_settings
+
+            settings = read_settings()
+        except Exception:
+            settings = {}
+        program = settings.get("program") if isinstance(settings, dict) else {}
+        if not isinstance(program, dict):
+            program = {}
+        window = settings.get("window") if isinstance(settings, dict) else {}
+        if not isinstance(window, dict):
+            window = {}
+
         return self._build_snapshot(
-            auto_dpi_enabled=auto_dpi_enabled,
-            gui_autostart_enabled=gui_autostart_enabled,
-            hide_to_tray_on_minimize_close=hide_to_tray_on_minimize_close,
-            defender_disabled=self._read_remembered_defender_disabled(),
-            max_blocked=self._read_remembered_max_blocked(),
+            auto_dpi_enabled=bool(program.get("dpi_autostart", True)),
+            gui_autostart_enabled=bool(program.get("gui_autostart_enabled", False)),
+            hide_to_tray_on_minimize_close=bool(window.get("hide_to_tray_on_minimize_close", False)),
+            defender_disabled=bool(program.get("defender_disabled", False)),
+            max_blocked=bool(program.get("max_blocked", False)),
         )
 
     def _read_system_status_snapshot(self) -> ProgramSettingsSnapshot:
@@ -223,10 +128,6 @@ class ProgramSettingsRuntimeService:
         )
 
     def read_snapshot(self) -> ProgramSettingsSnapshot:
-        with self._lock:
-            snapshot = self._snapshot
-        if snapshot is not None:
-            return snapshot
         return self.refresh_fast()
 
     def publish_snapshot(self, snapshot: ProgramSettingsSnapshot) -> bool:
@@ -314,11 +215,8 @@ class ProgramSettingsRuntimeService:
                 pass
 
     def load_snapshot(self, *, refresh: bool = False) -> ProgramSettingsSnapshot:
-        with self._lock:
-            snapshot = self._snapshot
-        if snapshot is None or refresh:
-            return self.refresh_fast()
-        return snapshot
+        _ = refresh
+        return self.refresh_fast()
 
     def refresh(self) -> ProgramSettingsSnapshot:
         return self.refresh_fast()
