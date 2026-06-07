@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import QHBoxLayout
 from qfluentwidgets import (
     MessageBoxBase, SubtitleLabel, BodyLabel,
 )
+from ui.accessibility import set_control_accessibility, set_state_text
 from ui.dialog_action_buttons import create_dialog_action_button, create_dialog_cancel_button
 
 
@@ -96,6 +97,45 @@ class CloseDialog(MessageBoxBase):
         self.buttonGroup.setFixedHeight(0)
 
         self.widget.setMinimumWidth(440)
+        self._install_accessibility(description)
+
+    def _install_accessibility(self, description: str) -> None:
+        if self._launch_running:
+            body_name = "Описание закрытия: DPI запущен"
+            stop_name = "Закрыть ZapretGUI и остановить DPI"
+            stop_description = "Закрывает окно и остановит DPI. Обход блокировок перестанет работать."
+        else:
+            body_name = "Описание закрытия: DPI не запущен"
+            stop_name = "Закрыть ZapretGUI и остановить DPI, недоступно"
+            stop_description = "DPI сейчас не запущен, поэтому останавливать нечего."
+
+        set_control_accessibility(
+            self.bodyLabel,
+            name=body_name,
+            description=description,
+        )
+        set_control_accessibility(
+            self.trayButton,
+            name="Свернуть ZapretGUI в трей",
+            description="Скрывает окно и оставляет окно доступным из трея. DPI продолжит работать.",
+        )
+        set_control_accessibility(
+            self.guiOnlyButton,
+            name="Закрыть только окно ZapretGUI",
+            description="Закрывает только GUI. DPI продолжит работать в фоне.",
+        )
+        set_control_accessibility(
+            self.stopDpiButton,
+            name=stop_name,
+            description=stop_description,
+        )
+        if not self._launch_running:
+            set_state_text(self.stopDpiButton, stop_name)
+        set_control_accessibility(
+            self.cancelLinkButton,
+            name="Отменить закрытие ZapretGUI",
+            description="Закрывает этот вопрос и возвращает вас в программу.",
+        )
 
     def _on_tray(self):
         self.result_tray = True
