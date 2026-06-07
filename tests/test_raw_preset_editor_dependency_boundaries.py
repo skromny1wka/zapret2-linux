@@ -7,6 +7,7 @@ from unittest.mock import Mock
 
 class RawPresetEditorDependencyBoundaryTests(unittest.TestCase):
     def test_raw_preset_editor_receives_actions_instead_of_presets_feature(self) -> None:
+        import presets.commands as preset_commands
         import presets.raw_preset_editor_workflow as raw_workflow
         from presets.ui.common.preset_subpage_base import PresetRawEditorPage
         from ui.navigation_pages import PageName
@@ -15,6 +16,7 @@ class RawPresetEditorDependencyBoundaryTests(unittest.TestCase):
         page_init_source = inspect.getsource(PresetRawEditorPage.__init__)
         page_source = inspect.getsource(PresetRawEditorPage)
         deps_source = inspect.getsource(build_preset_raw_editor_page_kwargs)
+        commands_source = inspect.getsource(preset_commands)
         workflow_source = inspect.getsource(raw_workflow)
 
         self.assertFalse(hasattr(raw_workflow, "RawPresetEditorController"))
@@ -56,6 +58,9 @@ class RawPresetEditorDependencyBoundaryTests(unittest.TestCase):
         }
         for method_name in workflow_method_names:
             self.assertIn(method_name, workflow_source)
+
+        self.assertNotIn(".read_text(", workflow_source)
+        self.assertIn("def read_raw_preset_text", commands_source)
 
         presets = Mock()
         kwargs = build_preset_raw_editor_page_kwargs(

@@ -195,6 +195,15 @@ def open_preset_source_file(path: str | Path) -> None:
     _open_path_in_system(path)
 
 
+def read_raw_preset_text(path: str | Path | None) -> tuple[str, bool]:
+    if path is None:
+        return "", False
+    source_path = Path(path)
+    if not source_path.exists():
+        return "", False
+    return source_path.read_text(encoding="utf-8", errors="replace"), True
+
+
 def save_preset_source_by_file_name(
     launch_method: str,
     file_name: str,

@@ -28,10 +28,13 @@ class RawPresetSaveResult:
 
 def load_raw_preset_text(path: Path | None) -> RawPresetLoadResult:
     """Читает текст preset-файла для редактора."""
-    if path is None or not path.exists():
+    from presets.commands import read_raw_preset_text
+
+    text, found = read_raw_preset_text(path)
+    if not found:
         return RawPresetLoadResult(text="", footer_text="Файл не найден", path=path)
     return RawPresetLoadResult(
-        text=path.read_text(encoding="utf-8", errors="replace"),
+        text=text,
         footer_text="Загружено",
         path=path,
     )
