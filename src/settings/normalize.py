@@ -118,7 +118,6 @@ def normalize_program(data: object) -> dict[str, Any]:
         "dpi_autostart": as_bool(raw.get("dpi_autostart"), defaults["dpi_autostart"]),
         "gui_autostart_enabled": as_bool(raw.get("gui_autostart_enabled"), defaults["gui_autostart_enabled"]),
         "strategy_launch_method": as_str_in(raw.get("strategy_launch_method"), schema.VALID_LAUNCH_METHODS, defaults["strategy_launch_method"]),
-        "profile_ui_mode": as_str_in(raw.get("profile_ui_mode"), schema.VALID_PROFILE_UI_MODES, defaults["profile_ui_mode"]),
         SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS1: as_clean_str(
             raw.get(SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS1),
             defaults[SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS1],

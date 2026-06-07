@@ -3277,30 +3277,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Открыть",
         "en": "Open",
     },
-    "page.winws2_control.button.change_mode": {
-        "ru": "Изменить режим",
-        "en": "Change mode",
-    },
-    "page.winws2_control.profile_ui_mode.caption": {
-        "ru": "Режим отображения профилей",
-        "en": "Profile UI mode",
-    },
-    "page.winws2_control.profile_ui_mode.card.title": {
-        "ru": "Настройка пресета",
-        "en": "Preset setup",
-    },
-    "page.winws2_control.profile_ui_mode.card.desc": {
-        "ru": "Открыть профили выбранного пресета и выбрать готовые стратегии",
-        "en": "Open profiles from the selected preset and choose ready strategies",
-    },
-    "page.winws2_control.mode.basic": {
-        "ru": "Basic",
-        "en": "Basic",
-    },
-    "page.winws2_control.mode.advanced": {
-        "ru": "Advanced",
-        "en": "Advanced",
-    },
     "page.winws2_control.preset.not_selected": {
         "ru": "Не выбран",
         "en": "Not selected",
@@ -4314,30 +4290,6 @@ TEXTS_PAGES_FINAL: dict[str, dict[str, str]] = {
     "page.logs.info.errors_cleared": {
         "ru": "🧹 Ошибки очищены",
         "en": "🧹 Errors cleared",
-    },
-    "page.winws2_control.mode.dialog.title": {
-        "ru": "Режим отображения профилей",
-        "en": "Profile UI Mode",
-    },
-    "page.winws2_control.mode.dialog.description": {
-        "ru": "Профили поддерживают несколько режимов: упрощённый и расширенный. Настройки не переносятся между режимами, поэтому можно выбрать любой. Рекомендуем начать с базового. Если базовый режим с готовыми стратегиями плохо открывает сайты, попробуйте продвинутый: там можно тоньше настроить техники дурения.",
-        "en": "Profile UI supports multiple modes: simplified and advanced for power users. Settings are not shared across modes, so you can choose any mode. We recommend starting with Basic. If Basic does not bypass enough sites, try Advanced for finer technique tuning.",
-    },
-    "page.winws2_control.mode.dialog.basic_description": {
-        "ru": "Basic (базовый) — выбор готовой стратегии без настройки фаз. Свой набор аргументов в этом режиме собрать нельзя.",
-        "en": "Basic mode lets you choose a ready strategy without phase-level tuning. Custom argument sets are not available in this mode.",
-    },
-    "page.winws2_control.mode.dialog.advanced_description": {
-        "ru": "Advanced (продвинутый) — каждая функция настраивается индивидуально, можно выбирать несколько фаз и смешивать их друг с другом.",
-        "en": "Advanced mode allows per-function tuning, selecting multiple phases, and combining them.",
-    },
-    "page.winws2_control.mode.dialog.button.apply": {
-        "ru": "Применить",
-        "en": "Apply",
-    },
-    "page.winws2_control.mode.dialog.button.cancel": {
-        "ru": "Отмена",
-        "en": "Cancel",
     },
     "page.winws2_control.setting.autostart.title": {
         "ru": "Автозапуск DPI после старта программы",

@@ -60,7 +60,6 @@ def set_widget_enabled_if_changed(widget, enabled: bool) -> bool:
 
 
 class PresetSetupPageBase(BasePage):
-    profile_ui_mode_override: str | None = None
     launch_method = ZAPRET2_MODE
     engine_label = "Zapret 2"
     page_title = "Настройка пресета"

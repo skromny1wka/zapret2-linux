@@ -93,10 +93,40 @@ class ControlPageImmediateStartupTests(unittest.TestCase):
         import presets.ui.control.zapret2.sections_build as sections_build
 
         source = inspect.getsource(sections_build.build_winws2_pages_settings_sections)
+        widget_fields = getattr(sections_build.Zapret2SettingsBuildWidgets, "__dataclass_fields__", {})
 
         self.assertNotIn("profile_ui_mode_card = build_push_setting_card_common", source)
+        self.assertNotIn("on_open_profile_ui_mode_dialog", source)
         self.assertNotIn("get_cached_qta_pixmap", source)
-        self.assertIn("profile_ui_mode_btn=None", source)
+        self.assertNotIn("profile_ui_mode_btn", widget_fields)
+
+    def test_zapret2_profile_ui_mode_legacy_option_is_removed(self) -> None:
+        import app.ui_texts as ui_texts
+        import presets.ui.control.zapret2.page as zapret2_page
+        import presets.ui.control.zapret2.page_runtime as page_runtime
+        import presets.ui.control.zapret2.runtime_helpers as runtime_helpers
+        import settings.normalize as settings_normalize
+        import settings.schema as settings_schema
+        import settings.store as settings_store
+
+        self.assertNotIn("profile_ui_mode", settings_schema.default_program())
+        self.assertNotIn("profile_ui_mode", settings_normalize.normalize_program({"profile_ui_mode": "advanced"}))
+        self.assertFalse(hasattr(settings_schema, "VALID_PROFILE_UI_MODES"))
+        self.assertFalse(hasattr(settings_store, "get_profile_ui_mode"))
+        self.assertFalse(hasattr(settings_store, "set_profile_ui_mode"))
+        self.assertFalse(hasattr(runtime_helpers, "sync_profile_ui_mode_label"))
+        self.assertFalse(hasattr(page_runtime, "build_profile_ui_mode_label_plan"))
+        self.assertFalse(hasattr(zapret2_page.Zapret2ModeControlPage, "_open_profile_ui_mode_dialog"))
+
+        for key in (
+            "page.winws2_control.button.change_mode",
+            "page.winws2_control.profile_ui_mode.caption",
+            "page.winws2_control.mode.basic",
+            "page.winws2_control.mode.advanced",
+            "page.winws2_control.mode.dialog.title",
+            "page.winws2_control.mode.dialog.advanced_description",
+        ):
+            self.assertNotIn(key, ui_texts.TEXTS)
 
     def test_zapret2_program_settings_auto_height_is_not_applied_twice(self) -> None:
         import inspect

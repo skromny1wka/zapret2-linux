@@ -20,7 +20,6 @@ DEFAULT_TG_PROXY_PORT = 1353
 DEFAULT_TG_PROXY_UPSTREAM_PORT = 1080
 
 VALID_LAUNCH_METHODS = ALL_LAUNCH_METHODS
-VALID_PROFILE_UI_MODES = frozenset({"basic"})
 VALID_DISPLAY_MODES = frozenset({"dark", "light", "system"})
 VALID_UI_LANGUAGES = frozenset({"ru", "en"})
 VALID_BACKGROUND_PRESETS = frozenset({"standard", "amoled", "rkn_chan"})
@@ -45,7 +44,6 @@ def default_program() -> dict[str, Any]:
         "dpi_autostart": True,
         "gui_autostart_enabled": False,
         "strategy_launch_method": DEFAULT_LAUNCH_METHOD,
-        "profile_ui_mode": "basic",
         SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS1: "",
         SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS2: "",
         "auto_update_enabled": True,

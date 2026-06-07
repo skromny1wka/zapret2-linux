@@ -6,9 +6,6 @@ from presets.ui.control.control_runtime import ControlStatusPlan, ControlStopBut
 from app.ui_texts import tr as tr_catalog
 
 
-PROFILE_UI_MODE_DEFAULT = "basic"
-
-
 def create_refresh_runtime():
     from presets.ui.control.refresh_runtime_state import create_refresh_runtime as _create_refresh_runtime
 
@@ -20,45 +17,6 @@ def build_additional_settings_state(state):
 
     return _build_state(state)
 
-
-class ProfileUiModeLabelPlan:
-    def __init__(self, *, mode: str, label_text: str):
-        self.mode = mode
-        self.label_text = label_text
-
-
-class ProfileUiModeChangePlan:
-    def __init__(self, *, should_apply: bool, refresh_strategy_after: bool, refresh_mode_label_after: bool):
-        self.should_apply = bool(should_apply)
-        self.refresh_strategy_after = bool(refresh_strategy_after)
-        self.refresh_mode_label_after = bool(refresh_mode_label_after)
-
-
-def get_profile_ui_mode_setting() -> str:
-    return PROFILE_UI_MODE_DEFAULT
-
-def build_profile_ui_mode_label_plan(*, language: str) -> ProfileUiModeLabelPlan:
-    mode = PROFILE_UI_MODE_DEFAULT
-    key = "page.winws2_control.mode.basic"
-    default = "Basic"
-    return ProfileUiModeLabelPlan(
-        mode=mode,
-        label_text=tr_catalog(key, language=language, default=default),
-    )
-
-def build_profile_ui_mode_change_plan(*, wanted_mode: str, current_mode: str) -> ProfileUiModeChangePlan:
-    _ = (wanted_mode, current_mode)
-    return ProfileUiModeChangePlan(
-        should_apply=False,
-        refresh_strategy_after=False,
-        refresh_mode_label_after=True,
-    )
-
-def apply_profile_ui_mode_change(*, wanted_mode: str, reload_host) -> None:
-    _ = (wanted_mode, reload_host)
-    from profile.ui_mode import save_current_profile_ui_mode
-
-    save_current_profile_ui_mode(PROFILE_UI_MODE_DEFAULT)
 
 def build_stop_button_plan(*, language: str) -> ControlStopButtonPlan:
     try:

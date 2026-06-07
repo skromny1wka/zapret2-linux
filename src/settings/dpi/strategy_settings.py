@@ -8,17 +8,6 @@ from settings.mode import (
     normalize_launch_method,
 )
 
-PROFILE_UI_MODE_DEFAULT = "basic"
-_VALID_DIRECT_ZAPRET2_UI_MODES = frozenset({"basic"})
-
-
-def normalize_profile_ui_mode(value: object) -> str:
-    mode = str(value or "").strip().lower()
-    if mode in _VALID_DIRECT_ZAPRET2_UI_MODES:
-        return mode
-    return PROFILE_UI_MODE_DEFAULT
-
-
 def get_strategy_launch_method() -> str:
     try:
         return normalize_launch_method(settings_store.get_strategy_launch_method())
@@ -42,26 +31,6 @@ def set_strategy_launch_method(method: str) -> bool:
         return True
     except Exception as e:
         log(f"Ошибка сохранения метода запуска: {e}", "ERROR")
-        return False
-
-
-def get_profile_ui_mode() -> str:
-    try:
-        return normalize_profile_ui_mode(settings_store.get_profile_ui_mode())
-    except Exception as e:
-        log(f"Ошибка чтения режима profile UI из settings.json: {e}", "DEBUG")
-        return PROFILE_UI_MODE_DEFAULT
-
-
-def set_profile_ui_mode(mode: str) -> bool:
-    _ = mode
-    value = PROFILE_UI_MODE_DEFAULT
-    try:
-        settings_store.set_profile_ui_mode(value)
-        log(f"Profile UI mode set to: {value}", "DEBUG")
-        return True
-    except Exception as e:
-        log(f"Ошибка сохранения режима profile UI: {e}", "ERROR")
         return False
 
 
@@ -103,10 +72,6 @@ def get_debug_log_file(*, launch_method: str | None = None) -> str:
 __all__ = [
     "get_strategy_launch_method",
     "set_strategy_launch_method",
-    "PROFILE_UI_MODE_DEFAULT",
-    "normalize_profile_ui_mode",
-    "get_profile_ui_mode",
-    "set_profile_ui_mode",
     "get_wssize_enabled",
     "set_wssize_enabled",
     "get_debug_log_enabled",

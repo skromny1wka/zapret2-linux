@@ -1917,7 +1917,6 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         control_page.update_status = Mock()
         control_page.update_strategy = Mock()
         control_page._refresh_last_status_message = Mock()
-        control_page._sync_profile_ui_mode_from_settings = Mock()
 
         Zapret2ModeControlPage._on_ui_state_changed(control_page, AppUiState(), frozenset())
 
@@ -2031,7 +2030,6 @@ class StartupRuntimeSetupTests(unittest.TestCase):
                 control_page._startup_can_refresh_top_summary = Mock(return_value=True)
                 control_page._refresh_top_summary = Mock()
                 control_page._wait_for_startup_interactive_before_top_summary = Mock()
-                control_page._sync_profile_ui_mode_from_settings = Mock()
                 control_page.set_loading = Mock()
                 control_page.update_status = Mock()
                 control_page.update_strategy = Mock()
@@ -2058,7 +2056,6 @@ class StartupRuntimeSetupTests(unittest.TestCase):
                 control_page._startup_can_refresh_top_summary = Mock(return_value=True)
                 control_page._refresh_top_summary = Mock()
                 control_page._wait_for_startup_interactive_before_top_summary = Mock()
-                control_page._sync_profile_ui_mode_from_settings = Mock()
                 control_page._apply_selected_preset_name_fast = Mock()
                 control_page._refresh_preset_name = Mock()
                 control_page._schedule_additional_settings_reload = Mock()

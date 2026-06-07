@@ -12,9 +12,6 @@ from ui.theme import get_themed_qta_icon
 
 @dataclass(slots=True)
 class Zapret2SettingsBuildWidgets:
-    profile_ui_mode_btn: object | None
-    profile_ui_mode_label: object | None
-    profile_ui_mode_caption: object | None
     program_settings_section_label: object | None
     program_settings_card: object
     gui_autostart_toggle: object
@@ -42,7 +39,6 @@ def build_winws2_pages_settings_sections(
     setting_card_group_cls,
     push_setting_card_cls,
     win11_toggle_row_cls,
-    on_open_profile_ui_mode_dialog,
     on_gui_autostart_toggled,
     on_auto_dpi_toggled,
     on_hide_to_tray_toggled,
@@ -55,8 +51,6 @@ def build_winws2_pages_settings_sections(
     on_open_folder,
     on_open_docs,
 ) -> Zapret2SettingsBuildWidgets:
-    _ = on_open_profile_ui_mode_dialog
-
     program_settings_title = tr_fn("page.winws2_control.section.program_settings", "Настройки программы")
     program_settings_section_label = None
     program_settings_card = setting_card_group_cls(program_settings_title, content_parent)
@@ -180,9 +174,6 @@ def build_winws2_pages_settings_sections(
     enable_setting_card_group_auto_height(extra_card)
 
     return Zapret2SettingsBuildWidgets(
-        profile_ui_mode_btn=None,
-        profile_ui_mode_label=None,
-        profile_ui_mode_caption=None,
         program_settings_section_label=program_settings_section_label,
         program_settings_card=program_settings_card,
         gui_autostart_toggle=gui_autostart_toggle,

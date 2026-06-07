@@ -375,15 +375,6 @@ def set_strategy_launch_method(value: str) -> bool:
     return _set_str(("program", "strategy_launch_method"), normalize_launch_method(value))
 
 
-def get_profile_ui_mode() -> str:
-    return "basic"
-
-
-def set_profile_ui_mode(value: str) -> bool:
-    _ = value
-    return _set_str(("program", "profile_ui_mode"), "basic")
-
-
 def get_selected_source_preset_file_name(engine: str) -> str | None:
     value = _get_str(_presets_selection_path(engine), "")
     return value or None
@@ -1186,7 +1177,6 @@ __all__ = [
     "get_animations_enabled",
     "get_auto_update_enabled",
     "get_background_preset",
-    "get_profile_ui_mode",
     "get_discord_restart_enabled",
     "get_display_mode",
     "get_dns_crash_count",
@@ -1273,7 +1263,6 @@ __all__ = [
     "set_auto_update_enabled",
     "set_background_preset",
     "set_defender_disabled_memory",
-    "set_profile_ui_mode",
     "set_discord_restart_enabled",
     "set_display_mode",
     "set_dns_crash_count",

@@ -6,7 +6,6 @@ from app.ui_texts import tr as tr_catalog
 from presets.ui.control.control_page_runtime_shared import (
     apply_program_settings_toggles,
     apply_status_plan as apply_status_plan_shared,
-    set_text_if_changed,
     set_toggle_checked,
 )
 
@@ -39,15 +38,6 @@ def apply_additional_settings_state(state, *, discord_restart_toggle, wssize_tog
         set_toggle_checked(debug_log_toggle, bool(state.debug_log_enabled))
 
 
-def sync_profile_ui_mode_label(*, language: str, profile_ui_mode_label) -> None:
-    if profile_ui_mode_label is None:
-        return
-    from presets.ui.control.zapret2 import page_runtime as zapret2_page_runtime
-
-    plan = zapret2_page_runtime.build_profile_ui_mode_label_plan(language=language)
-    set_text_if_changed(profile_ui_mode_label, plan.label_text)
-
-
 def apply_status_plan(plan, *, status_title, status_desc, status_dot, start_btn, stop_winws_btn, stop_and_exit_btn, update_stop_button_text) -> None:
     apply_status_plan_shared(
         plan,
@@ -66,11 +56,9 @@ def apply_profile_language(
     language: str,
     start_btn,
     stop_and_exit_btn,
-    profile_ui_mode_btn,
     test_card,
     folder_card,
     docs_card,
-    profile_ui_mode_caption,
     additional_settings_notice,
     program_settings_card,
     auto_dpi_toggle,
@@ -83,15 +71,9 @@ def apply_profile_language(
     wssize_toggle,
     debug_log_toggle,
     update_stop_button_text,
-    sync_profile_ui_mode_from_settings,
 ) -> None:
     start_btn.setText(tr_catalog("page.winws2_control.button.start", language=language, default="Запустить Zapret"))
     stop_and_exit_btn.setText(tr_catalog("page.winws2_control.button.stop_and_exit", language=language, default="Остановить и закрыть программу"))
-    if profile_ui_mode_btn is not None:
-        profile_ui_mode_btn.setText(tr_catalog("page.winws2_control.button.change_mode", language=language, default="Изменить режим"))
-
-    if profile_ui_mode_caption is not None:
-        profile_ui_mode_caption.setText(tr_catalog("page.winws2_control.profile_ui_mode.caption", language=language, default="Режим отображения профилей"))
     if additional_settings_notice is not None:
         additional_settings_notice.setText(
             tr_catalog("page.winws2_control.advanced.warning", language=language, default="Изменяйте только если знаете что делаете")
@@ -155,7 +137,6 @@ def apply_profile_language(
     )
 
     update_stop_button_text()
-    sync_profile_ui_mode_from_settings()
 
     discord_restart_toggle.set_texts(
         tr_catalog("page.dpi_settings.discord_restart.title", language=language, default="Перезапуск Discord"),

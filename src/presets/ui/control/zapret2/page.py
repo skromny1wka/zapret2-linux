@@ -20,7 +20,6 @@ from presets.ui.control.zapret2.runtime_helpers import (
     apply_program_settings_snapshot,
     apply_status_plan,
     set_toggle_checked,
-    sync_profile_ui_mode_label,
 )
 from presets.ui.control.shared_builders import build_last_status_message_card_common
 from presets.ui.control.control_page_shared import (
@@ -150,10 +149,7 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         self._top_summary_profile_retry_count = 0
         self._top_summary_profile_retry_pending = False
         self._refresh_runtime = create_refresh_runtime()
-        self.profile_ui_mode_label = None
-        self.profile_ui_mode_caption = None
         self.top_summary = None
-        self.profile_ui_mode_btn = None
         self.program_settings_card = None
         self.gui_autostart_toggle = None
         self.auto_dpi_toggle = None
@@ -391,10 +387,6 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         _log_startup_winws2_control_metric("_build_ui.control_card", (_time.perf_counter() - _t_control) * 1000)
         self._build_settings_sections()
         self._attach_program_settings_runtime()
-        try:
-            self._sync_profile_ui_mode_from_settings()
-        except Exception:
-            pass
         self._schedule_additional_settings_reload(force=True)
 
         _log_startup_winws2_control_metric("_build_ui.total", (_time.perf_counter() - _t_total) * 1000)
@@ -413,7 +405,6 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             setting_card_group_cls=SettingCardGroup,
             push_setting_card_cls=PushSettingCard,
             win11_toggle_row_cls=Win11ToggleRow,
-            on_open_profile_ui_mode_dialog=self._open_profile_ui_mode_dialog,
             on_gui_autostart_toggled=self._on_gui_autostart_toggled,
             on_auto_dpi_toggled=self._on_auto_dpi_toggled,
             on_hide_to_tray_toggled=self._on_hide_to_tray_toggled,
@@ -426,10 +417,6 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             on_open_folder=self._open_folder,
             on_open_docs=self._open_docs,
         )
-
-        self.profile_ui_mode_label = section_widgets.profile_ui_mode_label
-        self.profile_ui_mode_caption = section_widgets.profile_ui_mode_caption
-        self.profile_ui_mode_btn = section_widgets.profile_ui_mode_btn
 
         self.program_settings_section_label = section_widgets.program_settings_section_label
         self.program_settings_card = section_widgets.program_settings_card
@@ -654,23 +641,6 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             launch_method=str(launch_method or ""),
         )
 
-    # ==================== Profile UI mode: Basic/Advanced ====================
-
-    def _sync_profile_ui_mode_from_settings(self) -> None:
-        sync_profile_ui_mode_label(language=self._ui_language, profile_ui_mode_label=self.profile_ui_mode_label)
-
-    def _open_profile_ui_mode_dialog(self) -> None:
-        self._sync_profile_ui_mode_from_settings()
-
-    def _on_profile_ui_mode_selected(self, mode: str) -> None:
-        _ = mode
-        plan = _zapret2_page_runtime().build_profile_ui_mode_change_plan(
-            wanted_mode="basic",
-            current_mode="basic",
-        )
-        if plan.refresh_mode_label_after:
-            self._sync_profile_ui_mode_from_settings()
-
     def _sync_program_settings(self) -> None:
         self._request_program_settings_load()
         self._request_program_settings_system_status_load()
@@ -767,8 +737,6 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             self._refresh_top_summary(state)
         elif top_summary_premium_changed:
             self._apply_top_summary_premium(state)
-        if "mode_revision" in changed:
-            self._sync_profile_ui_mode_from_settings()
         if presets_changed:
             try:
                 self._apply_selected_preset_name_fast()
@@ -850,11 +818,9 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             language=self._ui_language,
             start_btn=self.start_btn,
             stop_and_exit_btn=self.stop_and_exit_btn,
-            profile_ui_mode_btn=self.profile_ui_mode_btn,
             test_card=self.test_card,
             folder_card=self.folder_card,
             docs_card=self.docs_card,
-            profile_ui_mode_caption=self.profile_ui_mode_caption,
             additional_settings_notice=self.additional_settings_notice,
             program_settings_card=self.program_settings_card,
             auto_dpi_toggle=self.auto_dpi_toggle,
@@ -867,7 +833,6 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             wssize_toggle=self.wssize_toggle,
             debug_log_toggle=self.debug_log_toggle,
             update_stop_button_text=self._update_stop_winws_button_text,
-            sync_profile_ui_mode_from_settings=self._sync_profile_ui_mode_from_settings,
         )
 
     def _open_docs(self) -> None:

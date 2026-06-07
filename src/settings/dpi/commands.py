@@ -40,22 +40,6 @@ def get_launch_method() -> str:
     return normalize_launch_method(get_strategy_launch_method())
 
 
-def get_profile_ui_mode() -> str:
-    from settings.dpi.strategy_settings import get_profile_ui_mode as _get_profile_ui_mode
-    from settings.mode import normalize_profile_ui_mode
-
-    return normalize_profile_ui_mode(_get_profile_ui_mode())
-
-
-def set_profile_ui_mode(mode: str) -> str:
-    from settings.dpi.strategy_settings import set_profile_ui_mode as _set_profile_ui_mode
-    from settings.mode import normalize_profile_ui_mode
-
-    normalized = normalize_profile_ui_mode(mode)
-    _set_profile_ui_mode(normalized)
-    return normalized
-
-
 def describe_visibility(method: str) -> DpiVisibilityState:
     method = normalize_launch_method(method, default="")
     return DpiVisibilityState(

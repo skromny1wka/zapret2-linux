@@ -953,7 +953,6 @@ def _list_file_entries_count(text: str) -> int:
 
 
 class ProfileSetupPageBase(BasePage):
-    profile_ui_mode_override: str | None = None
     launch_method = ZAPRET2_MODE
     title_key_name = "page.winws2_profile_setup.title"
     control_key = "page.winws2_profile_setup.breadcrumb.control"
