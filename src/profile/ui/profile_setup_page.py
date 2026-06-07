@@ -2636,8 +2636,7 @@ class ProfileSetupPageBase(BasePage):
             if not bool(self.__dict__.get("_list_file_text_dirty", True)):
                 text = str(self.__dict__.get("_list_file_text_snapshot", "") or "")
             else:
-                editor = self.__dict__.get("_list_file_text")
-                text = str(editor.toPlainText() or "") if editor is not None else ""
+                text = ""
         else:
             text = str(raw_text or "")
         self._list_file_text_snapshot = text
@@ -2648,6 +2647,10 @@ class ProfileSetupPageBase(BasePage):
         }
 
     def _start_list_file_validation_worker(self, request: dict) -> None:
+        request = dict(request or {})
+        if request.get("text") is None and bool(self.__dict__.get("_list_file_text_dirty", True)):
+            editor = self.__dict__.get("_list_file_text")
+            request["text"] = str(editor.toPlainText() or "") if editor is not None else ""
         request = self._resolve_list_file_validation_request(request)
         runtime = self._worker_runtime("_list_file_validation_runtime")
         self._list_file_validation_request_id = int(getattr(self, "_list_file_validation_request_id", 0) or 0) + 1
