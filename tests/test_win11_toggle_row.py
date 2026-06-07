@@ -118,6 +118,30 @@ class Win11ToggleRowTests(unittest.TestCase):
         self.assertEqual(switch.block_calls, [True, False])
         self.assertTrue(switch.checked)
 
+    def test_set_checked_does_not_emit_user_toggle_signal(self) -> None:
+        from ui.widgets.win11_controls import Win11ToggleRow
+
+        row = Win11ToggleRow("fa5s.shield-alt", "Отключить Windows Defender")
+        events: list[bool] = []
+        row.toggled.connect(events.append)
+
+        row.setChecked(True)
+        self._app.processEvents()
+
+        self.assertTrue(row.isChecked())
+        self.assertEqual(events, [])
+
+    def test_switch_signal_still_emits_user_toggle_signal(self) -> None:
+        from ui.widgets.win11_controls import Win11ToggleRow
+
+        row = Win11ToggleRow("fa5s.shield-alt", "Отключить Windows Defender")
+        events: list[bool] = []
+        row.toggled.connect(events.append)
+
+        row._on_switch_toggled(True)
+
+        self.assertEqual(events, [True])
+
     def test_toggle_row_has_screen_reader_text_for_switch_state(self) -> None:
         from ui.widgets.win11_controls import Win11ToggleRow
 

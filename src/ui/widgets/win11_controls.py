@@ -55,6 +55,7 @@ class Win11ToggleRow(FluentSettingCard):
         self._switch_button = None
         self._accessible_title = str(title or "")
         self._accessible_description = str(description or "")
+        self._programmatic_set_checked = False
 
         initial_tokens = get_theme_tokens()
         FluentSettingCard.__init__(
@@ -141,11 +142,17 @@ class Win11ToggleRow(FluentSettingCard):
                 return
         except Exception:
             pass
-        if block_signals:
-            toggle.blockSignals(True)
-        toggle.setChecked(next_checked)
-        if block_signals:
-            toggle.blockSignals(False)
+        self._programmatic_set_checked = True
+        try:
+            if block_signals:
+                toggle.blockSignals(True)
+            try:
+                toggle.setChecked(next_checked)
+            finally:
+                if block_signals:
+                    toggle.blockSignals(False)
+        finally:
+            self._programmatic_set_checked = False
         self._update_toggle_accessibility()
 
     def isChecked(self) -> bool:
@@ -181,6 +188,8 @@ class Win11ToggleRow(FluentSettingCard):
 
     def _on_switch_toggled(self, checked: bool) -> None:
         self._update_toggle_accessibility()
+        if bool(getattr(self, "_programmatic_set_checked", False)):
+            return
         self.toggled.emit(bool(checked))
 
     def _update_toggle_accessibility(self) -> None:
