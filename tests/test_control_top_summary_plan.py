@@ -144,6 +144,38 @@ class ControlTopSummaryPlanTests(unittest.TestCase):
             widget.mode_item.set_texts.assert_not_called()
             widget.premium_item.set_texts.assert_not_called()
 
+    def test_top_summary_hides_profiles_item_for_circular_preset(self) -> None:
+        with patch.dict("os.environ", {"QT_QPA_PLATFORM": "offscreen"}):
+            from PyQt6.QtWidgets import QApplication
+            from presets.ui.control.top_summary_widget import ControlTopSummaryWidget
+
+            self.__class__._app = QApplication.instance() or QApplication([])
+            widget = ControlTopSummaryWidget(language="ru", mode_value="Zapret 2")
+            widget.profiles_item.setVisible = Mock()
+
+            widget.set_profiles_visible(False)
+
+            widget.profiles_item.setVisible.assert_called_once_with(False)
+
+    def test_top_summary_worker_marks_circular_preset_profile_tab_hidden(self) -> None:
+        from presets.ui.control.additional_settings_runtime import create_top_summary_worker
+        from settings.mode import ZAPRET2_MODE
+
+        worker = create_top_summary_worker(
+            7,
+            lambda _method: ("Default (circular)", "Default (circular).txt"),
+            lambda _method: 2,
+            lambda _method: (
+                "\n".join(("--filter-tcp=443", "--lua-desync=circular:fails=3")),
+                SimpleNamespace(file_name="Default (circular).txt"),
+            ),
+            launch_method=ZAPRET2_MODE,
+        )
+
+        state = worker._summary_loader()
+
+        self.assertFalse(state.profile_tab_visible)
+
     def test_top_summary_item_skips_same_text_render(self) -> None:
         with patch.dict("os.environ", {"QT_QPA_PLATFORM": "offscreen"}):
             from PyQt6.QtWidgets import QApplication

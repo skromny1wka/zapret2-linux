@@ -19,10 +19,18 @@ class ControlAdditionalSettingsState:
 
 
 class ControlTopSummaryState:
-    def __init__(self, *, preset_text: str, preset_tooltip: str, profile_count: int | None):
+    def __init__(
+        self,
+        *,
+        preset_text: str,
+        preset_tooltip: str,
+        profile_count: int | None,
+        profile_tab_visible: bool = True,
+    ):
         self.preset_text = str(preset_text or "")
         self.preset_tooltip = str(preset_tooltip or "")
         self.profile_count = profile_count
+        self.profile_tab_visible = bool(profile_tab_visible)
 
 
 def create_additional_settings_worker(request_id: int, create_load_worker, *, launch_method: str, parent=None):
@@ -61,6 +69,7 @@ def create_top_summary_worker(
     request_id: int,
     get_selected_source_preset_display,
     get_enabled_profile_count_snapshot,
+    read_selected_preset_source=None,
     *,
     launch_method: str,
     parent=None,
@@ -89,10 +98,23 @@ def create_top_summary_worker(
         except Exception as exc:
             log(f"ControlTopSummaryWorker: не удалось прочитать количество profile: {exc}", "DEBUG")
 
+        profile_tab_visible = True
+        if callable(read_selected_preset_source):
+            try:
+                from profile.winws2_preset_source import is_winws2_circular_preset_source
+                from settings.mode import is_zapret2_launch_method
+
+                if is_zapret2_launch_method(clean_launch_method):
+                    source_text, _manifest = read_selected_preset_source(clean_launch_method)
+                    profile_tab_visible = not is_winws2_circular_preset_source(str(source_text or ""))
+            except Exception as exc:
+                log(f"ControlTopSummaryWorker: не удалось проверить circular preset: {exc}", "DEBUG")
+
         return ControlTopSummaryState(
             preset_text=preset_text,
             preset_tooltip=preset_tooltip,
             profile_count=profile_count,
+            profile_tab_visible=profile_tab_visible,
         )
 
     return ControlTopSummaryWorker(

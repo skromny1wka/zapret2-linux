@@ -159,6 +159,7 @@ class ControlTopSummaryWidget(QWidget):
         self._mode_value = str(mode_value or "")
         self._preset_value = ""
         self._profile_count: int | None = None
+        self._profiles_visible = True
         self._is_premium = False
         self._premium_days: int | None = None
 
@@ -225,6 +226,13 @@ class ControlTopSummaryWidget(QWidget):
             return
         self._profile_count = enabled_count
         self.retranslate()
+
+    def set_profiles_visible(self, visible: bool) -> None:
+        value = bool(visible)
+        if self._profiles_visible == value:
+            return
+        self._profiles_visible = value
+        set_visible_if_changed(self.profiles_item, value)
 
     def set_premium(self, *, is_premium: bool, days_remaining: int | None) -> None:
         next_is_premium = bool(is_premium)

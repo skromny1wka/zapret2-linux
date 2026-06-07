@@ -46,6 +46,7 @@ def build_control_page_kwargs(
             request_id,
             presets_feature.get_selected_source_preset_display,
             profile_feature.get_enabled_profile_count_snapshot,
+            presets_feature.read_selected_preset_source,
             launch_method=method,
             parent=parent,
         )

@@ -260,6 +260,9 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
             or tr_catalog("page.winws2_control.preset.not_selected", language=self._ui_language, default="Не выбран")
         )
         profile_count = getattr(state, "profile_count", None)
+        profiles_visible_setter = getattr(summary, "set_profiles_visible", None)
+        if callable(profiles_visible_setter):
+            profiles_visible_setter(bool(getattr(state, "profile_tab_visible", True)))
         summary.set_profile_count(profile_count)
         if profile_count is None:
             self._schedule_top_summary_profile_retry()
