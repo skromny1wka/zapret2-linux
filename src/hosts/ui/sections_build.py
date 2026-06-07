@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel, QHBoxLayout
 
+from ui.accessibility import set_control_accessibility
 from ui.fluent_widgets import SettingsCard, SemanticNotice
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens
 from ui.theme_semantic import get_semantic_palette
@@ -108,6 +109,14 @@ def build_hosts_status_section(
         icon=FluentIcon.DELETE,
     )
     clear_btn.clicked.connect(on_clear_clicked)
+    set_control_accessibility(
+        clear_btn,
+        name=tr_fn("page.hosts.button.clear.accessible_name", "Очистить hosts"),
+        description=tr_fn(
+            "page.hosts.button.clear.accessible_description",
+            "Удаляет активные домены из файла hosts.",
+        ),
+    )
     status_layout.addWidget(clear_btn)
 
     open_hosts_button = PushButton(
@@ -115,6 +124,14 @@ def build_hosts_status_section(
         icon=FluentIcon.LINK,
     )
     open_hosts_button.clicked.connect(on_open_hosts_file)
+    set_control_accessibility(
+        open_hosts_button,
+        name=tr_fn("page.hosts.button.open.accessible_name", "Открыть файл hosts"),
+        description=tr_fn(
+            "page.hosts.button.open.accessible_description",
+            "Открывает системный файл hosts для просмотра или ручной проверки.",
+        ),
+    )
     status_layout.addWidget(open_hosts_button)
 
     status_card.add_layout(status_layout)
