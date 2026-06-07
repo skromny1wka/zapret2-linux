@@ -37,6 +37,7 @@ from blockcheck.ui.strategy_scan_page_runtime_helpers import (
 )
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.popup_menu import exec_popup_menu
+from ui.accessibility import set_control_accessibility, set_state_text
 from app.ui_texts import tr as tr_catalog
 from qfluentwidgets import (
     ComboBox,
@@ -228,6 +229,9 @@ class StrategyScanPage(BasePage):
         self._actions_bar = control_widgets.actions_bar
         self._start_btn = control_widgets.start_btn
         self._stop_btn = control_widgets.stop_btn
+        self._mode_combo.currentIndexChanged.connect(self._update_control_accessibility)
+        self._update_control_accessibility()
+        self._set_status_text(self._status_label.text())
 
         self.add_widget(self._control_card)
         self.add_widget(self._actions_title_label)
@@ -292,6 +296,7 @@ class StrategyScanPage(BasePage):
             log_edit=self._log_edit,
             expand_log_btn=self._expand_log_btn,
         )
+        self._update_log_expand_accessibility()
 
     # ------------------------------------------------------------------
     # Helpers
@@ -332,10 +337,12 @@ class StrategyScanPage(BasePage):
         self._target_input.setText(plan.normalized_target)
         self._target_input.setPlaceholderText(plan.placeholder_text)
         self._refresh_udp_scope_hint()
+        self._update_control_accessibility()
 
     def _on_udp_games_scope_changed(self, _index: int) -> None:
         """Update UDP scope helper text after combo change."""
         self._refresh_udp_scope_hint()
+        self._update_control_accessibility()
 
     def _refresh_udp_scope_hint(self) -> None:
         """Refresh compact helper label with resolved UDP ipset sources."""
@@ -559,7 +566,7 @@ class StrategyScanPage(BasePage):
         self._apply_interaction_plan(self._blockcheck.build_running_interaction_plan())
         self._progress_bar.setVisible(True)
         self._progress_bar.setValue(self._scan_cursor)
-        self._status_label.setText(run_result.status_text)
+        self._set_status_text(run_result.status_text)
         start_strategy_scan_worker(
             run_result.worker,
             parent=self,
@@ -573,9 +580,7 @@ class StrategyScanPage(BasePage):
             QTimer.singleShot(5000, lambda worker=expected_worker: self._force_stop(worker)),
         )
         self._stop_btn.setEnabled(False)
-        self._status_label.setText(
-            tr_catalog("page.blockcheck_public.stopping", default="Остановка...")
-        )
+        self._set_status_text(tr_catalog("page.blockcheck_public.stopping", default="Остановка..."))
 
     def request_runtime_conflicting_stop(self) -> bool:
         """Останавливает подбор перед ручным запуском основного DPI."""
@@ -591,6 +596,7 @@ class StrategyScanPage(BasePage):
             status_label=self._status_label,
             set_support_status=self._set_support_status,
         )
+        self._set_status_text(self._status_label.text())
 
     # ------------------------------------------------------------------
     # Signal handlers
@@ -614,6 +620,7 @@ class StrategyScanPage(BasePage):
             status_label=self._status_label,
             scan_cursor=self._scan_cursor,
         )
+        self._set_status_text(self._status_label.text())
 
     def _on_strategy_result(self, result):
         """Add a row to the results table."""
@@ -734,6 +741,7 @@ class StrategyScanPage(BasePage):
             status_label=self._status_label,
             phase=phase,
         )
+        self._set_status_text(self._status_label.text())
 
     def _on_finished(self, report):
         """Handle scan completion."""
@@ -781,6 +789,7 @@ class StrategyScanPage(BasePage):
             set_support_status=self._set_support_status,
             parent_widget=self.window(),
         )
+        self._set_status_text(self._status_label.text())
 
     def _on_strategy_scan_finalize_failed(self, request_id: int, error: str) -> None:
         if not self._strategy_scan_finalize_runtime.is_current(
@@ -792,9 +801,7 @@ class StrategyScanPage(BasePage):
             return
         logger.warning("Failed to finalize strategy scan: %s", error)
         self._reset_ui()
-        self._status_label.setText(
-            tr_catalog("page.blockcheck_public.scan_finish_error", default="Ошибка завершения сканирования")
-        )
+        self._set_status_text(tr_catalog("page.blockcheck_public.scan_finish_error", default="Ошибка завершения сканирования"))
         self._set_support_status(
             tr_catalog(
                 "page.blockcheck_public.support_ready_after_error",
@@ -955,6 +962,52 @@ class StrategyScanPage(BasePage):
     # UI helpers
     # ------------------------------------------------------------------
 
+    def _set_status_text(self, text: str) -> None:
+        value = str(text or "").strip()
+        self._status_label.setText(value)
+        set_state_text(self._status_label, f"Статус подбора стратегии: {value}")
+
+    def _update_combo_accessibility(self, combo, *, name: str, description: str) -> None:
+        if combo is None:
+            return
+        selected = str(combo.currentText() or "").strip() or "не выбрано"
+        set_control_accessibility(
+            combo,
+            name=f"{name}, выбрано: {selected}",
+            description=description,
+        )
+
+    def _update_control_accessibility(self, *_args) -> None:
+        self._update_combo_accessibility(
+            self._protocol_combo,
+            name="Протокол подбора стратегии",
+            description="Выберите тип соединения, для которого нужно подобрать стратегию.",
+        )
+        self._update_combo_accessibility(
+            self._games_scope_combo,
+            name="Охват UDP",
+            description="Выберите набор ipset для режима UDP Games.",
+        )
+        self._update_combo_accessibility(
+            self._mode_combo,
+            name="Режим подбора стратегии",
+            description="Выберите, сколько стратегий нужно проверить.",
+        )
+
+    def _update_log_expand_accessibility(self) -> None:
+        if self._log_expanded:
+            set_control_accessibility(
+                self._expand_log_btn,
+                name="Свернуть лог подбора стратегии",
+                description="Возвращает подробный лог подбора стратегии к обычному размеру.",
+            )
+        else:
+            set_control_accessibility(
+                self._expand_log_btn,
+                name="Развернуть лог подбора стратегии",
+                description="Разворачивает подробный лог подбора стратегии на странице.",
+            )
+
     def _apply_interaction_plan(self, plan) -> None:
         self._start_btn.setEnabled(plan.start_enabled)
         self._stop_btn.setEnabled(plan.stop_enabled)
@@ -980,6 +1033,9 @@ class StrategyScanPage(BasePage):
 
     def _set_support_status(self, text: str) -> None:
         set_support_status(self._support_status_label, text)
+        value = str(text or "").strip()
+        if value:
+            set_state_text(self._support_status_label, f"Статус обращения по подбору стратегии: {value}")
 
     def _prepare_support_from_strategy_scan(self) -> None:
         if self._cleanup_in_progress:
@@ -1134,6 +1190,9 @@ class StrategyScanPage(BasePage):
         try:
             self._apply_language_plan(language)
             self._refresh_udp_scope_hint()
+            self._update_control_accessibility()
+            self._update_log_expand_accessibility()
+            self._set_status_text(self._status_label.text())
         except Exception:
             pass
 

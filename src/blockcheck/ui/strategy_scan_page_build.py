@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QHeaderView
 from qfluentwidgets import CaptionLabel, FluentIcon
 
 from ui.fluent_widgets import QuickActionsBar, SettingsCard, set_tooltip
+from ui.accessibility import set_control_accessibility
 from ui.log_limits import BLOCKCHECK_LOG_VIEW_MAX_LINES, apply_text_line_limit
 from ui.pages.base_page import ScrollBlockingTextEdit
 from ui.widgets.fluent_item_tooltip import install_fluent_item_tooltips
@@ -138,6 +139,11 @@ def build_strategy_scan_control_section(
     target_input = line_edit_cls()
     target_input.setText(tr_fn("page.strategy_scan.target.default", "discord.com"))
     target_input.setPlaceholderText(tr_fn("page.strategy_scan.target.placeholder", "discord.com"))
+    set_control_accessibility(
+        target_input,
+        name="Цель подбора стратегии",
+        description="Введите домен или STUN-цель для подбора стратегии.",
+    )
     target_input.setFixedWidth(200)
     target_input.setFixedHeight(33)
     settings_row.addWidget(target_input)
@@ -146,9 +152,12 @@ def build_strategy_scan_control_section(
         tr_fn("page.strategy_scan.quick_domains", "Быстрый выбор"),
         icon=FluentIcon.MENU,
     )
-    set_tooltip(
+    quick_domain_description = tr_fn("page.strategy_scan.quick_domains_hint", "Выберите домен из готового списка")
+    set_tooltip(quick_domain_btn, quick_domain_description)
+    set_control_accessibility(
         quick_domain_btn,
-        tr_fn("page.strategy_scan.quick_domains_hint", "Выберите домен из готового списка")
+        name="Быстрый выбор цели",
+        description=quick_domain_description,
     )
     quick_domain_btn.clicked.connect(on_show_quick_domains_menu)
     settings_row.addWidget(quick_domain_btn)
@@ -182,12 +191,15 @@ def build_strategy_scan_control_section(
         tr_fn("page.strategy_scan.start", "Начать сканирование"),
         icon=FluentIcon.SEARCH,
     )
-    set_tooltip(
+    start_description = tr_fn(
+        "page.strategy_scan.action.start.description",
+        "Запустить автоматический перебор стратегий обхода DPI для выбранной цели.",
+    )
+    set_tooltip(start_btn, start_description)
+    set_control_accessibility(
         start_btn,
-        tr_fn(
-            "page.strategy_scan.action.start.description",
-            "Запустить автоматический перебор стратегий обхода DPI для выбранной цели.",
-        )
+        name="Начать подбор стратегии",
+        description=start_description,
     )
     start_btn.clicked.connect(on_start)
     actions_bar.add_button(start_btn)
@@ -196,12 +208,15 @@ def build_strategy_scan_control_section(
         tr_fn("page.strategy_scan.stop", "Остановить"),
         icon=FluentIcon.CANCEL,
     )
-    set_tooltip(
+    stop_description = tr_fn(
+        "page.strategy_scan.action.stop.description",
+        "Остановить текущее сканирование стратегий и вернуть страницу в обычный режим.",
+    )
+    set_tooltip(stop_btn, stop_description)
+    set_control_accessibility(
         stop_btn,
-        tr_fn(
-            "page.strategy_scan.action.stop.description",
-            "Остановить текущее сканирование стратегий и вернуть страницу в обычный режим.",
-        )
+        name="Остановить подбор стратегии",
+        description=stop_description,
     )
     stop_btn.setEnabled(False)
     stop_btn.clicked.connect(on_stop)
@@ -244,6 +259,11 @@ def build_strategy_scan_results_section(*, tr_fn, table_cls) -> StrategyScanResu
     table.setEditTriggers(table_cls.EditTrigger.NoEditTriggers)
     table.setSelectionBehavior(table_cls.SelectionBehavior.SelectRows)
     table.setMinimumHeight(250)
+    set_control_accessibility(
+        table,
+        name="Результаты подбора стратегии",
+        description="Таблица со стратегиями, статусом проверки, временем и действием применения.",
+    )
     table.verticalHeader().setVisible(False)
     install_fluent_item_tooltips(table)
 
@@ -271,6 +291,11 @@ def build_strategy_scan_log_section(*, tr_fn, push_button_cls, parent, on_toggle
     )
 
     expand_log_btn = push_button_cls("Развернуть", icon=FluentIcon.FULL_SCREEN)
+    set_control_accessibility(
+        expand_log_btn,
+        name="Развернуть лог подбора стратегии",
+        description="Разворачивает подробный лог подбора стратегии на странице.",
+    )
     expand_log_btn.setFixedWidth(120)
     expand_log_btn.clicked.connect(on_toggle_log_expand)
 
@@ -284,12 +309,22 @@ def build_strategy_scan_log_section(*, tr_fn, push_button_cls, parent, on_toggle
         tr_fn("page.strategy_scan.prepare_support", "Подготовить обращение"),
         icon=FluentIcon.GITHUB,
     )
+    set_control_accessibility(
+        prepare_support_btn,
+        name="Подготовить обращение по подбору стратегии",
+        description="Готовит обращение с логами подбора стратегии для поддержки.",
+    )
     prepare_support_btn.clicked.connect(on_prepare_support)
     log_header.addWidget(prepare_support_btn)
     log_header.addWidget(expand_log_btn)
     log_card.add_layout(log_header)
 
     log_edit = ScrollBlockingTextEdit()
+    set_control_accessibility(
+        log_edit,
+        name="Подробный лог подбора стратегии",
+        description="Здесь появляется подробный текстовый лог подбора стратегии.",
+    )
     log_edit.setReadOnly(True)
     log_edit.setMinimumHeight(180)
     log_edit.setMaximumHeight(300)
