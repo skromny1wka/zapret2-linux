@@ -142,6 +142,7 @@ class TelegramProxyWorkerQueueTests(unittest.TestCase):
                     "user": "",
                     "password": "",
                     "enabled": False,
+                    "value": "",
                     "context_extra": {
                         "restart": "",
                         "update_manual": False,

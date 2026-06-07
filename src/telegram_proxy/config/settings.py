@@ -4,13 +4,14 @@ from dataclasses import dataclass
 
 from telegram_proxy.config.upstream_catalog import UpstreamCatalog
 from telegram_proxy.proxy.cloudflare import CloudflareFallbackConfig, normalize_domain_list
-from telegram_proxy.proxy.mtproxy import normalize_secret
+from telegram_proxy.proxy.mtproxy import build_mtproxy_link, generate_secret, normalize_secret
 
 
 @dataclass(slots=True)
 class TelegramProxySettingsState:
     host: str
     port: int
+    mode: str
     upstream_enabled: bool
     upstream_host: str
     upstream_port: int
@@ -39,6 +40,7 @@ def default_state() -> TelegramProxySettingsState:
     return TelegramProxySettingsState(
         host=DEFAULT_HOST,
         port=DEFAULT_PORT,
+        mode="socks5",
         upstream_enabled=False,
         upstream_host="",
         upstream_port=DEFAULT_UPSTREAM_PORT,
@@ -88,15 +90,27 @@ def normalize_upstream_port(port: int | None) -> int:
         return value
     return DEFAULT_UPSTREAM_PORT
 
-def build_manual_instruction_text(host: str, port: int) -> str:
-    return f"  Тип: SOCKS5  |  Хост: {normalize_host(host)}  |  Порт: {normalize_port(port)}"
+def normalize_proxy_mode(mode: object) -> str:
+    text = str(mode or "").strip().lower()
+    if text == "mtproxy":
+        return "mtproxy"
+    return "socks5"
 
-def build_proxy_url(host: str, port: int) -> str:
-    return f"tg://socks?server={normalize_host(host)}&port={normalize_port(port)}"
+def build_manual_instruction_text(host: str, port: int, *, mode: object = "socks5") -> str:
+    proxy_type = "MTProxy" if normalize_proxy_mode(mode) == "mtproxy" else "SOCKS5"
+    return f"  Тип: {proxy_type}  |  Хост: {normalize_host(host)}  |  Порт: {normalize_port(port)}"
+
+def build_proxy_url(host: str, port: int, *, mode: object = "socks5", mtproxy_secret: str = "") -> str:
+    normalized_host = normalize_host(host)
+    normalized_port = normalize_port(port)
+    if normalize_proxy_mode(mode) == "mtproxy":
+        return build_mtproxy_link(normalized_host, normalized_port, mtproxy_secret)
+    return f"tg://socks?server={normalized_host}&port={normalized_port}"
 
 
 def _settings_state_from_data(data: dict, upstream_catalog: UpstreamCatalog) -> TelegramProxySettingsState:
     raw = dict((data or {}).get("telegram_proxy") or {})
+    mode = normalize_proxy_mode(raw.get("mode"))
     upstream_host = str(raw.get("upstream_host") or "").strip()
     upstream_port = normalize_upstream_port(raw.get("upstream_port"))
     upstream_user = str(raw.get("upstream_user") or "").strip()
@@ -109,6 +123,7 @@ def _settings_state_from_data(data: dict, upstream_catalog: UpstreamCatalog) -> 
     return TelegramProxySettingsState(
         host=normalize_host(raw.get("host")),
         port=normalize_port(raw.get("port")),
+        mode=mode,
         upstream_enabled=bool(raw.get("upstream_enabled", False)),
         upstream_host=upstream_host,
         upstream_port=upstream_port,
@@ -168,6 +183,29 @@ def set_proxy_enabled(enabled: bool) -> None:
     except Exception:
         pass
 
+def set_proxy_mode(mode: object) -> str:
+    normalized = normalize_proxy_mode(mode)
+    try:
+        from settings.store import set_tg_proxy_mode
+
+        set_tg_proxy_mode(normalized)
+    except Exception:
+        pass
+    return normalized
+
+def generate_mtproxy_secret() -> str:
+    return generate_secret()
+
+def set_mtproxy_secret(secret: str) -> str:
+    normalized = normalize_secret(secret)
+    try:
+        from settings.store import set_tg_proxy_mtproxy_secret
+
+        set_tg_proxy_mtproxy_secret(normalized)
+    except Exception:
+        pass
+    return normalized
+
 def set_upstream_enabled(enabled: bool) -> None:
     try:
         from settings.store import set_tg_proxy_upstream_enabled
@@ -199,6 +237,46 @@ def set_upstream_fields(host: str, port: int, user: str, password: str) -> None:
         set_tg_proxy_upstream_pass(str(password or ""))
     except Exception:
         pass
+
+
+def set_cloudflare_enabled(enabled: bool) -> None:
+    try:
+        from settings.store import set_tg_proxy_cloudflare_enabled
+
+        set_tg_proxy_cloudflare_enabled(bool(enabled))
+    except Exception:
+        pass
+
+
+def set_cloudflare_domains(value: object) -> tuple[str, ...]:
+    domains = normalize_domain_list(value)
+    try:
+        from settings.store import set_tg_proxy_cloudflare_domains
+
+        set_tg_proxy_cloudflare_domains(list(domains))
+    except Exception:
+        pass
+    return domains
+
+
+def set_cloudflare_worker_enabled(enabled: bool) -> None:
+    try:
+        from settings.store import set_tg_proxy_cloudflare_worker_enabled
+
+        set_tg_proxy_cloudflare_worker_enabled(bool(enabled))
+    except Exception:
+        pass
+
+
+def set_cloudflare_worker_domains(value: object) -> tuple[str, ...]:
+    domains = normalize_domain_list(value)
+    try:
+        from settings.store import set_tg_proxy_cloudflare_worker_domains
+
+        set_tg_proxy_cloudflare_worker_domains(list(domains))
+    except Exception:
+        pass
+    return domains
 
 
 def build_cloudflare_config() -> CloudflareFallbackConfig:

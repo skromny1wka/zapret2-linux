@@ -90,6 +90,10 @@ def start_proxy_runtime(
     status_label,
     append_log_line,
     create_start_worker,
+    mode: str = "socks5",
+    upstream_config=None,
+    cloudflare_config=None,
+    mtproxy_secret: str = "",
     on_finished=None,
 ) -> None:
     plan = telegram_proxy_page_runtime.build_start_plan(
@@ -97,7 +101,7 @@ def start_proxy_runtime(
         running=bool(running),
         host=host,
         port=port,
-        upstream_config=None,
+        upstream_config=upstream_config,
     )
     if not plan.should_start:
         return
@@ -115,9 +119,11 @@ def start_proxy_runtime(
         worker_factory=lambda _request_id: create_start_worker(
             manager=manager,
             port=port,
-            mode="socks5",
+            mode=str(mode or "socks5"),
             host=host,
-            upstream_config=None,
+            upstream_config=upstream_config,
+            cloudflare_config=cloudflare_config,
+            mtproxy_secret=str(mtproxy_secret or ""),
             parent=page,
         ),
         on_loaded=lambda _request_id, ok: _finish_proxy_start_worker(page, ok),

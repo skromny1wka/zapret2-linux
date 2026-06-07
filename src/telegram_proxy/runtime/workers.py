@@ -300,6 +300,7 @@ class TelegramProxySettingsSaveWorker(QThread):
         user: str = "",
         password: str = "",
         enabled: bool = False,
+        value: object = "",
         context_extra: dict | None = None,
         parent=None,
     ):
@@ -312,6 +313,7 @@ class TelegramProxySettingsSaveWorker(QThread):
         self._user = str(user or "").strip()
         self._password = str(password or "")
         self._enabled = bool(enabled)
+        self._value = value
         self._context_extra = dict(context_extra or {})
 
     def run(self) -> None:
@@ -321,6 +323,7 @@ class TelegramProxySettingsSaveWorker(QThread):
             "user": self._user,
             "password": self._password,
             "enabled": self._enabled,
+            "value": self._value,
         }
         context.update(self._context_extra)
         try:
@@ -331,6 +334,7 @@ class TelegramProxySettingsSaveWorker(QThread):
                 user=self._user,
                 password=self._password,
                 enabled=self._enabled,
+                value=self._value,
             )
         except Exception as exc:
             log(f"TelegramProxySettingsSaveWorker: не удалось сохранить настройку {self._action}: {exc}", "WARNING")

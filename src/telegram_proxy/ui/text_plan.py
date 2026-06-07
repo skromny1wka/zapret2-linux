@@ -12,6 +12,8 @@ class TelegramProxySettingsText:
     setup_description: str
     setup_fallback: str
     settings_title: str
+    proxy_mode_title: str
+    proxy_mode_description: str
     auto_setup_title: str
     auto_setup_description: str
     upstream_title: str
@@ -22,6 +24,10 @@ class TelegramProxySettingsText:
     upstream_catalog_missing: str
     upstream_mode_title: str
     upstream_mode_description: str
+    cloudflare_toggle_title: str
+    cloudflare_toggle_description: str
+    cloudflare_worker_toggle_title: str
+    cloudflare_worker_toggle_description: str
     manual_hidden_title: str
     manual_path: str
     diag_description: str
@@ -36,6 +42,8 @@ TELEGRAM_PROXY_SETTINGS_TEXT = TelegramProxySettingsText(
     setup_description="Откройте ссылку. Telegram сам предложит добавить прокси.",
     setup_fallback="Если Telegram не открылся, скопируйте ссылку и отправьте её себе в чат.",
     settings_title="Основные настройки",
+    proxy_mode_title="Режим прокси",
+    proxy_mode_description="SOCKS5 подходит большинству. MTProxy использует secret и отдельную ссылку Telegram.",
     auto_setup_title="Авто-настройка Telegram",
     auto_setup_description="Открывать ссылку при первом запуске прокси",
     upstream_title="Дополнительно",
@@ -46,6 +54,10 @@ TELEGRAM_PROXY_SETTINGS_TEXT = TelegramProxySettingsText(
     upstream_catalog_missing="В этой сборке список предустановленных прокси не загружен. Доступен только ручной ввод.",
     upstream_mode_title="Весь трафик через прокси",
     upstream_mode_description="Если выключено — только проблемные серверы Telegram. Если включено — весь трафик Telegram.",
+    cloudflare_toggle_title="Cloudflare fallback",
+    cloudflare_toggle_description="Пробовать запасные Cloudflare-домены, если обычный WSS-путь не ответил.",
+    cloudflare_worker_toggle_title="Cloudflare Worker fallback",
+    cloudflare_worker_toggle_description="Пробовать Worker-домены как отдельный запасной путь.",
     manual_hidden_title="Ручная настройка",
     manual_path="Telegram → Настройки → Продвинутые → Тип соединения → Прокси",
     diag_description=(

@@ -49,6 +49,25 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
         self.assertTrue(config.worker_enabled)
         self.assertEqual(config.worker_domains, ("demo.workers.dev",))
 
+    def test_cloudflare_settings_are_saved_through_runtime_command(self) -> None:
+        import telegram_proxy.runtime.commands as commands
+
+        with (
+            patch("telegram_proxy.config.settings.set_cloudflare_enabled") as set_enabled,
+            patch("telegram_proxy.config.settings.set_cloudflare_domains") as set_domains,
+            patch("telegram_proxy.config.settings.set_cloudflare_worker_enabled") as set_worker_enabled,
+            patch("telegram_proxy.config.settings.set_cloudflare_worker_domains") as set_worker_domains,
+        ):
+            commands.save_settings_action("cloudflare_enabled", enabled=True)
+            commands.save_settings_action("cloudflare_domains", value="example.com, demo.example.com")
+            commands.save_settings_action("cloudflare_worker_enabled", enabled=True)
+            commands.save_settings_action("cloudflare_worker_domains", value="worker.example.dev")
+
+        set_enabled.assert_called_once_with(True)
+        set_domains.assert_called_once_with("example.com, demo.example.com")
+        set_worker_enabled.assert_called_once_with(True)
+        set_worker_domains.assert_called_once_with("worker.example.dev")
+
     def test_cloudflare_helpers_build_domain_and_worker_targets(self) -> None:
         from telegram_proxy.proxy.cloudflare import (
             CloudflareFallbackConfig,

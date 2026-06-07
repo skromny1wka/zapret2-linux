@@ -190,6 +190,64 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("_build_upstream_config", worker_source)
         self.assertNotIn("telegram_proxy.runtime.commands", worker_source)
 
+    def test_page_start_runtime_passes_selected_mode_and_mtproxy_secret(self) -> None:
+        from telegram_proxy.ui import proxy_runtime_workflow
+
+        class _Runtime:
+            def __init__(self) -> None:
+                self.started = None
+
+            def is_running(self) -> bool:
+                return False
+
+            def start_qthread_worker(self, **kwargs) -> None:
+                self.started = kwargs
+
+        page = SimpleNamespace(_proxy_start_runtime=_Runtime())
+        manager = Mock()
+        create_start_worker = Mock(return_value=object())
+        upstream_config = SimpleNamespace(
+            host="upstream.example.com",
+            port=1080,
+            mode="fallback",
+            username="user",
+        )
+        cloudflare_config = object()
+        secret = "aabbccddeeff00112233445566778899"
+
+        proxy_runtime_workflow.start_proxy_runtime(
+            page=page,
+            manager=manager,
+            starting=False,
+            running=False,
+            host="127.0.0.1",
+            port=1443,
+            set_starting=Mock(),
+            btn_toggle=Mock(),
+            status_label=Mock(),
+            append_log_line=Mock(),
+            create_start_worker=create_start_worker,
+            mode="mtproxy",
+            upstream_config=upstream_config,
+            cloudflare_config=cloudflare_config,
+            mtproxy_secret=secret,
+        )
+
+        self.assertIsNotNone(page._proxy_start_runtime.started)
+        worker_factory = page._proxy_start_runtime.started["worker_factory"]
+        worker_factory(1)
+
+        create_start_worker.assert_called_once_with(
+            manager=manager,
+            port=1443,
+            mode="mtproxy",
+            host="127.0.0.1",
+            upstream_config=upstream_config,
+            cloudflare_config=cloudflare_config,
+            mtproxy_secret=secret,
+            parent=page,
+        )
+
     def test_tray_toggle_stops_proxy_through_worker_runtime(self) -> None:
         feature_source = inspect.getsource(TelegramProxyFeature)
         toggle_source = inspect.getsource(TelegramProxyFeature.toggle_async)

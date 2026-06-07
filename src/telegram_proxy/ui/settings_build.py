@@ -36,6 +36,11 @@ class TelegramProxySettingsPanelWidgets:
     host_edit: object
     port_label: object
     port_spin: object
+    proxy_mode_row: object
+    mtproxy_secret_row: object
+    mtproxy_secret_label: object
+    mtproxy_secret_edit: object
+    mtproxy_generate_btn: object
     auto_deeplink_toggle: object
     upstream_card: object
     upstream_desc_label: object
@@ -55,6 +60,14 @@ class TelegramProxySettingsPanelWidgets:
     mtproxy_action_btn: object
     mtproxy_action_widget: object
     upstream_mode_toggle: object
+    cloudflare_toggle: object
+    cloudflare_domains_row: object
+    cloudflare_domains_label: object
+    cloudflare_domains_edit: object
+    cloudflare_worker_toggle: object
+    cloudflare_worker_domains_row: object
+    cloudflare_worker_domains_label: object
+    cloudflare_worker_domains_edit: object
     manual_section_label: object
     instructions_card: object
     instr1_label: object
@@ -82,6 +95,7 @@ def build_telegram_proxy_settings_panel(
     on_open_in_telegram,
     on_copy_link,
     on_open_mtproxy,
+    on_generate_mtproxy_secret,
     upstream_catalog,
 ) -> TelegramProxySettingsPanelWidgets:
     text = TELEGRAM_PROXY_SETTINGS_TEXT
@@ -162,6 +176,39 @@ def build_telegram_proxy_settings_panel(
     host_port_row.addWidget(port_spin)
     host_port_row.addStretch()
     insert_widget_into_setting_card_group(settings_card, 1, settings_host_row)
+
+    proxy_mode_row = win11_combo_row_cls(
+        icon_name="mdi.swap-horizontal",
+        title=text.proxy_mode_title,
+        description=text.proxy_mode_description,
+        items=[
+            ("SOCKS5", "socks5"),
+            ("MTProxy", "mtproxy"),
+        ],
+    )
+    proxy_mode_row.combo.setFixedWidth(170)
+    settings_card.addSettingCard(proxy_mode_row)
+
+    mtproxy_secret_row = QWidget(settings_card)
+    mtproxy_secret_layout = QHBoxLayout(mtproxy_secret_row)
+    mtproxy_secret_layout.setContentsMargins(16, 8, 16, 6)
+    mtproxy_secret_layout.setSpacing(12)
+    mtproxy_secret_label = body_label_cls("Secret:")
+    mtproxy_secret_layout.addWidget(mtproxy_secret_label)
+    mtproxy_secret_edit = line_edit_cls()
+    mtproxy_secret_edit.setMinimumWidth(280)
+    mtproxy_secret_edit.setPlaceholderText("32 символа: 0-9 и a-f")
+    mtproxy_secret_edit.setClearButtonEnabled(True)
+    set_tooltip(mtproxy_secret_edit, "Секрет MTProxy. Telegram использует его как ключ подключения.")
+    mtproxy_secret_layout.addWidget(mtproxy_secret_edit)
+    mtproxy_generate_btn = push_button_cls("Создать", icon=FluentIcon.SYNC)
+    mtproxy_generate_btn.setMinimumWidth(120)
+    set_tooltip(mtproxy_generate_btn, "Создать новый случайный secret для MTProxy.")
+    mtproxy_generate_btn.clicked.connect(on_generate_mtproxy_secret)
+    mtproxy_secret_layout.addWidget(mtproxy_generate_btn)
+    mtproxy_secret_layout.addStretch()
+    mtproxy_secret_row.setVisible(False)
+    settings_card.addSettingCard(mtproxy_secret_row)
 
     auto_deeplink_toggle = win11_toggle_row_cls(
         "mdi.telegram",
@@ -262,6 +309,55 @@ def build_telegram_proxy_settings_panel(
     )
     upstream_mode_toggle.setChecked(True)
     upstream_card.addSettingCard(upstream_mode_toggle)
+
+    cloudflare_toggle = win11_toggle_row_cls(
+        "mdi.cloud",
+        text.cloudflare_toggle_title,
+        text.cloudflare_toggle_description,
+    )
+    cloudflare_toggle.setChecked(False)
+    upstream_card.addSettingCard(cloudflare_toggle)
+
+    cloudflare_domains_row = QWidget(upstream_card)
+    cloudflare_domains_layout = QHBoxLayout(cloudflare_domains_row)
+    cloudflare_domains_layout.setContentsMargins(16, 8, 16, 6)
+    cloudflare_domains_layout.setSpacing(12)
+    cloudflare_domains_label = body_label_cls("Домены:")
+    cloudflare_domains_layout.addWidget(cloudflare_domains_label)
+    cloudflare_domains_edit = line_edit_cls()
+    cloudflare_domains_edit.setMinimumWidth(320)
+    cloudflare_domains_edit.setPlaceholderText("example.com, backup.example.com")
+    cloudflare_domains_edit.setClearButtonEnabled(True)
+    set_tooltip(cloudflare_domains_edit, "Cloudflare-домены для запасного WSS-пути.")
+    cloudflare_domains_layout.addWidget(cloudflare_domains_edit)
+    cloudflare_domains_layout.addStretch()
+    cloudflare_domains_row.setVisible(False)
+    upstream_card.addSettingCard(cloudflare_domains_row)
+
+    cloudflare_worker_toggle = win11_toggle_row_cls(
+        "mdi.cloud-outline",
+        text.cloudflare_worker_toggle_title,
+        text.cloudflare_worker_toggle_description,
+    )
+    cloudflare_worker_toggle.setChecked(False)
+    upstream_card.addSettingCard(cloudflare_worker_toggle)
+
+    cloudflare_worker_domains_row = QWidget(upstream_card)
+    cloudflare_worker_domains_layout = QHBoxLayout(cloudflare_worker_domains_row)
+    cloudflare_worker_domains_layout.setContentsMargins(16, 8, 16, 6)
+    cloudflare_worker_domains_layout.setSpacing(12)
+    cloudflare_worker_domains_label = body_label_cls("Worker:")
+    cloudflare_worker_domains_layout.addWidget(cloudflare_worker_domains_label)
+    cloudflare_worker_domains_edit = line_edit_cls()
+    cloudflare_worker_domains_edit.setMinimumWidth(320)
+    cloudflare_worker_domains_edit.setPlaceholderText("worker-name.workers.dev")
+    cloudflare_worker_domains_edit.setClearButtonEnabled(True)
+    set_tooltip(cloudflare_worker_domains_edit, "Домены Cloudflare Worker для отдельного запасного пути.")
+    cloudflare_worker_domains_layout.addWidget(cloudflare_worker_domains_edit)
+    cloudflare_worker_domains_layout.addStretch()
+    cloudflare_worker_domains_row.setVisible(False)
+    upstream_card.addSettingCard(cloudflare_worker_domains_row)
+
     enable_setting_card_group_auto_height(upstream_card)
 
     layout.addWidget(upstream_card)
@@ -305,6 +401,11 @@ def build_telegram_proxy_settings_panel(
         host_edit=host_edit,
         port_label=port_label,
         port_spin=port_spin,
+        proxy_mode_row=proxy_mode_row,
+        mtproxy_secret_row=mtproxy_secret_row,
+        mtproxy_secret_label=mtproxy_secret_label,
+        mtproxy_secret_edit=mtproxy_secret_edit,
+        mtproxy_generate_btn=mtproxy_generate_btn,
         auto_deeplink_toggle=auto_deeplink_toggle,
         upstream_card=upstream_card,
         upstream_desc_label=upstream_desc_label,
@@ -324,6 +425,14 @@ def build_telegram_proxy_settings_panel(
         mtproxy_action_btn=mtproxy_action_btn,
         mtproxy_action_widget=mtproxy_action_widget,
         upstream_mode_toggle=upstream_mode_toggle,
+        cloudflare_toggle=cloudflare_toggle,
+        cloudflare_domains_row=cloudflare_domains_row,
+        cloudflare_domains_label=cloudflare_domains_label,
+        cloudflare_domains_edit=cloudflare_domains_edit,
+        cloudflare_worker_toggle=cloudflare_worker_toggle,
+        cloudflare_worker_domains_row=cloudflare_worker_domains_row,
+        cloudflare_worker_domains_label=cloudflare_worker_domains_label,
+        cloudflare_worker_domains_edit=cloudflare_worker_domains_edit,
         manual_section_label=manual_section_label,
         instructions_card=instructions_card,
         instr1_label=instr1_label,

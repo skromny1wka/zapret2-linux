@@ -121,6 +121,7 @@ def save_settings_action(
     user: str = "",
     password: str = "",
     enabled: bool = False,
+    value: object = "",
 ):
     import telegram_proxy.config.settings as telegram_proxy_settings
 
@@ -131,12 +132,24 @@ def save_settings_action(
         return telegram_proxy_settings.set_port(port)
     if action_name == "proxy_enabled":
         return telegram_proxy_settings.set_proxy_enabled(enabled)
+    if action_name == "proxy_mode":
+        return telegram_proxy_settings.set_proxy_mode(value)
+    if action_name == "mtproxy_secret":
+        return telegram_proxy_settings.set_mtproxy_secret(str(value or ""))
     if action_name == "upstream_enabled":
         return telegram_proxy_settings.set_upstream_enabled(enabled)
     if action_name == "upstream_fields":
         return telegram_proxy_settings.set_upstream_fields(host, port, user, password)
     if action_name == "upstream_mode":
         return telegram_proxy_settings.set_upstream_mode(enabled)
+    if action_name == "cloudflare_enabled":
+        return telegram_proxy_settings.set_cloudflare_enabled(enabled)
+    if action_name == "cloudflare_domains":
+        return telegram_proxy_settings.set_cloudflare_domains(value)
+    if action_name == "cloudflare_worker_enabled":
+        return telegram_proxy_settings.set_cloudflare_worker_enabled(enabled)
+    if action_name == "cloudflare_worker_domains":
+        return telegram_proxy_settings.set_cloudflare_worker_domains(value)
     raise ValueError(f"Неизвестная настройка Telegram Proxy: {action_name}")
 
 

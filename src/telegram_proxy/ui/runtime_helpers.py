@@ -77,6 +77,9 @@ def apply_ui_texts(
     setup_fallback_label,
     host_label,
     port_label,
+    mtproxy_secret_label,
+    cloudflare_domains_label,
+    cloudflare_worker_domains_label,
     upstream_desc_label,
     upstream_host_label,
     upstream_port_label,
@@ -95,16 +98,22 @@ def apply_ui_texts(
     btn_copy_diag,
     btn_run_diag,
     host_edit,
+    mtproxy_secret_edit,
+    cloudflare_domains_edit,
+    cloudflare_worker_domains_edit,
     upstream_host_edit,
     upstream_user_edit,
     upstream_pass_edit,
     log_edit,
     diag_edit,
     auto_deeplink_toggle,
+    proxy_mode_row,
     upstream_toggle,
     upstream_preset_row,
     upstream_catalog_hint,
     upstream_mode_toggle,
+    cloudflare_toggle,
+    cloudflare_worker_toggle,
     update_manual_instructions_callback,
 ) -> None:
     try:
@@ -132,6 +141,12 @@ def apply_ui_texts(
             host_label.setText("Адрес:")
         if port_label is not None:
             port_label.setText("Порт:")
+        if mtproxy_secret_label is not None:
+            mtproxy_secret_label.setText("Secret:")
+        if cloudflare_domains_label is not None:
+            cloudflare_domains_label.setText("Домены:")
+        if cloudflare_worker_domains_label is not None:
+            cloudflare_worker_domains_label.setText("Worker:")
         if upstream_desc_label is not None:
             upstream_desc_label.setText("")
             upstream_desc_label.setVisible(False)
@@ -183,6 +198,12 @@ def apply_ui_texts(
 
         if host_edit is not None:
             host_edit.setPlaceholderText("127.0.0.1")
+        if mtproxy_secret_edit is not None:
+            mtproxy_secret_edit.setPlaceholderText("32 символа: 0-9 и a-f")
+        if cloudflare_domains_edit is not None:
+            cloudflare_domains_edit.setPlaceholderText("example.com, backup.example.com")
+        if cloudflare_worker_domains_edit is not None:
+            cloudflare_worker_domains_edit.setPlaceholderText("worker-name.workers.dev")
         if upstream_host_edit is not None:
             upstream_host_edit.setPlaceholderText("192.168.1.100 или proxy.example.com")
         if upstream_user_edit is not None:
@@ -198,6 +219,11 @@ def apply_ui_texts(
             auto_deeplink_toggle.set_texts(
                 text.auto_setup_title,
                 text.auto_setup_description,
+            )
+        if proxy_mode_row is not None:
+            proxy_mode_row.set_texts(
+                text.proxy_mode_title,
+                text.proxy_mode_description,
             )
         if upstream_toggle is not None:
             upstream_toggle.set_texts(
@@ -215,6 +241,16 @@ def apply_ui_texts(
             upstream_mode_toggle.set_texts(
                 text.upstream_mode_title,
                 text.upstream_mode_description,
+            )
+        if cloudflare_toggle is not None:
+            cloudflare_toggle.set_texts(
+                text.cloudflare_toggle_title,
+                text.cloudflare_toggle_description,
+            )
+        if cloudflare_worker_toggle is not None:
+            cloudflare_worker_toggle.set_texts(
+                text.cloudflare_worker_toggle_title,
+                text.cloudflare_worker_toggle_description,
             )
 
         update_manual_instructions_callback()
