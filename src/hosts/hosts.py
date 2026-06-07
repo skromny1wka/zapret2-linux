@@ -256,6 +256,12 @@ def _insert_managed_hosts_block(new_lines: list[str], rows: list[tuple[str, str]
                 break
     insert_at = max(0, min(insert_at, len(new_lines)))
 
+    while insert_at > 0 and new_lines[insert_at - 1].strip() == "":
+        del new_lines[insert_at - 1]
+        insert_at -= 1
+    while insert_at < len(new_lines) and new_lines[insert_at].strip() == "":
+        del new_lines[insert_at]
+
     block: list[str] = []
     if insert_at > 0 and new_lines[insert_at - 1].strip() != "":
         block.append("\n")

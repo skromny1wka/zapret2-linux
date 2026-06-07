@@ -804,6 +804,43 @@ class HostsCatalogJsonTests(unittest.TestCase):
         self.assertIn("10.0.0.2 another.example", written[0])
         self.assertEqual(manager.last_status, "Файл hosts обновлён: применено 1 запись")
 
+    def test_apply_domain_rows_does_not_shift_block_down_on_repeated_updates(self) -> None:
+        from hosts import hosts as hosts_module
+
+        original = "\n".join(
+            [
+                "# user header",
+                "10.0.0.1 chatgpt.com",
+                "10.0.0.2 another.example",
+                "",
+            ]
+        )
+        written: list[str] = []
+        current_content = {"text": original}
+        manager = hosts_module.HostsManager()
+        manager.is_hosts_file_accessible = lambda: True
+
+        def write_hosts(text: str) -> bool:
+            written.append(text)
+            current_content["text"] = text
+            return True
+
+        with (
+            patch.object(hosts_module, "safe_read_hosts_file", side_effect=lambda: current_content["text"]),
+            patch.object(hosts_module, "safe_write_hosts_file", side_effect=write_hosts),
+            patch.object(hosts_module, "is_ipv6_available", return_value=True),
+        ):
+            self.assertTrue(manager.apply_domain_ip_rows([("chatgpt.com", "2.2.2.2")]))
+            self.assertTrue(manager.apply_domain_ip_rows([("chatgpt.com", "3.3.3.3")]))
+
+        self.assertEqual(len(written), 2)
+        first_lines = written[0].splitlines()
+        second_lines = written[1].splitlines()
+        first_begin = first_lines.index("# >>> zapretgui:hosts managed begin >>>")
+        second_begin = second_lines.index("# >>> zapretgui:hosts managed begin >>>")
+        self.assertEqual(second_begin, first_begin)
+        self.assertNotIn("\n\n\n# >>> zapretgui:hosts managed begin >>>", written[1])
+
     def test_apply_domain_rows_keeps_other_domains_from_same_hosts_line(self) -> None:
         from hosts import hosts as hosts_module
 
