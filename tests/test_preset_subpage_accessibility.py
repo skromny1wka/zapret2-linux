@@ -3,9 +3,9 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QWidget
 
-from presets.ui.common.preset_subpage_base import PresetRawEditorPage, RawPresetRuntimeActions
+from presets.ui.common.preset_subpage_base import PresetRawEditorPage, RawPresetRuntimeActions, _RenameDialog
 
 
 class PresetSubpageAccessibilityTests(unittest.TestCase):
@@ -42,6 +42,27 @@ class PresetSubpageAccessibilityTests(unittest.TestCase):
         self.assertIn("Запускает Zapret", page.runtimeToggleButton.accessibleDescription())
         self.assertEqual(page.searchInput.accessibleName(), "Поиск по тексту пресета")
         self.assertEqual(page.editor.accessibleName(), "Текст открытого пресета")
+
+    def test_rename_dialog_is_named_for_screen_reader(self) -> None:
+        parent = QWidget()
+        parent.resize(640, 480)
+        parent.show()
+        self.addCleanup(parent.deleteLater)
+
+        dialog = _RenameDialog("Default", [], parent)
+        self.addCleanup(dialog.deleteLater)
+
+        self.assertEqual(dialog.nameEdit.accessibleName(), "Новое название открытого пресета")
+        self.assertIn("Текущее имя: Default", dialog.nameEdit.accessibleDescription())
+        self.assertEqual(dialog.yesButton.accessibleName(), "Переименовать открытый пресет")
+        self.assertIn("Меняет имя открытого пресета", dialog.yesButton.accessibleDescription())
+        self.assertEqual(dialog.cancelButton.accessibleName(), "Отменить переименование открытого пресета")
+
+        dialog.nameEdit.setText("")
+        self.assertFalse(dialog.validate())
+
+        self.assertEqual(dialog.warningLabel.accessibleName(), "Ошибка: Введите название.")
+        self.assertEqual(dialog.warningLabel.property("screenReaderStateText"), "Ошибка: Введите название.")
 
 
 if __name__ == "__main__":

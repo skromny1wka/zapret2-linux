@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QFi
 
 from ui.pages.base_page import BasePage
 from ui.fluent_widgets import set_tooltip, style_semantic_caption_label
-from ui.accessibility import set_control_accessibility
+from ui.accessibility import set_control_accessibility, set_state_text
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.popup_menu import exec_popup_menu
 from ui.smooth_scroll import apply_editor_smooth_scroll_preference
@@ -205,15 +205,37 @@ class _RenameDialog(MessageBoxBase):
         self.yesButton.setText("Переименовать")
         self.cancelButton.setText("Отмена")
         self.widget.setMinimumWidth(420)
+        self._install_accessibility()
 
     def validate(self) -> bool:
         name = self.nameEdit.text().strip()
         if not name:
-            self.warningLabel.setText("Введите название.")
+            self._show_warning("Введите название.")
             self.warningLabel.show()
             return False
         self.warningLabel.hide()
         return True
+
+    def _install_accessibility(self) -> None:
+        set_control_accessibility(
+            self.nameEdit,
+            name="Новое название открытого пресета",
+            description=f"Текущее имя: {self._current_name}. Введите новое имя для открытого пресета.",
+        )
+        set_control_accessibility(
+            self.yesButton,
+            name="Переименовать открытый пресет",
+            description="Меняет имя открытого пресета.",
+        )
+        set_control_accessibility(
+            self.cancelButton,
+            name="Отменить переименование открытого пресета",
+            description="Закрывает окно без изменения имени.",
+        )
+
+    def _show_warning(self, text: str) -> None:
+        self.warningLabel.setText(text)
+        set_state_text(self.warningLabel, f"Ошибка: {text}")
 
 
 class PresetRawEditorPage(BasePage):
