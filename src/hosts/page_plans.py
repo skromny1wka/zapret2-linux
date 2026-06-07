@@ -21,6 +21,7 @@ class HostsSelectionSyncEntry:
     direct_only: bool
     available_profiles: list[str]
     selected_profile: str | None
+    has_active_domains: bool
     toggle_enabled: bool
     toggle_checked: bool
 
@@ -338,6 +339,21 @@ def infer_direct_toggle_from_hosts(service_name: str, active_domains_map: dict[s
     return True
 
 
+def service_has_active_domains(service_name: str, active_domains_map: dict[str, str]) -> bool:
+    from hosts.proxy_domains import get_service_domain_names
+
+    normalized_active = _normalize_active_domains_map(active_domains_map)
+    if not normalized_active:
+        return False
+    try:
+        for domain in (get_service_domain_names(service_name) or []):
+            if str(domain or "").strip().casefold() in normalized_active:
+                return True
+    except Exception:
+        return False
+    return False
+
+
 def build_selection_sync_plan(
     *,
     service_names: list[str],
@@ -366,6 +382,7 @@ def build_selection_sync_plan(
         else:
             available = list(get_service_available_dns_profiles(service_name) or [])
         selected_profile: str | None = None
+        has_active_domains = service_has_active_domains(service_name, active_domains_map)
         toggle_enabled = False
         toggle_checked = False
 
@@ -387,6 +404,7 @@ def build_selection_sync_plan(
             direct_only=direct_only,
             available_profiles=available,
             selected_profile=selected_profile,
+            has_active_domains=has_active_domains,
             toggle_enabled=toggle_enabled,
             toggle_checked=toggle_checked,
         )
@@ -524,13 +542,13 @@ def build_services_catalog_plan(
             toggle_checked = False
             toggle_enabled = bool(entry.toggle_enabled) if entry is not None else False
 
-            if saved_profile in available_profiles:
+            inferred_profile = entry.selected_profile if entry is not None else None
+            if inferred_profile in available_profiles:
+                selected_profile = inferred_profile
+                new_selection[service_name] = inferred_profile
+            elif saved_profile in available_profiles and not bool(entry and entry.has_active_domains):
                 selected_profile = saved_profile
                 new_selection[service_name] = saved_profile
-            elif not saved_profile and entry is not None and entry.selected_profile in available_profiles:
-                selected_profile = entry.selected_profile
-                if selected_profile:
-                    new_selection[service_name] = selected_profile
 
             if entry is not None and entry.direct_only:
                 toggle_checked = bool(selected_profile and selected_profile == direct_profile)
