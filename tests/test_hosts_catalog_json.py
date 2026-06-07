@@ -324,6 +324,52 @@ class HostsCatalogJsonTests(unittest.TestCase):
         service_name = "IP для подмены заблокированных ресурсов"
         self.assertEqual(plan.new_selection.get(service_name), "direct")
 
+    def test_services_catalog_plan_matches_direct_ipv4_when_catalog_has_ipv6_first(self) -> None:
+        from hosts import page_plans
+
+        catalog = {
+            "version": 1,
+            "profiles": [
+                {"id": "zapret_dns", "name": "Zapret DNS"},
+                {"id": "direct", "name": "Вкл. (активировать hosts)"},
+            ],
+            "services": [
+                {
+                    "name": "IPv6 First Direct Service",
+                    "mode": "direct",
+                    "hosts": [
+                        {"ip": "2a03:2880:f330:25:face:b00c:0:4420", "host": "instagram.com"},
+                        {"ip": "163.70.151.174", "host": "instagram.com"},
+                    ],
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            catalog_path = root / "private_zapretgui" / "resources" / "json" / "hosts_catalog.json"
+            catalog_path.parent.mkdir(parents=True, exist_ok=True)
+            catalog_path.write_text(json.dumps(catalog, ensure_ascii=False, indent=2), encoding="utf-8")
+            fake_module = root / "public_zapretgui" / "src" / "hosts" / "proxy_domains.py"
+            fake_module.parent.mkdir(parents=True, exist_ok=True)
+            fake_module.write_text("", encoding="utf-8")
+
+            with patch.object(self.proxy_domains, "__file__", str(fake_module)):
+                self.proxy_domains.invalidate_hosts_catalog_cache()
+
+                plan = page_plans.build_services_catalog_plan(
+                    current_selection={},
+                    active_domains_map={"instagram.com": "163.70.151.174"},
+                    direct_title="Direct",
+                    ai_title="AI",
+                    other_title="Other",
+                )
+
+        rows = [row for group in plan.groups for row in group.rows if row.service_name == "IPv6 First Direct Service"]
+        self.assertEqual(rows[0].selected_profile, "direct")
+        self.assertTrue(rows[0].toggle_checked)
+        self.assertEqual(plan.new_selection.get("IPv6 First Direct Service"), "direct")
+
     def test_services_catalog_plan_does_not_enable_direct_service_from_partial_hosts_match(self) -> None:
         from hosts import page_plans
 

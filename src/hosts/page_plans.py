@@ -319,22 +319,32 @@ def infer_profile_from_hosts(
 
 
 def infer_direct_toggle_from_hosts(service_name: str, active_domains_map: dict[str, str]) -> bool:
-    from hosts.proxy_domains import get_service_domains
+    from hosts.proxy_domains import get_service_domain_ip_rows
 
     normalized_active = _normalize_active_domains_map(active_domains_map)
     if not normalized_active:
         return False
+    direct_profile = get_direct_profile_name()
+    if not direct_profile:
+        return False
     try:
-        domain_map = get_service_domains(service_name) or {}
+        rows = get_service_domain_ip_rows(service_name, direct_profile) or []
     except Exception:
         return False
-    if not domain_map:
+    domain_ip_candidates: dict[str, set[str]] = {}
+    for domain, ip in rows:
+        domain_key = str(domain or "").strip().casefold()
+        ip_key = str(ip or "").strip().casefold()
+        if not domain_key or not ip_key:
+            continue
+        domain_ip_candidates.setdefault(domain_key, set()).add(ip_key)
+    if not domain_ip_candidates:
         return False
-    for domain, ip in domain_map.items():
-        active_ip = normalized_active.get(str(domain or "").casefold())
+    for domain_key, allowed_ips in domain_ip_candidates.items():
+        active_ip = normalized_active.get(domain_key)
         if active_ip is None:
             return False
-        if (active_ip or "").strip().casefold() != (ip or "").strip().casefold():
+        if (active_ip or "").strip().casefold() not in allowed_ips:
             return False
     return True
 
