@@ -169,6 +169,17 @@ def _format_hosts_mapping_line(ip: str, domains: list[str], comment: str) -> str
     return line + "\n"
 
 
+def _format_hosts_entries_count(count: int) -> str:
+    count = int(count)
+    if count % 10 == 1 and count % 100 != 11:
+        word = "запись"
+    elif count % 10 in (2, 3, 4) and count % 100 not in (12, 13, 14):
+        word = "записи"
+    else:
+        word = "записей"
+    return f"{count} {word}"
+
+
 def _remove_top_domain_entries(lines: list[str], domain_keys: set[str]) -> tuple[list[str], set[str], int | None]:
     """Убирает первое вхождение каждого нужного домена и возвращает место для нового блока."""
     if not domain_keys:
@@ -950,7 +961,7 @@ class HostsManager:
                 self.set_status("Не удалось записать файл hosts")
                 return False
 
-            self.set_status(f"Файл hosts обновлён: добавлено {len(desired_rows)} записей")
+            self.set_status(f"Файл hosts обновлён: применено {_format_hosts_entries_count(len(desired_rows))}")
             log(
                 f"✅ apply_domain_ip_rows: removed={removed_count}, "
                 f"replaced_top={len(replaced_domains)}, added={len(desired_rows)}",

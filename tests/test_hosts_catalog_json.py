@@ -294,6 +294,7 @@ class HostsCatalogJsonTests(unittest.TestCase):
         ]
         self.assertEqual(chatgpt_lines, ["2.2.2.2 chatgpt.com", "10.0.0.3 chatgpt.com"])
         self.assertIn("10.0.0.2 another.example", written[0])
+        self.assertEqual(manager.last_status, "Файл hosts обновлён: применено 1 запись")
 
     def test_apply_domain_rows_keeps_other_domains_from_same_hosts_line(self) -> None:
         from hosts import hosts as hosts_module
