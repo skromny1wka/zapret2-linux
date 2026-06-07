@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QFi
 
 from ui.pages.base_page import BasePage
 from ui.fluent_widgets import set_tooltip, style_semantic_caption_label
+from ui.accessibility import set_control_accessibility
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.popup_menu import exec_popup_menu
 from ui.smooth_scroll import apply_editor_smooth_scroll_preference
@@ -118,7 +119,25 @@ def apply_runtime_toggle_button_plan(
     if getattr(button, "_last_runtime_toggle_button_enabled", None) != enabled:
         setattr(button, "_last_runtime_toggle_button_enabled", enabled)
         button.setEnabled(enabled)
+    _set_runtime_toggle_accessibility(button, plan, runtime_available=runtime_available)
     return plan.should_stop
+
+
+def _set_runtime_toggle_accessibility(button, plan: RuntimeToggleButtonPlan, *, runtime_available: bool) -> None:
+    action = "Остановить" if plan.should_stop else "Запустить"
+    if runtime_available:
+        description = (
+            "Останавливает запущенный Zapret с этим пресетом."
+            if plan.should_stop
+            else "Запускает Zapret с открытым пресетом."
+        )
+    else:
+        description = "Управление Zapret сейчас недоступно."
+    set_control_accessibility(
+        button,
+        name=f"{action} пресет",
+        description=description,
+    )
 
 
 def set_text_if_changed(widget, text: str) -> bool:
@@ -507,6 +526,11 @@ class PresetRawEditorPage(BasePage):
         top_layout.addStretch(1)
 
         self.menuButton = TransparentToolButton(_fluent_icon("MENU"), self)
+        set_control_accessibility(
+            self.menuButton,
+            name="Открыть меню действий пресета",
+            description="Открывает действия для пресета: переименовать, дублировать, экспортировать или удалить.",
+        )
         self.menuButton.clicked.connect(self._open_menu)
         top_layout.addWidget(self.menuButton, 0)
         self.add_widget(top_row)
@@ -534,16 +558,36 @@ class PresetRawEditorPage(BasePage):
 
         self.activateButton = PushButton("Сделать активным", self)
         self.activateButton.setIcon(_fluent_icon("ACCEPT"))
+        set_control_accessibility(
+            self.activateButton,
+            name="Сделать пресет активным",
+            description="Делает этот пресет выбранным для запуска.",
+        )
         self.activateButton.clicked.connect(self._activate_preset)
         actions_layout.addWidget(self.activateButton)
 
         self.openExternalButton = PushButton("Открыть в редакторе", self)
         self.openExternalButton.setIcon(_fluent_icon("FOLDER"))
+        set_control_accessibility(
+            self.openExternalButton,
+            name="Открыть пресет в редакторе",
+            description="Открывает файл пресета во внешнем текстовом редакторе.",
+        )
         self.openExternalButton.clicked.connect(self._open_external)
         actions_layout.addWidget(self.openExternalButton)
 
         self.runtimeToggleButton = PushButton("Запустить", self)
         self.runtimeToggleButton.setIcon(_fluent_icon("PLAY"))
+        _set_runtime_toggle_accessibility(
+            self.runtimeToggleButton,
+            RuntimeToggleButtonPlan(
+                text="Запустить",
+                icon_name="PLAY",
+                should_stop=False,
+                enabled=True,
+            ),
+            runtime_available=self._runtime_actions is not None,
+        )
         self.runtimeToggleButton.clicked.connect(self._toggle_runtime)
         actions_layout.addWidget(self.runtimeToggleButton)
 
@@ -551,6 +595,11 @@ class PresetRawEditorPage(BasePage):
         self.searchInput = SearchLineEdit(self)
         self.searchInput.setPlaceholderText("Поиск по тексту пресета")
         set_tooltip(self.searchInput, "Найти строку в тексте открытого пресета.")
+        set_control_accessibility(
+            self.searchInput,
+            name="Поиск по тексту пресета",
+            description="Введите текст, чтобы найти строку внутри открытого пресета.",
+        )
         self.searchInput.setClearButtonEnabled(True)
         self.searchInput.setFixedHeight(34)
         self.searchInput.setMinimumWidth(220)
@@ -561,6 +610,11 @@ class PresetRawEditorPage(BasePage):
         self.add_widget(actions)
 
         self.editor = PlainTextEdit(self)
+        set_control_accessibility(
+            self.editor,
+            name="Текст открытого пресета",
+            description="Здесь можно читать и редактировать содержимое открытого пресета.",
+        )
         apply_editor_smooth_scroll_preference(self.editor)
         self.editor.textChanged.connect(self._on_text_changed)
         self.add_widget(self.editor, 1)
