@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
 
 from telegram_proxy.diagnostics import _build_summary
-from telegram_proxy.ui.page_runtime import build_relay_result_plan
+from telegram_proxy.ui.page_runtime import build_relay_result_plan, build_stats_plan
 
 
 class TelegramProxyDiagnosticsTests(unittest.TestCase):
@@ -36,6 +37,47 @@ class TelegramProxyDiagnosticsTests(unittest.TestCase):
 
         self.assertNotIn("прокси не будет работать", summary)
         self.assertIn("прямой WSS relay сейчас недоступен", summary)
+
+    def test_stats_plan_shows_proxy_route_and_pool_counters(self) -> None:
+        stats = SimpleNamespace(
+            active_connections=2,
+            total_connections=9,
+            bytes_sent=4096,
+            bytes_received=8192,
+            uptime_seconds=12,
+            wss_connections=3,
+            tcp_fallback_connections=2,
+            cloudflare_connections=4,
+            cloudflare_worker_connections=1,
+            upstream_connections=1,
+            passthrough_connections=2,
+            failed_connections=1,
+            pool_hits=7,
+            pool_misses=2,
+            cloudflare_worker_pool_hits=5,
+            cloudflare_worker_pool_misses=1,
+            recv_zero_count=0,
+            recv_zero_per_dc={},
+        )
+
+        plan = build_stats_plan(
+            stats=stats,
+            prev_sent=0,
+            prev_recv=0,
+            speed_hist_up=(),
+            speed_hist_down=(),
+            interval=2.0,
+        )
+
+        self.assertIn("Пути: WSS 3", plan.stats_text)
+        self.assertIn("TCP 2", plan.stats_text)
+        self.assertIn("CF 4", plan.stats_text)
+        self.assertIn("Worker 1", plan.stats_text)
+        self.assertIn("внешний 1", plan.stats_text)
+        self.assertIn("мимо 2", plan.stats_text)
+        self.assertIn("ошибки 1", plan.stats_text)
+        self.assertIn("Пул: WSS 7/2", plan.stats_text)
+        self.assertIn("Worker 5/1", plan.stats_text)
 
 
 if __name__ == "__main__":

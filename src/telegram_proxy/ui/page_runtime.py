@@ -319,12 +319,39 @@ def build_stats_plan(
         recv_zero = getattr(stats, "recv_zero_count", 0)
         recv_zero_str = f"  |  recv=0: {recv_zero}" if recv_zero > 0 else ""
 
+    route_parts: list[str] = []
+    route_counters = (
+        ("WSS", "wss_connections"),
+        ("TCP", "tcp_fallback_connections"),
+        ("CF", "cloudflare_connections"),
+        ("Worker", "cloudflare_worker_connections"),
+        ("внешний", "upstream_connections"),
+        ("мимо", "passthrough_connections"),
+        ("ошибки", "failed_connections"),
+    )
+    for label, attr in route_counters:
+        value = int(getattr(stats, attr, 0) or 0)
+        if value > 0:
+            route_parts.append(f"{label} {value}")
+    routes_str = f"  |  Пути: {', '.join(route_parts)}" if route_parts else ""
+
+    pool_parts: list[str] = []
+    pool_hits = int(getattr(stats, "pool_hits", 0) or 0)
+    pool_misses = int(getattr(stats, "pool_misses", 0) or 0)
+    if pool_hits > 0 or pool_misses > 0:
+        pool_parts.append(f"WSS {pool_hits}/{pool_misses}")
+    worker_pool_hits = int(getattr(stats, "cloudflare_worker_pool_hits", 0) or 0)
+    worker_pool_misses = int(getattr(stats, "cloudflare_worker_pool_misses", 0) or 0)
+    if worker_pool_hits > 0 or worker_pool_misses > 0:
+        pool_parts.append(f"Worker {worker_pool_hits}/{worker_pool_misses}")
+    pool_str = f"  |  Пул: {', '.join(pool_parts)}" if pool_parts else ""
+
     text = (
         f"Подключения: {getattr(stats, 'active_connections', 0)} акт. / "
         f"{getattr(stats, 'total_connections', 0)} всего  |  "
         f"↑ {_fmt_bytes(now_sent)} ({_fmt_speed(avg_sent, interval)})  "
         f"↓ {_fmt_bytes(now_recv)} ({_fmt_speed(avg_recv, interval)})  |  "
-        f"Uptime: {uptime_str}{recv_zero_str}"
+        f"Uptime: {uptime_str}{routes_str}{pool_str}{recv_zero_str}"
     )
 
     return TelegramProxyStatsPlan(
