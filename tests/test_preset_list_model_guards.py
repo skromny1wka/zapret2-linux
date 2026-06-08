@@ -18,6 +18,35 @@ class PresetListModelGuardTests(unittest.TestCase):
         ])
         self.assertFalse(model.rename_preset("Default.txt", "Default.txt", name="Default"))
 
+    def test_set_folder_collapsed_removes_only_visible_folder_rows(self) -> None:
+        model = PresetListModel()
+        model.set_rows(
+            [
+                {"kind": "folder", "folder_key": "common", "name": "Common", "is_collapsed": False, "count": 2},
+                {"kind": "preset", "file_name": "A.txt", "name": "A", "folder_key": "common"},
+                {"kind": "preset", "file_name": "B.txt", "name": "B", "folder_key": "common"},
+                {"kind": "folder", "folder_key": "games", "name": "Games", "is_collapsed": False, "count": 1},
+                {"kind": "preset", "file_name": "C.txt", "name": "C", "folder_key": "games"},
+            ]
+        )
+
+        self.assertTrue(model.set_folder_collapsed("common", True))
+
+        self.assertEqual(model.rowCount(), 3)
+        self.assertTrue(model.index(0, 0).data(PresetListModel.CollapsedRole))
+        self.assertEqual(model.index(1, 0).data(PresetListModel.FolderKeyRole), "games")
+        self.assertEqual(model.index(2, 0).data(PresetListModel.FileNameRole), "C.txt")
+
+    def test_set_folder_collapsed_does_not_expand_without_rows_plan(self) -> None:
+        model = PresetListModel()
+        model.set_rows(
+            [
+                {"kind": "folder", "folder_key": "common", "name": "Common", "is_collapsed": True, "count": 2},
+            ]
+        )
+
+        self.assertFalse(model.set_folder_collapsed("common", False))
+
 
 if __name__ == "__main__":
     unittest.main()

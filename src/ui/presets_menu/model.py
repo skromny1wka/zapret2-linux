@@ -221,6 +221,38 @@ class PresetListModel(QAbstractListModel):
         self.dataChanged.emit(model_index, model_index, sorted(changed_roles))
         return True
 
+    def set_folder_collapsed(self, folder_key: str, collapsed: bool) -> bool:
+        key = str(folder_key or "").strip()
+        folder_index = _row_index_for_folder(self._rows, key)
+        if folder_index < 0:
+            return False
+
+        next_collapsed = bool(collapsed)
+        folder_row = self._rows[folder_index]
+        if bool(folder_row.get("is_collapsed", False)) == next_collapsed:
+            return False
+        if not next_collapsed:
+            return False
+
+        remove_start = folder_index + 1
+        remove_end = remove_start
+        while remove_end < len(self._rows):
+            row = self._rows[remove_end]
+            if str(row.get("kind") or "") == "folder":
+                break
+            remove_end += 1
+
+        folder_row["is_collapsed"] = True
+        if remove_end > remove_start:
+            self.beginRemoveRows(QModelIndex(), remove_start, remove_end - 1)
+            del self._rows[remove_start:remove_end]
+            self._rebuild_row_index()
+            self.endRemoveRows()
+
+        model_index = self.index(folder_index, 0)
+        self.dataChanged.emit(model_index, model_index, [self.CollapsedRole])
+        return True
+
     def remove_preset(self, file_name: str) -> bool:
         preset_file_name = str(file_name or "").strip()
         row_index = self.find_preset_row(preset_file_name)
