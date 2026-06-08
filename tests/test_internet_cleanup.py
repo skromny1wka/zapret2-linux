@@ -60,6 +60,43 @@ class InternetCleanupTests(unittest.TestCase):
         self.assertEqual(dns_flush_calls, [True])
         self.assertTrue(statuses[0].startswith("Сброс TCP/IP"))
 
+    def test_run_internet_cleanup_decodes_command_error_bytes(self) -> None:
+        from windows_features.internet_cleanup import run_internet_cleanup
+
+        def command_runner(_args, **_kwargs):
+            return SimpleNamespace(
+                returncode=1,
+                stdout="требуется повышение прав\n".encode("utf-8"),
+                stderr=b"",
+            )
+
+        result = run_internet_cleanup(
+            command_runner=command_runner,
+            flush_dns_cache=lambda: True,
+            resolve_system_exe=lambda name: f"C:/Windows/System32/{name}",
+        )
+
+        self.assertEqual(result.level, "warning")
+        self.assertIn("требуется повышение прав", result.content)
+        self.assertNotIn("\\xd1", result.content)
+
+    def test_run_internet_cleanup_prefers_error_line_over_ok_line(self) -> None:
+        from windows_features.internet_cleanup import run_internet_cleanup
+
+        output = "Сброс глобальных параметров - OK!\nОтказано в доступе.\n"
+
+        def command_runner(_args, **_kwargs):
+            return SimpleNamespace(returncode=1, stdout=output.encode("cp866"), stderr=b"")
+
+        result = run_internet_cleanup(
+            command_runner=command_runner,
+            flush_dns_cache=lambda: True,
+            resolve_system_exe=lambda name: f"C:/Windows/System32/{name}",
+        )
+
+        self.assertIn("Отказано в доступе.", result.content)
+        self.assertNotIn("код 1, Сброс глобальных параметров - OK!", result.content)
+
     def test_internet_cleanup_confirmation_plan_warns_about_reboot(self) -> None:
         import presets.ui.control.control_runtime as control_runtime
 

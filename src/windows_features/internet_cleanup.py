@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -68,16 +69,70 @@ def _default_command_runner(args: Sequence[str], *, timeout: int):
         tuple(args),
         wait=True,
         capture_output=True,
+        text=False,
         timeout=timeout,
         shell=False,
     )
 
 
+_MOJIBAKE_MARKERS = (
+    "\ufffd",
+    "╨",
+    "╤",
+    "Ð",
+    "Ñ",
+    "Рџ",
+    "Р°",
+    "Р±",
+    "Рµ",
+    "Рѕ",
+    "С‚",
+    "СЂ",
+    "СЃ",
+)
+_CYRILLIC_RE = re.compile(r"[А-Яа-яЁё]")
+
+
+def _decode_command_output(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bytes):
+        candidates = [
+            value.decode(encoding, errors="replace")
+            for encoding in ("utf-8-sig", "cp866", "cp1251")
+        ]
+
+        def score(text: str) -> int:
+            cyrillic = len(_CYRILLIC_RE.findall(text))
+            mojibake = sum(text.count(marker) for marker in _MOJIBAKE_MARKERS)
+            replacement = text.count("\ufffd")
+            controls = sum(1 for char in text if ord(char) < 32 and char not in "\r\n\t")
+            return cyrillic * 3 - mojibake * 8 - replacement * 20 - controls * 5
+
+        return max(candidates, key=score)
+    return str(value)
+
+
+def _looks_like_success_line(line: str) -> bool:
+    normalized = line.strip().upper()
+    return normalized in {"OK", "OK."} or normalized.endswith(" OK!") or normalized.endswith("- OK!")
+
+
+def _first_relevant_error_line(text: str) -> str:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    for line in lines:
+        if not _looks_like_success_line(line):
+            return line
+    return lines[0] if lines else ""
+
+
 def _short_error_from_completed(completed: Any) -> str:
-    stderr = str(getattr(completed, "stderr", "") or "").strip()
-    stdout = str(getattr(completed, "stdout", "") or "").strip()
+    stderr = _decode_command_output(getattr(completed, "stderr", "")).strip()
+    stdout = _decode_command_output(getattr(completed, "stdout", "")).strip()
     text = stderr or stdout
-    first_line = text.splitlines()[0].strip() if text else ""
+    first_line = _first_relevant_error_line(text)
     if len(first_line) <= 180:
         return first_line
     return first_line[:177] + "..."
