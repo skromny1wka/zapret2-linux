@@ -428,6 +428,7 @@ class PresetSubpageUiGuardTests(unittest.TestCase):
         page._raw_save_runtime = _StartRuntime()
         page._raw_save_request_id = 0
         page._raw_save_succeeded = True
+        page._raw_editor_text_snapshot = "--new\n--filter-tcp=443\n"
         page._set_footer = Mock()
         page.editor = _PlainTextEditor("--new\n--filter-tcp=443\n")
         page.create_raw_preset_save_worker = Mock(return_value=worker)
@@ -445,7 +446,7 @@ class PresetSubpageUiGuardTests(unittest.TestCase):
 
         callbacks[0]()
 
-        self.assertEqual(page.editor.plain_text_read_calls, ["--new\n--filter-tcp=443\n"])
+        self.assertEqual(page.editor.plain_text_read_calls, [])
         page.create_raw_preset_save_worker.assert_called_once_with(
             1,
             file_name="Default.txt",
@@ -465,6 +466,44 @@ class PresetSubpageUiGuardTests(unittest.TestCase):
 
         self.assertEqual(text, "--new\n--filter-tcp=443\n")
         self.assertEqual(page.editor.plain_text_read_calls, [])
+
+    def test_raw_preset_save_after_text_change_uses_cached_snapshot(self) -> None:
+        from presets.ui.common.preset_subpage_base import PresetRawEditorPage
+
+        page = PresetRawEditorPage.__new__(PresetRawEditorPage)
+        page._cleanup_in_progress = False
+        page._is_loading = False
+        page._raw_editor_text_snapshot = "--new\nold\n"
+        page._raw_save_runtime = _StartRuntime()
+        page._raw_save_request_id = 0
+        page._raw_save_succeeded = True
+        page._set_footer = Mock()
+        page.editor = _PlainTextEditor("--new\nlatest\n")
+        page.create_raw_preset_save_worker = Mock(return_value=object())
+        page._raw_editor_inserted_text = Mock(return_value="--new\nlatest\n")
+
+        PresetRawEditorPage._on_raw_editor_contents_changed(
+            page,
+            0,
+            len("--new\nold\n"),
+            len("--new\nlatest\n"),
+        )
+        page.editor.plain_text_read_calls.clear()
+        PresetRawEditorPage._start_raw_preset_save_worker(
+            page,
+            file_name="Default.txt",
+            source_text=None,
+            publish_content_changed=True,
+        )
+
+        self.assertEqual(page.editor.plain_text_read_calls, [])
+        page.create_raw_preset_save_worker.assert_called_once_with(
+            1,
+            file_name="Default.txt",
+            source_text="--new\nlatest\n",
+            publish_content_changed=True,
+            parent=page,
+        )
 
     def test_status_message_update_skips_runtime_toggle_render(self) -> None:
         from app.state_store import AppUiState

@@ -60,14 +60,14 @@ class RawPresetEditorReadDeferTests(unittest.TestCase):
             publish_content_changed=True,
         )
 
-    def test_raw_preset_save_while_action_runs_defers_editor_read(self) -> None:
+    def test_raw_preset_save_while_action_runs_uses_cached_text_after_queue(self) -> None:
         from presets.ui.common.preset_subpage_base import PresetRawEditorPage
 
         page = PresetRawEditorPage.__new__(PresetRawEditorPage)
         page._cleanup_in_progress = False
         page._preset_path = "C:/Zapret/Dev/presets/winws2/Default.txt"
         page._preset_file_name = "Default.txt"
-        page._raw_editor_text_snapshot = None
+        page._raw_editor_text_snapshot = "--new\n--filter-tcp=443\n"
         page.editor = _RawTextEditor("--new\n--filter-tcp=443\n")
         page._raw_save_runtime = _Runtime(running=False)
         page._raw_activate_runtime = _Runtime(running=False)
@@ -103,7 +103,7 @@ class RawPresetEditorReadDeferTests(unittest.TestCase):
 
         self.assertTrue(PresetRawEditorPage._start_next_raw_preset_write_operation(page))
 
-        self.assertEqual(page.editor.read_calls, 1)
+        self.assertEqual(page.editor.read_calls, 0)
         page.create_raw_preset_save_worker.assert_called_once_with(
             1,
             file_name="Default.txt",

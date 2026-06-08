@@ -267,6 +267,7 @@ class PresetRawEditorPage(BasePage):
         self._active_preset_file_name = ""
         self._active_preset_name = ""
         self._raw_editor_text_snapshot: str | None = None
+        self._raw_editor_text_cache_update_suspended = False
         self._is_loading = False
         self._raw_load_runtime = OneShotWorkerRuntime()
         self._raw_load_request_id = 0
@@ -627,6 +628,7 @@ class PresetRawEditorPage(BasePage):
             description="Здесь можно читать и редактировать содержимое открытого пресета.",
         )
         apply_editor_smooth_scroll_preference(self.editor)
+        self.editor.document().contentsChange.connect(self._on_raw_editor_contents_changed)
         self.editor.textChanged.connect(self._on_text_changed)
         self.add_widget(self.editor, 1)
 
@@ -815,7 +817,11 @@ class PresetRawEditorPage(BasePage):
         value = str(text or "")
         if self.__dict__.get("_raw_editor_text_snapshot") == value:
             return
-        self.editor.setPlainText(value)
+        self._raw_editor_text_cache_update_suspended = True
+        try:
+            self.editor.setPlainText(value)
+        finally:
+            self._raw_editor_text_cache_update_suspended = False
         self._raw_editor_text_snapshot = value
 
     def _apply_raw_preset_active_state(self, file_name: str, name: str = "") -> None:
@@ -878,12 +884,37 @@ class PresetRawEditorPage(BasePage):
             return
         if self._is_loading:
             return
-        self._raw_editor_text_snapshot = None
         self._content_publish_pending = True
         self._save_timer.stop()
         self._commit_timer.stop()
         self._save_timer.start(900)
         self._set_footer("Изменения...")
+
+    def _on_raw_editor_contents_changed(self, position: int, chars_removed: int, chars_added: int) -> None:
+        if self._cleanup_in_progress or self._is_loading:
+            return
+        if bool(self.__dict__.get("_raw_editor_text_cache_update_suspended", False)):
+            return
+        current = str(self.__dict__.get("_raw_editor_text_snapshot") or "")
+        start = max(0, min(int(position or 0), len(current)))
+        removed = max(0, int(chars_removed or 0))
+        inserted = self._raw_editor_inserted_text(start, max(0, int(chars_added or 0)))
+        self._raw_editor_text_snapshot = f"{current[:start]}{inserted}{current[start + removed:]}"
+
+    def _raw_editor_inserted_text(self, position: int, chars_added: int) -> str:
+        if chars_added <= 0:
+            return ""
+        editor = self.__dict__.get("editor")
+        if editor is None:
+            return ""
+        try:
+            document = editor.document()
+            cursor = QTextCursor(document)
+            cursor.setPosition(max(0, int(position or 0)))
+            cursor.setPosition(max(0, int(position or 0)) + int(chars_added or 0), QTextCursor.MoveMode.KeepAnchor)
+            return str(cursor.selectedText() or "").replace("\u2029", "\n")
+        except Exception:
+            return ""
 
     def _save_file(self, *, publish_content_changed: bool = False) -> bool:
         if self._cleanup_in_progress:
@@ -939,9 +970,6 @@ class PresetRawEditorPage(BasePage):
         runtime = self._raw_worker_runtime("_raw_save_runtime")
         self._raw_save_request_id += 1
         request_id = self._raw_save_request_id
-        if source_text is None and self.__dict__.get("_raw_editor_text_snapshot") is None:
-            editor = self.__dict__.get("editor")
-            source_text = "" if editor is None else str(editor.toPlainText() or "")
         source_text = self._resolve_raw_preset_save_text(source_text)
         self._raw_save_succeeded = False
         self._set_footer("Сохранение...")

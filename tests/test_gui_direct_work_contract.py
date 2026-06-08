@@ -44,9 +44,7 @@ ALLOWED_PROCESS_EVENTS_FILES = {
     "ui/startup_ui_metrics.py",
 }
 
-ALLOWED_EDITOR_TEXT_READS = {
-    "presets/ui/common/preset_subpage_base.py:_start_raw_preset_save_worker:toPlainText()",
-}
+ALLOWED_EDITOR_TEXT_READS = set()
 
 FORBIDDEN_IMPORT_ROOTS = {
     "requests",
