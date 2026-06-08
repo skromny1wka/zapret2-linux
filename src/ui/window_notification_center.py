@@ -7,6 +7,7 @@ from PyQt6.QtCore import Q_ARG, QMetaObject, QObject, Qt, QTimer, pyqtSlot
 from app_notifications import advisory_notification, normalize_notification_payload, notification_action
 from log.log import global_logger, log
 from ui.accessibility import set_control_accessibility
+from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.window_notification_actions import WindowNotificationActionHandler, WindowNotificationRuntimeActions
 
@@ -38,11 +39,7 @@ class WindowNotificationCenter(QObject):
         self._is_window_visible = is_window_visible
         self._is_window_minimized = is_window_minimized
         self._external_open_url_runtime = OneShotWorkerRuntime()
-        self._external_open_url_pending: str | None = None
-        self._external_open_url_start_scheduled = False
         self._notification_action_runtime = OneShotWorkerRuntime()
-        self._notification_action_pending = None
-        self._notification_action_start_scheduled = False
         self._notification_action_context: dict[int, dict[str, object]] = {}
         self._startup_notification_queue: list[dict] = []
         self._startup_notification_timer = QTimer(self)
@@ -118,14 +115,10 @@ class WindowNotificationCenter(QObject):
         target = str(url or "").strip()
         if not target:
             return
-        if (
-            self._external_open_url_runtime.is_running()
-            or self.__dict__.get("_external_open_url_start_scheduled", False)
-        ):
-            self._external_open_url_pending = target
-            return
-        self._external_open_url_pending = None
-        self._start_external_open_url_worker(target)
+        self._external_open_url_state_obj().request_or_start(
+            target,
+            self._start_external_open_url_worker,
+        )
 
     def _start_external_open_url_worker(self, url: str) -> None:
         self._external_open_url_runtime.start_qthread_worker(
@@ -138,7 +131,7 @@ class WindowNotificationCenter(QObject):
     def _on_external_open_url_finished(self, request_id: int, result) -> None:
         if not self._external_open_url_runtime.is_current(request_id):
             return
-        if self.__dict__.get("_external_open_url_pending"):
+        if self._external_open_url_state_obj().has_pending():
             return
         if getattr(result, "ok", False):
             return
@@ -147,32 +140,37 @@ class WindowNotificationCenter(QObject):
     def _on_external_open_url_failed(self, request_id: int, error: str) -> None:
         if not self._external_open_url_runtime.is_current(request_id):
             return
-        if self.__dict__.get("_external_open_url_pending"):
+        if self._external_open_url_state_obj().has_pending():
             return
         self._notify_external_open_url_error(str(error or ""))
 
     def _on_external_open_url_worker_finished(self, _worker) -> None:
-        if not self._is_current_worker_finish(self.__dict__.get("_external_open_url_runtime"), _worker):
-            return
-        pending = self._external_open_url_pending
-        self._external_open_url_pending = None
-        if pending:
-            self._schedule_external_open_url_worker_start(pending)
+        self._external_open_url_state_obj().schedule_pending_after_finish(
+            _worker,
+            is_current_worker_finish=self._is_current_worker_finish,
+            single_shot=QTimer.singleShot,
+            run_scheduled=self._run_scheduled_external_open_url_worker_start,
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
 
     def _schedule_external_open_url_worker_start(self, url: str) -> None:
         target = str(url or "").strip()
         if not target:
             return
-        if self.__dict__.get("_external_open_url_start_scheduled", False):
-            self._external_open_url_pending = target
-            return
-        self._external_open_url_start_scheduled = True
-        QTimer.singleShot(0, lambda value=target: self._run_scheduled_external_open_url_worker_start(value))
+        self._external_open_url_state_obj().schedule_start(
+            QTimer.singleShot,
+            lambda value=target: self._run_scheduled_external_open_url_worker_start(value),
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+            pending_when_already_scheduled=target,
+        )
 
-    def _run_scheduled_external_open_url_worker_start(self, url: str) -> None:
-        self._external_open_url_start_scheduled = False
-        pending = str(self._external_open_url_pending or "").strip()
-        self._external_open_url_pending = None
+    def _run_scheduled_external_open_url_worker_start(self, url: str = "") -> None:
+        pending = str(
+            self._external_open_url_state_obj().take_pending_for_scheduled_start(
+                cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False)
+            )
+            or ""
+        ).strip()
         target = pending or str(url or "").strip()
         if target:
             self._start_external_open_url_worker(target)
@@ -247,14 +245,10 @@ class WindowNotificationCenter(QObject):
 
     def _request_notification_action(self, action_name: str, action_fn, *, bar=None, context=None) -> None:
         request = (str(action_name or "").strip(), action_fn, bar, dict(context or {}))
-        if (
-            self._notification_action_runtime.is_running()
-            or self.__dict__.get("_notification_action_start_scheduled", False)
-        ):
-            self._notification_action_pending = request
-            return
-        self._notification_action_pending = None
-        self._run_notification_action_worker(*request)
+        self._notification_action_state_obj().request_or_start(
+            request,
+            lambda value: self._run_notification_action_worker(*value),
+        )
 
     def _run_notification_action_worker(self, action_name: str, action_fn, bar, context: dict[str, object]) -> None:
         def _worker_factory(request_id: int):
@@ -298,7 +292,7 @@ class WindowNotificationCenter(QObject):
         context = self._notification_action_context.pop(int(request_id), {})
         if not self._notification_action_runtime.is_current(request_id):
             return
-        if self.__dict__.get("_notification_action_pending") is not None:
+        if self._notification_action_state_obj().has_pending():
             return
 
         action = str(action_name or context.get("action_name") or "")
@@ -338,7 +332,7 @@ class WindowNotificationCenter(QObject):
         context = self._notification_action_context.pop(int(request_id), {})
         if not self._notification_action_runtime.is_current(request_id):
             return
-        if self.__dict__.get("_notification_action_pending") is not None:
+        if self._notification_action_state_obj().has_pending():
             return
         action = str(action_name or context.get("action_name") or "")
         bar = context.get("bar")
@@ -374,29 +368,97 @@ class WindowNotificationCenter(QObject):
             self._finish_launch_conflict_action((False, error), context=context, bar=bar)
 
     def _on_notification_action_worker_finished(self, _worker) -> None:
-        if not self._is_current_worker_finish(self.__dict__.get("_notification_action_runtime"), _worker):
-            return
-        pending = self._notification_action_pending
-        self._notification_action_pending = None
-        if pending is not None:
-            self._schedule_notification_action_worker_start(pending)
+        self._notification_action_state_obj().schedule_pending_after_finish(
+            _worker,
+            is_current_worker_finish=self._is_current_worker_finish,
+            single_shot=QTimer.singleShot,
+            run_scheduled=self._run_scheduled_notification_action_worker_start,
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
 
     def _schedule_notification_action_worker_start(self, request) -> None:
         if request is None:
             return
-        if self.__dict__.get("_notification_action_start_scheduled", False):
-            self._notification_action_pending = request
-            return
-        self._notification_action_start_scheduled = True
-        QTimer.singleShot(0, lambda value=request: self._run_scheduled_notification_action_worker_start(value))
+        self._notification_action_state_obj().schedule_start(
+            QTimer.singleShot,
+            lambda value=request: self._run_scheduled_notification_action_worker_start(value),
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+            pending_when_already_scheduled=request,
+        )
 
-    def _run_scheduled_notification_action_worker_start(self, request) -> None:
-        self._notification_action_start_scheduled = False
-        pending = self._notification_action_pending
-        self._notification_action_pending = None
+    def _run_scheduled_notification_action_worker_start(self, request=None) -> None:
+        pending = self._notification_action_state_obj().take_pending_for_scheduled_start(
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False)
+        )
         next_request = pending if pending is not None else request
         if next_request is not None:
             self._run_notification_action_worker(*next_request)
+
+    def _external_open_url_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_external_open_url_state")
+        runtime = self.__dict__.get("_external_open_url_runtime")
+        if state is None:
+            pending = str(self.__dict__.pop("_external_open_url_pending", "") or "")
+            start_scheduled = bool(self.__dict__.pop("_external_open_url_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value="",
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_external_open_url_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _external_open_url_pending(self):
+        return self._external_open_url_state_obj().pending
+
+    @_external_open_url_pending.setter
+    def _external_open_url_pending(self, value) -> None:
+        self._external_open_url_state_obj().pending = str(value or "")
+
+    @property
+    def _external_open_url_start_scheduled(self) -> bool:
+        return bool(self._external_open_url_state_obj().start_scheduled)
+
+    @_external_open_url_start_scheduled.setter
+    def _external_open_url_start_scheduled(self, value: bool) -> None:
+        self._external_open_url_state_obj().start_scheduled = bool(value)
+
+    def _notification_action_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_notification_action_state")
+        runtime = self.__dict__.get("_notification_action_runtime")
+        if state is None:
+            pending = self.__dict__.pop("_notification_action_pending", None)
+            start_scheduled = bool(self.__dict__.pop("_notification_action_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=None,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_notification_action_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _notification_action_pending(self):
+        return self._notification_action_state_obj().pending
+
+    @_notification_action_pending.setter
+    def _notification_action_pending(self, value) -> None:
+        self._notification_action_state_obj().pending = value
+
+    @property
+    def _notification_action_start_scheduled(self) -> bool:
+        return bool(self._notification_action_state_obj().start_scheduled)
+
+    @_notification_action_start_scheduled.setter
+    def _notification_action_start_scheduled(self, value: bool) -> None:
+        self._notification_action_state_obj().start_scheduled = bool(value)
 
     def _is_current_worker_finish(self, runtime, worker) -> bool:
         if self.__dict__.get("_cleanup_in_progress", False):

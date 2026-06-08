@@ -35,6 +35,18 @@ class WindowNotificationActionsContractTests(unittest.TestCase):
         self.assertNotIn("self._external_actions", center_source)
         self.assertIn("features.external_actions", setup_source)
 
+    def test_notification_pending_state_uses_shared_latest_worker_state(self) -> None:
+        center_source = inspect.getsource(WindowNotificationCenter)
+        center_init_source = inspect.getsource(WindowNotificationCenter.__init__)
+
+        self.assertIn("LatestValueWorkerState", center_source)
+        self.assertIn("_external_open_url_state_obj", center_source)
+        self.assertIn("_notification_action_state_obj", center_source)
+        self.assertNotIn("self._external_open_url_pending: str | None = None", center_init_source)
+        self.assertNotIn("self._external_open_url_start_scheduled = False", center_init_source)
+        self.assertNotIn("self._notification_action_pending = None", center_init_source)
+        self.assertNotIn("self._notification_action_start_scheduled = False", center_init_source)
+
     def test_infobar_action_button_has_screen_reader_text(self) -> None:
         import qfluentwidgets
 
