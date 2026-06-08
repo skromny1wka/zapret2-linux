@@ -103,6 +103,21 @@ class LogsWorkerArchitectureTests(unittest.TestCase):
 
         page._request_open_logs_folder.assert_called_once_with()
 
+    def test_open_folder_state_uses_shared_latest_value_helper(self) -> None:
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        init_source = inspect.getsource(logs_page.LogsPage.__init__)
+        request_source = inspect.getsource(logs_page.LogsPage._request_open_logs_folder)
+        finished_source = inspect.getsource(logs_page.LogsPage._on_open_logs_folder_worker_finished)
+        cleanup_source = inspect.getsource(logs_page.LogsPage.cleanup)
+
+        self.assertTrue(hasattr(logs_page, "LatestValueWorkerState"))
+        self.assertIs(logs_page.LatestValueWorkerState, LatestValueWorkerState)
+        self.assertIn("_open_folder_state = LatestValueWorkerState", init_source)
+        self.assertIn("_open_folder_state_obj()", request_source)
+        self.assertIn("schedule_pending_after_finish", finished_source)
+        self.assertIn("_open_folder_state_obj().reset()", cleanup_source)
+
     def test_logs_overview_pending_cleanup_restarts_after_event_loop_turn(self) -> None:
         page = logs_page.LogsPage.__new__(logs_page.LogsPage)
         page._cleanup_in_progress = False

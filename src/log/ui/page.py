@@ -126,8 +126,7 @@ class LogsPage(BasePage):
         self._support_prepare_runtime = OneShotWorkerRuntime()
         self._support_prepare_state = LatestValueWorkerState(self._support_prepare_runtime, empty_value=False)
         self._open_folder_runtime = OneShotWorkerRuntime()
-        self._open_folder_pending = False
-        self._open_folder_start_scheduled = False
+        self._open_folder_state = LatestValueWorkerState(self._open_folder_runtime, empty_value=False)
 
         # Error panel height tuning (avoid large empty block when no errors).
         self._errors_text_min_height = 52
@@ -1151,10 +1150,11 @@ class LogsPage(BasePage):
         return self._logs.create_open_folder_worker(request_id, parent=self)
 
     def _request_open_logs_folder(self) -> None:
-        if self._open_folder_runtime.is_running() or self.__dict__.get("_open_folder_start_scheduled", False):
-            self._open_folder_pending = True
+        state = self._open_folder_state_obj()
+        if state.is_busy():
+            state.pending = True
             return
-        self._open_folder_pending = False
+        state.pending = False
         self._open_folder_runtime.start_qthread_worker(
             worker_factory=lambda request_id: self.create_open_folder_worker(request_id),
             on_failed=self._on_open_logs_folder_failed,
@@ -1164,30 +1164,69 @@ class LogsPage(BasePage):
     def _on_open_logs_folder_failed(self, request_id: int, error: str) -> None:
         if not self._open_folder_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
             return
-        if self.__dict__.get("_open_folder_pending", False):
+        if self._open_folder_state_obj().has_pending():
             return
         log(f"Ошибка открытия папки: {error}", "ERROR")
 
     def _on_open_logs_folder_worker_finished(self, _worker) -> None:
         if not self._is_current_worker_finish(self.__dict__.get("_open_folder_runtime"), _worker):
             return
-        if self._open_folder_pending and not self._cleanup_in_progress:
-            self._open_folder_pending = False
-            self._schedule_open_logs_folder_start()
+        self._open_folder_state_obj().schedule_pending_after_finish(
+            _worker,
+            is_current_worker_finish=self._is_current_worker_finish,
+            single_shot=QTimer.singleShot,
+            run_scheduled=self._run_scheduled_open_logs_folder_start,
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+            clear_pending_before_schedule=True,
+        )
 
     def _schedule_open_logs_folder_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        if self.__dict__.get("_open_folder_start_scheduled", False):
-            return
-        self._open_folder_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_open_logs_folder_start)
+        self._open_folder_state_obj().schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_open_logs_folder_start,
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
 
     def _run_scheduled_open_logs_folder_start(self) -> None:
-        self._open_folder_start_scheduled = False
+        self._open_folder_state_obj().start_scheduled = False
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         self._request_open_logs_folder()
+
+    def _open_folder_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_open_folder_state")
+        runtime = self.__dict__.get("_open_folder_runtime")
+        if state is None:
+            pending = bool(self.__dict__.pop("_open_folder_pending", False))
+            start_scheduled = bool(self.__dict__.pop("_open_folder_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=False,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_open_folder_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _open_folder_pending(self) -> bool:
+        return bool(self._open_folder_state_obj().pending)
+
+    @_open_folder_pending.setter
+    def _open_folder_pending(self, value: bool) -> None:
+        self._open_folder_state_obj().pending = bool(value)
+
+    @property
+    def _open_folder_start_scheduled(self) -> bool:
+        return bool(self._open_folder_state_obj().start_scheduled)
+
+    @_open_folder_start_scheduled.setter
+    def _open_folder_start_scheduled(self, value: bool) -> None:
+        self._open_folder_state_obj().start_scheduled = bool(value)
             
     def _update_stats(self):
         """Обновляет статистику"""
@@ -1277,8 +1316,7 @@ class LogsPage(BasePage):
         self._spin_timer.stop()
         self._stop_logs_overview_worker(blocking=False)
         self._stop_support_prepare_worker(blocking=False)
-        self._open_folder_pending = False
-        self._open_folder_start_scheduled = False
+        self._open_folder_state_obj().reset()
         self._open_folder_runtime.stop(
             blocking=False,
             log_fn=log,
