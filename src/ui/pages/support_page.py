@@ -8,6 +8,7 @@ from qfluentwidgets import InfoBar, PrimaryPushSettingCard, PushSettingCard, Set
 
 from app.ui_texts import tr as tr_catalog
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
+from ui.queued_worker_state import QueuedWorkerState
 from ui.pages.support_page_accessibility import apply_support_page_accessibility
 from ui.theme import get_theme_tokens, get_themed_qta_icon
 
@@ -27,8 +28,7 @@ class SupportPage(BasePage):
         )
         self._create_support_open_action_worker = create_open_action_worker
         self._support_open_runtime = OneShotWorkerRuntime()
-        self._support_open_pending: list[tuple[str, str, str]] = []
-        self._support_open_start_scheduled = False
+        self._support_open_state = QueuedWorkerState[tuple[str, str, str]](self._support_open_runtime)
 
         self._support_card = None
         self._support_group = None
@@ -202,16 +202,13 @@ class SupportPage(BasePage):
         error_default: str,
     ) -> None:
         request = (str(action_name or "").strip(), str(error_key), str(error_default))
-        if self._support_open_runtime.is_running() or self.__dict__.get("_support_open_start_scheduled", False):
+        if self._support_open_state_obj().is_busy():
             self._queue_support_open_action(request)
             return
         self._start_support_open_action_worker(*request)
 
     def _queue_support_open_action(self, request) -> None:
-        pending = self.__dict__.setdefault("_support_open_pending", [])
-        if request in pending:
-            return
-        pending.append(request)
+        self._support_open_state_obj().append_unique(request, key=lambda item: item)
 
     def _start_support_open_action_worker(
         self,
@@ -253,7 +250,7 @@ class SupportPage(BasePage):
     ) -> None:
         if not self._support_open_runtime.is_current(request_id):
             return
-        if self.__dict__.get("_support_open_pending"):
+        if self._support_open_state_obj().has_pending():
             return
         if result.ok:
             return
@@ -270,28 +267,32 @@ class SupportPage(BasePage):
     ) -> None:
         if not self._support_open_runtime.is_current(request_id):
             return
-        if self.__dict__.get("_support_open_pending"):
+        if self._support_open_state_obj().has_pending():
             return
         self._show_support_open_error(error_key, error_default, str(error))
 
     def _on_support_open_action_worker_finished(self, _worker) -> None:
-        if not self._is_current_worker_finish(self.__dict__.get("_support_open_runtime"), _worker):
-            return
-        pending_actions = self.__dict__.setdefault("_support_open_pending", [])
-        pending = pending_actions.pop(0) if pending_actions else None
-        if pending is not None:
-            self._schedule_support_open_action_worker_start(pending)
+        self._support_open_state_obj().schedule_next_after_finish(
+            _worker,
+            is_current_worker_finish=self._is_current_worker_finish,
+            single_shot=QTimer.singleShot,
+            start=lambda request: self._run_scheduled_support_open_action_worker_start(request),
+            queue_item=self._queue_support_open_action,
+            is_cleanup_in_progress=lambda: self.__dict__.get("_cleanup_in_progress", False),
+        )
 
     def _schedule_support_open_action_worker_start(self, request) -> None:
-        if self.__dict__.get("_support_open_start_scheduled", False):
-            self._queue_support_open_action(request)
-            return
-        self._support_open_start_scheduled = True
-        QTimer.singleShot(0, lambda value=request: self._run_scheduled_support_open_action_worker_start(value))
+        self._support_open_state_obj().schedule_start(
+            request,
+            QTimer.singleShot,
+            lambda value: self._run_scheduled_support_open_action_worker_start(value),
+            queue_item=self._queue_support_open_action,
+            is_cleanup_in_progress=lambda: self.__dict__.get("_cleanup_in_progress", False),
+        )
 
     def _run_scheduled_support_open_action_worker_start(self, request) -> None:
-        self._support_open_start_scheduled = False
-        if request is not None:
+        self._support_open_state_obj().start_scheduled = False
+        if request is not None and not self.__dict__.get("_cleanup_in_progress", False):
             self._start_support_open_action_worker(*request)
 
     def _show_support_open_error(self, error_key: str, error_default: str, error: str) -> None:
@@ -316,9 +317,40 @@ class SupportPage(BasePage):
         except (TypeError, ValueError):
             return False
 
+    def _support_open_state_obj(self) -> QueuedWorkerState[tuple[str, str, str]]:
+        state = self.__dict__.get("_support_open_state")
+        runtime = self.__dict__.get("_support_open_runtime")
+        if state is None:
+            pending = self.__dict__.pop("_support_open_pending", None)
+            start_scheduled = bool(self.__dict__.pop("_support_open_start_scheduled", False))
+            state = QueuedWorkerState(
+                runtime,
+                pending=list(pending or []),
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_support_open_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _support_open_pending(self):
+        return self._support_open_state_obj().pending
+
+    @_support_open_pending.setter
+    def _support_open_pending(self, value) -> None:
+        self._support_open_state_obj().pending = list(value or [])
+
+    @property
+    def _support_open_start_scheduled(self) -> bool:
+        return bool(self._support_open_state_obj().start_scheduled)
+
+    @_support_open_start_scheduled.setter
+    def _support_open_start_scheduled(self, value: bool) -> None:
+        self._support_open_state_obj().start_scheduled = bool(value)
+
     def cleanup(self) -> None:
         self._cleanup_in_progress = True
-        self.__dict__.setdefault("_support_open_pending", []).clear()
-        self._support_open_start_scheduled = False
+        self._support_open_state_obj().reset()
         self._support_open_runtime.stop(blocking=False, warning_prefix="Support open action worker")
         self._support_open_runtime.cancel()
