@@ -113,6 +113,13 @@ class ProfileListModel(QAbstractListModel):
         self._set_rows(next_rows)
         self.endResetModel()
 
+    def view_state_options(self) -> dict[str, Any]:
+        return {
+            "active_profile_types": set(self._active_profile_types or {"all"}),
+            "search_query": str(self._search_query or ""),
+            "group_expanded": dict(self._group_expanded or {}),
+        }
+
     def update_profiles(
         self,
         items: tuple[Any, ...],

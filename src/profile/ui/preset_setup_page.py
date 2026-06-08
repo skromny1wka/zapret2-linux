@@ -322,6 +322,7 @@ class PresetSetupPageBase(BasePage):
         request_id = self._profile_load_request_id
         if self.__dict__.get("_profiles_list") is None:
             self._clear_dynamic_widgets()
+        view_state_options = self._profile_list_view_state_options()
 
         def _bind_worker(worker) -> None:
             worker.loaded.connect(self._on_profile_payload_loaded)
@@ -332,11 +333,26 @@ class PresetSetupPageBase(BasePage):
                 request_id,
                 self.launch_method,
                 self,
+                view_state_options=view_state_options,
             ),
             bind_worker=_bind_worker,
             on_finished=self._on_profile_worker_finished,
         )
         self._profile_load_runtime_worker = worker
+
+    def _profile_list_view_state_options(self) -> dict[str, object]:
+        profiles_list = self.__dict__.get("_profiles_list")
+        getter = getattr(profiles_list, "view_state_options", None)
+        if callable(getter):
+            try:
+                return dict(getter() or {})
+            except Exception:
+                pass
+        return {
+            "active_profile_types": {"all"},
+            "search_query": str(self.__dict__.get("_profile_search_query", "") or ""),
+            "group_expanded": {},
+        }
 
     def _on_profile_payload_loaded(self, request_id: int, payload) -> None:
         if request_id != self._profile_load_request_id or self._cleanup_in_progress:
@@ -960,8 +976,20 @@ class PresetSetupPageBase(BasePage):
             parent=parent,
         )
 
-    def _create_profile_list_load_worker(self, request_id: int, launch_method: str, parent=None):
-        return self._create_profile_list_load_worker_fn(request_id, launch_method, parent)
+    def _create_profile_list_load_worker(
+        self,
+        request_id: int,
+        launch_method: str,
+        parent=None,
+        *,
+        view_state_options: dict[str, object] | None = None,
+    ):
+        return self._create_profile_list_load_worker_fn(
+            request_id,
+            launch_method,
+            parent,
+            view_state_options=view_state_options,
+        )
 
     def _sync_profile_list_locally(self) -> None:
         self._profile_payload_dirty = True

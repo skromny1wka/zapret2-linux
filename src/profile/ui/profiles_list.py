@@ -89,7 +89,19 @@ class ProfilesList(QWidget):
         )
 
     def apply_view_state(self, view_state) -> None:
+        self._active_profile_types = set(getattr(view_state, "active_profile_types", None) or {"all"})
+        self._search_query = str(getattr(view_state, "search_query", "") or "")
+        try:
+            self._profile_type_selector.set_active_profile_types(self._active_profile_types)
+        except Exception:
+            pass
         self._model.apply_view_state(view_state)
+
+    def view_state_options(self) -> dict[str, Any]:
+        options = self._model.view_state_options()
+        options["active_profile_types"] = set(self._active_profile_types or {"all"})
+        options["search_query"] = str(self._search_query or "")
+        return options
 
     def update_profiles(self, items: tuple[Any, ...]) -> bool:
         return self._model.update_profiles(

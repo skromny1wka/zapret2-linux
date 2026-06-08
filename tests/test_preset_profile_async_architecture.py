@@ -1819,6 +1819,11 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         helper_source = inspect.getsource(ProfileFeature._profile_list_load_result)
 
         self.assertIn("_profile_list_load_result", source)
+        self.assertIn("view_state_options", source)
+        self.assertIn("active_profile_types", source)
+        self.assertIn("search_query", source)
+        self.assertIn("group_expanded", source)
+        self.assertIn("build_profile_list_view_state", source)
         self.assertIn("service.get_cached_profile_list", helper_source)
         self.assertLess(source.index("_profile_list_load_result"), source.index("service.list_profiles"))
 

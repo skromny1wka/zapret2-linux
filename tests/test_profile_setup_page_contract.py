@@ -614,6 +614,21 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         profiles_list._model.set_active_profile_types.assert_not_called()
 
+    def test_profile_list_apply_view_state_syncs_widget_filters(self) -> None:
+        profiles_list = ProfilesList.__new__(ProfilesList)
+        profiles_list._active_profile_types = {"all"}
+        profiles_list._search_query = ""
+        profiles_list._profile_type_selector = SimpleNamespace(set_active_profile_types=Mock())
+        profiles_list._model = SimpleNamespace(apply_view_state=Mock())
+        state = SimpleNamespace(active_profile_types={"tcp"}, search_query="youtube")
+
+        ProfilesList.apply_view_state(profiles_list, state)
+
+        self.assertEqual(profiles_list._active_profile_types, {"tcp"})
+        self.assertEqual(profiles_list._search_query, "youtube")
+        profiles_list._profile_type_selector.set_active_profile_types.assert_called_once_with({"tcp"})
+        profiles_list._model.apply_view_state.assert_called_once_with(state)
+
     def test_profile_list_reserves_space_for_visible_fluent_scrollbar(self) -> None:
         list_source = inspect.getsource(ProfilesList._build_ui)
 
@@ -2903,6 +2918,49 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertTrue(page._profile_payload_dirty)
         self.assertTrue(page._profile_load_refresh_pending)
         page._create_profile_list_load_worker.assert_not_called()
+
+    def test_profile_payload_worker_receives_current_view_state_options(self) -> None:
+        class _Runtime:
+            def is_running(self) -> bool:
+                return False
+
+            def start_qthread_worker(self, *, worker_factory, bind_worker, on_finished):
+                worker = worker_factory(1)
+                return 1, worker
+
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._cleanup_in_progress = False
+        page._profile_payload_loaded_once = False
+        page._profile_payload_dirty = False
+        page._profile_load_refresh_pending = False
+        page._profile_load_request_id = 41
+        page._profile_load_runtime = _Runtime()
+        page._profile_search_query = "youtube"
+        page.launch_method = "zapret2"
+        page._profiles_list = SimpleNamespace(
+            view_state_options=Mock(
+                return_value={
+                    "active_profile_types": {"tcp"},
+                    "search_query": "youtube",
+                    "group_expanded": {"video": False},
+                }
+            )
+        )
+        page._create_profile_list_load_worker = Mock(return_value=SimpleNamespace())
+
+        PresetSetupPageBase._request_profiles_payload(page, force=True)
+
+        page._profiles_list.view_state_options.assert_called_once()
+        page._create_profile_list_load_worker.assert_called_once_with(
+            42,
+            "zapret2",
+            page,
+            view_state_options={
+                "active_profile_types": {"tcp"},
+                "search_query": "youtube",
+                "group_expanded": {"video": False},
+            },
+        )
 
     def test_pending_running_profile_refresh_does_not_schedule_extra_timer(self) -> None:
         runtime = SimpleNamespace(is_running=Mock(return_value=True))

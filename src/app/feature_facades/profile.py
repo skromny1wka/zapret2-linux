@@ -733,21 +733,40 @@ class ProfileFeature:
             parent=parent,
         )
 
-    def create_profile_list_load_worker(self, request_id: int, launch_method: str, parent=None):
+    def create_profile_list_load_worker(
+        self,
+        request_id: int,
+        launch_method: str,
+        parent=None,
+        *,
+        view_state_options: dict[str, Any] | None = None,
+    ):
         from profile.profile_list_loader import ProfileListLoadResult, ProfileListLoadWorker
         from profile.list_view_state import build_profile_list_view_state
 
         service = self._commands()._profile_preset_service(self, launch_method)
+        options = dict(view_state_options or {})
+        active_profile_types = options.get("active_profile_types")
+        search_query = str(options.get("search_query") or "")
+        group_expanded = options.get("group_expanded")
+
+        def _build_profile_list_result(payload):
+            return ProfileListLoadResult(
+                payload=payload,
+                view_state=build_profile_list_view_state(
+                    tuple(getattr(payload, "items", ()) or ()),
+                    active_profile_types=active_profile_types if isinstance(active_profile_types, set) else None,
+                    search_query=search_query,
+                    group_expanded=group_expanded if isinstance(group_expanded, dict) else None,
+                ),
+            )
 
         def _load_profile_list_result():
             warmed = self._profile_list_load_result(service, launch_method)
             if warmed is not None:
-                return warmed
+                return _build_profile_list_result(getattr(warmed, "payload", None))
             payload = service.list_profiles()
-            return ProfileListLoadResult(
-                payload=payload,
-                view_state=build_profile_list_view_state(tuple(getattr(payload, "items", ()) or ())),
-            )
+            return _build_profile_list_result(payload)
 
         return ProfileListLoadWorker(request_id, _load_profile_list_result, None, parent)
 
