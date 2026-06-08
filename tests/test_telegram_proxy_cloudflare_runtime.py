@@ -326,6 +326,68 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
         self.assertEqual(connect.call_count, 0)
         self.assertEqual(proxy.stats.cloudflare_worker_connections, 1)
 
+    def test_proxy_start_prewarms_worker_pool_for_fallback_media_targets(self) -> None:
+        from telegram_proxy.proxy.cloudflare import CloudflareFallbackConfig
+        from telegram_proxy.wss_proxy import TelegramWSProxy
+
+        warmup_calls: list[tuple[tuple[str, ...], tuple[tuple[int, str], ...]]] = []
+
+        class _WsPool:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def warmup(self):
+                return None
+
+            async def close_all(self):
+                return None
+
+        class _WorkerPool:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def warmup(self, worker_domains, fallback_targets):
+                warmup_calls.append((tuple(worker_domains), tuple(fallback_targets)))
+
+            async def close_all(self):
+                return None
+
+        async def run_proxy_once():
+            proxy = TelegramWSProxy(
+                port=0,
+                cloudflare_config=CloudflareFallbackConfig(
+                    worker_enabled=True,
+                    worker_domains=("worker.example.dev",),
+                ),
+            )
+            await proxy.start()
+            await asyncio.sleep(0)
+            await proxy.stop()
+
+        with (
+            patch("telegram_proxy.wss_proxy._WsPool", _WsPool),
+            patch("telegram_proxy.wss_proxy.CloudflareWorkerPool", _WorkerPool),
+        ):
+            asyncio.run(run_proxy_once())
+
+        self.assertEqual(
+            warmup_calls,
+            [
+                (
+                    ("worker.example.dev",),
+                    (
+                        (1, "149.154.175.50"),
+                        (1, "149.154.175.52"),
+                        (3, "149.154.175.100"),
+                        (3, "149.154.175.102"),
+                        (5, "91.108.56.100"),
+                        (5, "91.108.56.102"),
+                        (203, "91.105.192.100"),
+                    ),
+                )
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

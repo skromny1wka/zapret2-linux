@@ -190,6 +190,13 @@ class TelegramWSProxy:
 
         # Pre-fill WebSocket connection pool (non-blocking)
         asyncio.create_task(self._ws_pool.warmup())
+        if self._cloudflare.worker_enabled and self._cloudflare.worker_domains:
+            asyncio.create_task(
+                self._cloudflare_worker_pool.warmup(
+                    self._cloudflare.worker_domains,
+                    self._cloudflare_worker_warmup_targets(),
+                )
+            )
 
     async def stop(self) -> None:
         """Graceful shutdown."""
@@ -218,6 +225,25 @@ class TelegramWSProxy:
         self._log("Proxy stopped")
 
     # ---- Connection handlers ----
+
+    def _cloudflare_worker_warmup_targets(self) -> list[tuple[int, str]]:
+        targets: list[tuple[int, str]] = []
+        seen: set[tuple[int, str]] = set()
+        for dc in (1, 2, 3, 4, 5, 203):
+            if dc in WSS_DOMAINS:
+                continue
+            for is_media in (False, True):
+                host, _port = dc_to_tcp_endpoint(
+                    dc,
+                    self._dc_endpoint_overrides,
+                    is_media=is_media,
+                )
+                key = (dc, host)
+                if key in seen:
+                    continue
+                seen.add(key)
+                targets.append(key)
+        return targets
 
     async def _handle_socks5_client(
         self,

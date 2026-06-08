@@ -258,6 +258,28 @@ class CloudflareWorkerPool:
         except Exception:
             pass
 
+    async def warmup(
+        self,
+        worker_domains: tuple[str, ...],
+        fallback_targets: list[tuple[int, str]],
+    ) -> None:
+        scheduled: set[tuple[int, str, str]] = set()
+        for worker_domain in worker_domains:
+            worker = str(worker_domain or "").strip()
+            if not worker:
+                continue
+            for dc, fallback_dst in fallback_targets:
+                target = str(fallback_dst or "").strip()
+                if not target:
+                    continue
+                key = (int(dc), worker, target)
+                if key in scheduled:
+                    continue
+                scheduled.add(key)
+                self._schedule_refill(key)
+        if scheduled:
+            log.info("Cloudflare Worker pool warmup started for %d target(s)", len(scheduled))
+
     async def close_all(self) -> None:
         for bucket in self._idle.values():
             for ws, _created in bucket:
