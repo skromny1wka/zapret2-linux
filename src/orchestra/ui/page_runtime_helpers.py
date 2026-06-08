@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import QListWidgetItem
 
 import orchestra.page_runtime as orchestra_page_runtime
 from orchestra.orchestra_runner import MAX_ORCHESTRA_LOGS
+from ui.accessibility import set_item_accessible_text
 from ui.fluent_widgets import set_tooltip
 
 
@@ -211,6 +212,7 @@ def update_log_history_view(*, logs, tr_fn, log_history_list) -> None:
     for entry in plan.entries:
         item = QListWidgetItem(entry.text)
         item.setData(Qt.ItemDataRole.UserRole, entry.log_id)
+        set_item_accessible_text(item, _log_history_accessible_text(entry))
 
         if entry.is_current:
             item.setForeground(Qt.GlobalColor.green)
@@ -218,3 +220,19 @@ def update_log_history_view(*, logs, tr_fn, log_history_list) -> None:
             item.setForeground(Qt.GlobalColor.gray)
 
         log_history_list.addItem(item)
+
+
+def _log_history_accessible_text(entry) -> str:
+    text = " ".join(str(getattr(entry, "text", "") or "").replace("▶", "").split())
+    if bool(getattr(entry, "is_placeholder", False)):
+        return f"История логов Оркестратора: {text}"
+
+    created, separator, size_text = text.partition("|")
+    parts = [f"Лог Оркестратора: {created.strip()}"]
+    if separator:
+        size_text = size_text.replace("(текущий)", "").strip()
+        if size_text:
+            parts.append(f"размер {size_text}")
+    if bool(getattr(entry, "is_current", False)):
+        parts.append("текущий")
+    return ", ".join(part for part in parts if part)

@@ -3,7 +3,9 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QListWidget
 
 from orchestra.ui.blocked_page import BlockedDomainRow, OrchestraBlockedPage
 from orchestra.ui.locked_page import LockedDomainRow, OrchestraLockedPage
@@ -78,6 +80,47 @@ class OrchestraAccessibilityTests(unittest.TestCase):
         self.assertEqual(page.stats_label.accessibleName(), "Статистика рейтингов: Загрузка...")
         self.assertEqual(page.history_text.accessibleName(), "История рейтингов стратегий")
         self.assertIn("результаты обучения", page.history_text.accessibleDescription())
+
+    def test_log_history_items_expose_screen_reader_text(self) -> None:
+        from orchestra.ui.page_runtime_helpers import update_log_history_view
+
+        widget = QListWidget()
+        self.addCleanup(widget.deleteLater)
+
+        update_log_history_view(
+            logs=[
+                {
+                    "id": "log-1",
+                    "created": "2026-06-08 12:30",
+                    "size_str": "14 KB",
+                    "is_current": True,
+                }
+            ],
+            tr_fn=lambda _key, default, **_kwargs: default,
+            log_history_list=widget,
+        )
+
+        self.assertEqual(
+            widget.item(0).data(Qt.ItemDataRole.AccessibleTextRole),
+            "Лог Оркестратора: 2026-06-08 12:30, размер 14 KB, текущий",
+        )
+
+    def test_empty_log_history_item_exposes_screen_reader_text(self) -> None:
+        from orchestra.ui.page_runtime_helpers import update_log_history_view
+
+        widget = QListWidget()
+        self.addCleanup(widget.deleteLater)
+
+        update_log_history_view(
+            logs=[],
+            tr_fn=lambda _key, default, **_kwargs: default,
+            log_history_list=widget,
+        )
+
+        self.assertEqual(
+            widget.item(0).data(Qt.ItemDataRole.AccessibleTextRole),
+            "История логов Оркестратора: Нет сохранённых логов",
+        )
 
     def test_row_controls_include_domain_protocol_and_strategy(self) -> None:
         locked_row = LockedDomainRow("example.com", 3, "tcp")
