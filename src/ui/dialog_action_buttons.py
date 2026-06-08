@@ -3,6 +3,7 @@ from __future__ import annotations
 from PyQt6.QtGui import QIcon
 
 from qfluentwidgets import PushButton, TransparentPushButton
+from ui.accessibility import set_control_accessibility
 from ui.theme import get_themed_qta_icon
 
 
@@ -44,6 +45,11 @@ def create_dialog_action_button(
     button.setText(text)
     button.setMinimumHeight(36)
     _configure_button_icon(button, icon_name, icon_color)
+    set_control_accessibility(
+        button,
+        name=text,
+        description=f"Выполняет действие диалога: {text}.",
+    )
 
     if danger:
         try:
@@ -66,4 +72,9 @@ def create_dialog_cancel_button(
     button = TransparentPushButton(parent)
     button.setText(text)
     _configure_button_icon(button, icon_name, icon_color)
+    set_control_accessibility(
+        button,
+        name=text,
+        description="Закрывает диалог без выполнения действия.",
+    )
     return button
