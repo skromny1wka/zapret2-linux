@@ -388,6 +388,18 @@ def apply_window_background(window, theme_name: str | None = None, preset: str |
                 pass
             return
 
+        if preset == "standard" and sys.platform == 'win32' and not _is_win11_plus and mica_enabled:
+            try:
+                from settings.appearance import peek_warmed_window_opacity
+                opacity_pct = peek_warmed_window_opacity()
+                if opacity_pct is None:
+                    opacity_pct = 100
+            except Exception:
+                opacity_pct = 100
+
+            apply_aero_effect(window, opacity_pct)
+            return
+
         if preset == "standard":
             # Solid fallback for the default static UI. No DWM blur, no acrylic,
             # no transparent Qt surface.
