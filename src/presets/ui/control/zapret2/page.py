@@ -249,8 +249,9 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
 
     def _request_top_summary_worker(self) -> None:
         runtime = self._refresh_runtime
-        if runtime.top_summary_runtime.is_running() or bool(getattr(runtime, "top_summary_start_scheduled", False)):
-            runtime.top_summary_pending = True
+        state = runtime.top_summary_state
+        if state.is_busy():
+            state.pending = True
             return
 
         request_id = runtime.next_top_summary_request_id()
@@ -268,7 +269,7 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         runtime = self._refresh_runtime
         if request_id != runtime.top_summary_request_id or self._cleanup_in_progress:
             return
-        if bool(getattr(runtime, "top_summary_pending", False)):
+        if runtime.top_summary_state.has_pending():
             return
         summary = self.top_summary
         if summary is None:
@@ -298,34 +299,39 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
 
     def _on_top_summary_worker_finished(self, worker) -> None:
         runtime = self._refresh_runtime
-        current_worker = getattr(runtime.top_summary_runtime, "worker", None)
-        if current_worker is not None and worker is not current_worker:
-            return
-        if runtime.top_summary_pending and not self._cleanup_in_progress:
-            self._schedule_top_summary_worker_start()
+        runtime.top_summary_state.schedule_pending_after_finish(
+            worker,
+            is_current_worker_finish=lambda _runtime, current_worker: runtime.accept_worker_finish(
+                current_worker,
+                "top_summary_request_id",
+            ),
+            single_shot=QTimer.singleShot,
+            run_scheduled=self._run_scheduled_top_summary_worker_start,
+            cleanup_in_progress=bool(self._cleanup_in_progress),
+        )
 
     def _schedule_top_summary_worker_start(self) -> None:
         runtime = self._refresh_runtime
         if self._cleanup_in_progress:
             return
-        if runtime.top_summary_runtime.is_running():
-            runtime.top_summary_pending = True
-            return
-        if bool(getattr(runtime, "top_summary_start_scheduled", False)):
-            runtime.top_summary_pending = True
-            return
-        runtime.top_summary_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_top_summary_worker_start)
+        runtime.top_summary_state.pending = True
+        runtime.top_summary_state.schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_top_summary_worker_start,
+            cleanup_in_progress=bool(self._cleanup_in_progress),
+            pending_when_already_scheduled=True,
+        )
 
     def _run_scheduled_top_summary_worker_start(self) -> None:
         runtime = self._refresh_runtime
-        runtime.top_summary_start_scheduled = False
-        if self._cleanup_in_progress:
+        pending = runtime.top_summary_state.take_pending_for_scheduled_start(
+            cleanup_in_progress=bool(self._cleanup_in_progress)
+        )
+        if not pending:
             return
         if runtime.top_summary_runtime.is_running():
-            runtime.top_summary_pending = True
+            runtime.top_summary_state.pending = True
             return
-        runtime.top_summary_pending = False
         self._request_top_summary_worker()
 
     def _refresh_top_summary(self, state: AppUiState | None = None) -> None:

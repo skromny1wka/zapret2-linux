@@ -1,15 +1,25 @@
 from __future__ import annotations
 
+import inspect
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from presets.ui.control.additional_settings_runtime import create_refresh_runtime
+from presets.ui.control.additional_settings_runtime import ModeControlRefreshRuntime, create_refresh_runtime
 from presets.ui.control.zapret1.page import Zapret1ModeControlPage
 from presets.ui.control.zapret2.page import Zapret2ModeControlPage
 
 
 class ControlTopSummaryWorkerQueueTests(unittest.TestCase):
+    def test_top_summary_queue_uses_shared_latest_worker_state(self) -> None:
+        runtime_source = inspect.getsource(ModeControlRefreshRuntime)
+        init_source = inspect.getsource(ModeControlRefreshRuntime.__init__)
+
+        self.assertIn("LatestValueWorkerState", runtime_source)
+        self.assertIn("top_summary_state", runtime_source)
+        self.assertNotIn("self.top_summary_pending = False", init_source)
+        self.assertNotIn("self.top_summary_start_scheduled = False", init_source)
+
     def test_pending_top_summary_replay_is_scheduled_after_worker_finish(self) -> None:
         for page_cls in (Zapret1ModeControlPage, Zapret2ModeControlPage):
             with self.subTest(page=page_cls.__name__):

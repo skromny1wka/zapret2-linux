@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 
 
@@ -16,8 +17,7 @@ class ModeControlRefreshRuntime:
         self.additional_settings_save_request_id = 0
         self.additional_settings_dirty = True
         self.top_summary_runtime = OneShotWorkerRuntime()
-        self.top_summary_pending = False
-        self.top_summary_start_scheduled = False
+        self.top_summary_state = LatestValueWorkerState(self.top_summary_runtime, empty_value=False)
         self.top_summary_reload_after_preset_switch_scheduled = False
         self.top_summary_request_id = 0
         self.program_settings_load_runtime = OneShotWorkerRuntime()
@@ -81,6 +81,22 @@ class ModeControlRefreshRuntime:
     def next_top_summary_request_id(self) -> int:
         self.top_summary_request_id += 1
         return self.top_summary_request_id
+
+    @property
+    def top_summary_pending(self) -> bool:
+        return bool(self.top_summary_state.pending)
+
+    @top_summary_pending.setter
+    def top_summary_pending(self, value: bool) -> None:
+        self.top_summary_state.pending = bool(value)
+
+    @property
+    def top_summary_start_scheduled(self) -> bool:
+        return bool(self.top_summary_state.start_scheduled)
+
+    @top_summary_start_scheduled.setter
+    def top_summary_start_scheduled(self, value: bool) -> None:
+        self.top_summary_state.start_scheduled = bool(value)
 
     def accept_additional_settings_result(self, request_id: int) -> bool:
         if int(request_id) != int(self.additional_settings_request_id):
