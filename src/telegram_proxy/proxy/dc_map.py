@@ -78,6 +78,15 @@ TCP_ENDPOINTS = {
     203: ("91.105.192.100", 443),
 }
 
+TCP_MEDIA_ENDPOINTS = {
+    1: ("149.154.175.52", 443),
+    2: ("149.154.167.151", 443),
+    3: ("149.154.175.102", 443),
+    4: ("149.154.164.250", 443),
+    5: ("91.108.56.102", 443),
+    203: ("91.105.192.100", 443),
+}
+
 # Telegram CIDR ranges -> DC mapping
 # Source: https://core.telegram.org/resources/cidr.txt + known DC assignments
 _SUBNET_TO_DC: list[tuple[IPv4Network, int]] = [
@@ -292,11 +301,18 @@ def parse_dc_endpoint_overrides(value: object) -> dict[int, str]:
     return overrides
 
 
-def dc_to_tcp_endpoint(dc: int, overrides: dict[int, str] | None = None) -> tuple[str, int]:
+def dc_to_tcp_endpoint(
+    dc: int,
+    overrides: dict[int, str] | None = None,
+    *,
+    is_media: bool = False,
+) -> tuple[str, int]:
     """Get direct TCP endpoint for a datacenter (fallback)."""
     override_ip = (overrides or {}).get(int(dc))
     if override_ip:
         return override_ip, 443
+    if is_media:
+        return TCP_MEDIA_ENDPOINTS.get(dc, TCP_MEDIA_ENDPOINTS[2])
     return TCP_ENDPOINTS.get(dc, TCP_ENDPOINTS[2])
 
 

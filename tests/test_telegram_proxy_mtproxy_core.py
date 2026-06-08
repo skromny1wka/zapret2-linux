@@ -451,8 +451,11 @@ class TelegramProxyMTProxyCoreTests(unittest.TestCase):
 
         self.assertEqual(overrides, {4: "149.154.167.220"})
         self.assertEqual(dc_to_tcp_endpoint(4, overrides), ("149.154.167.220", 443))
+        self.assertEqual(dc_to_tcp_endpoint(2, is_media=True), ("149.154.167.151", 443))
+        self.assertEqual(dc_to_tcp_endpoint(4, is_media=True), ("149.154.164.250", 443))
+        self.assertEqual(dc_to_tcp_endpoint(4, overrides, is_media=True), ("149.154.167.220", 443))
         self.assertEqual(dc_to_tcp_endpoint(203), ("91.105.192.100", 443))
-        self.assertIn("dc_to_tcp_endpoint(dc, self._dc_endpoint_overrides)", inspect.getsource(wss_proxy.TelegramWSProxy._handle_mtproxy_client))
+        self.assertIn("dc_to_tcp_endpoint(dc, self._dc_endpoint_overrides, is_media=is_media)", inspect.getsource(wss_proxy.TelegramWSProxy._handle_mtproxy_client))
         self.assertNotIn("TCP_ENDPOINTS.get(dc", inspect.getsource(wss_proxy.TelegramWSProxy._handle_mtproxy_client))
 
     def test_standalone_cli_accepts_mtproxy_mode_and_secret(self) -> None:

@@ -411,7 +411,7 @@ class TelegramWSProxy:
             relay_init = generate_relay_init(parsed.proto_tag, dc=dc, is_media=is_media)
             crypto = build_crypto_context(parsed.client_prekey_iv, self._mtproxy_secret, relay_init)
 
-            target_host, target_port = dc_to_tcp_endpoint(dc, self._dc_endpoint_overrides)
+            target_host, target_port = dc_to_tcp_endpoint(dc, self._dc_endpoint_overrides, is_media=is_media)
             media_tag = " media" if is_media else ""
             self._log(f"[{label}] MTProxy DC{dc}{media_tag} -> {target_host}:{target_port}")
 
