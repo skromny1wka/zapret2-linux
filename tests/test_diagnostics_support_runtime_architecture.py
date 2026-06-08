@@ -171,6 +171,22 @@ class DiagnosticsSupportRuntimeArchitectureTests(unittest.TestCase):
         page._append.assert_not_called()
         page._set_status.assert_not_called()
 
+    def test_support_prepare_state_uses_shared_latest_value_helper(self) -> None:
+        import diagnostics.ui.page as diagnostics_page
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        init_source = inspect.getsource(ConnectionTestPage.__init__)
+        request_source = inspect.getsource(ConnectionTestPage._request_support_prepare)
+        finished_source = inspect.getsource(ConnectionTestPage._on_support_prepare_worker_finished)
+        cleanup_source = inspect.getsource(ConnectionTestPage.cleanup)
+
+        self.assertTrue(hasattr(diagnostics_page, "LatestValueWorkerState"))
+        self.assertIs(diagnostics_page.LatestValueWorkerState, LatestValueWorkerState)
+        self.assertIn("_support_prepare_state = LatestValueWorkerState", init_source)
+        self.assertIn("_support_prepare_state_obj()", request_source)
+        self.assertIn("schedule_pending_after_finish", finished_source)
+        self.assertIn("_support_prepare_state_obj().reset()", cleanup_source)
+
     def test_support_prepare_runtime_keeps_page_worker_boundary(self) -> None:
         page_source = inspect.getsource(ConnectionTestPage)
         request_source = "\n".join(
@@ -183,11 +199,10 @@ class DiagnosticsSupportRuntimeArchitectureTests(unittest.TestCase):
         cleanup_source = inspect.getsource(ConnectionTestPage.cleanup)
 
         self.assertIn("_support_prepare_runtime = OneShotWorkerRuntime()", page_source)
-        self.assertIn("_support_prepare_pending", page_source)
-        self.assertIn("_support_prepare_start_scheduled", page_source)
+        self.assertIn("_support_prepare_state = LatestValueWorkerState", page_source)
         self.assertIn("start_qthread_worker", request_source)
         self.assertIn("create_support_prepare_worker", request_source)
-        self.assertIn("_schedule_support_prepare_worker_start", finished_source)
+        self.assertIn("schedule_pending_after_finish", finished_source)
         self.assertIn("_support_prepare_runtime.stop", cleanup_source)
         self.assertIn("_support_prepare_runtime.cancel", cleanup_source)
         self.assertNotIn("_support_prepare_worker =", page_source)
