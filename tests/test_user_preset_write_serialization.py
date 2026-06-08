@@ -727,6 +727,43 @@ class UserPresetWriteSerializationTests(unittest.TestCase):
         page._update_cached_preset_rating.assert_not_called()
         page._apply_preset_move_locally.assert_not_called()
 
+    def test_rating_result_updates_single_visible_row_without_full_refresh(self) -> None:
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_storage_action_request_id = 4
+        page._pending_preset_write_actions = []
+        page._pending_preset_storage_actions = []
+        page._preset_item_action_pending = []
+        page._preset_bulk_action_pending = []
+        page._preset_edit_action_pending = []
+        page._pending_preset_activation = None
+        page._preset_folder_action_pending = []
+        page._runtime_service = Mock()
+        page._runtime_service.cached_presets_metadata.return_value = {
+            "Preset.txt": {"name": "Preset", "rating": 1}
+        }
+        page._presets_model = Mock()
+        page._presets_model.update_preset_row.return_value = True
+        page._refresh_presets_view_from_cache = Mock(
+            side_effect=AssertionError("rating must not refresh the whole preset list")
+        )
+        page._update_presets_view_height = Mock()
+        page._schedule_layout_resync = Mock()
+
+        with patch("presets.ui.common.user_presets_page.log") as log_mock:
+            UserPresetsPageBase._on_preset_storage_action_finished(
+                page,
+                4,
+                "rating",
+                True,
+                {"name": "Preset.txt", "rating": 7, "folder_state": {"folders": {}, "items": {}}},
+            )
+
+        page._presets_model.update_preset_row.assert_called_once_with("Preset.txt", rating=7)
+        page._refresh_presets_view_from_cache.assert_not_called()
+        page._update_presets_view_height.assert_not_called()
+        page._schedule_layout_resync.assert_not_called()
+        log_mock.assert_not_called()
+
     def test_legacy_pending_edit_action_restarts_later_after_worker_finished(self) -> None:
         page = UserPresetsPageBase.__new__(UserPresetsPageBase)
         page._preset_activate_runtime = _Runtime(running=False)

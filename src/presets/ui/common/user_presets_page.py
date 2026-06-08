@@ -1852,11 +1852,12 @@ class UserPresetsPageBase(BasePage):
             self._refresh_presets_view_from_cache()
         elif action == "rating":
             if bool(result):
-                self._update_cached_preset_rating(
+                updated_locally = self._update_cached_preset_rating(
                     str(context.get("name") or ""),
                     int(context.get("rating") or 0),
                 )
-                self._refresh_presets_view_from_cache()
+                if not updated_locally:
+                    self._refresh_presets_view_from_cache()
         elif action == "move_step":
             if bool(result):
                 self._refresh_presets_view_from_cache()
@@ -2036,21 +2037,26 @@ class UserPresetsPageBase(BasePage):
         candidate = str(name or "").strip().lower()
         return bool(current and candidate and current == candidate)
 
-    def _update_cached_preset_rating(self, name: str, rating: int) -> None:
+    def _update_cached_preset_rating(self, name: str, rating: int) -> bool:
         cached_metadata = self._runtime_service.cached_presets_metadata()
         preset_name = str(name or "").strip()
         if not preset_name:
-            return
+            return False
         metadata_key = preset_name
         metadata = cached_metadata.get(metadata_key)
         if metadata is None and not preset_name.lower().endswith(".txt"):
             metadata_key = f"{preset_name}.txt"
             metadata = cached_metadata.get(metadata_key)
         if metadata is None:
-            return
+            return False
+        next_rating = max(0, min(10, int(rating or 0)))
         updated = dict(metadata)
-        updated["rating"] = max(0, min(10, int(rating or 0)))
+        updated["rating"] = next_rating
         cached_metadata[metadata_key] = updated
+        model = getattr(self, "_presets_model", None)
+        if model is None or not callable(getattr(model, "update_preset_row", None)):
+            return False
+        return bool(model.update_preset_row(metadata_key, rating=next_rating))
 
     def _show_rating_menu(self, name: str, global_pos: QPoint | None = None):
         display_name = self._resolve_display_name(name)
