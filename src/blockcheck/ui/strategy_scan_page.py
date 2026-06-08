@@ -35,6 +35,7 @@ from blockcheck.ui.strategy_scan_page_runtime_helpers import (
     apply_log_expand_state,
     set_support_status,
 )
+from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.popup_menu import exec_popup_menu
 from ui.accessibility import set_control_accessibility, set_state_text
@@ -108,8 +109,7 @@ class StrategyScanPage(BasePage):
         self._strategy_apply_pending = None
         self._strategy_apply_start_scheduled = False
         self._support_prepare_runtime = OneShotWorkerRuntime()
-        self._support_prepare_pending = None
-        self._support_prepare_start_scheduled = False
+        self._support_prepare_state = LatestValueWorkerState(self._support_prepare_runtime, empty_value=None)
         self._quick_targets_runtime = OneShotWorkerRuntime()
         self._quick_targets_pending = None
         self._quick_targets_start_scheduled = False
@@ -849,6 +849,39 @@ class StrategyScanPage(BasePage):
             return worker is current_worker
         return True
 
+    def _support_prepare_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_support_prepare_state")
+        runtime = self.__dict__.get("_support_prepare_runtime")
+        if state is None:
+            pending = self.__dict__.pop("_support_prepare_pending", None)
+            start_scheduled = bool(self.__dict__.pop("_support_prepare_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=None,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_support_prepare_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _support_prepare_pending(self):
+        return self._support_prepare_state_obj().pending
+
+    @_support_prepare_pending.setter
+    def _support_prepare_pending(self, value) -> None:
+        self._support_prepare_state_obj().pending = value
+
+    @property
+    def _support_prepare_start_scheduled(self) -> bool:
+        return bool(self._support_prepare_state_obj().start_scheduled)
+
+    @_support_prepare_start_scheduled.setter
+    def _support_prepare_start_scheduled(self, value: bool) -> None:
+        self._support_prepare_state_obj().start_scheduled = bool(value)
+
     # ------------------------------------------------------------------
     # Apply strategy
     # ------------------------------------------------------------------
@@ -1073,14 +1106,13 @@ class StrategyScanPage(BasePage):
             "mode_label": str(mode_label or ""),
             "scan_protocol": str(scan_protocol or ""),
         }
-        if (
-            self._support_prepare_runtime.is_running()
-            or self.__dict__.get("_support_prepare_start_scheduled", False)
-        ):
-            self._support_prepare_pending = dict(payload)
+        state = self._support_prepare_state_obj()
+        if state.is_busy():
+            state.pending = dict(payload)
             self._set_support_status("Подготовка уже идёт...")
             return
 
+        state.pending = None
         self._set_support_status("Подготовка обращения...")
         if self._prepare_support_btn is not None:
             self._prepare_support_btn.setEnabled(False)
@@ -1113,7 +1145,7 @@ class StrategyScanPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_support_prepare_pending") is not None:
+        if self._support_prepare_state_obj().has_pending():
             return
         result = feedback.result
         if result.zip_path:
@@ -1137,7 +1169,7 @@ class StrategyScanPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_support_prepare_pending") is not None:
+        if self._support_prepare_state_obj().has_pending():
             return
         logger.warning("Failed to prepare strategy-scan support bundle: %s", error)
         message_plan = self._blockcheck.build_support_error_plan(str(error))
@@ -1154,9 +1186,16 @@ class StrategyScanPage(BasePage):
     def _on_support_prepare_runtime_finished(self, _worker) -> None:
         if not self._is_current_worker_finish(self.__dict__.get("_support_prepare_runtime"), _worker):
             return
-        pending = self.__dict__.get("_support_prepare_pending")
-        if pending is not None and not self._cleanup_in_progress:
-            self._schedule_support_prepare_worker_start(dict(pending or {}))
+        state = self._support_prepare_state_obj()
+        had_pending = state.has_pending()
+        state.schedule_pending_after_finish(
+            _worker,
+            is_current_worker_finish=self._is_current_worker_finish,
+            single_shot=QTimer.singleShot,
+            run_scheduled=self._run_scheduled_support_prepare_worker_start,
+            cleanup_in_progress=self._cleanup_in_progress,
+        )
+        if had_pending and state.start_scheduled:
             return
         if not self._cleanup_in_progress and self._prepare_support_btn is not None:
             self._prepare_support_btn.setEnabled(True)
@@ -1164,16 +1203,19 @@ class StrategyScanPage(BasePage):
     def _schedule_support_prepare_worker_start(self, payload: dict) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        self._support_prepare_pending = dict(payload or {})
-        if self.__dict__.get("_support_prepare_start_scheduled", False):
-            return
-        self._support_prepare_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_support_prepare_worker_start)
+        state = self._support_prepare_state_obj()
+        state.pending = dict(payload or {})
+        state.schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_support_prepare_worker_start,
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+            pending_when_already_scheduled=dict(payload or {}),
+        )
 
     def _run_scheduled_support_prepare_worker_start(self) -> None:
-        self._support_prepare_start_scheduled = False
-        pending = self.__dict__.get("_support_prepare_pending")
-        self._support_prepare_pending = None
+        pending = self._support_prepare_state_obj().take_pending_for_scheduled_start(
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False)
+        )
         if pending is None or self.__dict__.get("_cleanup_in_progress", False):
             return
         self._set_support_status("Подготовка обращения...")
@@ -1210,8 +1252,7 @@ class StrategyScanPage(BasePage):
             warning_prefix="strategy scan support prepare worker",
         )
         self._support_prepare_runtime.cancel()
-        self._support_prepare_pending = None
-        self._support_prepare_start_scheduled = False
+        self._support_prepare_state_obj().reset()
         self._quick_targets_pending = None
         self._quick_targets_start_scheduled = False
         self._quick_targets_runtime.stop(
