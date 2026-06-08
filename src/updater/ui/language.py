@@ -6,7 +6,7 @@ from config.build_info import APP_VERSION, CHANNEL
 
 
 from updater.ui.table_view import apply_server_table_headers
-from ui.accessibility import set_state_text
+from ui.accessibility import set_control_accessibility, set_state_text
 
 
 def _label_text(label) -> str:
@@ -95,6 +95,24 @@ def apply_servers_page_language(
             pass
     telegram_button.setText(
         tr_fn("page.servers.telegram.button.open_channel", "Открыть Telegram канал")
+    )
+    telegram_action_name = tr_fn(
+        "page.servers.telegram.accessible_name",
+        "Открыть Telegram канал обновлений",
+    )
+    telegram_action_description = tr_fn(
+        "page.servers.telegram.accessible_description",
+        "Открывает Telegram канал, где публикуются версии программы и новости обновлений.",
+    )
+    set_control_accessibility(
+        telegram_card,
+        name=telegram_action_name,
+        description=telegram_action_description,
+    )
+    set_control_accessibility(
+        telegram_button,
+        name=telegram_action_name,
+        description=telegram_action_description,
     )
 
     refresh_server_rows()

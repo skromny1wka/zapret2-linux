@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ui.accessibility import set_state_text
+from ui.accessibility import set_control_accessibility, set_state_text
 from ui.theme import get_themed_qta_icon
 
 
@@ -101,6 +101,16 @@ def build_servers_telegram_section(
     )
     tg_card.clicked.connect(on_open_channel)
     tg_btn = tg_card.button
+    telegram_action_name = tr_fn(
+        "page.servers.telegram.accessible_name",
+        "Открыть Telegram канал обновлений",
+    )
+    telegram_action_description = tr_fn(
+        "page.servers.telegram.accessible_description",
+        "Открывает Telegram канал, где публикуются версии программы и новости обновлений.",
+    )
+    set_control_accessibility(tg_card, name=telegram_action_name, description=telegram_action_description)
+    set_control_accessibility(tg_btn, name=telegram_action_name, description=telegram_action_description)
 
     return ServersTelegramWidgets(
         card=tg_card,

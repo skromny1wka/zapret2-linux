@@ -10,6 +10,7 @@ class _TextTarget:
     def __init__(self, text: str = ""):
         self.text = text
         self._accessible_name = ""
+        self._accessible_description = ""
         self.properties = {}
 
     def setText(self, text):  # noqa: N802
@@ -20,6 +21,12 @@ class _TextTarget:
 
     def accessibleName(self):  # noqa: N802
         return self._accessible_name
+
+    def setAccessibleDescription(self, value):  # noqa: N802
+        self._accessible_description = value
+
+    def accessibleDescription(self):  # noqa: N802
+        return self._accessible_description
 
     def setProperty(self, name, value):  # noqa: N802
         self.properties[name] = value
@@ -34,12 +41,26 @@ class _Card:
     def __init__(self):
         self.title = ""
         self.content = ""
+        self._accessible_name = ""
+        self._accessible_description = ""
 
     def set_title(self, text):
         self.title = text
 
     def setContent(self, text):  # noqa: N802
         self.content = text
+
+    def setAccessibleName(self, value):  # noqa: N802
+        self._accessible_name = value
+
+    def accessibleName(self):  # noqa: N802
+        return self._accessible_name
+
+    def setAccessibleDescription(self, value):  # noqa: N802
+        self._accessible_description = value
+
+    def accessibleDescription(self):  # noqa: N802
+        return self._accessible_description
 
 
 class _Stateful:
@@ -104,6 +125,38 @@ class UpdaterLanguageAccessibilityTests(unittest.TestCase):
             version_info_label.property("screenReaderStateText"),
             expected,
         )
+
+    def test_language_refresh_updates_telegram_screen_reader_action(self) -> None:
+        telegram_card = _Card()
+        telegram_button = _TextTarget()
+
+        apply_servers_page_language(
+            tr_fn=lambda key, default, **_kwargs: {
+                "page.servers.telegram.accessible_name": "Открыть канал обновлений",
+                "page.servers.telegram.accessible_description": "Открывает канал с версиями программы.",
+            }.get(key, default),
+            ui_language="ru",
+            update_card=_Stateful(),
+            changelog_card=_Stateful(),
+            breadcrumb=_Breadcrumb(),
+            page_title_label=_TextTarget(),
+            servers_title_label=_TextTarget(),
+            legend_active_label=_TextTarget(),
+            servers_table=_Table(),
+            settings_card=_Card(),
+            toggle_label=None,
+            auto_check_card=_Stateful(),
+            version_info_label=_TextTarget(),
+            telegram_card=telegram_card,
+            telegram_info_label=None,
+            telegram_button=telegram_button,
+            refresh_server_rows=lambda: None,
+        )
+
+        self.assertEqual(telegram_card.accessibleName(), "Открыть канал обновлений")
+        self.assertEqual(telegram_card.accessibleDescription(), "Открывает канал с версиями программы.")
+        self.assertEqual(telegram_button.accessibleName(), "Открыть канал обновлений")
+        self.assertEqual(telegram_button.accessibleDescription(), "Открывает канал с версиями программы.")
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from updater.ui import settings_build
 from updater.ui.settings_build import build_servers_settings_section
 
 
@@ -33,6 +34,52 @@ class _FakeSettingsGroup:
 class _FakeCard:
     def add_layout(self, layout):
         self.layout = layout
+
+
+class _FakeButton:
+    def __init__(self):
+        self.text = ""
+        self._accessible_name = ""
+        self._accessible_description = ""
+
+    def setText(self, text):  # noqa: N802
+        self.text = text
+
+    def setAccessibleName(self, value):  # noqa: N802
+        self._accessible_name = value
+
+    def accessibleName(self):  # noqa: N802
+        return self._accessible_name
+
+    def setAccessibleDescription(self, value):  # noqa: N802
+        self._accessible_description = value
+
+    def accessibleDescription(self):  # noqa: N802
+        return self._accessible_description
+
+
+class _FakePushSettingCard:
+    def __init__(self, action_text, icon, title, content):
+        self.action_text = action_text
+        self.icon = icon
+        self.title = title
+        self.content = content
+        self.button = _FakeButton()
+        self.clicked = _FakeSignal()
+        self._accessible_name = ""
+        self._accessible_description = ""
+
+    def setAccessibleName(self, value):  # noqa: N802
+        self._accessible_name = value
+
+    def accessibleName(self):  # noqa: N802
+        return self._accessible_name
+
+    def setAccessibleDescription(self, value):  # noqa: N802
+        self._accessible_description = value
+
+    def accessibleDescription(self):  # noqa: N802
+        return self._accessible_description
 
 
 class _FakeLabel:
@@ -110,6 +157,25 @@ class UpdaterSettingsBuildTests(unittest.TestCase):
             widgets.version_info_label.property("screenReaderStateText"),
             "Версия ZapretGUI: v21.0.0.142 · dev",
         )
+
+    def test_telegram_card_and_button_expose_screen_reader_action(self) -> None:
+        old_icon_factory = settings_build.get_themed_qta_icon
+        settings_build.get_themed_qta_icon = lambda *_args, **_kwargs: object()
+        self.addCleanup(setattr, settings_build, "get_themed_qta_icon", old_icon_factory)
+
+        widgets = settings_build.build_servers_telegram_section(
+            tr_fn=lambda _key, default: default,
+            accent_hex="#22dddd",
+            push_setting_card_cls=_FakePushSettingCard,
+            on_open_channel=lambda: None,
+        )
+
+        expected_name = "Открыть Telegram канал обновлений"
+
+        self.assertEqual(widgets.card.accessibleName(), expected_name)
+        self.assertIn("версии программы", widgets.card.accessibleDescription())
+        self.assertEqual(widgets.button.accessibleName(), expected_name)
+        self.assertIn("версии программы", widgets.button.accessibleDescription())
 
 
 if __name__ == "__main__":
