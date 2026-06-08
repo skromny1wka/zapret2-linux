@@ -21,6 +21,7 @@ from ui.startup_ui_metrics import pump_startup_ui
 from app.ui_texts import tr as tr_catalog
 from ui.window_ui_session import get_window_ui_session
 from ui.navigation.sidebar_state import peek_warmed_sidebar_expanded
+from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 
 
@@ -98,9 +99,11 @@ def _start_sidebar_expanded_save_worker(window, expanded: bool) -> None:
     if session is None:
         return
 
-    runtime = _ensure_sidebar_expanded_save_runtime(session)
-    if runtime.is_running() or bool(getattr(session, "sidebar_expanded_save_start_scheduled", False)):
-        session.sidebar_expanded_save_pending = bool(expanded)
+    state = _sidebar_expanded_save_state_obj(session)
+    runtime = state.runtime
+    if state.is_busy():
+        state.pending = bool(expanded)
+        _sync_sidebar_expanded_save_compat_fields(session, state)
         return
 
     create_worker = getattr(session, "sidebar_expanded_save_worker_factory", None)
@@ -131,6 +134,27 @@ def _ensure_sidebar_expanded_save_runtime(session) -> OneShotWorkerRuntime:
     return runtime
 
 
+def _sidebar_expanded_save_state_obj(session) -> LatestValueWorkerState:
+    runtime = _ensure_sidebar_expanded_save_runtime(session)
+    state = getattr(session, "sidebar_expanded_save_state", None)
+    if state is None:
+        state = LatestValueWorkerState(
+            runtime,
+            empty_value=None,
+            pending=getattr(session, "sidebar_expanded_save_pending", None),
+            start_scheduled=bool(getattr(session, "sidebar_expanded_save_start_scheduled", False)),
+        )
+        session.sidebar_expanded_save_state = state
+    elif getattr(state, "runtime", None) is None:
+        state.runtime = runtime
+    return state
+
+
+def _sync_sidebar_expanded_save_compat_fields(session, state: LatestValueWorkerState) -> None:
+    session.sidebar_expanded_save_pending = state.pending
+    session.sidebar_expanded_save_start_scheduled = bool(state.start_scheduled)
+
+
 def _on_sidebar_expanded_save_worker_finished(window, worker=None) -> None:
     session = get_window_ui_session(window)
     if session is None:
@@ -139,31 +163,34 @@ def _on_sidebar_expanded_save_worker_finished(window, worker=None) -> None:
     if current_worker is not None and worker is not current_worker:
         return
     session.sidebar_expanded_save_runtime_worker = None
-    pending = getattr(session, "sidebar_expanded_save_pending", None)
-    if pending is None:
+    state = _sidebar_expanded_save_state_obj(session)
+    if not state.has_pending():
+        _sync_sidebar_expanded_save_compat_fields(session, state)
         return
-    session.sidebar_expanded_save_pending = None
-    _schedule_sidebar_expanded_save_worker_start(window, bool(pending))
+    _schedule_sidebar_expanded_save_worker_start(window, bool(state.pending))
 
 
 def _schedule_sidebar_expanded_save_worker_start(window, expanded: bool) -> None:
     session = get_window_ui_session(window)
     if session is None:
         return
-    session.sidebar_expanded_save_pending = bool(expanded)
-    if bool(getattr(session, "sidebar_expanded_save_start_scheduled", False)):
-        return
-    session.sidebar_expanded_save_start_scheduled = True
-    QTimer.singleShot(0, lambda current_window=window: _run_scheduled_sidebar_expanded_save_worker_start(current_window))
+    state = _sidebar_expanded_save_state_obj(session)
+    state.pending = bool(expanded)
+    state.schedule_start(
+        QTimer.singleShot,
+        lambda current_window=window: _run_scheduled_sidebar_expanded_save_worker_start(current_window),
+        pending_when_already_scheduled=bool(expanded),
+    )
+    _sync_sidebar_expanded_save_compat_fields(session, state)
 
 
 def _run_scheduled_sidebar_expanded_save_worker_start(window) -> None:
     session = get_window_ui_session(window)
     if session is None:
         return
-    session.sidebar_expanded_save_start_scheduled = False
-    pending = getattr(session, "sidebar_expanded_save_pending", None)
-    session.sidebar_expanded_save_pending = None
+    state = _sidebar_expanded_save_state_obj(session)
+    pending = state.take_pending_for_scheduled_start()
+    _sync_sidebar_expanded_save_compat_fields(session, state)
     if pending is None:
         return
     _start_sidebar_expanded_save_worker(window, bool(pending))

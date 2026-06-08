@@ -8,6 +8,7 @@ class SidebarStateWorkerBoundaryTests(unittest.TestCase):
     def test_sidebar_expanded_state_save_goes_through_program_settings_feature(self) -> None:
         from app.feature_facades.program_settings import ProgramSettingsFeature
         import program_settings.workers as workers
+        from ui.latest_value_worker_state import LatestValueWorkerState
         import ui.navigation.sidebar_builder as sidebar_builder
         from ui.window_bootstrap_runtime import WindowRuntimeBootstrapDeps, initialize_build_ui_state
         from ui.window_ui_session import WindowUiSession
@@ -29,6 +30,9 @@ class SidebarStateWorkerBoundaryTests(unittest.TestCase):
         self.assertNotIn("set_ui_state_settings", builder_source)
         self.assertNotIn("ui.navigation.sidebar_state_worker", builder_source)
         self.assertIn("OneShotWorkerRuntime", session_source)
+        self.assertIn("LatestValueWorkerState", session_source)
+        self.assertIn("_sidebar_expanded_save_state_obj", inspect.getsource(sidebar_builder))
+        self.assertIs(sidebar_builder.LatestValueWorkerState, LatestValueWorkerState)
         self.assertIn("sidebar_expanded_save_runtime", session_source)
         self.assertIn("start_qthread_worker", builder_source)
         self.assertNotIn("worker.start()", builder_source)
