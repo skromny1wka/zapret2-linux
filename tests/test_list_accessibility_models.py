@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
 
 from PyQt6.QtCore import Qt
 
@@ -42,6 +43,27 @@ class ListAccessibilityModelTests(unittest.TestCase):
         text = model.index(0, 0).data(Qt.ItemDataRole.AccessibleTextRole)
 
         self.assertEqual(text, "Группа Видео, 3 профиля, свернута")
+
+    def test_profile_order_rows_expose_screen_reader_text(self) -> None:
+        from profile.ui.profile_order_list import ProfileOrderListModel
+
+        model = ProfileOrderListModel()
+        model.set_profiles(
+            (
+                SimpleNamespace(
+                    display_name="YouTube",
+                    enabled=True,
+                    in_preset=True,
+                    profile_index=2,
+                    strategy_name="TLS fake",
+                    match_lines=("--filter-tcp=443",),
+                ),
+            )
+        )
+
+        text = model.index(0, 0).data(Qt.ItemDataRole.AccessibleTextRole)
+
+        self.assertEqual(text, "Позиция 1, YouTube, включён, стратегия: TLS fake, TCP | TCP 443")
 
     def test_preset_rows_expose_screen_reader_text(self) -> None:
         from ui.presets_menu.model import PresetListModel

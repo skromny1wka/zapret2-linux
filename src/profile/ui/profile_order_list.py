@@ -156,6 +156,13 @@ class ProfileOrderListModel(QAbstractListModel):
             return icon.color
         if role == ProfileListModel.TooltipRole:
             return "\n".join((display_name, description)).strip()
+        if role == int(Qt.ItemDataRole.AccessibleTextRole):
+            return _profile_order_accessible_text(
+                item,
+                row=index.row(),
+                display_name=display_name,
+                description=description,
+            )
         return None
 
 
@@ -206,9 +213,30 @@ def _profile_order_identity(item: Any) -> str:
     return str(getattr(item, "persistent_key", "") or getattr(item, "key", "") or "")
 
 
+def _profile_order_accessible_text(
+    item: Any,
+    *,
+    row: int,
+    display_name: str,
+    description: str,
+) -> str:
+    parts = [
+        f"Позиция {int(row) + 1}",
+        str(display_name or "Profile"),
+        "включён" if bool(getattr(item, "enabled", False)) else "выключен",
+    ]
+    strategy_name = str(getattr(item, "strategy_name", "") or "").strip()
+    if strategy_name:
+        parts.append(f"стратегия: {strategy_name}")
+    if description:
+        parts.append(description)
+    return ", ".join(parts)
+
+
 def _profile_order_data_roles() -> list[int]:
     return [
         int(Qt.ItemDataRole.DisplayRole),
+        int(Qt.ItemDataRole.AccessibleTextRole),
         ProfileListModel.KindRole,
         ProfileListModel.ProfileKeyRole,
         ProfileListModel.PersistentKeyRole,
