@@ -76,6 +76,38 @@ def build_fake_tls_secret(secret: str, domain: str) -> str:
     return "ee" + clean_secret + clean_domain.encode("ascii").hex()
 
 
+def build_fake_tls_nginx_config(
+    *,
+    fake_tls_domain: object = "",
+    upstream_host: object = "127.0.0.1",
+    upstream_port: object = 8446,
+) -> str:
+    domain = normalize_fake_tls_domain(fake_tls_domain) or "example.com"
+    host = str(upstream_host or "127.0.0.1").strip() or "127.0.0.1"
+    try:
+        port = int(upstream_port or 8446)
+    except (TypeError, ValueError):
+        port = 8446
+    if port < 1 or port > 65535:
+        port = 8446
+    return (
+        "upstream mtproxy {\n"
+        f"    server {host}:{port};\n"
+        "}\n\n"
+        "map $ssl_preread_server_name $sni_name {\n"
+        "    hostnames;\n"
+        f"    {domain} mtproxy;\n"
+        "}\n\n"
+        "server {\n"
+        "    listen 443;\n"
+        "    proxy_protocol on;\n"
+        "    set_real_ip_from unix:;\n"
+        "    proxy_pass $sni_name;\n"
+        "    ssl_preread on;\n"
+        "}\n"
+    )
+
+
 def _secret_bytes(secret: object) -> bytes:
     if isinstance(secret, bytes):
         return secret
@@ -301,6 +333,7 @@ __all__ = [
     "TLS_RECORD_CCS",
     "TLS_RECORD_HANDSHAKE",
     "build_fake_tls_secret",
+    "build_fake_tls_nginx_config",
     "build_server_hello",
     "normalize_fake_tls_domain",
     "read_mtproxy_client_init",

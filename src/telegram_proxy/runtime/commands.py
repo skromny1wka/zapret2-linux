@@ -257,3 +257,13 @@ def get_cloudflare_worker_code() -> str:
     from telegram_proxy.proxy.cloudflare import build_cfworker_code
 
     return build_cfworker_code()
+
+
+def get_fake_tls_nginx_config(*, fake_tls_domain: str = "", upstream_host: str = "127.0.0.1", upstream_port: int = 8446) -> str:
+    from telegram_proxy.proxy.fake_tls import build_fake_tls_nginx_config
+
+    return build_fake_tls_nginx_config(
+        fake_tls_domain=fake_tls_domain,
+        upstream_host=upstream_host,
+        upstream_port=upstream_port,
+    )

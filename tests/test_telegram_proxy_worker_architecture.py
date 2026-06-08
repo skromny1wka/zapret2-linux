@@ -67,6 +67,7 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
             check_cloudflare_connectivity=Mock(),
             get_cloudflare_dns_records_text=Mock(),
             get_cloudflare_worker_code=Mock(),
+            get_fake_tls_nginx_config=Mock(),
             build_diagnostics_start_plan=Mock(),
             build_diagnostics_poll_plan=Mock(),
             build_diagnostics_finish_plan=Mock(),
@@ -340,6 +341,7 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
             check_cloudflare_connectivity=Mock(),
             get_cloudflare_dns_records_text=Mock(),
             get_cloudflare_worker_code=Mock(),
+            get_fake_tls_nginx_config=Mock(),
             build_diagnostics_start_plan=Mock(),
             build_diagnostics_poll_plan=Mock(),
             build_diagnostics_finish_plan=Mock(),
@@ -477,6 +479,39 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
             success_title="Скопировано",
             success_content="Результат диагностики",
         )
+
+    def test_copy_fake_tls_nginx_config_uses_feature_helper(self) -> None:
+        from telegram_proxy.ui import page as telegram_proxy_page_module
+        from telegram_proxy.ui.page import TelegramProxyPage
+
+        copy_text = Mock(return_value=SimpleNamespace(ok=False, log_line="Copied Nginx config"))
+        get_config = Mock(return_value="nginx config")
+        page = TelegramProxyPage.__new__(TelegramProxyPage)
+        page._telegram_proxy = SimpleNamespace(
+            copy_text=copy_text,
+            get_fake_tls_nginx_config=get_config,
+        )
+        page._append_log_line = Mock()
+        page._show_cloudflare_message = Mock()
+        page._local_fake_tls_domain = Mock(return_value="front.example.com")
+        page._host_edit = SimpleNamespace(text=Mock(return_value="127.0.0.1"))
+        page._port_spin = SimpleNamespace(value=Mock(return_value=8446))
+
+        with patch.object(telegram_proxy_page_module, "InfoBar", None):
+            TelegramProxyPage._on_copy_fake_tls_nginx_config(page)
+
+        get_config.assert_called_once_with(
+            fake_tls_domain="front.example.com",
+            upstream_host="127.0.0.1",
+            upstream_port=8446,
+        )
+        copy_text.assert_called_once_with(
+            "nginx config",
+            success_title="Скопировано",
+            success_content="Конфиг Nginx для Fake TLS",
+            success_log="Copied Fake TLS Nginx config",
+        )
+        page._append_log_line.assert_called_once_with("Copied Nginx config")
 
     def test_start_worker_passes_command_loaded_upstream_config_to_manager(self) -> None:
         manager = Mock()

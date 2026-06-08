@@ -30,6 +30,7 @@ class TelegramProxyFeature:
     check_cloudflare_connectivity: Callable
     get_cloudflare_dns_records_text: Callable
     get_cloudflare_worker_code: Callable
+    get_fake_tls_nginx_config: Callable
     build_diagnostics_start_plan: Callable
     build_diagnostics_poll_plan: Callable
     build_diagnostics_finish_plan: Callable
@@ -372,6 +373,7 @@ def build_telegram_proxy_feature() -> TelegramProxyFeature:
         check_cloudflare_connectivity=lambda *args, **kwargs: _commands().check_cloudflare_connectivity(*args, **kwargs),
         get_cloudflare_dns_records_text=lambda *args, **kwargs: _commands().get_cloudflare_dns_records_text(*args, **kwargs),
         get_cloudflare_worker_code=lambda *args, **kwargs: _commands().get_cloudflare_worker_code(*args, **kwargs),
+        get_fake_tls_nginx_config=lambda *args, **kwargs: _commands().get_fake_tls_nginx_config(*args, **kwargs),
         build_diagnostics_start_plan=lambda *args, **kwargs: _public().build_diagnostics_start_plan(*args, **kwargs),
         build_diagnostics_poll_plan=lambda *args, **kwargs: _public().build_diagnostics_poll_plan(*args, **kwargs),
         build_diagnostics_finish_plan=lambda *args, **kwargs: _public().build_diagnostics_finish_plan(*args, **kwargs),

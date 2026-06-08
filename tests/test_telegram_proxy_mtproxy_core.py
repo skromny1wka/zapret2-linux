@@ -141,6 +141,7 @@ class TelegramProxyMTProxyCoreTests(unittest.TestCase):
         from settings.normalize import normalize_telegram_proxy
         from settings.schema import default_telegram_proxy
         from telegram_proxy.config.settings import default_state
+        from telegram_proxy.proxy.fake_tls import build_fake_tls_nginx_config
 
         defaults = default_telegram_proxy()
 
@@ -158,6 +159,17 @@ class TelegramProxyMTProxyCoreTests(unittest.TestCase):
 
         self.assertEqual(normalized["fake_tls_domain"], "front.example.com")
         self.assertTrue(normalized["proxy_protocol"])
+
+        nginx_config = build_fake_tls_nginx_config(
+            fake_tls_domain="Front.Example.Com",
+            upstream_host="127.0.0.1",
+            upstream_port=8446,
+        )
+        self.assertIn("upstream mtproxy", nginx_config)
+        self.assertIn("server 127.0.0.1:8446;", nginx_config)
+        self.assertIn("front.example.com mtproxy;", nginx_config)
+        self.assertIn("proxy_protocol on;", nginx_config)
+        self.assertIn("ssl_preread on;", nginx_config)
 
     def test_mtproxy_client_init_parser_checks_secret_and_dc(self) -> None:
         from telegram_proxy.proxy.mtproxy import parse_client_init

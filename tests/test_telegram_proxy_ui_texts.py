@@ -49,13 +49,16 @@ class TelegramProxyUiTextsTests(unittest.TestCase):
         self.assertIn("on_copy_cloudflare_dns", signature.parameters)
         self.assertIn("on_test_cloudflare_worker", signature.parameters)
         self.assertIn("on_copy_cloudflare_worker_code", signature.parameters)
+        self.assertIn("on_copy_fake_tls_nginx_config", signature.parameters)
         self.assertIn("cloudflare_test_btn", source)
         self.assertIn("cloudflare_dns_btn", source)
         self.assertIn("cloudflare_worker_test_btn", source)
         self.assertIn("cloudflare_worker_code_btn", source)
+        self.assertIn("fake_tls_nginx_btn", source)
         self.assertIn("Проверить", source)
         self.assertIn("DNS", source)
         self.assertIn("Код Worker", source)
+        self.assertIn("Nginx", source)
 
     def test_proxy_mode_choice_marks_socks5_as_recommended(self) -> None:
         import inspect

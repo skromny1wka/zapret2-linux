@@ -344,6 +344,7 @@ class TelegramProxyPage(BasePage):
             on_copy_link=self._on_copy_link,
             on_open_mtproxy=self._on_open_mtproxy,
             on_generate_mtproxy_secret=self._on_generate_mtproxy_secret,
+            on_copy_fake_tls_nginx_config=self._on_copy_fake_tls_nginx_config,
             on_test_cloudflare=self._on_test_cloudflare,
             on_copy_cloudflare_dns=self._on_copy_cloudflare_dns,
             on_test_cloudflare_worker=self._on_test_cloudflare_worker,
@@ -372,6 +373,7 @@ class TelegramProxyPage(BasePage):
         self._mtproxy_secret_label = widgets.mtproxy_secret_label
         self._mtproxy_secret_edit = widgets.mtproxy_secret_edit
         self._mtproxy_generate_btn = widgets.mtproxy_generate_btn
+        self._fake_tls_nginx_btn = widgets.fake_tls_nginx_btn
         self._auto_deeplink_toggle = widgets.auto_deeplink_toggle
         self._upstream_card = widgets.upstream_card
         self._upstream_desc_label = widgets.upstream_desc_label
@@ -530,6 +532,7 @@ class TelegramProxyPage(BasePage):
             mtproxy_action_btn=getattr(self, "_mtproxy_action_btn", None),
             cloudflare_test_btn=getattr(self, "_cloudflare_test_btn", None),
             cloudflare_dns_btn=getattr(self, "_cloudflare_dns_btn", None),
+            fake_tls_nginx_btn=getattr(self, "_fake_tls_nginx_btn", None),
             cloudflare_worker_test_btn=getattr(self, "_cloudflare_worker_test_btn", None),
             cloudflare_worker_code_btn=getattr(self, "_cloudflare_worker_code_btn", None),
             btn_copy_logs=getattr(self, "_btn_copy_logs", None),
@@ -1560,6 +1563,23 @@ class TelegramProxyPage(BasePage):
             success_title="Скопировано",
             success_content="Код Cloudflare Worker",
             success_log="Copied Cloudflare Worker code",
+        )
+        if plan.log_line:
+            self._append_log_line(plan.log_line)
+        if plan.ok:
+            self._show_cloudflare_message(plan.info_title, plan.info_content, success=True)
+
+    def _on_copy_fake_tls_nginx_config(self):
+        text = self._telegram_proxy.get_fake_tls_nginx_config(
+            fake_tls_domain=self._local_fake_tls_domain(),
+            upstream_host=self._host_edit.text().strip(),
+            upstream_port=self._port_spin.value(),
+        )
+        plan = self._telegram_proxy.copy_text(
+            text,
+            success_title="Скопировано",
+            success_content="Конфиг Nginx для Fake TLS",
+            success_log="Copied Fake TLS Nginx config",
         )
         if plan.log_line:
             self._append_log_line(plan.log_line)

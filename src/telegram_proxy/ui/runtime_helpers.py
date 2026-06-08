@@ -94,6 +94,7 @@ def apply_ui_texts(
     mtproxy_action_btn,
     cloudflare_test_btn,
     cloudflare_dns_btn,
+    fake_tls_nginx_btn,
     cloudflare_worker_test_btn,
     cloudflare_worker_code_btn,
     btn_copy_logs,
@@ -195,6 +196,9 @@ def apply_ui_texts(
         if cloudflare_dns_btn is not None:
             cloudflare_dns_btn.setText("DNS")
             set_tooltip(cloudflare_dns_btn, "Скопировать DNS-записи для своего Cloudflare-домена.")
+        if fake_tls_nginx_btn is not None:
+            fake_tls_nginx_btn.setText("Nginx")
+            set_tooltip(fake_tls_nginx_btn, "Скопировать stream-конфиг Nginx для MTProxy Fake TLS.")
         if cloudflare_worker_test_btn is not None and cloudflare_worker_test_btn.isEnabled():
             cloudflare_worker_test_btn.setText("Проверить")
             set_tooltip(cloudflare_worker_test_btn, "Проверить, отвечает ли ваш Cloudflare Worker.")

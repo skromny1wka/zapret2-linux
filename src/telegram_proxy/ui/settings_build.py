@@ -41,6 +41,7 @@ class TelegramProxySettingsPanelWidgets:
     mtproxy_secret_label: object
     mtproxy_secret_edit: object
     mtproxy_generate_btn: object
+    fake_tls_nginx_btn: object
     auto_deeplink_toggle: object
     upstream_card: object
     upstream_desc_label: object
@@ -100,6 +101,7 @@ def build_telegram_proxy_settings_panel(
     on_copy_link,
     on_open_mtproxy,
     on_generate_mtproxy_secret,
+    on_copy_fake_tls_nginx_config,
     on_test_cloudflare,
     on_copy_cloudflare_dns,
     on_test_cloudflare_worker,
@@ -214,6 +216,11 @@ def build_telegram_proxy_settings_panel(
     set_tooltip(mtproxy_generate_btn, "Создать новый случайный secret для MTProxy.")
     mtproxy_generate_btn.clicked.connect(on_generate_mtproxy_secret)
     mtproxy_secret_layout.addWidget(mtproxy_generate_btn)
+    fake_tls_nginx_btn = push_button_cls("Nginx", icon=FluentIcon.COPY)
+    fake_tls_nginx_btn.setMinimumWidth(96)
+    set_tooltip(fake_tls_nginx_btn, "Скопировать stream-конфиг Nginx для MTProxy Fake TLS.")
+    fake_tls_nginx_btn.clicked.connect(on_copy_fake_tls_nginx_config)
+    mtproxy_secret_layout.addWidget(fake_tls_nginx_btn)
     mtproxy_secret_layout.addStretch()
     mtproxy_secret_row.setVisible(False)
     settings_card.addSettingCard(mtproxy_secret_row)
@@ -434,6 +441,7 @@ def build_telegram_proxy_settings_panel(
         mtproxy_secret_label=mtproxy_secret_label,
         mtproxy_secret_edit=mtproxy_secret_edit,
         mtproxy_generate_btn=mtproxy_generate_btn,
+        fake_tls_nginx_btn=fake_tls_nginx_btn,
         auto_deeplink_toggle=auto_deeplink_toggle,
         upstream_card=upstream_card,
         upstream_desc_label=upstream_desc_label,
