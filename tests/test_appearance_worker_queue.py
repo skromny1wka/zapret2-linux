@@ -54,6 +54,16 @@ class AppearanceWorkerQueueTests(unittest.TestCase):
         self.assertFalse(page._initial_state_load_pending)
         self.assertFalse(page._initial_state_load_pending_force)
 
+    def test_initial_state_load_queue_state_lives_in_state_object(self) -> None:
+        import inspect
+        from ui.pages.appearance_page import AppearancePage
+
+        init_source = inspect.getsource(AppearancePage.__init__)
+        finished_source = inspect.getsource(AppearancePage._on_initial_state_worker_finished)
+
+        self.assertIn("_initial_state_load_state = LatestValueWorkerState", init_source)
+        self.assertIn("schedule_pending_after_finish", finished_source)
+
     def test_stale_initial_state_worker_finished_does_not_restart_pending_load(self) -> None:
         import ui.pages.appearance_page as appearance_page
         from ui.pages.appearance_page import AppearancePage
