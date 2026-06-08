@@ -105,6 +105,44 @@ class TableAccessibilityTests(unittest.TestCase):
         self.assertIn("Example ISP", text)
         self.assertIn("статус DETECTED", text)
 
+    def test_blockcheck_target_result_row_has_screen_reader_text(self) -> None:
+        from blockcheck.models import DPIClassification, SingleTestResult, TargetResult, TestStatus, TestType
+        from blockcheck.ui.page_results_workflow import update_target_result_table
+
+        table = QTableWidget(0, 8)
+        tcp_table = QTableWidget(0, 5)
+        target = TargetResult(
+            name="YouTube",
+            value="youtube.com",
+            classification=DPIClassification.HTTP_INJECT,
+            tests=[
+                SingleTestResult(
+                    target_name="youtube.com",
+                    test_type=TestType.HTTP,
+                    status=TestStatus.FAIL,
+                    error_code="HTTP_INJECT",
+                    detail="Провайдер подменил HTTP-ответ",
+                )
+            ],
+        )
+
+        update_target_result_table(
+            target_result=target,
+            table=table,
+            tcp_table=tcp_table,
+            tcp_section_label=None,
+        )
+
+        text = table.item(0, 0).data(Qt.ItemDataRole.AccessibleTextRole)
+        self.assertIsNotNone(text)
+        self.assertIn("YouTube", text)
+        self.assertIn("HTTP HTTP_INJECT", text)
+        self.assertIn("DPI HTTP инъекция", text)
+        self.assertIn("Провайдер подменил HTTP-ответ", text)
+        self.assertEqual(table.item(0, 1).data(Qt.ItemDataRole.AccessibleTextRole), text)
+        self.assertEqual(table.item(0, 5).data(Qt.ItemDataRole.AccessibleTextRole), text)
+        self.assertEqual(table.item(0, 7).data(Qt.ItemDataRole.AccessibleTextRole), text)
+
 
 if __name__ == "__main__":
     unittest.main()

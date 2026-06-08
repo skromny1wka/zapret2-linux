@@ -324,3 +324,43 @@ def update_target_result_table(*, target_result, table, tcp_table, tcp_section_l
     detail_cell.setForeground(QColor("#9aa0a6"))
     set_fluent_item_tooltip(detail_cell, detail_text)
     table.setItem(row, 7, detail_cell)
+    _apply_target_row_accessibility(table, row, detail_text=detail_text)
+
+
+_TARGET_TABLE_ACCESSIBLE_COLUMNS = {
+    1: "HTTP",
+    2: "TLS 1.2",
+    3: "TLS 1.3",
+    4: "DNS/ISP",
+    5: "DPI",
+    6: "Ping",
+    7: "детали",
+}
+
+
+def _apply_target_row_accessibility(table, row: int, *, detail_text: str) -> None:
+    target_item = table.item(row, 0)
+    target_name = str(target_item.text() if target_item is not None else "").strip()
+    parts = [target_name] if target_name else []
+
+    for col, label in _TARGET_TABLE_ACCESSIBLE_COLUMNS.items():
+        item = table.item(row, col)
+        if item is None:
+            continue
+        value = str(item.text() or "").strip()
+        if not value or value == "—":
+            continue
+        if col == 7 and detail_text:
+            value = str(detail_text or "").strip()
+        if value:
+            parts.append(f"{label} {value}")
+
+    accessible_text = ", ".join(parts)
+    if not accessible_text:
+        return
+
+    description = str(detail_text or "").strip() or None
+    for col in range(table.columnCount()):
+        item = table.item(row, col)
+        if item is not None:
+            set_item_accessible_text(item, accessible_text, description=description)
