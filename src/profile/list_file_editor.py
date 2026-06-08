@@ -139,6 +139,14 @@ def validate_profile_list_file_text(kind: str, text: str) -> tuple[tuple[int, st
     return tuple(invalid)
 
 
+def count_profile_list_entries(text: str) -> int:
+    return sum(
+        1
+        for line in str(text or "").splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    )
+
+
 def profile_list_file_exists(lists_root: Path, value: str) -> bool:
     file_name = safe_list_file_name(value)
     if not file_name:

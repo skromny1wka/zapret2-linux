@@ -25,6 +25,7 @@ from .folders import (
 )
 from .list_interpreter import build_profile_list_sources
 from .list_file_editor import (
+    count_profile_list_entries,
     profile_list_file_exists,
     profile_list_file_reference,
     read_profile_list_file_text_parts,
@@ -1025,6 +1026,10 @@ class ProfilePresetService:
         reference = profile_list_file_reference(profile, self._lists_root())
         text_parts = read_profile_list_file_text_parts(self._lists_root(), reference)
         invalid_lines = validate_profile_list_file_text(reference.kind, text_parts.user_text) if reference.editable else ()
+        base_entries_count = count_profile_list_entries(text_parts.base_text) if reference.editable else 0
+        user_entries_count = count_profile_list_entries(
+            text_parts.user_text if reference.editable else text_parts.final_text
+        )
         return ProfileListFileEditorState(
             kind=reference.kind,
             display_path=reference.display_path,
@@ -1036,6 +1041,8 @@ class ProfilePresetService:
             editable=reference.editable,
             invalid_lines=invalid_lines,
             error_text=reference.error_text,
+            base_entries_count=base_entries_count,
+            user_entries_count=user_entries_count,
         )
 
     def _append_template_profile_to_preset(

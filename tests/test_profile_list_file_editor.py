@@ -7,6 +7,7 @@ import unittest
 
 from core.paths import AppPaths
 from profile.list_file_editor import (
+    count_profile_list_entries,
     profile_list_file_reference,
     validate_profile_list_file_text,
 )
@@ -43,6 +44,13 @@ class ProfileListFileEditorTests(unittest.TestCase):
         )
 
         self.assertEqual(invalid, ((3, "1.1.1.1-2.2.2.2"),))
+
+    def test_counts_list_entries_without_comments(self) -> None:
+        count = count_profile_list_entries(
+            "youtube.com\n# comment\n\nsub.example.org\n",
+        )
+
+        self.assertEqual(count, 2)
 
     def test_profile_reference_uses_current_hostlist_file(self) -> None:
         preset = parse_preset_text(
@@ -109,6 +117,8 @@ class ProfileListFileEditorTests(unittest.TestCase):
             self.assertEqual(list_editor.base_text, "1.1.1.1\n")
             self.assertEqual(list_editor.user_text, "2.2.2.2\n")
             self.assertEqual(list_editor.text, "1.1.1.1\n2.2.2.2\n")
+            self.assertEqual(list_editor.base_entries_count, 1)
+            self.assertEqual(list_editor.user_entries_count, 1)
 
             saved = service.save_profile_list_file_text("profile:0", "8.8.8.8\n")
             saved_text = (lists_dir / "user" / "ipset-youtube.txt").read_text(encoding="utf-8")
@@ -140,6 +150,8 @@ class ProfileListFileEditorTests(unittest.TestCase):
             self.assertEqual(list_editor.base_text, "youtube.com\n")
             self.assertEqual(list_editor.user_text, "")
             self.assertEqual(list_editor.text, "youtube.com\n")
+            self.assertEqual(list_editor.base_entries_count, 1)
+            self.assertEqual(list_editor.user_entries_count, 0)
             self.assertEqual((lists_dir / "user" / "youtube.txt").read_text(encoding="utf-8"), "")
             self.assertEqual((lists_dir / "youtube.txt").read_text(encoding="utf-8"), "youtube.com\n")
 

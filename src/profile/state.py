@@ -18,6 +18,8 @@ class ProfileListFileEditorState:
     editable: bool = False
     invalid_lines: tuple[tuple[int, str], ...] = ()
     error_text: str = ""
+    base_entries_count: int = 0
+    user_entries_count: int = 0
 
 
 @dataclass(frozen=True)

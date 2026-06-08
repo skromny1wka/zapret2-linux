@@ -933,12 +933,11 @@ def _profile_setup_payload_and_apply_signature(result):
     )
 
 
-def _list_file_entries_count(text: str) -> int:
-    return len([
-        line
-        for line in str(text or "").splitlines()
-        if line.strip() and not line.strip().startswith("#")
-    ])
+def _non_negative_int(value, default: int = 0) -> int:
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return max(0, int(default))
 
 
 class ProfileSetupPageBase(BasePage):
@@ -2695,8 +2694,14 @@ class ProfileSetupPageBase(BasePage):
         visible_user_text = user_text if editable else text
         base_text_changed = self.__dict__.get("_list_file_base_text_snapshot", "") != base_text
         user_text_changed = self.__dict__.get("_list_file_text_snapshot", "") != visible_user_text
-        self._list_file_base_entries_count = _list_file_entries_count(base_text) if editable else 0
-        self._list_file_user_entries_count = _list_file_entries_count(visible_user_text)
+        self._list_file_base_entries_count = (
+            _non_negative_int(getattr(state, "base_entries_count", 0))
+            if editable
+            else 0
+        )
+        self._list_file_user_entries_count = _non_negative_int(
+            getattr(state, "user_entries_count", 0)
+        )
 
         title = "Файл списка"
         if display_path:

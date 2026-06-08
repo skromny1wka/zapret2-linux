@@ -3,11 +3,8 @@ from __future__ import annotations
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from log.log import log
+from profile.list_file_editor import count_profile_list_entries
 from profile.setup_apply_signature import profile_setup_payload_apply_signature
-
-
-def _list_file_entries_count(text: str) -> int:
-    return sum(1 for line in str(text or "").splitlines() if line.strip())
 
 
 def _profile_setup_load_result(payload):
@@ -98,7 +95,7 @@ class ProfileListFileValidationWorker(QThread):
             )
             result = {
                 "invalid_lines": tuple(invalid_lines or ()),
-                "entries_count": _list_file_entries_count(self._text),
+                "entries_count": count_profile_list_entries(self._text),
             }
         except Exception as exc:
             log(f"ProfileListFileValidationWorker: не удалось проверить файл списка profile: {exc}", "ERROR")

@@ -610,6 +610,8 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
             text="user.example",
             base_text="base.example",
             user_text="user.example",
+            base_entries_count=1,
+            user_entries_count=1,
             base_display_path="",
             user_display_path="",
             editable=True,
@@ -625,6 +627,48 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         self.assertEqual(page._list_file_text.plain_text_read_calls, [])
         self.assertEqual(page._list_file_text.read_only_calls, [])
         self.assertEqual(page._list_file_status_label.calls, [])
+
+    def test_list_file_editor_state_uses_worker_entry_counts(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        import inspect
+
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._list_file_title = None
+        page._list_file_base_title = None
+        page._list_file_base_text = _PlainTextWidget("")
+        page._list_file_user_title = None
+        page._list_file_text = _PlainTextWidget("", read_only=False)
+        page._list_file_base_text_snapshot = ""
+        page._list_file_text_snapshot = ""
+        page._list_file_save_button = _BoolWidget(enabled=True)
+        page._list_file_status_label = _TextWidget("")
+        page._render_list_file_validation = Mock()
+
+        state = SimpleNamespace(
+            kind="hostlist",
+            display_path="",
+            text="visible.example\nignored-for-count.example\n",
+            base_text="base.example\nignored-for-count.example\n",
+            user_text="user.example\nignored-for-count.example\n",
+            base_entries_count=10,
+            user_entries_count=3,
+            base_display_path="",
+            user_display_path="",
+            editable=True,
+            error_text="",
+            invalid_lines=(),
+        )
+
+        ProfileSetupPageBase._apply_list_file_editor_state(page, state)
+
+        source = inspect.getsource(ProfileSetupPageBase._apply_list_file_editor_state)
+        self.assertNotIn("_list_file_entries_count", source)
+        self.assertEqual(page._list_file_base_entries_count, 10)
+        self.assertEqual(page._list_file_user_entries_count, 3)
+        self.assertEqual(page._list_file_status_label.text(), "Записей всего: 13 • ваших: 3")
 
     def test_list_file_editor_state_apply_is_deferred_after_worker_signal(self) -> None:
         from types import SimpleNamespace
