@@ -634,6 +634,21 @@ class TelegramWSProxy:
         except Exception:
             splitter = None
 
+        if should_route_upstream(self._upstream, mode="always"):
+            self._log(f"[{label}] MTProxy DC{dc}{media_tag} -> upstream (always mode)")
+            await self._mtproxy_upstream_proxy_connect(
+                client_reader,
+                client_writer,
+                target_host,
+                target_port,
+                relay_init,
+                crypto,
+                label,
+                dc,
+                is_media,
+            )
+            return
+
         if dc not in WSS_DOMAINS:
             self._log(f"[{label}] MTProxy DC{dc}{media_tag} -> fallback (no own WSS relay)")
             if await self._cloudflare_fallback(
@@ -881,6 +896,19 @@ class TelegramWSProxy:
         except Exception as exc:
             self.stats.failed_connections += 1
             self._log(f"[{label}] MTProxy TCP fallback failed: {type(exc).__name__}")
+            if self._upstream.enabled:
+                self._log(f"[{label}] MTProxy DC{dc}{media_tag} TCP failed -> trying upstream")
+                await self._mtproxy_upstream_proxy_connect(
+                    client_reader,
+                    client_writer,
+                    target_host,
+                    target_port,
+                    relay_init,
+                    crypto,
+                    label,
+                    dc,
+                    is_media,
+                )
             return
 
         self.stats.tcp_fallback_connections += 1
@@ -896,6 +924,65 @@ class TelegramWSProxy:
             log_fn=self._log,
             label=label,
         )
+
+    async def _mtproxy_upstream_proxy_connect(
+        self,
+        client_reader: asyncio.StreamReader,
+        client_writer: asyncio.StreamWriter,
+        target_host: str,
+        target_port: int,
+        relay_init: bytes,
+        crypto,
+        label: str,
+        dc: int,
+        is_media: bool,
+    ) -> bool:
+        """Route MTProxy relay traffic through the external SOCKS5 fallback."""
+        if not self._upstream.enabled:
+            return False
+
+        media_tag = " media" if is_media else ""
+        self._log(
+            f"[{label}] MTProxy DC{dc}{media_tag} upstream proxy "
+            f"-> {self._upstream.host}:{self._upstream.port}"
+        )
+        t_connect = time.monotonic()
+        try:
+            rr, rw = await socks5.connect_via_socks5(
+                self._upstream.host,
+                self._upstream.port,
+                target_host,
+                target_port,
+                username=self._upstream.username,
+                password=self._upstream.password,
+                timeout=CONNECT_TIMEOUT,
+            )
+            apply_socket_options(rw.transport, self._buffer_size)
+        except Exception as exc:
+            elapsed = time.monotonic() - t_connect
+            self.stats.failed_connections += 1
+            self._log(
+                f"[{label}] MTProxy DC{dc}{media_tag} upstream connect failed "
+                f"({elapsed:.1f}s): {type(exc).__name__}: {exc}"
+            )
+            return False
+
+        elapsed = time.monotonic() - t_connect
+        self._log(f"[{label}] MTProxy DC{dc}{media_tag} upstream connected ({elapsed:.1f}s)")
+        self.stats.upstream_connections += 1
+        rw.write(relay_init)
+        await rw.drain()
+        await relay_mtproxy_tcp(
+            client_reader=client_reader,
+            client_writer=client_writer,
+            remote_reader=rr,
+            remote_writer=rw,
+            crypto=crypto,
+            stats=self.stats,
+            log_fn=self._log,
+            label=label,
+        )
+        return True
 
     async def _tcp_fallback(
         self,

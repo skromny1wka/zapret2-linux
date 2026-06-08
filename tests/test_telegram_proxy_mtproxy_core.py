@@ -622,6 +622,101 @@ class TelegramProxyMTProxyCoreTests(unittest.TestCase):
         self.assertEqual(cloudflare.call_count, 1)
         connect.assert_not_called()
 
+    def test_mtproxy_respects_upstream_always_mode_before_wss(self) -> None:
+        import asyncio
+        from unittest.mock import patch
+
+        from telegram_proxy.proxy.mtproxy import PROTO_TAG_INTERMEDIATE, generate_relay_init
+        from telegram_proxy.proxy.routing import UpstreamProxyConfig
+        from telegram_proxy.wss_proxy import TelegramWSProxy
+
+        class _NoWssPool:
+            async def get(self, *_args, **_kwargs):
+                raise AssertionError("MTProxy upstream always mode must skip WSS")
+
+        async def fake_upstream(*_args, **_kwargs):
+            return True
+
+        proxy = TelegramWSProxy(
+            mode="mtproxy",
+            mtproxy_secret="aabbccddeeff00112233445566778899",
+            upstream_config=UpstreamProxyConfig(
+                enabled=True,
+                host="127.0.0.1",
+                port=1080,
+                mode="always",
+            ),
+        )
+        proxy._ws_pool = _NoWssPool()
+        relay_init = generate_relay_init(PROTO_TAG_INTERMEDIATE, dc=2, is_media=True)
+
+        with (
+            patch.object(proxy, "_mtproxy_upstream_proxy_connect", side_effect=fake_upstream) as upstream,
+            patch.object(proxy, "_cloudflare_fallback") as cloudflare,
+            patch("telegram_proxy.wss_proxy.RawWebSocket.connect") as connect,
+        ):
+            asyncio.run(
+                proxy._tunnel_mtproxy_via_wss(
+                    object(),
+                    object(),
+                    2,
+                    True,
+                    relay_init,
+                    object(),
+                    PROTO_TAG_INTERMEDIATE,
+                    "149.154.167.151",
+                    443,
+                    "test",
+                )
+            )
+
+        self.assertEqual(upstream.call_count, 1)
+        cloudflare.assert_not_called()
+        connect.assert_not_called()
+
+    def test_mtproxy_tcp_fallback_tries_upstream_after_direct_connect_failure(self) -> None:
+        import asyncio
+        from unittest.mock import patch
+
+        from telegram_proxy.proxy.mtproxy import PROTO_TAG_INTERMEDIATE, generate_relay_init
+        from telegram_proxy.proxy.routing import UpstreamProxyConfig
+        from telegram_proxy.wss_proxy import TelegramWSProxy
+
+        async def fake_upstream(*_args, **_kwargs):
+            return True
+
+        proxy = TelegramWSProxy(
+            mode="mtproxy",
+            mtproxy_secret="aabbccddeeff00112233445566778899",
+            upstream_config=UpstreamProxyConfig(
+                enabled=True,
+                host="127.0.0.1",
+                port=1080,
+                mode="fallback",
+            ),
+        )
+        relay_init = generate_relay_init(PROTO_TAG_INTERMEDIATE, dc=5, is_media=False)
+
+        with (
+            patch("telegram_proxy.wss_proxy.asyncio.open_connection", side_effect=OSError("blocked")),
+            patch.object(proxy, "_mtproxy_upstream_proxy_connect", side_effect=fake_upstream) as upstream,
+        ):
+            asyncio.run(
+                proxy._mtproxy_tcp_fallback(
+                    object(),
+                    object(),
+                    "91.108.56.100",
+                    443,
+                    relay_init,
+                    object(),
+                    "test",
+                    5,
+                    False,
+                )
+            )
+
+        self.assertEqual(upstream.call_count, 1)
+
 
 if __name__ == "__main__":
     unittest.main()
