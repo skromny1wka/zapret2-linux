@@ -45,7 +45,13 @@ async def handshake(
     """
     try:
         return await _do_handshake(reader, writer)
-    except (Socks5Error, asyncio.IncompleteReadError, ConnectionError, struct.error) as e:
+    except (
+        Socks5Error,
+        asyncio.IncompleteReadError,
+        asyncio.TimeoutError,
+        ConnectionError,
+        struct.error,
+    ) as e:
         log.debug("SOCKS5 handshake failed: %s", e)
         return None
     except Exception:

@@ -136,6 +136,15 @@ class TelegramProxyMTProxyCoreTests(unittest.TestCase):
             ),
             "tg://proxy?server=proxy.example.com&port=443&secret=eeaabbccddeeff0011223344556677889966726f6e742e6578616d706c652e636f6d",
         )
+        self.assertEqual(
+            build_mtproxy_link(
+                "proxy.example.com",
+                443,
+                "aabbccddeeff00112233445566778899",
+                fake_tls_domain="bad domain",
+            ),
+            "tg://proxy?server=proxy.example.com&port=443&secret=ddaabbccddeeff00112233445566778899",
+        )
 
     def test_fake_tls_settings_are_normalized_in_settings_json_shape(self) -> None:
         from settings.normalize import normalize_telegram_proxy
