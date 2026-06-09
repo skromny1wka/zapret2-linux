@@ -130,10 +130,9 @@ class ProfilesList(QWidget):
         apply_smooth_scroll_mode(self._view, enabled)
 
     def build_profiles(self, items: tuple[Any, ...]) -> None:
-        self._model.set_profiles(
-            tuple(items or ()),
-            active_profile_types=self._active_profile_types,
-            search_query=self._search_query,
+        self._request_view_state_rebuild(
+            items=tuple(items or ()),
+            reset_group_expanded=True,
         )
 
     def apply_view_state(self, view_state) -> None:
@@ -154,11 +153,8 @@ class ProfilesList(QWidget):
         return options
 
     def update_profiles(self, items: tuple[Any, ...]) -> bool:
-        return self._model.update_profiles(
-            tuple(items or ()),
-            active_profile_types=self._active_profile_types,
-            search_query=self._search_query,
-        )
+        self._request_view_state_rebuild(items=tuple(items or ()))
+        return True
 
     def clear(self) -> None:
         self._model.set_profiles(())

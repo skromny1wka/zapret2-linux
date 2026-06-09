@@ -1810,6 +1810,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         import profile.ui.profiles_list as profiles_list_module
 
         list_source = inspect.getsource(ProfilesList)
+        build_source = inspect.getsource(ProfilesList.build_profiles)
+        update_source = inspect.getsource(ProfilesList.update_profiles)
         search_source = inspect.getsource(ProfilesList.set_search_query)
         type_source = inspect.getsource(ProfilesList._apply_profile_type_filter)
         toggle_source = inspect.getsource(ProfilesList._on_delegate_action)
@@ -1823,6 +1825,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         worker_source = inspect.getsource(profiles_list_module.ProfileListViewStateWorker.run)
 
         self.assertIn("OneShotWorkerRuntime", list_source)
+        self.assertIn("_request_view_state_rebuild", build_source)
+        self.assertIn("_request_view_state_rebuild", update_source)
         self.assertIn("_request_view_state_rebuild", search_source)
         self.assertIn("_request_view_state_rebuild", type_source)
         self.assertIn("_request_view_state_rebuild", toggle_source)
@@ -1833,6 +1837,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_request_view_state_rebuild", replace_item_source)
         self.assertIn("_request_view_state_rebuild", add_item_source)
         self.assertIn("_request_view_state_rebuild", remove_item_source)
+        self.assertNotIn("self._model.set_profiles", build_source)
+        self.assertNotIn("self._model.update_profiles", update_source)
         self.assertNotIn("self._model.set_search_query", search_source)
         self.assertNotIn("self._model.set_active_profile_types", type_source)
         self.assertNotIn("self._model.set_group_expanded", toggle_source)

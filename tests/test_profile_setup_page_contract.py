@@ -457,14 +457,15 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertIn("QStyledItemDelegate", delegate_source)
         self.assertIn("ListView", view_source)
 
-    def test_profile_list_builds_model_in_one_reset(self) -> None:
+    def test_profile_list_builds_model_through_worker_view_state(self) -> None:
         from profile.ui.profile_list_model import ProfileListModel
 
         list_source = inspect.getsource(ProfilesList.build_profiles)
         model_source = inspect.getsource(ProfileListModel.set_profiles)
 
-        self.assertIn("active_profile_types=", list_source)
-        self.assertIn("search_query=", list_source)
+        self.assertIn("_request_view_state_rebuild", list_source)
+        self.assertIn("reset_group_expanded=True", list_source)
+        self.assertNotIn("self._model.set_profiles", list_source)
         self.assertNotIn("set_active_profile_types(self._active_profile_types)", list_source)
         self.assertNotIn("set_search_query(self._search_query)", list_source)
         self.assertIn("active_profile_types", model_source)
@@ -732,6 +733,31 @@ class ProfileSetupPageContractTests(unittest.TestCase):
                 call(items=(updated,)),
                 call(items=(current, created)),
                 call(items=()),
+            ],
+        )
+
+    def test_profile_list_build_and_update_request_worker_view_state_rebuild(self) -> None:
+        first = SimpleNamespace(key="profile-1", user_profile_id="", enabled=True)
+        second = SimpleNamespace(key="profile-2", user_profile_id="", enabled=True)
+        profiles_list = ProfilesList.__new__(ProfilesList)
+        profiles_list._active_profile_types = {"all"}
+        profiles_list._search_query = ""
+        profiles_list._model = SimpleNamespace(
+            set_profiles=Mock(side_effect=AssertionError("initial rows must be built in worker")),
+            update_profiles=Mock(side_effect=AssertionError("updated rows must be built in worker")),
+        )
+        profiles_list._request_view_state_rebuild = Mock()
+
+        ProfilesList.build_profiles(profiles_list, (first,))
+        self.assertTrue(ProfilesList.update_profiles(profiles_list, (first, second)))
+
+        profiles_list._model.set_profiles.assert_not_called()
+        profiles_list._model.update_profiles.assert_not_called()
+        self.assertEqual(
+            profiles_list._request_view_state_rebuild.call_args_list,
+            [
+                call(items=(first,), reset_group_expanded=True),
+                call(items=(first, second)),
             ],
         )
 
