@@ -1024,9 +1024,10 @@ class ProfileSetupPageBase(BasePage):
         self._list_file_save_runtime = OneShotWorkerRuntime()
         self._list_file_save_request_id = 0
         self._list_file_save_runtime_worker = None
-        self._pending_list_file_save: tuple[str, str] | None = None
-        self._scheduled_list_file_save: tuple[str, str] | None = None
-        self._list_file_save_start_scheduled = False
+        self._list_file_save_state = LatestValueWorkerState(
+            self._list_file_save_runtime,
+            empty_value=None,
+        )
         self._list_file_validation_runtime = OneShotWorkerRuntime()
         self._list_file_validation_request_id = 0
         self._list_file_validation_runtime_worker = None
@@ -1159,7 +1160,7 @@ class ProfileSetupPageBase(BasePage):
                 return True
         if self.__dict__.get("_enabled_save_start_scheduled", False):
             return True
-        if self.__dict__.get("_list_file_save_start_scheduled", False):
+        if self._list_file_save_state_obj().start_scheduled:
             return True
         return False
 
@@ -2861,6 +2862,7 @@ class ProfileSetupPageBase(BasePage):
         inserted = self._list_file_inserted_text(start, max(0, int(chars_added or 0)))
         self._list_file_text_snapshot = f"{current[:start]}{inserted}{current[start + removed:]}"
         self._list_file_text_dirty = True
+        self._list_file_text_snapshot_from_change = True
 
     def _list_file_inserted_text(self, position: int, chars_added: int) -> str:
         if chars_added <= 0:
@@ -2896,7 +2898,10 @@ class ProfileSetupPageBase(BasePage):
         request = dict(request or {})
         raw_text = request.get("text")
         if raw_text is None:
-            if bool(self.__dict__.get("_list_file_text_dirty", False)):
+            if (
+                bool(self.__dict__.get("_list_file_text_dirty", False))
+                and not bool(self.__dict__.get("_list_file_text_snapshot_from_change", False))
+            ):
                 editor = self.__dict__.get("_list_file_text")
                 try:
                     text = str(editor.toPlainText() or "") if editor is not None else ""
@@ -2908,6 +2913,7 @@ class ProfileSetupPageBase(BasePage):
             text = str(raw_text or "")
         self._list_file_text_snapshot = text
         self._list_file_text_dirty = False
+        self._list_file_text_snapshot_from_change = False
         return {
             "kind": str(request.get("kind") or ""),
             "text": text,
@@ -3059,7 +3065,9 @@ class ProfileSetupPageBase(BasePage):
             return
         text = str(text or "")
         if self._profile_setup_write_is_running():
-            self._pending_list_file_save = (profile_key, text)
+            state = self._list_file_save_state_obj()
+            if not (state.start_scheduled and state.has_pending()):
+                state.pending = (profile_key, text)
             self._queue_profile_setup_write_operation(
                 {"kind": "list_file_save", "profile_key": profile_key, "text": text}
             )
@@ -3091,7 +3099,7 @@ class ProfileSetupPageBase(BasePage):
     def _on_list_file_save_finished(self, request_id: int, state, payload=None) -> None:
         if request_id != self._list_file_save_request_id:
             return
-        if self.__dict__.get("_pending_list_file_save"):
+        if self._list_file_save_state_obj().has_pending():
             return
         payload, apply_signature = _profile_setup_payload_and_apply_signature(payload)
         if state is not None:
@@ -3116,7 +3124,7 @@ class ProfileSetupPageBase(BasePage):
     def _on_list_file_save_failed(self, request_id: int, error: str) -> None:
         if request_id != self._list_file_save_request_id:
             return
-        if self.__dict__.get("_pending_list_file_save"):
+        if self._list_file_save_state_obj().has_pending():
             return
         log(f"{self.__class__.__name__}: не удалось сохранить файл списка profile: {error}", "ERROR")
         self._render_list_file_validation((), fallback_error=str(error))
@@ -3129,31 +3137,31 @@ class ProfileSetupPageBase(BasePage):
             return
         if self._start_next_profile_setup_write_operation():
             return
-        pending = self.__dict__.get("_pending_list_file_save")
-        self._pending_list_file_save = None
-        if pending:
-            profile_key, text = pending
-            self._schedule_pending_list_file_save_start(profile_key, text)
+        if self._list_file_save_state_obj().has_pending():
+            self._schedule_pending_list_file_save_start()
 
-    def _schedule_pending_list_file_save_start(self, profile_key: str, text: str) -> None:
-        self._scheduled_list_file_save = (str(profile_key or ""), str(text or ""))
-        if self.__dict__.get("_list_file_save_start_scheduled", False):
-            return
-        self._list_file_save_start_scheduled = True
-        try:
-            QTimer.singleShot(0, self._run_scheduled_list_file_save_start)
-        except Exception:
-            self._run_scheduled_list_file_save_start()
+    def _schedule_pending_list_file_save_start(self, profile_key: str | None = None, text: str | None = None) -> None:
+        state = self._list_file_save_state_obj()
+        if profile_key is not None or text is not None:
+            state.pending = (str(profile_key or ""), str(text or ""))
+
+        def _single_shot(delay: int, callback) -> None:
+            try:
+                QTimer.singleShot(delay, callback)
+            except Exception:
+                callback()
+
+        state.schedule_start(_single_shot, self._run_scheduled_list_file_save_start)
 
     def _run_scheduled_list_file_save_start(self) -> None:
-        self._list_file_save_start_scheduled = False
-        pending = self.__dict__.get("_scheduled_list_file_save")
-        self._scheduled_list_file_save = None
-        if not pending or self.__dict__.get("_cleanup_in_progress", False):
+        pending = self._list_file_save_state_obj().take_pending_for_scheduled_start(
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
+        if not pending:
             return
         profile_key, text = pending
         if self._profile_setup_write_is_running():
-            self._pending_list_file_save = (str(profile_key or ""), str(text or ""))
+            self._list_file_save_state_obj().pending = (str(profile_key or ""), str(text or ""))
             self._queue_profile_setup_write_operation(
                 {
                     "kind": "list_file_save",
@@ -3163,6 +3171,48 @@ class ProfileSetupPageBase(BasePage):
             )
             return
         self._start_list_file_save_worker(str(profile_key or ""), str(text or ""))
+
+    def _list_file_save_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_list_file_save_state")
+        runtime = self.__dict__.get("_list_file_save_runtime")
+        if state is None:
+            pending = self.__dict__.pop("_pending_list_file_save", None)
+            scheduled = self.__dict__.pop("_scheduled_list_file_save", None)
+            start_scheduled = bool(self.__dict__.pop("_list_file_save_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=None,
+                pending=scheduled if scheduled is not None else pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_list_file_save_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _pending_list_file_save(self):
+        return self._list_file_save_state_obj().pending
+
+    @_pending_list_file_save.setter
+    def _pending_list_file_save(self, value) -> None:
+        self._list_file_save_state_obj().pending = value
+
+    @property
+    def _scheduled_list_file_save(self):
+        return self._list_file_save_state_obj().pending
+
+    @_scheduled_list_file_save.setter
+    def _scheduled_list_file_save(self, value) -> None:
+        self._list_file_save_state_obj().pending = value
+
+    @property
+    def _list_file_save_start_scheduled(self) -> bool:
+        return bool(self._list_file_save_state_obj().start_scheduled)
+
+    @_list_file_save_start_scheduled.setter
+    def _list_file_save_start_scheduled(self, value: bool) -> None:
+        self._list_file_save_state_obj().start_scheduled = bool(value)
 
     def _render_list_file_validation(
         self,
@@ -4137,7 +4187,7 @@ class ProfileSetupPageBase(BasePage):
         self._setup_load_start_scheduled = False
         self._list_file_load_state_obj().reset()
         self._list_file_validation_state_obj().reset()
-        self._list_file_save_start_scheduled = False
+        self._list_file_save_state_obj().reset()
         self._enabled_save_start_scheduled = False
         self._strategy_feedback_save_start_scheduled = False
         self._profile_setup_payload_apply_scheduled = False

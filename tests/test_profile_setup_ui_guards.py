@@ -1345,7 +1345,8 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
             ProfileSetupPageBase._on_list_file_save_worker_finished(page, object())
 
         page._start_list_file_save_worker.assert_not_called()
-        self.assertIsNone(page._pending_list_file_save)
+        self.assertEqual(page._list_file_save_state_obj().pending, pending)
+        self.assertTrue(page._list_file_save_state_obj().start_scheduled)
         self.assertEqual(len(callbacks), 1)
 
         callbacks[0]()
@@ -1373,7 +1374,11 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
             ProfileSetupPageBase._request_list_file_save(page, "profile-1", "second.example")
 
         page._start_list_file_save_worker.assert_not_called()
-        self.assertEqual(page._pending_list_file_save, ("profile-1", "second.example"))
+        self.assertEqual(page._list_file_save_state_obj().pending, ("profile-1", "first.example"))
+        self.assertEqual(
+            page._pending_profile_setup_write_operations,
+            [{"kind": "list_file_save", "profile_key": "profile-1", "text": "second.example"}],
+        )
         self.assertEqual(len(callbacks), 1)
 
         callbacks[0]()
