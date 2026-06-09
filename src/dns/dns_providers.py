@@ -66,11 +66,27 @@ DNS_PROVIDERS = {
     },
     "Для ИИ": {
         "Xbox DNS": {
-            "ipv4": ["176.99.11.77", "80.78.247.254"],
+            "ipv4": ["111.88.96.50", "111.88.96.51"],
             "ipv6": [],
             "desc": "ChatGPT",
             "icon": "fa5s.robot",
             "color": "#9c27b0",
+            "doh": "https://xbox-dns.ru/dns-query"
+        },
+        "Xbox DNS v2": {
+            "ipv4": ["87.228.47.200", "87.228.47.201"],
+            "ipv6": [],
+            "desc": "ChatGPT",
+            "icon": "fa5s.robot",
+            "color": "#7b1fa2",
+            "doh": "https://xbox-dns.ru/dns-query"
+        },
+        "Xbox DNS (old)": {
+            "ipv4": ["176.99.11.77", "80.78.247.254"],
+            "ipv6": [],
+            "desc": "ChatGPT",
+            "icon": "fa5s.robot",
+            "color": "#6d6d6d",
             "doh": "https://xbox-dns.ru/dns-query"
         },
         "Comss DNS": {
@@ -91,4 +107,3 @@ DNS_PROVIDERS = {
         },
     }
 }
-
