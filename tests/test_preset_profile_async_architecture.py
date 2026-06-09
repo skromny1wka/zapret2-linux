@@ -1628,12 +1628,11 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn('context["folder_state"]', worker_source)
         self.assertIn("_queue_preset_folder_action", request_source)
         self.assertIn(
-            "_preset_folder_action_pending",
+            "_preset_folder_action_state_obj()",
             inspect.getsource(UserPresetsPageBase._queue_preset_folder_action),
         )
         self.assertIn("_start_next_preset_write_action", finished_source)
-        self.assertIn("_preset_folder_action_pending", next_write_source)
-        self.assertIn("pending_folder_actions.pop(0)", next_write_source)
+        self.assertIn("_preset_folder_action_state_obj().pop_next()", next_write_source)
         self.assertIn("update_cached_folder_state", action_finished_source)
         self.assertIn("show_menu", action_finished_source)
         self.assertIn("create_preset_folder_action_worker", request_source)

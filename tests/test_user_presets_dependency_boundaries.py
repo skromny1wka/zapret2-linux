@@ -648,6 +648,25 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
             ["toggle_collapsed", "toggle_collapsed"],
         )
 
+    def test_user_presets_folder_action_queue_uses_shared_queued_worker_state(self) -> None:
+        from presets.ui.common.user_presets_page import UserPresetsPageBase
+        from ui.queued_worker_state import QueuedWorkerState
+
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_folder_action_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+
+        init_source = inspect.getsource(UserPresetsPageBase.__init__)
+        queue_source = inspect.getsource(UserPresetsPageBase._queue_preset_folder_action)
+        cleanup_source = inspect.getsource(UserPresetsPageBase._stop_action_workers_for_cleanup)
+
+        self.assertTrue(hasattr(UserPresetsPageBase, "_preset_folder_action_state_obj"))
+        self.assertIsInstance(page._preset_folder_action_state_obj(), QueuedWorkerState)
+        self.assertIn("_preset_folder_action_state = QueuedWorkerState", init_source)
+        self.assertIn("_preset_folder_action_state_obj()", queue_source)
+        self.assertIn("_preset_folder_action_state_obj().reset()", cleanup_source)
+        self.assertNotIn("self._preset_folder_action_pending: list", init_source)
+        self.assertNotIn("self._preset_folder_action_start_scheduled = False", init_source)
+
     def test_user_presets_folder_click_requests_explicit_collapsed_state(self) -> None:
         from presets.ui.common.user_presets_page import UserPresetsPageBase
 

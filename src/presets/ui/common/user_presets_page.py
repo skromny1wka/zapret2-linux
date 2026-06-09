@@ -82,6 +82,7 @@ from ui.presets_menu.toolbar import PresetsToolbarLayout
 from ui.presets_menu.common import tr_text as _tr_text
 from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
+from ui.queued_worker_state import QueuedWorkerState
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,8 +198,9 @@ class UserPresetsPageBase(BasePage):
         self._preset_folder_action_runtime = OneShotWorkerRuntime()
         self._preset_folder_action_request_id = 0
         self._preset_folder_action_runtime_worker = None
-        self._preset_folder_action_pending: list[dict[str, object]] = []
-        self._preset_folder_action_start_scheduled = False
+        self._preset_folder_action_state = QueuedWorkerState[dict[str, object]](
+            self._preset_folder_action_runtime,
+        )
         self._preset_open_folder_runtime = OneShotWorkerRuntime()
         self._preset_open_folder_request_id = 0
         self._preset_open_folder_runtime_worker = None
@@ -1280,7 +1282,7 @@ class UserPresetsPageBase(BasePage):
         queued = dict(payload or {})
         action = str(queued.get("action") or "")
         folder_key = str(queued.get("folder_key") or "")
-        pending = self.__dict__.setdefault("_preset_folder_action_pending", [])
+        pending = self._preset_folder_action_state_obj().pending
         if action == "move" and queued in pending:
             return
         if action == "set_collapsed" and folder_key:
@@ -1297,7 +1299,7 @@ class UserPresetsPageBase(BasePage):
     def _on_preset_folder_action_finished(self, request_id: int, action: str, result, context) -> None:
         if request_id != int(getattr(self, "_preset_folder_action_request_id", 0) or 0):
             return
-        if self.__dict__.get("_preset_folder_action_pending"):
+        if self._preset_folder_action_state_obj().has_pending():
             return
         context = dict(context or {})
         if isinstance(result, dict):
@@ -1341,19 +1343,24 @@ class UserPresetsPageBase(BasePage):
 
     def _schedule_preset_folder_action_start(self, pending: dict[str, object]) -> None:
         queued = dict(pending or {})
-        if self.__dict__.get("_cleanup_in_progress", False):
-            return
-        if self.__dict__.get("_preset_folder_action_start_scheduled", False):
-            self._queue_preset_folder_action(queued)
-            return
-        self._preset_folder_action_start_scheduled = True
-        try:
-            QTimer.singleShot(0, lambda: self._run_scheduled_preset_folder_action_start(queued))
-        except Exception:
-            self._run_scheduled_preset_folder_action_start(queued)
+        state = self._preset_folder_action_state_obj()
+
+        def _single_shot(delay: int, callback) -> None:
+            try:
+                QTimer.singleShot(delay, callback)
+            except Exception:
+                callback()
+
+        state.schedule_start(
+            queued,
+            _single_shot,
+            self._run_scheduled_preset_folder_action_start,
+            queue_item=self._queue_preset_folder_action,
+            is_cleanup_in_progress=lambda: bool(self.__dict__.get("_cleanup_in_progress", False)),
+        )
 
     def _run_scheduled_preset_folder_action_start(self, pending: dict[str, object]) -> None:
-        self._preset_folder_action_start_scheduled = False
+        self._preset_folder_action_state_obj().start_scheduled = False
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         self._request_preset_folder_action(
@@ -1364,6 +1371,38 @@ class UserPresetsPageBase(BasePage):
             collapsed=bool(pending.get("collapsed")),
             context_extra=dict(pending.get("context_extra") or {}),
         )
+
+    def _preset_folder_action_state_obj(self) -> QueuedWorkerState[dict[str, object]]:
+        state = self.__dict__.get("_preset_folder_action_state")
+        runtime = self.__dict__.get("_preset_folder_action_runtime")
+        if state is None:
+            pending = list(self.__dict__.pop("_preset_folder_action_pending", []) or [])
+            start_scheduled = bool(self.__dict__.pop("_preset_folder_action_start_scheduled", False))
+            state = QueuedWorkerState(
+                runtime,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_preset_folder_action_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _preset_folder_action_pending(self) -> list[dict[str, object]]:
+        return self._preset_folder_action_state_obj().pending
+
+    @_preset_folder_action_pending.setter
+    def _preset_folder_action_pending(self, value: list[dict[str, object]]) -> None:
+        self._preset_folder_action_state_obj().pending = list(value or [])
+
+    @property
+    def _preset_folder_action_start_scheduled(self) -> bool:
+        return bool(self._preset_folder_action_state_obj().start_scheduled)
+
+    @_preset_folder_action_start_scheduled.setter
+    def _preset_folder_action_start_scheduled(self, value: bool) -> None:
+        self._preset_folder_action_state_obj().start_scheduled = bool(value)
 
     def _on_toggle_pin_preset(self, name: str):
         self._request_preset_storage_action(
@@ -1482,7 +1521,7 @@ class UserPresetsPageBase(BasePage):
     def _preset_write_action_running(self) -> bool:
         if self.__dict__.get("_preset_write_action_start_scheduled", False):
             return True
-        if self.__dict__.get("_preset_folder_action_start_scheduled", False):
+        if self._preset_folder_action_state_obj().start_scheduled:
             return True
         for attr in (
             "_preset_activate_runtime",
@@ -1506,9 +1545,8 @@ class UserPresetsPageBase(BasePage):
                 "_preset_bulk_action_pending",
                 "_preset_edit_action_pending",
                 "_pending_preset_activation",
-                "_preset_folder_action_pending",
             )
-        )
+        ) or self._preset_folder_action_state_obj().has_pending()
 
     def _queue_preset_write_action(
         self,
@@ -1758,9 +1796,8 @@ class UserPresetsPageBase(BasePage):
     def _start_next_preset_write_action(self) -> bool:
         if self._preset_write_action_running():
             return True
-        pending_folder_actions = self.__dict__.setdefault("_preset_folder_action_pending", [])
-        if pending_folder_actions:
-            pending_folder = pending_folder_actions.pop(0)
+        pending_folder = self._preset_folder_action_state_obj().pop_next()
+        if pending_folder:
             self._schedule_preset_folder_action_start(pending_folder)
             return True
         pending = self._pop_next_preset_write_action()
@@ -2468,8 +2505,7 @@ class UserPresetsPageBase(BasePage):
         self.__dict__.setdefault("_pending_preset_write_actions", []).clear()
         self._scheduled_preset_write_action = None
         self._preset_write_action_start_scheduled = False
-        self._preset_folder_action_pending.clear()
-        self._preset_folder_action_start_scheduled = False
+        self._preset_folder_action_state_obj().reset()
         self._preset_open_folder_state_obj().reset()
         self._preset_open_folder_runtime_worker = None
         self.__dict__.setdefault("_preset_item_action_pending", []).clear()
