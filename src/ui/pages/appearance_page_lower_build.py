@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import QLabel, QVBoxLayout, QHBoxLayout
 
 from ui.fluent_widgets import SettingsCard, build_premium_badge
 from app.ui_texts import tr as tr_catalog
+from ui.accessibility import set_control_accessibility, set_state_text
 
 
 @dataclass(slots=True)
@@ -211,6 +212,12 @@ def build_opacity_section(
     opacity_slider.setValue(initial_opacity)
     opacity_slider.setSingleStep(1)
     opacity_slider.setPageStep(5)
+    opacity_slider.setProperty("appearanceOpacityTitle", opacity_title_text)
+    opacity_slider.setProperty("appearanceOpacityDescription", opacity_desc_text)
+    update_opacity_slider_accessibility(opacity_slider, initial_opacity)
+    opacity_slider.valueChanged.connect(
+        lambda value, slider=opacity_slider: update_opacity_slider_accessibility(slider, value)
+    )
     opacity_slider.valueChanged.connect(on_opacity_changed)
     opacity_layout.addWidget(opacity_slider)
 
@@ -290,4 +297,22 @@ def build_performance_section(
         animations_switch=animations_switch,
         smooth_scroll_switch=smooth_scroll_switch,
         editor_smooth_scroll_switch=editor_smooth_scroll_switch,
+    )
+
+
+def update_opacity_slider_accessibility(slider, value: object | None = None) -> None:
+    if slider is None:
+        return
+    try:
+        current_value = int(slider.value() if value is None else value)
+    except Exception:
+        current_value = 100
+    title = str(slider.property("appearanceOpacityTitle") or "Прозрачность окна").strip()
+    description = str(slider.property("appearanceOpacityDescription") or "").strip()
+    state = f"{title}, значение: {current_value}%"
+    set_state_text(slider, state)
+    set_control_accessibility(
+        slider,
+        name=state,
+        description=description or "Настройка прозрачности окна приложения.",
     )

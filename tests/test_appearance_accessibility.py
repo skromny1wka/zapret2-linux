@@ -6,9 +6,11 @@ import unittest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtWidgets import QApplication, QWidget
-from qfluentwidgets import BodyLabel, CaptionLabel, ComboBox, RadioButton, SegmentedWidget
+from PyQt6.QtGui import QPixmap
+from qfluentwidgets import BodyLabel, CaptionLabel, ComboBox, RadioButton, SegmentedWidget, Slider
 
 from ui.fluent_widgets import SettingsCard
+from ui.pages.appearance_page_lower_build import build_opacity_section
 from ui.pages.appearance_page_top_build import (
     build_background_section,
     build_display_mode_section,
@@ -100,6 +102,43 @@ class AppearanceAccessibilityTests(unittest.TestCase):
         self.assertEqual(
             segmented.property("screenReaderStateText"),
             "Стиль иконок бокового меню, выбрано: Windows 11 Fluent",
+        )
+
+    def test_opacity_slider_reads_current_percent(self) -> None:
+        class _Page:
+            content = QWidget()
+
+            def __init__(self) -> None:
+                self.widgets = []
+
+            def add_widget(self, widget) -> None:
+                self.widgets.append(widget)
+
+            def add_spacing(self, _value: int) -> None:
+                pass
+
+        page = _Page()
+        widgets = build_opacity_section(
+            page=page,
+            tr_language="ru",
+            settings_card_cls=SettingsCard,
+            caption_label_cls=CaptionLabel,
+            body_label_cls=BodyLabel,
+            slider_cls=Slider,
+            initial_opacity=72,
+            get_icon_pixmap=lambda *_args: QPixmap(20, 20),
+            on_opacity_changed=lambda _value: None,
+        )
+
+        self.assertEqual(widgets.opacity_slider.accessibleName(), "Прозрачность окна, значение: 72%")
+        self.assertIn("Настройка прозрачности", widgets.opacity_slider.accessibleDescription())
+
+        widgets.opacity_slider.setValue(85)
+
+        self.assertEqual(widgets.opacity_slider.accessibleName(), "Прозрачность окна, значение: 85%")
+        self.assertEqual(
+            widgets.opacity_slider.property("screenReaderStateText"),
+            "Прозрачность окна, значение: 85%",
         )
 
     def test_saved_sidebar_icon_style_refreshes_screen_reader_state(self) -> None:

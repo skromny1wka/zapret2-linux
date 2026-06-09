@@ -13,6 +13,7 @@ from ui.pages.appearance_page_lower_build import (
     build_holiday_sections,
     build_opacity_section,
     build_performance_section,
+    update_opacity_slider_accessibility,
 )
 from ui.pages.appearance_page_runtime_helpers import (
     apply_appearance_language,
@@ -1563,6 +1564,7 @@ class AppearancePage(BasePage):
         """Устанавливает значение слайдера прозрачности (без эмита сигнала)"""
         if self._opacity_slider:
             self._set_slider_value_silently(self._opacity_slider, value)
+            update_opacity_slider_accessibility(self._opacity_slider, value)
         if self._opacity_label:
             self._opacity_label.setText(f"{value}%")
 
