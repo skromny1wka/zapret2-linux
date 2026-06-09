@@ -1072,7 +1072,10 @@ class ProfileSetupPageBase(BasePage):
         self._strategy_apply_runtime_worker = None
         self._strategy_apply_runtime_strategy_id = ""
         self._strategy_apply_runtime_branch_id = ""
-        self._pending_strategy_apply = None
+        self._strategy_apply_state = LatestValueWorkerState(
+            self._strategy_apply_runtime,
+            empty_value=None,
+        )
         self._scheduled_profile_setup_write_operation = None
         self._pending_profile_setup_write_operations: list[dict[str, object]] = []
         self._profile_setup_write_operation_start_scheduled = False
@@ -3910,7 +3913,7 @@ class ProfileSetupPageBase(BasePage):
                 strategy_id != str(getattr(self, "_strategy_apply_runtime_strategy_id", "") or "").strip()
                 or branch_id != str(getattr(self, "_strategy_apply_runtime_branch_id", "") or "").strip()
             ):
-                self._pending_strategy_apply = (strategy_id, branch_id) if branch_id else strategy_id
+                self._strategy_apply_state_obj().pending = (strategy_id, branch_id) if branch_id else strategy_id
                 self._queue_profile_setup_write_operation(
                     {
                         "kind": "strategy_apply",
@@ -3962,7 +3965,7 @@ class ProfileSetupPageBase(BasePage):
             return
         if str(requested_profile_key or "").strip() != str(self._profile_key or "").strip():
             return
-        pending = getattr(self, "_pending_strategy_apply", None)
+        pending = self._strategy_apply_state_obj().pending
         pending_strategy_id = ""
         if isinstance(pending, tuple):
             pending_strategy_id = str(pending[0] or "").strip()
@@ -4003,7 +4006,7 @@ class ProfileSetupPageBase(BasePage):
     def _on_strategy_apply_failed(self, request_id: int, error: str) -> None:
         if request_id != int(getattr(self, "_strategy_apply_request_id", 0) or 0):
             return
-        if getattr(self, "_pending_strategy_apply", None):
+        if self._strategy_apply_state_obj().has_pending():
             return
         log(f"{self.__class__.__name__}: не удалось применить стратегию: {error}", "ERROR")
         self.reload_current_profile()
@@ -4015,8 +4018,8 @@ class ProfileSetupPageBase(BasePage):
         self._strategy_apply_runtime_branch_id = ""
         if self._start_next_profile_setup_write_operation():
             return
-        pending = getattr(self, "_pending_strategy_apply", None)
-        self._pending_strategy_apply = None
+        pending = self._strategy_apply_state_obj().pending
+        self._strategy_apply_state_obj().pending = None
         if pending:
             if isinstance(pending, tuple):
                 self._schedule_profile_setup_write_operation_start(
@@ -4034,6 +4037,29 @@ class ProfileSetupPageBase(BasePage):
                         "branch_id": "",
                     }
                 )
+
+    def _strategy_apply_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_strategy_apply_state")
+        runtime = self.__dict__.get("_strategy_apply_runtime")
+        if state is None:
+            pending = self.__dict__.pop("_pending_strategy_apply", None)
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=None,
+                pending=pending,
+            )
+            self.__dict__["_strategy_apply_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _pending_strategy_apply(self):
+        return self._strategy_apply_state_obj().pending
+
+    @_pending_strategy_apply.setter
+    def _pending_strategy_apply(self, value) -> None:
+        self._strategy_apply_state_obj().pending = value
 
     def _apply_strategy_locally(self, strategy_id: str) -> bool:
         payload = self._payload
@@ -4315,6 +4341,7 @@ class ProfileSetupPageBase(BasePage):
         self._settings_save_state_obj().reset()
         self._raw_profile_save_state_obj().reset()
         self._enabled_save_state_obj().reset()
+        self._strategy_apply_state_obj().reset()
         self._strategy_feedback_save_state_obj().reset()
         self._profile_setup_payload_apply_scheduled = False
         self._profile_setup_write_operation_start_scheduled = False
