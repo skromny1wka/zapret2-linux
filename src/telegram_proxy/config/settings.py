@@ -283,6 +283,28 @@ def set_dc_ip(value: object) -> tuple[str, ...]:
     return result
 
 
+def set_pool_size(value: object) -> int:
+    normalized = normalize_pool_size(value)
+    try:
+        from settings.store import set_tg_proxy_pool_size
+
+        set_tg_proxy_pool_size(normalized)
+    except Exception:
+        pass
+    return normalized
+
+
+def set_buffer_kb(value: object) -> int:
+    normalized = normalize_buffer_kb(value)
+    try:
+        from settings.store import set_tg_proxy_buffer_kb
+
+        set_tg_proxy_buffer_kb(normalized)
+    except Exception:
+        pass
+    return normalized
+
+
 def set_fake_tls_domain(value: object) -> str:
     domain = normalize_fake_tls_domain(value)
     try:

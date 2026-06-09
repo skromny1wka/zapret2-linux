@@ -28,6 +28,16 @@ class TelegramProxySettingsText:
     cloudflare_toggle_description: str
     cloudflare_worker_toggle_title: str
     cloudflare_worker_toggle_description: str
+    advanced_title: str
+    advanced_description: str
+    fake_tls_domain_title: str
+    fake_tls_domain_description: str
+    dc_ip_title: str
+    dc_ip_description: str
+    performance_title: str
+    performance_description: str
+    proxy_protocol_title: str
+    proxy_protocol_description: str
     manual_hidden_title: str
     manual_path: str
     diag_description: str
@@ -58,6 +68,16 @@ TELEGRAM_PROXY_SETTINGS_TEXT = TelegramProxySettingsText(
     cloudflare_toggle_description="Пробовать запасные Cloudflare-домены. Если поле доменов пустое, используется авто-список.",
     cloudflare_worker_toggle_title="Cloudflare Worker fallback",
     cloudflare_worker_toggle_description="Пробовать Worker-домены как отдельный запасной путь.",
+    advanced_title="Продвинутый режим",
+    advanced_description="Cloudflare, Fake TLS, ручные DC->IP и сетевые параметры. Обычно это не нужно менять.",
+    fake_tls_domain_title="Fake TLS домен",
+    fake_tls_domain_description="Домен для MTProxy Fake TLS. Нужен только для своего домена и Nginx.",
+    dc_ip_title="DC -> IP",
+    dc_ip_description="Ручная таблица дата-центр -> IP, например 4:149.154.167.220.",
+    performance_title="Производительность",
+    performance_description="Размер пула WSS и буфер обмена. Меняйте только при явных проблемах.",
+    proxy_protocol_title="Proxy protocol для Nginx",
+    proxy_protocol_description="Включайте только если Nginx передаёт MTProxy через proxy_protocol.",
     manual_hidden_title="Ручная настройка",
     manual_path="Telegram → Настройки → Продвинутые → Тип соединения → Прокси",
     diag_description=(

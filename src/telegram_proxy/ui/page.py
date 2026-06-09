@@ -373,8 +373,13 @@ class TelegramProxyPage(BasePage):
         self._mtproxy_secret_label = widgets.mtproxy_secret_label
         self._mtproxy_secret_edit = widgets.mtproxy_secret_edit
         self._mtproxy_generate_btn = widgets.mtproxy_generate_btn
+        self._fake_tls_domain_row = widgets.fake_tls_domain_row
+        self._fake_tls_domain_label = widgets.fake_tls_domain_label
+        self._fake_tls_domain_edit = widgets.fake_tls_domain_edit
         self._fake_tls_nginx_btn = widgets.fake_tls_nginx_btn
         self._auto_deeplink_toggle = widgets.auto_deeplink_toggle
+        self._advanced_toggle = widgets.advanced_toggle
+        self._advanced_card = widgets.advanced_card
         self._upstream_card = widgets.upstream_card
         self._upstream_desc_label = widgets.upstream_desc_label
         self._upstream_toggle = widgets.upstream_toggle
@@ -406,6 +411,15 @@ class TelegramProxyPage(BasePage):
         self._cloudflare_worker_domains_edit = widgets.cloudflare_worker_domains_edit
         self._cloudflare_worker_test_btn = widgets.cloudflare_worker_test_btn
         self._cloudflare_worker_code_btn = widgets.cloudflare_worker_code_btn
+        self._dc_ip_row = widgets.dc_ip_row
+        self._dc_ip_label = widgets.dc_ip_label
+        self._dc_ip_edit = widgets.dc_ip_edit
+        self._performance_label = widgets.performance_label
+        self._pool_size_label = widgets.pool_size_label
+        self._pool_size_spin = widgets.pool_size_spin
+        self._buffer_kb_label = widgets.buffer_kb_label
+        self._buffer_kb_spin = widgets.buffer_kb_spin
+        self._proxy_protocol_toggle = widgets.proxy_protocol_toggle
         self._manual_section_label = widgets.manual_section_label
         self._instructions_card = widgets.instructions_card
         self._instr1_label = widgets.instr1_label
@@ -509,6 +523,7 @@ class TelegramProxyPage(BasePage):
             refresh_status_texts_callback=self._refresh_status_texts,
             setup_section_label=getattr(self, "_setup_section_label", None),
             settings_card=getattr(self, "_settings_card", None),
+            advanced_card=getattr(self, "_advanced_card", None),
             upstream_card=getattr(self, "_upstream_card", None),
             manual_section_label=getattr(self, "_manual_section_label", None),
             setup_desc_label=getattr(self, "_setup_desc_label", None),
@@ -516,6 +531,11 @@ class TelegramProxyPage(BasePage):
             host_label=getattr(self, "_host_label", None),
             port_label=getattr(self, "_port_label", None),
             mtproxy_secret_label=getattr(self, "_mtproxy_secret_label", None),
+            fake_tls_domain_label=getattr(self, "_fake_tls_domain_label", None),
+            dc_ip_label=getattr(self, "_dc_ip_label", None),
+            performance_label=getattr(self, "_performance_label", None),
+            pool_size_label=getattr(self, "_pool_size_label", None),
+            buffer_kb_label=getattr(self, "_buffer_kb_label", None),
             cloudflare_domains_label=getattr(self, "_cloudflare_domains_label", None),
             cloudflare_worker_domains_label=getattr(self, "_cloudflare_worker_domains_label", None),
             upstream_desc_label=getattr(self, "_upstream_desc_label", None),
@@ -542,6 +562,8 @@ class TelegramProxyPage(BasePage):
             btn_run_diag=getattr(self, "_btn_run_diag", None),
             host_edit=getattr(self, "_host_edit", None),
             mtproxy_secret_edit=getattr(self, "_mtproxy_secret_edit", None),
+            fake_tls_domain_edit=getattr(self, "_fake_tls_domain_edit", None),
+            dc_ip_edit=getattr(self, "_dc_ip_edit", None),
             cloudflare_domains_edit=getattr(self, "_cloudflare_domains_edit", None),
             cloudflare_worker_domains_edit=getattr(self, "_cloudflare_worker_domains_edit", None),
             upstream_host_edit=getattr(self, "_upstream_host_edit", None),
@@ -550,7 +572,9 @@ class TelegramProxyPage(BasePage):
             log_edit=getattr(self, "_log_edit", None),
             diag_edit=getattr(self, "_diag_edit", None),
             auto_deeplink_toggle=getattr(self, "_auto_deeplink_toggle", None),
+            advanced_toggle=getattr(self, "_advanced_toggle", None),
             proxy_mode_row=getattr(self, "_proxy_mode_row", None),
+            proxy_protocol_toggle=getattr(self, "_proxy_protocol_toggle", None),
             upstream_toggle=getattr(self, "_upstream_toggle", None),
             upstream_preset_row=getattr(self, "_upstream_preset_row", None),
             upstream_catalog_hint=getattr(self, "_upstream_catalog_hint", None),
@@ -615,8 +639,14 @@ class TelegramProxyPage(BasePage):
 
         self._port_spin.valueChanged.connect(self._on_port_changed)
         self._host_edit.editingFinished.connect(self._on_host_changed)
+        self._advanced_toggle.toggled.connect(self._on_advanced_toggled)
         self._proxy_mode_row.currentIndexChanged.connect(self._on_proxy_mode_changed)
         self._mtproxy_secret_edit.editingFinished.connect(self._on_mtproxy_secret_changed)
+        self._fake_tls_domain_edit.editingFinished.connect(self._on_fake_tls_domain_changed)
+        self._proxy_protocol_toggle.toggled.connect(self._on_proxy_protocol_changed)
+        self._dc_ip_edit.editingFinished.connect(self._on_dc_ip_changed)
+        self._pool_size_spin.valueChanged.connect(self._on_pool_size_changed)
+        self._buffer_kb_spin.valueChanged.connect(self._on_buffer_kb_changed)
 
         # Upstream proxy signals
         self._upstream_toggle.toggled.connect(self._on_upstream_changed)
@@ -647,7 +677,15 @@ class TelegramProxyPage(BasePage):
 
         self._proxy_mode_row.setCurrentData(state.mode, block_signals=True)
         self._mtproxy_secret_edit.setText(state.mtproxy_secret)
-        self._apply_local_proxy_mode_ui()
+        self._fake_tls_domain_edit.setText(state.fake_tls_domain)
+        self._proxy_protocol_toggle.setChecked(state.proxy_protocol, block_signals=True)
+        self._dc_ip_edit.setText(", ".join(state.dc_ip))
+        self._pool_size_spin.blockSignals(True)
+        self._pool_size_spin.setValue(state.pool_size)
+        self._pool_size_spin.blockSignals(False)
+        self._buffer_kb_spin.blockSignals(True)
+        self._buffer_kb_spin.setValue(state.buffer_kb)
+        self._buffer_kb_spin.blockSignals(False)
 
         self._upstream_toggle.setChecked(state.upstream_enabled, block_signals=True)
 
@@ -668,8 +706,29 @@ class TelegramProxyPage(BasePage):
         self._cloudflare_domains_edit.setText(", ".join(state.cloudflare_domains))
         self._cloudflare_worker_toggle.setChecked(state.cloudflare_worker_enabled, block_signals=True)
         self._cloudflare_worker_domains_edit.setText(", ".join(state.cloudflare_worker_domains))
+        self._advanced_toggle.setChecked(self._advanced_settings_should_open(state), block_signals=True)
+        self._apply_advanced_settings_ui()
+        self._apply_local_proxy_mode_ui()
         self._apply_cloudflare_ui()
         self._log_ui_timing("telegram_proxy_ui.settings.apply", started_at)
+
+    def _advanced_settings_should_open(self, state: telegram_proxy_settings.TelegramProxySettingsState) -> bool:
+        return bool(
+            state.mode == "mtproxy"
+            or state.upstream_enabled
+            or state.upstream_host
+            or state.upstream_user
+            or state.cloudflare_enabled
+            or state.cloudflare_domains
+            or state.cloudflare_worker_enabled
+            or state.cloudflare_worker_domains
+            or state.mtproxy_secret
+            or state.dc_ip
+            or state.pool_size != 4
+            or state.buffer_kb != 256
+            or state.fake_tls_domain
+            or state.proxy_protocol
+        )
 
     def _try_auto_deeplink(self):
         """Open tg:// deep link automatically on first start."""
@@ -1174,17 +1233,6 @@ class TelegramProxyPage(BasePage):
             return
         self._worker_state("_proxy_start_state", "_proxy_start_runtime").pending = False
         mgr = self._proxy_manager()
-        try:
-            start_config = self._telegram_proxy.get_start_config()
-            pool_size = int(getattr(start_config, "pool_size", 4))
-            buffer_kb = int(getattr(start_config, "buffer_kb", 256))
-            fake_tls_domain = str(getattr(start_config, "fake_tls_domain", "") or "")
-            proxy_protocol = bool(getattr(start_config, "proxy_protocol", False))
-        except Exception:
-            pool_size = 4
-            buffer_kb = 256
-            fake_tls_domain = ""
-            proxy_protocol = False
         start_proxy_runtime(
             page=self,
             manager=mgr,
@@ -1199,10 +1247,10 @@ class TelegramProxyPage(BasePage):
             create_start_worker=self._telegram_proxy.create_start_worker,
             mode=self._local_proxy_mode(),
             mtproxy_secret=self._ensure_mtproxy_secret_if_needed(),
-            pool_size=pool_size,
-            buffer_kb=buffer_kb,
-            fake_tls_domain=fake_tls_domain,
-            proxy_protocol=proxy_protocol,
+            pool_size=self._local_pool_size(),
+            buffer_kb=self._local_buffer_kb(),
+            fake_tls_domain=self._local_fake_tls_domain(),
+            proxy_protocol=self._local_proxy_protocol(),
             on_finished=self._on_proxy_start_worker_finished,
         )
 
@@ -1464,17 +1512,58 @@ class TelegramProxyPage(BasePage):
         return secret
 
     def _local_fake_tls_domain(self) -> str:
+        edit = getattr(self, "_fake_tls_domain_edit", None)
+        if edit is not None:
+            return telegram_proxy_settings.normalize_fake_tls_domain(edit.text())
         try:
             start_config = self._telegram_proxy.get_start_config()
             return str(getattr(start_config, "fake_tls_domain", "") or "")
         except Exception:
             return ""
 
+    def _local_pool_size(self) -> int:
+        spin = getattr(self, "_pool_size_spin", None)
+        if spin is None:
+            return 4
+        return telegram_proxy_settings.normalize_pool_size(spin.value())
+
+    def _local_buffer_kb(self) -> int:
+        spin = getattr(self, "_buffer_kb_spin", None)
+        if spin is None:
+            return 256
+        return telegram_proxy_settings.normalize_buffer_kb(spin.value())
+
+    def _local_proxy_protocol(self) -> bool:
+        toggle = getattr(self, "_proxy_protocol_toggle", None)
+        return bool(toggle is not None and toggle.isChecked())
+
+    def _normalized_dc_ip_text(self) -> str:
+        edit = getattr(self, "_dc_ip_edit", None)
+        if edit is None:
+            return ""
+        overrides = telegram_proxy_settings.parse_dc_endpoint_overrides(edit.text())
+        text = ", ".join(f"{dc}:{ip}" for dc, ip in overrides.items())
+        edit.setText(text)
+        return text
+
+    def _apply_advanced_settings_ui(self) -> None:
+        advanced = bool(self._advanced_toggle.isChecked())
+        self._advanced_card.setVisible(advanced)
+        self._apply_local_proxy_mode_ui()
+        self._apply_cloudflare_ui()
+        enable_setting_card_group_auto_height(self._settings_card)
+        enable_setting_card_group_auto_height(self._advanced_card)
+
     def _apply_local_proxy_mode_ui(self) -> None:
         is_mtproxy = self._local_proxy_mode() == "mtproxy"
+        if is_mtproxy and not self._advanced_toggle.isChecked():
+            self._advanced_toggle.setChecked(True)
         self._mtproxy_secret_row.setVisible(is_mtproxy)
+        self._fake_tls_domain_row.setVisible(is_mtproxy)
+        self._proxy_protocol_toggle.setVisible(is_mtproxy)
         self._update_manual_instructions()
         enable_setting_card_group_auto_height(self._settings_card)
+        enable_setting_card_group_auto_height(self._advanced_card)
 
     def _apply_cloudflare_ui(self) -> None:
         cloudflare_enabled = bool(self._cloudflare_toggle.isChecked())
@@ -1482,7 +1571,10 @@ class TelegramProxyPage(BasePage):
         self._cloudflare_domains_row.setVisible(cloudflare_enabled)
         self._cloudflare_worker_domains_row.setVisible(worker_enabled)
         self._cloudflare_worker_domains_edit.setEnabled(worker_enabled)
-        enable_setting_card_group_auto_height(self._upstream_card)
+        enable_setting_card_group_auto_height(self._advanced_card)
+
+    def _on_advanced_toggled(self, _checked: bool):
+        self._apply_advanced_settings_ui()
 
     def _on_proxy_mode_changed(self, _index: int):
         mode = self._local_proxy_mode()
@@ -1500,6 +1592,33 @@ class TelegramProxyPage(BasePage):
         secret = telegram_proxy_settings.normalize_secret(self._mtproxy_secret_edit.text())
         self._mtproxy_secret_edit.setText(secret)
         self._request_settings_save("mtproxy_secret", value=secret, restart="now")
+
+    def _on_fake_tls_domain_changed(self):
+        domain = telegram_proxy_settings.normalize_fake_tls_domain(self._fake_tls_domain_edit.text())
+        self._fake_tls_domain_edit.setText(domain)
+        self._request_settings_save("fake_tls_domain", value=domain, restart="now", update_manual=True)
+
+    def _on_proxy_protocol_changed(self, checked: bool):
+        self._request_settings_save("proxy_protocol", enabled=bool(checked), restart="now")
+
+    def _on_dc_ip_changed(self):
+        self._request_settings_save("dc_ip", value=self._normalized_dc_ip_text(), restart="now")
+
+    def _on_pool_size_changed(self, value: int):
+        normalized = telegram_proxy_settings.normalize_pool_size(value)
+        if normalized != value:
+            self._pool_size_spin.blockSignals(True)
+            self._pool_size_spin.setValue(normalized)
+            self._pool_size_spin.blockSignals(False)
+        self._request_settings_save("pool_size", value=normalized, restart="schedule")
+
+    def _on_buffer_kb_changed(self, value: int):
+        normalized = telegram_proxy_settings.normalize_buffer_kb(value)
+        if normalized != value:
+            self._buffer_kb_spin.blockSignals(True)
+            self._buffer_kb_spin.setValue(normalized)
+            self._buffer_kb_spin.blockSignals(False)
+        self._request_settings_save("buffer_kb", value=normalized, restart="schedule")
 
     def _cloudflare_domains_text(self, edit) -> str:
         domains = telegram_proxy_settings.normalize_domain_list(edit.text())

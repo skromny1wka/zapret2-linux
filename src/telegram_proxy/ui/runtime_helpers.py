@@ -71,6 +71,7 @@ def apply_ui_texts(
     refresh_status_texts_callback,
     setup_section_label,
     settings_card,
+    advanced_card,
     upstream_card,
     manual_section_label,
     setup_desc_label,
@@ -78,6 +79,11 @@ def apply_ui_texts(
     host_label,
     port_label,
     mtproxy_secret_label,
+    fake_tls_domain_label,
+    dc_ip_label,
+    performance_label,
+    pool_size_label,
+    buffer_kb_label,
     cloudflare_domains_label,
     cloudflare_worker_domains_label,
     upstream_desc_label,
@@ -104,6 +110,8 @@ def apply_ui_texts(
     btn_run_diag,
     host_edit,
     mtproxy_secret_edit,
+    fake_tls_domain_edit,
+    dc_ip_edit,
     cloudflare_domains_edit,
     cloudflare_worker_domains_edit,
     upstream_host_edit,
@@ -112,7 +120,9 @@ def apply_ui_texts(
     log_edit,
     diag_edit,
     auto_deeplink_toggle,
+    advanced_toggle,
     proxy_mode_row,
+    proxy_protocol_toggle,
     upstream_toggle,
     upstream_preset_row,
     upstream_catalog_hint,
@@ -131,8 +141,11 @@ def apply_ui_texts(
         title_label = getattr(settings_card, "titleLabel", None)
         if title_label is not None:
             title_label.setText(text.settings_title)
-        title_label = getattr(upstream_card, "titleLabel", None)
+        title_label = getattr(advanced_card, "titleLabel", None)
         if title_label is not None:
+            title_label.setText(text.advanced_title)
+        title_label = getattr(upstream_card, "titleLabel", None)
+        if title_label is not None and upstream_card is not advanced_card:
             title_label.setText(text.upstream_title)
         if manual_section_label is not None:
             manual_section_label.setText(text.manual_hidden_title)
@@ -148,6 +161,16 @@ def apply_ui_texts(
             port_label.setText("Порт:")
         if mtproxy_secret_label is not None:
             mtproxy_secret_label.setText("Secret:")
+        if fake_tls_domain_label is not None:
+            fake_tls_domain_label.setText("Fake TLS:")
+        if dc_ip_label is not None:
+            dc_ip_label.setText("DC -> IP:")
+        if performance_label is not None:
+            performance_label.setText(text.performance_description)
+        if pool_size_label is not None:
+            pool_size_label.setText("Пул WSS:")
+        if buffer_kb_label is not None:
+            buffer_kb_label.setText("Буфер, КБ:")
         if cloudflare_domains_label is not None:
             cloudflare_domains_label.setText("Домены:")
         if cloudflare_worker_domains_label is not None:
@@ -220,6 +243,10 @@ def apply_ui_texts(
             host_edit.setPlaceholderText("127.0.0.1")
         if mtproxy_secret_edit is not None:
             mtproxy_secret_edit.setPlaceholderText("32 символа: 0-9 и a-f")
+        if fake_tls_domain_edit is not None:
+            fake_tls_domain_edit.setPlaceholderText("front.example.com")
+        if dc_ip_edit is not None:
+            dc_ip_edit.setPlaceholderText("4:149.154.167.220, 5:91.108.56.100")
         if cloudflare_domains_edit is not None:
             cloudflare_domains_edit.setPlaceholderText("Пусто = авто, или example.com, backup.example.com")
         if cloudflare_worker_domains_edit is not None:
@@ -240,10 +267,20 @@ def apply_ui_texts(
                 text.auto_setup_title,
                 text.auto_setup_description,
             )
+        if advanced_toggle is not None:
+            advanced_toggle.set_texts(
+                text.advanced_title,
+                text.advanced_description,
+            )
         if proxy_mode_row is not None:
             proxy_mode_row.set_texts(
                 text.proxy_mode_title,
                 text.proxy_mode_description,
+            )
+        if proxy_protocol_toggle is not None:
+            proxy_protocol_toggle.set_texts(
+                text.proxy_protocol_title,
+                text.proxy_protocol_description,
             )
         if upstream_toggle is not None:
             upstream_toggle.set_texts(

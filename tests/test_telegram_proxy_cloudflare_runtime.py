@@ -84,6 +84,19 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
         set_worker_enabled.assert_called_once_with(True)
         set_worker_domains.assert_called_once_with("worker.example.dev")
 
+    def test_advanced_performance_settings_are_saved_through_runtime_command(self) -> None:
+        import telegram_proxy.runtime.commands as commands
+
+        with (
+            patch("telegram_proxy.config.settings.set_pool_size") as set_pool_size,
+            patch("telegram_proxy.config.settings.set_buffer_kb") as set_buffer_kb,
+        ):
+            commands.save_settings_action("pool_size", value=8)
+            commands.save_settings_action("buffer_kb", value=512)
+
+        set_pool_size.assert_called_once_with(8)
+        set_buffer_kb.assert_called_once_with(512)
+
     def test_cloudflare_helpers_build_domain_and_worker_targets(self) -> None:
         from telegram_proxy.proxy.cloudflare import (
             CloudflareFallbackConfig,

@@ -41,8 +41,13 @@ class TelegramProxySettingsPanelWidgets:
     mtproxy_secret_label: object
     mtproxy_secret_edit: object
     mtproxy_generate_btn: object
+    fake_tls_domain_row: object
+    fake_tls_domain_label: object
+    fake_tls_domain_edit: object
     fake_tls_nginx_btn: object
     auto_deeplink_toggle: object
+    advanced_toggle: object
+    advanced_card: object
     upstream_card: object
     upstream_desc_label: object
     upstream_toggle: object
@@ -73,6 +78,15 @@ class TelegramProxySettingsPanelWidgets:
     cloudflare_worker_domains_edit: object
     cloudflare_worker_test_btn: object
     cloudflare_worker_code_btn: object
+    dc_ip_row: object
+    dc_ip_label: object
+    dc_ip_edit: object
+    performance_label: object
+    pool_size_label: object
+    pool_size_spin: object
+    buffer_kb_label: object
+    buffer_kb_spin: object
+    proxy_protocol_toggle: object
     manual_section_label: object
     instructions_card: object
     instr1_label: object
@@ -199,7 +213,29 @@ def build_telegram_proxy_settings_panel(
     proxy_mode_row.combo.setFixedWidth(250)
     settings_card.addSettingCard(proxy_mode_row)
 
-    mtproxy_secret_row = QWidget(settings_card)
+    auto_deeplink_toggle = win11_toggle_row_cls(
+        "mdi.telegram",
+        text.auto_setup_title,
+        text.auto_setup_description,
+    )
+    auto_deeplink_toggle.setChecked(True)
+    settings_card.addSettingCard(auto_deeplink_toggle)
+
+    advanced_toggle = win11_toggle_row_cls(
+        "mdi.tune-variant",
+        text.advanced_title,
+        text.advanced_description,
+    )
+    advanced_toggle.setChecked(False)
+    settings_card.addSettingCard(advanced_toggle)
+    enable_setting_card_group_auto_height(settings_card)
+
+    layout.addWidget(settings_card)
+
+    advanced_card = setting_card_group_cls(text.advanced_title, content_parent)
+    advanced_card.setVisible(False)
+
+    mtproxy_secret_row = QWidget(advanced_card)
     mtproxy_secret_layout = QHBoxLayout(mtproxy_secret_row)
     mtproxy_secret_layout.setContentsMargins(16, 8, 16, 6)
     mtproxy_secret_layout.setSpacing(12)
@@ -216,27 +252,41 @@ def build_telegram_proxy_settings_panel(
     set_tooltip(mtproxy_generate_btn, "Создать новый случайный secret для MTProxy.")
     mtproxy_generate_btn.clicked.connect(on_generate_mtproxy_secret)
     mtproxy_secret_layout.addWidget(mtproxy_generate_btn)
+    mtproxy_secret_layout.addStretch()
+    mtproxy_secret_row.setVisible(False)
+    advanced_card.addSettingCard(mtproxy_secret_row)
+
+    fake_tls_domain_row = QWidget(advanced_card)
+    fake_tls_domain_layout = QHBoxLayout(fake_tls_domain_row)
+    fake_tls_domain_layout.setContentsMargins(16, 8, 16, 6)
+    fake_tls_domain_layout.setSpacing(12)
+    fake_tls_domain_label = body_label_cls("Fake TLS:")
+    fake_tls_domain_layout.addWidget(fake_tls_domain_label)
+    fake_tls_domain_edit = line_edit_cls()
+    fake_tls_domain_edit.setMinimumWidth(280)
+    fake_tls_domain_edit.setPlaceholderText("front.example.com")
+    fake_tls_domain_edit.setClearButtonEnabled(True)
+    set_tooltip(fake_tls_domain_edit, "Домен для MTProxy Fake TLS. Оставьте пустым, если Fake TLS не нужен.")
+    fake_tls_domain_layout.addWidget(fake_tls_domain_edit)
     fake_tls_nginx_btn = push_button_cls("Nginx", icon=FluentIcon.COPY)
     fake_tls_nginx_btn.setMinimumWidth(96)
     set_tooltip(fake_tls_nginx_btn, "Скопировать stream-конфиг Nginx для MTProxy Fake TLS.")
     fake_tls_nginx_btn.clicked.connect(on_copy_fake_tls_nginx_config)
-    mtproxy_secret_layout.addWidget(fake_tls_nginx_btn)
-    mtproxy_secret_layout.addStretch()
-    mtproxy_secret_row.setVisible(False)
-    settings_card.addSettingCard(mtproxy_secret_row)
+    fake_tls_domain_layout.addWidget(fake_tls_nginx_btn)
+    fake_tls_domain_layout.addStretch()
+    fake_tls_domain_row.setVisible(False)
+    advanced_card.addSettingCard(fake_tls_domain_row)
 
-    auto_deeplink_toggle = win11_toggle_row_cls(
-        "mdi.telegram",
-        text.auto_setup_title,
-        text.auto_setup_description,
+    proxy_protocol_toggle = win11_toggle_row_cls(
+        "mdi.lan-connect",
+        text.proxy_protocol_title,
+        text.proxy_protocol_description,
     )
-    auto_deeplink_toggle.setChecked(True)
-    settings_card.addSettingCard(auto_deeplink_toggle)
-    enable_setting_card_group_auto_height(settings_card)
+    proxy_protocol_toggle.setChecked(False)
+    proxy_protocol_toggle.setVisible(False)
+    advanced_card.addSettingCard(proxy_protocol_toggle)
 
-    layout.addWidget(settings_card)
-
-    upstream_card = setting_card_group_cls(text.upstream_title, content_parent)
+    upstream_card = advanced_card
 
     upstream_desc_label = caption_label_cls("")
     upstream_desc_label.setWordWrap(True)
@@ -393,6 +443,50 @@ def build_telegram_proxy_settings_panel(
     cloudflare_worker_domains_row.setVisible(False)
     upstream_card.addSettingCard(cloudflare_worker_domains_row)
 
+    dc_ip_row = QWidget(upstream_card)
+    dc_ip_layout = QHBoxLayout(dc_ip_row)
+    dc_ip_layout.setContentsMargins(16, 8, 16, 6)
+    dc_ip_layout.setSpacing(12)
+    dc_ip_label = body_label_cls("DC -> IP:")
+    dc_ip_layout.addWidget(dc_ip_label)
+    dc_ip_edit = line_edit_cls()
+    dc_ip_edit.setMinimumWidth(360)
+    dc_ip_edit.setPlaceholderText("4:149.154.167.220, 5:91.108.56.100")
+    dc_ip_edit.setClearButtonEnabled(True)
+    set_tooltip(dc_ip_edit, "Ручные адреса дата-центров Telegram. Формат: номер:IP, через запятую.")
+    dc_ip_layout.addWidget(dc_ip_edit)
+    dc_ip_layout.addStretch()
+    upstream_card.addSettingCard(dc_ip_row)
+
+    performance_label = caption_label_cls(text.performance_description)
+    performance_label.setWordWrap(True)
+    performance_label_index = upstream_card.vBoxLayout.count() if getattr(upstream_card, "vBoxLayout", None) else 1
+    insert_widget_into_setting_card_group(upstream_card, performance_label_index, performance_label)
+
+    performance_row = QWidget(upstream_card)
+    performance_layout = QHBoxLayout(performance_row)
+    performance_layout.setContentsMargins(16, 8, 16, 6)
+    performance_layout.setSpacing(12)
+    pool_size_label = body_label_cls("Пул WSS:")
+    performance_layout.addWidget(pool_size_label)
+    pool_size_spin = spin_box_cls()
+    pool_size_spin.setRange(0, 32)
+    pool_size_spin.setValue(4)
+    pool_size_spin.setFixedWidth(120)
+    set_tooltip(pool_size_spin, "Сколько запасных WSS-соединений держать в пуле. 4 — обычное значение.")
+    performance_layout.addWidget(pool_size_spin)
+    performance_layout.addSpacing(16)
+    buffer_kb_label = body_label_cls("Буфер, КБ:")
+    performance_layout.addWidget(buffer_kb_label)
+    buffer_kb_spin = spin_box_cls()
+    buffer_kb_spin.setRange(4, 4096)
+    buffer_kb_spin.setValue(256)
+    buffer_kb_spin.setFixedWidth(120)
+    set_tooltip(buffer_kb_spin, "Размер сетевого буфера. 256 КБ обычно достаточно.")
+    performance_layout.addWidget(buffer_kb_spin)
+    performance_layout.addStretch()
+    upstream_card.addSettingCard(performance_row)
+
     enable_setting_card_group_auto_height(upstream_card)
 
     layout.addWidget(upstream_card)
@@ -441,8 +535,13 @@ def build_telegram_proxy_settings_panel(
         mtproxy_secret_label=mtproxy_secret_label,
         mtproxy_secret_edit=mtproxy_secret_edit,
         mtproxy_generate_btn=mtproxy_generate_btn,
+        fake_tls_domain_row=fake_tls_domain_row,
+        fake_tls_domain_label=fake_tls_domain_label,
+        fake_tls_domain_edit=fake_tls_domain_edit,
         fake_tls_nginx_btn=fake_tls_nginx_btn,
         auto_deeplink_toggle=auto_deeplink_toggle,
+        advanced_toggle=advanced_toggle,
+        advanced_card=advanced_card,
         upstream_card=upstream_card,
         upstream_desc_label=upstream_desc_label,
         upstream_toggle=upstream_toggle,
@@ -473,6 +572,15 @@ def build_telegram_proxy_settings_panel(
         cloudflare_worker_domains_edit=cloudflare_worker_domains_edit,
         cloudflare_worker_test_btn=cloudflare_worker_test_btn,
         cloudflare_worker_code_btn=cloudflare_worker_code_btn,
+        dc_ip_row=dc_ip_row,
+        dc_ip_label=dc_ip_label,
+        dc_ip_edit=dc_ip_edit,
+        performance_label=performance_label,
+        pool_size_label=pool_size_label,
+        pool_size_spin=pool_size_spin,
+        buffer_kb_label=buffer_kb_label,
+        buffer_kb_spin=buffer_kb_spin,
+        proxy_protocol_toggle=proxy_protocol_toggle,
         manual_section_label=manual_section_label,
         instructions_card=instructions_card,
         instr1_label=instr1_label,

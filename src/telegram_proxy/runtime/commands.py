@@ -175,6 +175,10 @@ def save_settings_action(
         return telegram_proxy_settings.set_mtproxy_secret(str(value or ""))
     if action_name == "dc_ip":
         return telegram_proxy_settings.set_dc_ip(value)
+    if action_name == "pool_size":
+        return telegram_proxy_settings.set_pool_size(value)
+    if action_name == "buffer_kb":
+        return telegram_proxy_settings.set_buffer_kb(value)
     if action_name == "fake_tls_domain":
         return telegram_proxy_settings.set_fake_tls_domain(value)
     if action_name == "proxy_protocol":

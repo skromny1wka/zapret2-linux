@@ -60,6 +60,39 @@ class TelegramProxyUiTextsTests(unittest.TestCase):
         self.assertIn("Код Worker", source)
         self.assertIn("Nginx", source)
 
+    def test_advanced_settings_panel_exposes_all_technical_options(self) -> None:
+        import inspect
+        from telegram_proxy.ui import page, settings_build
+
+        build_source = inspect.getsource(settings_build)
+        page_source = inspect.getsource(page.TelegramProxyPage)
+
+        self.assertIn("advanced_toggle", build_source)
+        self.assertIn("advanced_card", build_source)
+        self.assertIn("fake_tls_domain_edit", build_source)
+        self.assertIn("proxy_protocol_toggle", build_source)
+        self.assertIn("dc_ip_edit", build_source)
+        self.assertIn("pool_size_spin", build_source)
+        self.assertIn("buffer_kb_spin", build_source)
+        self.assertIn("Cloudflare", build_source)
+        self.assertIn("Cloudflare Worker", build_source)
+        self.assertIn("Nginx", build_source)
+
+        self.assertIn("_apply_advanced_settings_ui", page_source)
+        self.assertIn("_advanced_settings_should_open", page_source)
+        self.assertIn("_on_pool_size_changed", page_source)
+        self.assertIn("_on_buffer_kb_changed", page_source)
+
+    def test_advanced_texts_are_plain_and_not_shown_as_main_scenario(self) -> None:
+        from telegram_proxy.ui import text_plan
+
+        plan = text_plan.TELEGRAM_PROXY_SETTINGS_TEXT
+
+        self.assertEqual(plan.advanced_title, "Продвинутый режим")
+        self.assertIn("Cloudflare", plan.advanced_description)
+        self.assertIn("Fake TLS", plan.advanced_description)
+        self.assertEqual(plan.performance_title, "Производительность")
+
     def test_proxy_mode_choice_marks_socks5_as_recommended(self) -> None:
         import inspect
         from telegram_proxy.ui import settings_build
