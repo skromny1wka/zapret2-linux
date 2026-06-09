@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout
 
 from ui.fluent_widgets import SettingsCard, build_premium_badge
 from app.ui_texts import LANGUAGE_OPTIONS, tr as tr_catalog
+from ui.accessibility import set_control_accessibility, set_state_text
 
 
 @dataclass(slots=True)
@@ -85,6 +86,10 @@ def build_display_mode_section(
             lambda: on_display_mode_changed("system"),
         )
         display_mode_seg.setCurrentItem("dark")
+        update_display_mode_accessibility(display_mode_seg, mode="dark")
+        display_mode_seg.currentItemChanged.connect(
+            lambda mode: update_display_mode_accessibility(display_mode_seg, mode=mode)
+        )
         display_layout.addWidget(display_mode_seg)
     except Exception:
         display_mode_seg = None
@@ -132,6 +137,10 @@ def build_language_section(
     language_combo = combo_cls()
     for lang_code, lang_title in LANGUAGE_OPTIONS:
         language_combo.addItem(lang_title, userData=lang_code)
+    update_language_combo_accessibility(language_combo)
+    language_combo.currentIndexChanged.connect(
+        lambda _index: update_language_combo_accessibility(language_combo)
+    )
     language_combo.currentIndexChanged.connect(on_ui_language_changed)
     language_row.addWidget(language_combo)
 
@@ -224,15 +233,102 @@ def build_background_section(
     rkn_bg_row.addStretch()
 
     rkn_background_combo = combo_cls()
+    update_rkn_background_combo_accessibility(rkn_background_combo)
     rkn_background_combo.currentIndexChanged.connect(on_rkn_background_changed)
+    rkn_background_combo.currentIndexChanged.connect(
+        lambda _index: update_rkn_background_combo_accessibility(rkn_background_combo)
+    )
     rkn_bg_row.addWidget(rkn_background_combo)
     bg_layout.addLayout(rkn_bg_row)
 
     bg_card.add_layout(bg_layout)
+    _update_background_radio_accessibility(
+        bg_radio_standard,
+        bg_radio_amoled,
+        bg_radio_rkn_chan,
+    )
+    for radio in (bg_radio_standard, bg_radio_amoled, bg_radio_rkn_chan):
+        radio.toggled.connect(
+            lambda _checked, standard=bg_radio_standard, amoled=bg_radio_amoled, rkn=bg_radio_rkn_chan: (
+                _update_background_radio_accessibility(standard, amoled, rkn)
+            )
+        )
     return AppearanceBackgroundWidgets(
         card=bg_card,
         radio_standard=bg_radio_standard,
         radio_amoled=bg_radio_amoled,
         radio_rkn_chan=bg_radio_rkn_chan,
         rkn_background_combo=rkn_background_combo,
+    )
+
+
+def update_display_mode_accessibility(widget, *, mode: object | None = None) -> None:
+    labels = {
+        "dark": "Тёмный",
+        "light": "Светлый",
+        "system": "Авто",
+    }
+    key = str(mode or "").strip()
+    if not key:
+        try:
+            key = str(widget.currentItem() or "").strip()
+        except Exception:
+            key = ""
+    selected = labels.get(key, key or "Тёмный")
+    state = f"Режим отображения интерфейса, выбрано: {selected}"
+    set_state_text(widget, state)
+    set_control_accessibility(
+        widget,
+        name=state,
+        description="Выберите светлый, тёмный или автоматический режим интерфейса.",
+    )
+
+
+def update_language_combo_accessibility(combo) -> None:
+    selected = str(combo.currentText() or "").strip() or "не выбран"
+    state = f"Язык интерфейса, выбрано: {selected}"
+    set_state_text(combo, state)
+    set_control_accessibility(
+        combo,
+        name=state,
+        description="Выберите язык интерфейса программы.",
+    )
+
+
+def _update_background_radio_accessibility(standard, amoled, rkn) -> None:
+    _set_background_radio_accessibility(standard, label="Стандартный", premium_locked=False)
+    _set_background_radio_accessibility(amoled, label="AMOLED — чёрный", premium_locked=True)
+    _set_background_radio_accessibility(rkn, label="РКН Тян", premium_locked=True)
+
+
+def _set_background_radio_accessibility(radio, *, label: str, premium_locked: bool) -> None:
+    if bool(premium_locked) and not bool(radio.isEnabled()):
+        state = "недоступно без Premium"
+    else:
+        state = "выбрано" if bool(radio.isChecked()) else "не выбрано"
+    text = f"Фон окна: {label}, {state}"
+    set_state_text(radio, text)
+    description = "Выберите этот фон окна."
+    if bool(premium_locked):
+        description = "Этот фон окна доступен подписчикам Premium."
+    set_control_accessibility(radio, name=text, description=description)
+
+
+def update_rkn_background_combo_accessibility(combo) -> None:
+    try:
+        count = int(combo.count())
+    except Exception:
+        count = 0
+    if count <= 0:
+        state = "Фон РКН Тян, вариантов пока нет"
+    else:
+        selected = str(combo.currentText() or "").strip() or "не выбран"
+        state = f"Фон РКН Тян, выбрано: {selected}"
+        if not bool(combo.isEnabled()):
+            state = f"{state}, недоступно"
+    set_state_text(combo, state)
+    set_control_accessibility(
+        combo,
+        name=state,
+        description="Выберите готовый фон РКН Тян.",
     )

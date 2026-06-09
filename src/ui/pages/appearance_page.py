@@ -21,6 +21,9 @@ from ui.pages.appearance_page_top_build import (
     build_background_section,
     build_display_mode_section,
     build_language_section,
+    update_display_mode_accessibility,
+    update_language_combo_accessibility,
+    update_rkn_background_combo_accessibility,
 )
 from ui.fluent_widgets import (
     SettingsCard,
@@ -665,6 +668,7 @@ class AppearancePage(BasePage):
                 pass
             finally:
                 self._end_ui_sync()
+            update_display_mode_accessibility(self._display_mode_seg, mode=mode)
 
     def _apply_sidebar_icon_style_value(self, style: str) -> None:
         if self._sidebar_icon_style_seg is not None:
@@ -993,6 +997,7 @@ class AppearancePage(BasePage):
             smooth_scroll_switch=self._smooth_scroll_switch,
             editor_smooth_scroll_switch=self._editor_smooth_scroll_switch,
         )
+        update_language_combo_accessibility(self._language_combo)
 
     def _apply_bg_preset_ui(self, preset: str):
         """Update RadioButton selection without emitting signals."""
@@ -1175,6 +1180,7 @@ class AppearancePage(BasePage):
         finally:
             self._rkn_background_combo.blockSignals(False)
             self._end_ui_sync()
+        update_rkn_background_combo_accessibility(self._rkn_background_combo)
         self._update_rkn_background_control_state()
 
     def _update_rkn_background_control_state(self):
@@ -1190,6 +1196,7 @@ class AppearancePage(BasePage):
         is_rkn_selected = bool(self._bg_radio_rkn_chan and self._bg_radio_rkn_chan.isChecked())
         is_premium, _garland_enabled, _snowflakes_enabled, _window_opacity = self._current_appearance_state()
         self._rkn_background_combo.setEnabled(bool(is_premium and is_rkn_selected and has_options))
+        update_rkn_background_combo_accessibility(self._rkn_background_combo)
 
     def _on_rkn_background_changed(self, index: int):
         if self._is_ui_syncing():
