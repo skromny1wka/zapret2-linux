@@ -244,6 +244,23 @@ class HostsPageRuntimeTests(unittest.TestCase):
         self.assertTrue(page._selection_load_pending)
         self.assertTrue(page._selection_load_show_access_errors)
 
+    def test_user_selection_load_queue_uses_shared_latest_worker_state(self) -> None:
+        import inspect
+
+        from hosts.ui.page import HostsPage
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        page = HostsPage.__new__(HostsPage)
+        page._selection_load_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+
+        init_source = inspect.getsource(HostsPage.__init__)
+
+        self.assertTrue(hasattr(HostsPage, "_selection_load_state_obj"))
+        self.assertIsInstance(page._selection_load_state_obj(), LatestValueWorkerState)
+        self.assertIn("_selection_load_state = LatestValueWorkerState", init_source)
+        self.assertNotIn("self._selection_load_pending = False", init_source)
+        self.assertNotIn("self._selection_load_start_scheduled = False", init_source)
+
     def test_user_selection_load_pending_restarts_after_event_loop_turn(self) -> None:
         import hosts.ui.page as hosts_page
         from hosts.ui.page import HostsPage

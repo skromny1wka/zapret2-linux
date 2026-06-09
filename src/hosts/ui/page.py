@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
 import hosts.page_plans as hosts_page_plans
 from hosts.ui.page_runtime import create_page_hosts_runtime, create_runtime_cache
 from ui.pages.base_page import BasePage
+from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from hosts.ui.sections_build import (
     build_hosts_adobe_section,
@@ -153,8 +154,7 @@ class HostsPage(BasePage):
         self._catalog_refresh_start_scheduled = False
         self._selection_load_runtime = OneShotWorkerRuntime()
         self._selection_load_show_access_errors = False
-        self._selection_load_pending = False
-        self._selection_load_start_scheduled = False
+        self._selection_load_state = LatestValueWorkerState(self._selection_load_runtime, empty_value=False)
         self._selection_save_runtime = OneShotWorkerRuntime()
         self._selection_save_pending = None
         self._selection_save_start_scheduled = False
@@ -248,11 +248,9 @@ class HostsPage(BasePage):
         self._selection_load_show_access_errors = (
             bool(self._selection_load_show_access_errors) or bool(show_access_errors)
         )
-        if (
-            self._selection_load_runtime.is_running()
-            or self.__dict__.get("_selection_load_start_scheduled", False)
-        ):
-            self._selection_load_pending = True
+        state = self._selection_load_state_obj()
+        if state.is_busy():
+            state.pending = True
             return
         started_at = time.perf_counter()
         self._selection_load_runtime.start_qthread_worker(
@@ -272,7 +270,7 @@ class HostsPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_selection_load_pending", False):
+        if self._selection_load_state_obj().has_pending():
             return
         self._service_dns_selection = dict(selection or {})
         show_access_errors = bool(self._selection_load_show_access_errors)
@@ -285,7 +283,7 @@ class HostsPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_selection_load_pending", False):
+        if self._selection_load_state_obj().has_pending():
             return
         log(f"Hosts: ошибка загрузки выбора профилей: {error}", "ERROR")
         show_access_errors = bool(self._selection_load_show_access_errors)
@@ -298,27 +296,61 @@ class HostsPage(BasePage):
             return
         if self._cleanup_in_progress:
             return
-        if self.__dict__.get("_selection_load_pending", False):
+        if self._selection_load_state_obj().has_pending():
             self._schedule_user_selection_load_start()
 
     def _schedule_user_selection_load_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        if self.__dict__.get("_selection_load_start_scheduled", False):
-            return
-        self._selection_load_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_user_selection_load_start)
+        state = self._selection_load_state_obj()
+        state.pending = True
+        state.schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_user_selection_load_start,
+            pending_when_already_scheduled=True,
+        )
 
     def _run_scheduled_user_selection_load_start(self) -> None:
-        self._selection_load_start_scheduled = False
-        if self.__dict__.get("_cleanup_in_progress", False):
-            return
-        pending = bool(self.__dict__.get("_selection_load_pending", False))
-        self._selection_load_pending = False
+        pending = self._selection_load_state_obj().take_pending_for_scheduled_start(
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
         if not pending:
             return
         show_access_errors = bool(self.__dict__.get("_selection_load_show_access_errors", False))
         self._start_user_selection_load_worker(show_access_errors=show_access_errors)
+
+    def _selection_load_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_selection_load_state")
+        runtime = self.__dict__.get("_selection_load_runtime")
+        if state is None:
+            pending = bool(self.__dict__.pop("_selection_load_pending", False))
+            start_scheduled = bool(self.__dict__.pop("_selection_load_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=False,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_selection_load_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _selection_load_pending(self) -> bool:
+        return bool(self._selection_load_state_obj().pending)
+
+    @_selection_load_pending.setter
+    def _selection_load_pending(self, value: bool) -> None:
+        self._selection_load_state_obj().pending = bool(value)
+
+    @property
+    def _selection_load_start_scheduled(self) -> bool:
+        return bool(self._selection_load_state_obj().start_scheduled)
+
+    @_selection_load_start_scheduled.setter
+    def _selection_load_start_scheduled(self, value: bool) -> None:
+        self._selection_load_state_obj().start_scheduled = bool(value)
 
     def _finish_runtime_init_after_selection(self, *, show_access_errors: bool) -> None:
         started_at = time.perf_counter()
