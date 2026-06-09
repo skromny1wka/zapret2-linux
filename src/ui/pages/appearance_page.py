@@ -38,6 +38,7 @@ from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from app.state_store import AppUiState, MainWindowStateStore
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens
+from ui.accessibility import set_control_accessibility, set_state_text
 from app.ui_texts import tr as tr_catalog
 from ui.widgets.win11_controls import Win11ToggleRow
 from log.log import log
@@ -54,6 +55,32 @@ from qfluentwidgets import (
     ComboBox,
     SettingCardGroup,
 )
+
+
+def update_accent_color_button_accessibility(button, *, language: str = "ru", color: QColor | None = None) -> None:
+    if button is None:
+        return
+    current_color = color
+    if current_color is None:
+        try:
+            current_color = button.color
+        except Exception:
+            current_color = None
+    if current_color is not None and current_color.isValid():
+        color_text = current_color.name()
+    else:
+        color_text = "не выбран"
+    title = tr_catalog("page.appearance.accent.color.title", language=language, default="Цвет акцента")
+    pick_text = tr_catalog("page.appearance.accent.color.pick", language=language, default="Выбрать цвет")
+    state = f"{title}, текущий цвет: {color_text}"
+    if not button.isEnabled():
+        state = f"{state}, недоступно: включён акцент из Windows"
+    set_state_text(button, state)
+    set_control_accessibility(
+        button,
+        name=state,
+        description=f"{pick_text}. Открывает выбор цвета акцента интерфейса.",
+    )
 
 
 class AppearancePage(BasePage):
@@ -506,6 +533,7 @@ class AppearancePage(BasePage):
             QColor("#0078d4"),
             tr_catalog("page.appearance.accent.color.pick", language=self._ui_language, default="Выбрать цвет"),
         )
+        self._update_accent_color_button_accessibility()
         try:
             self._color_picker_btn.clicked.disconnect()
             self._color_picker_btn.clicked.connect(self._show_accent_color_dialog)
@@ -1007,6 +1035,7 @@ class AppearancePage(BasePage):
             editor_smooth_scroll_switch=self._editor_smooth_scroll_switch,
         )
         update_language_combo_accessibility(self._language_combo)
+        self._update_accent_color_button_accessibility()
         self._update_garland_checkbox_accessibility()
         self._update_snowflakes_checkbox_accessibility()
 
@@ -1310,6 +1339,7 @@ class AppearancePage(BasePage):
         except Exception:
             pass
         hex_color = color.name()
+        self._update_accent_color_button_accessibility(color)
         self._request_appearance_save("accent_color", hex_color)
         self._emit_accent_update(hex_color, refresh_background=False)
 
@@ -1357,6 +1387,7 @@ class AppearancePage(BasePage):
 
         if self._color_picker_btn is not None:
             self._color_picker_btn.setEnabled(not plan.follow_windows_accent)
+            self._update_accent_color_button_accessibility()
 
     def _on_follow_windows_accent_changed(self, state):
         """Обработчик переключения 'Акцент из Windows'."""
@@ -1368,9 +1399,11 @@ class AppearancePage(BasePage):
             self._request_windows_accent_load()
             if self._color_picker_btn is not None:
                 self._color_picker_btn.setEnabled(False)
+                self._update_accent_color_button_accessibility()
         else:
             if self._color_picker_btn is not None:
                 self._color_picker_btn.setEnabled(True)
+                self._update_accent_color_button_accessibility()
 
     def create_windows_accent_load_worker(self, request_id: int):
         return self._appearance.create_windows_accent_load_worker(request_id, parent=self)
@@ -1479,6 +1512,7 @@ class AppearancePage(BasePage):
                         self._request_appearance_save("accent_color", hex_color)
                         if self._color_picker_btn is not None:
                             self._color_picker_btn.setColor(color)
+                            self._update_accent_color_button_accessibility(color)
                     finally:
                         self._end_ui_sync()
                     self._emit_accent_update(hex_color, refresh_background=True)
@@ -1585,6 +1619,13 @@ class AppearancePage(BasePage):
                 language=self.__dict__.get("_ui_language", "ru"),
                 default="Снежинки",
             ),
+        )
+
+    def _update_accent_color_button_accessibility(self, color: QColor | None = None) -> None:
+        update_accent_color_button_accessibility(
+            self._color_picker_btn,
+            language=self.__dict__.get("_ui_language", "ru"),
+            color=color,
         )
 
     def set_opacity_value(self, value: int):

@@ -6,8 +6,8 @@ import unittest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtWidgets import QApplication, QWidget
-from PyQt6.QtGui import QPixmap
-from qfluentwidgets import BodyLabel, CaptionLabel, CheckBox, ComboBox, RadioButton, SegmentedWidget, Slider
+from PyQt6.QtGui import QColor, QPixmap
+from qfluentwidgets import BodyLabel, CaptionLabel, CheckBox, ColorPickerButton, ComboBox, RadioButton, SegmentedWidget, Slider
 
 from ui.fluent_widgets import SettingsCard
 from ui.pages.appearance_page_lower_build import build_holiday_sections, build_opacity_section
@@ -207,6 +207,59 @@ class AppearanceAccessibilityTests(unittest.TestCase):
 
         self.assertEqual(garland.accessibleName(), "Новогодняя гирлянда, включено")
         self.assertEqual(snowflakes.accessibleName(), "Снежинки, выключено")
+
+    def test_accent_color_button_reads_current_color(self) -> None:
+        from settings.appearance import AppearancePageInitialStatePlan
+        from ui.pages.appearance_page import AppearancePage
+
+        button = ColorPickerButton(QColor("#0078d4"), "Выбрать цвет")
+        self.addCleanup(button.deleteLater)
+
+        page = AppearancePage.__new__(AppearancePage)
+        page._color_picker_btn = button
+        page._follow_windows_accent_cb = None
+        page._tinted_bg_cb = None
+        page._tinted_intensity_slider = None
+        page._tinted_intensity_value_label = None
+        page._tinted_intensity_container = None
+        page._begin_ui_sync = lambda: None
+        page._end_ui_sync = lambda: None
+        page._is_ui_syncing = lambda: False
+        page._request_appearance_save = lambda *_args, **_kwargs: None
+        page._emit_accent_update = lambda *_args, **_kwargs: None
+
+        AppearancePage._apply_initial_accent_state(
+            page,
+            AppearancePageInitialStatePlan(
+                display_mode="dark",
+                ui_language="ru",
+                background_preset="standard",
+                rkn_background=None,
+                mica_enabled=False,
+                window_opacity=100,
+                accent_color="#112233",
+                follow_windows_accent=False,
+                tinted_background=False,
+                tinted_intensity=15,
+                animations_enabled=True,
+                smooth_scroll_enabled=True,
+                editor_smooth_scroll_enabled=True,
+                sidebar_icon_style="standard",
+                garland_enabled=False,
+                snowflakes_enabled=False,
+            ),
+        )
+
+        self.assertEqual(button.accessibleName(), "Цвет акцента, текущий цвет: #112233")
+        self.assertIn("Открывает выбор цвета", button.accessibleDescription())
+
+        AppearancePage._on_accent_color_changed(page, QColor("#445566"))
+
+        self.assertEqual(button.accessibleName(), "Цвет акцента, текущий цвет: #445566")
+        self.assertEqual(
+            button.property("screenReaderStateText"),
+            "Цвет акцента, текущий цвет: #445566",
+        )
 
     def test_saved_sidebar_icon_style_refreshes_screen_reader_state(self) -> None:
         from ui.pages.appearance_page import AppearancePage
