@@ -816,7 +816,10 @@ class ProfileOrderPageTests(unittest.TestCase):
         load_worker.run()
 
         load_profiles.assert_called_once_with()
-        self.assertEqual(loaded, [(2, load_profiles.return_value)])
+        self.assertEqual(len(loaded), 1)
+        self.assertEqual(loaded[0][0], 2)
+        self.assertIs(loaded[0][1].payload, load_profiles.return_value)
+        self.assertIsNone(loaded[0][1].view_state)
 
         move_before = Mock(return_value="profile-1")
         move_after = Mock()

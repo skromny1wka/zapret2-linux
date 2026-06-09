@@ -772,9 +772,15 @@ class ProfileFeature:
 
     def create_profile_order_load_worker(self, request_id: int, launch_method: str, parent=None):
         from profile.profile_order_loader import ProfileOrderListLoadWorker
+        from profile.order_view_state import build_profile_order_list_view_state
 
         service = self._commands()._profile_preset_service(self, launch_method)
-        return ProfileOrderListLoadWorker(request_id, service.list_preset_order_profiles, parent)
+        return ProfileOrderListLoadWorker(
+            request_id,
+            service.list_preset_order_profiles,
+            build_profile_order_list_view_state,
+            parent,
+        )
 
     def create_preset_profile_order_move_worker(
         self,

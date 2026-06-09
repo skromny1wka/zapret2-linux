@@ -3,16 +3,48 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from PyQt6.QtCore import QAbstractListModel, QMimeData, QModelIndex, QPoint, Qt, pyqtSignal
+from PyQt6.QtCore import QAbstractListModel, QMimeData, QModelIndex, QPoint, QThread, QTimer, Qt, pyqtSignal
 from PyQt6.QtWidgets import QListView, QVBoxLayout, QWidget
 
+from log.log import log
 from profile.icons import resolve_profile_icon
 from profile.match_filters import ports_label_from_match_lines, protocol_label_from_match_lines
+from profile.order_view_state import build_profile_order_list_view_state, move_profile_order_items
 from profile.ui.profile_list_delegate import ProfileListDelegate
 from profile.ui.profile_list_model import ProfileListModel
 from profile.ui.profile_list_view import ProfileListView
+from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.smooth_scroll import apply_page_smooth_scroll_preference
 from ui.widgets.fluent_scrollbar import install_fluent_scrollbars
+
+
+class ProfileOrderListViewStateWorker(QThread):
+    loaded = pyqtSignal(int, object)
+    failed = pyqtSignal(int, str)
+
+    def __init__(
+        self,
+        request_id: int,
+        *,
+        items: tuple[Any, ...],
+        preserve_order: bool = False,
+        parent=None,
+    ):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self._items = tuple(items or ())
+        self._preserve_order = bool(preserve_order)
+
+    def run(self) -> None:
+        try:
+            state = build_profile_order_list_view_state(
+                self._items,
+                preserve_order=self._preserve_order,
+            )
+        except Exception as exc:
+            self.failed.emit(self._request_id, str(exc))
+            return
+        self.loaded.emit(self._request_id, state)
 
 
 class ProfileOrderListModel(QAbstractListModel):
@@ -23,9 +55,10 @@ class ProfileOrderListModel(QAbstractListModel):
         self._items: tuple[Any, ...] = ()
 
     def set_profiles(self, items: tuple[Any, ...]) -> None:
-        rows = [item for item in tuple(items or ()) if bool(getattr(item, "in_preset", False))]
-        rows.sort(key=lambda item: int(getattr(item, "profile_index", 0) or 0))
-        next_items = tuple(rows)
+        self.apply_view_state(build_profile_order_list_view_state(tuple(items or ())))
+
+    def apply_view_state(self, state) -> None:
+        next_items = tuple(getattr(state, "items", ()) or ())
         if self._items == next_items:
             return
         if tuple(_profile_order_identity(item) for item in self._items) == tuple(
@@ -41,9 +74,16 @@ class ProfileOrderListModel(QAbstractListModel):
                 model_index = self.index(row_index, 0)
                 self.dataChanged.emit(model_index, model_index, _profile_order_data_roles())
             return
+        if self._apply_single_row_move(next_items):
+            return
         self.beginResetModel()
         self._items = next_items
         self.endResetModel()
+
+    def view_state_options(self) -> dict[str, Any]:
+        return {
+            "items": tuple(self._items or ()),
+        }
 
     def move_profile(self, source_profile_key: str, action: str, destination_profile_key: str = "") -> bool:
         source_key = str(source_profile_key or "").strip()
@@ -74,6 +114,33 @@ class ProfileOrderListModel(QAbstractListModel):
         self._items = tuple(rows)
         self.endMoveRows()
         return True
+
+    def _apply_single_row_move(self, next_items: tuple[Any, ...]) -> bool:
+        current_identity = [_profile_order_identity(item) for item in self._items]
+        next_identity = [_profile_order_identity(item) for item in next_items]
+        if len(current_identity) != len(next_identity) or len(current_identity) < 2:
+            return False
+        if sorted(current_identity) != sorted(next_identity):
+            return False
+        moved_from = -1
+        moved_to = -1
+        for source_index, identity in enumerate(current_identity):
+            next_index = next_identity.index(identity)
+            without_current = list(current_identity)
+            item = without_current.pop(source_index)
+            without_current.insert(next_index, item)
+            if without_current == next_identity:
+                moved_from = source_index
+                moved_to = next_index
+                break
+        if moved_from < 0 or moved_to < 0 or moved_from == moved_to:
+            return False
+        destination_child = moved_to + 1 if moved_to > moved_from else moved_to
+        self.beginMoveRows(QModelIndex(), moved_from, moved_from, QModelIndex(), destination_child)
+        self._items = next_items
+        self.endMoveRows()
+        return True
+
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         if parent.isValid():
@@ -173,6 +240,11 @@ class ProfileOrderList(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._view_state_runtime = OneShotWorkerRuntime()
+        self._view_state_runtime_worker = None
+        self._view_state_rebuild_pending = False
+        self._view_state_items: tuple[Any, ...] | None = None
+        self._view_state_preserve_order = False
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
@@ -203,10 +275,98 @@ class ProfileOrderList(QWidget):
         layout.addWidget(self._view, 1)
 
     def set_profiles(self, items: tuple[Any, ...]) -> None:
-        self._model.set_profiles(tuple(items or ()))
+        self._request_view_state_rebuild(items=tuple(items or ()))
+
+    def apply_view_state(self, view_state) -> None:
+        self._model.apply_view_state(view_state)
+        self._view_state_items = None
 
     def move_profile_item(self, source_profile_key: str, action: str, destination_profile_key: str = "") -> bool:
-        return self._model.move_profile(source_profile_key, action, destination_profile_key)
+        next_items = move_profile_order_items(
+            self._current_view_state_items(),
+            source_profile_key,
+            action,
+            destination_profile_key,
+        )
+        if next_items is None:
+            return False
+        self._request_view_state_rebuild(items=next_items, preserve_order=True)
+        return True
+
+    def _request_view_state_rebuild(
+        self,
+        *,
+        items: tuple[Any, ...],
+        preserve_order: bool = False,
+    ) -> None:
+        self._view_state_items = tuple(items or ())
+        self._view_state_preserve_order = bool(preserve_order)
+        runtime = self.__dict__.get("_view_state_runtime")
+        if runtime is None:
+            runtime = OneShotWorkerRuntime()
+            self._view_state_runtime = runtime
+        if runtime.is_running():
+            self._view_state_rebuild_pending = True
+            return
+        self._start_view_state_worker()
+
+    def _start_view_state_worker(self) -> None:
+        runtime = self.__dict__.get("_view_state_runtime")
+        if runtime is None:
+            runtime = OneShotWorkerRuntime()
+            self._view_state_runtime = runtime
+        options = self._model.view_state_options()
+        items = tuple(self.__dict__.get("_view_state_items") or options.get("items") or ())
+        preserve_order = bool(self.__dict__.get("_view_state_preserve_order", False))
+
+        _request_id, worker = runtime.start_qthread_worker(
+            worker_factory=lambda request_id: ProfileOrderListViewStateWorker(
+                request_id,
+                items=items,
+                preserve_order=preserve_order,
+                parent=self,
+            ),
+            on_loaded=self._on_view_state_loaded,
+            on_failed=self._on_view_state_failed,
+            on_finished=self._on_view_state_worker_finished,
+        )
+        self._view_state_runtime_worker = worker
+
+    def _current_view_state_items(self) -> tuple[Any, ...]:
+        pending = self.__dict__.get("_view_state_items")
+        if isinstance(pending, tuple):
+            return pending
+        try:
+            options = self._model.view_state_options()
+        except Exception:
+            options = {}
+        return tuple(options.get("items") or ())
+
+    def _on_view_state_loaded(self, request_id: int, state) -> None:
+        runtime = self.__dict__.get("_view_state_runtime")
+        if runtime is None or not runtime.is_current(request_id):
+            return
+        if self.__dict__.get("_view_state_rebuild_pending", False):
+            return
+        self.apply_view_state(state)
+
+    def _on_view_state_failed(self, request_id: int, error: str) -> None:
+        runtime = self.__dict__.get("_view_state_runtime")
+        if runtime is None or not runtime.is_current(request_id):
+            return
+        log(f"ProfileOrderList: не удалось подготовить порядок profile-ов: {error}", "ERROR")
+
+    def _on_view_state_worker_finished(self, worker) -> None:
+        if worker is not self.__dict__.get("_view_state_runtime_worker"):
+            return
+        self._view_state_runtime_worker = None
+        if not self.__dict__.get("_view_state_rebuild_pending", False):
+            return
+        self._view_state_rebuild_pending = False
+        try:
+            QTimer.singleShot(0, self._start_view_state_worker)
+        except Exception:
+            self._start_view_state_worker()
 
 
 def _profile_order_identity(item: Any) -> str:
@@ -260,4 +420,4 @@ def _profile_order_data_roles() -> list[int]:
     ]
 
 
-__all__ = ["ProfileOrderList", "ProfileOrderListModel"]
+__all__ = ["ProfileOrderList", "ProfileOrderListModel", "ProfileOrderListViewStateWorker"]

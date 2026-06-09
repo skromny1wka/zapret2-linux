@@ -112,7 +112,7 @@ class ProfileOrderPageBase(BasePage):
             cleanup_in_progress=bool(self.__dict__.get("_cleanup_in_progress", False)),
         ):
             return
-        self._payload = payload
+        self._payload = getattr(payload, "payload", payload)
         self._schedule_order_payload_apply(payload)
 
     def _schedule_order_payload_apply(self, payload) -> None:
@@ -134,7 +134,12 @@ class ProfileOrderPageBase(BasePage):
         if self.__dict__.get("_order_load_dirty", False) or self.__dict__.get("_order_load_restart_scheduled", False):
             return
         if self._order_list is not None:
-            self._order_list.set_profiles(tuple(getattr(payload, "items", ()) or ()))
+            view_state = getattr(payload, "view_state", None)
+            if view_state is not None:
+                self._order_list.apply_view_state(view_state)
+            else:
+                payload_items = getattr(getattr(payload, "payload", payload), "items", ())
+                self._order_list.set_profiles(tuple(payload_items or ()))
         self._rebuild_breadcrumb()
 
     def _on_order_profiles_failed(self, request_id: int, error: str) -> None:

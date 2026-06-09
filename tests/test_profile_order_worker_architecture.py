@@ -20,6 +20,24 @@ class ProfileOrderWorkerArchitectureTests(unittest.TestCase):
         self.assertNotIn("self._service.list_preset_order_profiles", run_source)
         self.assertNotIn("self._profile.list_preset_order_profiles", run_source)
 
+    def test_profile_order_load_worker_builds_view_state_off_gui_thread(self) -> None:
+        from profile.profile_order_loader import ProfileOrderListLoadWorker
+
+        init_source = inspect.getsource(ProfileOrderListLoadWorker.__init__)
+        run_source = inspect.getsource(ProfileOrderListLoadWorker.run)
+
+        self.assertIn("build_view_state", init_source)
+        self.assertIn("self._build_view_state", run_source)
+        self.assertIn("ProfileOrderListLoadResult", run_source)
+
+    def test_profile_feature_builds_order_state_without_ui_model_import(self) -> None:
+        from app.feature_facades.profile import ProfileFeature
+
+        worker_source = inspect.getsource(ProfileFeature.create_profile_order_load_worker)
+
+        self.assertIn("profile.order_view_state", worker_source)
+        self.assertNotIn("profile.ui.profile_order_list", worker_source)
+
     def test_profile_order_move_worker_receives_move_functions(self) -> None:
         from profile.profile_order_loader import ProfilePresetOrderMoveWorker
 
@@ -40,6 +58,20 @@ class ProfileOrderWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("self._move_to_end(", run_source)
         self.assertNotIn("self._service.move_preset_profile", run_source)
         self.assertNotIn("self._profile.move_preset_profile", run_source)
+
+    def test_profile_order_list_rebuilds_visible_rows_through_worker(self) -> None:
+        import profile.ui.profile_order_list as order_list_module
+        from profile.ui.profile_order_list import ProfileOrderList
+
+        set_source = inspect.getsource(ProfileOrderList.set_profiles)
+        move_source = inspect.getsource(ProfileOrderList.move_profile_item)
+        worker_source = inspect.getsource(order_list_module.ProfileOrderListViewStateWorker.run)
+
+        self.assertIn("_request_view_state_rebuild", set_source)
+        self.assertIn("_request_view_state_rebuild", move_source)
+        self.assertNotIn("self._model.set_profiles", set_source)
+        self.assertNotIn("self._model.move_profile", move_source)
+        self.assertIn("build_profile_order_list_view_state", worker_source)
 
 
 if __name__ == "__main__":
