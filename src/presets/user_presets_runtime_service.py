@@ -211,8 +211,7 @@ class UserPresetsRuntimeService:
         self._attached_adapter: UserPresetsRuntimeAdapter | None = None
         self._metadata_load_request_id = 0
         self._metadata_load_runtime = OneShotWorkerRuntime()
-        self._metadata_load_pending_page = None
-        self._metadata_load_start_scheduled = False
+        self._metadata_load_state = LatestValueWorkerState(self._metadata_load_runtime, empty_value=None)
         self._single_metadata_request_id = 0
         self._single_metadata_runtime = OneShotWorkerRuntime()
         self._single_metadata_pending: list[str] = []
@@ -678,8 +677,7 @@ class UserPresetsRuntimeService:
         self._metadata_load_request_id += 1
         self._single_metadata_request_id += 1
         self._rows_plan_request_id += 1
-        self._metadata_load_pending_page = None
-        self._metadata_load_start_scheduled = False
+        self._metadata_load_state_obj().reset()
         self._single_metadata_pending.clear()
         self._single_metadata_start_scheduled = False
         self._rows_plan_state_obj().reset()
@@ -919,11 +917,9 @@ class UserPresetsRuntimeService:
     def load_presets(self, page=None) -> None:
         page = self._resolve_page(page)
         adapter = self._resolve_adapter()
-        if (
-            self._metadata_load_runtime.is_running()
-            or self.__dict__.get("_metadata_load_start_scheduled", False)
-        ):
-            self._metadata_load_pending_page = page
+        metadata_load_state = self._metadata_load_state_obj()
+        if metadata_load_state.is_busy():
+            metadata_load_state.pending = page
             self._ui_dirty = True
             return
 
@@ -963,7 +959,7 @@ class UserPresetsRuntimeService:
     ) -> None:
         if request_id != self._metadata_load_request_id:
             return
-        if self.__dict__.get("_metadata_load_pending_page") is not None:
+        if self._metadata_load_state_obj().has_pending():
             return
         page = self._resolve_page(page)
         self._cached_presets_metadata = dict(all_presets)
@@ -984,7 +980,7 @@ class UserPresetsRuntimeService:
     def _on_metadata_failed(self, request_id: int, error: str, page=None) -> None:
         if request_id != self._metadata_load_request_id:
             return
-        if self.__dict__.get("_metadata_load_pending_page") is not None:
+        if self._metadata_load_state_obj().has_pending():
             return
         _ = self._resolve_page(page)
         self._ui_dirty = True
@@ -993,26 +989,47 @@ class UserPresetsRuntimeService:
     def _on_metadata_worker_finished(self, worker: UserPresetsMetadataLoadWorker) -> None:
         if not self._is_current_worker_finish(worker, "_metadata_load_request_id"):
             return
-        pending_page = self._metadata_load_pending_page
-        if pending_page is not None:
+        if self._metadata_load_state_obj().has_pending():
             self._schedule_metadata_load()
 
     def _schedule_metadata_load(self) -> None:
-        if self.__dict__.get("_metadata_load_start_scheduled", False):
-            return
-        self._metadata_load_start_scheduled = True
-        try:
-            QTimer.singleShot(0, self._run_scheduled_metadata_load)
-        except Exception:
-            self._run_scheduled_metadata_load()
+        self._metadata_load_state_obj().schedule_start(
+            self._single_shot_or_run,
+            self._run_scheduled_metadata_load,
+        )
 
     def _run_scheduled_metadata_load(self) -> None:
-        self._metadata_load_start_scheduled = False
-        pending_page = self.__dict__.get("_metadata_load_pending_page")
-        self._metadata_load_pending_page = None
+        pending_page = self._metadata_load_state_obj().take_pending_for_scheduled_start()
         if pending_page is None:
             return
         self.load_presets(pending_page)
+
+    def _metadata_load_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_metadata_load_state")
+        if state is None:
+            runtime = self.__dict__.get("_metadata_load_runtime")
+            if runtime is None:
+                runtime = OneShotWorkerRuntime()
+                self._metadata_load_runtime = runtime
+            state = LatestValueWorkerState(runtime, empty_value=None)
+            self._metadata_load_state = state
+        return state
+
+    @property
+    def _metadata_load_pending_page(self):
+        return self._metadata_load_state_obj().pending
+
+    @_metadata_load_pending_page.setter
+    def _metadata_load_pending_page(self, value) -> None:
+        self._metadata_load_state_obj().pending = value
+
+    @property
+    def _metadata_load_start_scheduled(self) -> bool:
+        return bool(self._metadata_load_state_obj().start_scheduled)
+
+    @_metadata_load_start_scheduled.setter
+    def _metadata_load_start_scheduled(self, value: bool) -> None:
+        self._metadata_load_state_obj().start_scheduled = bool(value)
 
     def refresh_presets_view_if_possible(self, page=None) -> None:
         page = self._resolve_page(page)

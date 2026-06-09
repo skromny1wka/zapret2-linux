@@ -48,6 +48,26 @@ class UserPresetsRowsWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("_rows_plan_state_obj()", scheduled_source)
         self.assertNotIn("_rows_plan_start_scheduled", service_source)
 
+    def test_runtime_service_uses_shared_state_for_full_metadata_load_queue(self) -> None:
+        import presets.user_presets_runtime_service as runtime_service
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        service = runtime_service.UserPresetsRuntimeService()
+        init_source = inspect.getsource(runtime_service.UserPresetsRuntimeService.__init__)
+        load_source = inspect.getsource(runtime_service.UserPresetsRuntimeService.load_presets)
+        finished_source = inspect.getsource(runtime_service.UserPresetsRuntimeService._on_metadata_worker_finished)
+        scheduled_source = inspect.getsource(runtime_service.UserPresetsRuntimeService._run_scheduled_metadata_load)
+        cleanup_source = inspect.getsource(runtime_service.UserPresetsRuntimeService._stop_metadata_workers)
+
+        self.assertIsInstance(service._metadata_load_state_obj(), LatestValueWorkerState)
+        self.assertIn("_metadata_load_state = LatestValueWorkerState", init_source)
+        self.assertIn("_metadata_load_state_obj()", load_source)
+        self.assertIn("_metadata_load_state_obj()", finished_source)
+        self.assertIn("_metadata_load_state_obj()", scheduled_source)
+        self.assertIn("_metadata_load_state_obj().reset()", cleanup_source)
+        self.assertNotIn("_metadata_load_pending_page = None", init_source)
+        self.assertNotIn("_metadata_load_start_scheduled = False", init_source)
+
     def test_runtime_finished_handlers_leave_worker_deletion_to_shared_runtime(self) -> None:
         import presets.user_presets_runtime_service as runtime_service
 
