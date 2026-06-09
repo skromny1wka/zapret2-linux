@@ -164,8 +164,10 @@ class HostsPage(BasePage):
         self._open_file_runtime = OneShotWorkerRuntime()
         self._open_file_state = LatestValueWorkerState(self._open_file_runtime, empty_value=False)
         self._permission_restore_runtime = OneShotWorkerRuntime()
-        self._permission_restore_pending = False
-        self._permission_restore_start_scheduled = False
+        self._permission_restore_state = LatestValueWorkerState(
+            self._permission_restore_runtime,
+            empty_value=False,
+        )
         self._applying = False
         self._cleanup_in_progress = False
         self._runtime_cache = create_runtime_cache()
@@ -693,13 +695,11 @@ class HostsPage(BasePage):
         return self._hosts.create_permission_restore_worker(request_id, self)
 
     def _request_restore_hosts_permissions(self) -> None:
-        if (
-            self._permission_restore_runtime.is_running()
-            or self.__dict__.get("_permission_restore_start_scheduled", False)
-        ):
-            self._permission_restore_pending = True
+        state = self._permission_restore_state_obj()
+        if state.is_busy():
+            state.pending = True
             return
-        self._permission_restore_pending = False
+        state.pending = False
         self._permission_restore_runtime.start_qthread_worker(
             worker_factory=lambda request_id: self.create_permission_restore_worker(request_id),
             on_loaded=self._on_restore_hosts_permissions_finished,
@@ -713,7 +713,7 @@ class HostsPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_permission_restore_pending", False):
+        if self._permission_restore_state_obj().has_pending():
             return
         apply_restore_hosts_permissions_result_flow(
             result=result,
@@ -731,7 +731,7 @@ class HostsPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_permission_restore_pending", False):
+        if self._permission_restore_state_obj().has_pending():
             return
         self._dismiss_hosts_error_bar()
         self._show_error(str(error or ""))
@@ -739,27 +739,62 @@ class HostsPage(BasePage):
     def _on_restore_hosts_permissions_worker_finished(self, _worker) -> None:
         if not self._is_current_worker_finish(self.__dict__.get("_permission_restore_runtime"), _worker):
             return
-        if self.__dict__.get("_cleanup_in_progress", False):
-            return
-        if self.__dict__.get("_permission_restore_pending", False):
+        state = self._permission_restore_state_obj()
+        if state.has_pending() and not self.__dict__.get("_cleanup_in_progress", False):
+            state.pending = False
             self._schedule_permission_restore_start()
 
     def _schedule_permission_restore_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        if self.__dict__.get("_permission_restore_start_scheduled", False):
-            return
-        self._permission_restore_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_permission_restore_start)
+        state = self._permission_restore_state_obj()
+        state.pending = True
+        state.schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_permission_restore_start,
+            pending_when_already_scheduled=True,
+        )
 
     def _run_scheduled_permission_restore_start(self) -> None:
-        self._permission_restore_start_scheduled = False
-        if self.__dict__.get("_cleanup_in_progress", False):
+        pending = self._permission_restore_state_obj().take_pending_for_scheduled_start(
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
+        if not pending:
             return
-        if not self.__dict__.get("_permission_restore_pending", False):
-            return
-        self._permission_restore_pending = False
         self._request_restore_hosts_permissions()
+
+    def _permission_restore_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_permission_restore_state")
+        runtime = self.__dict__.get("_permission_restore_runtime")
+        if state is None:
+            pending = bool(self.__dict__.pop("_permission_restore_pending", False))
+            start_scheduled = bool(self.__dict__.pop("_permission_restore_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=False,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_permission_restore_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _permission_restore_pending(self) -> bool:
+        return bool(self._permission_restore_state_obj().pending)
+
+    @_permission_restore_pending.setter
+    def _permission_restore_pending(self, value: bool) -> None:
+        self._permission_restore_state_obj().pending = bool(value)
+
+    @property
+    def _permission_restore_start_scheduled(self) -> bool:
+        return bool(self._permission_restore_state_obj().start_scheduled)
+
+    @_permission_restore_start_scheduled.setter
+    def _permission_restore_start_scheduled(self, value: bool) -> None:
+        self._permission_restore_state_obj().start_scheduled = bool(value)
 
     def _check_hosts_access(self):
         """Проверяет доступ к hosts файлу при загрузке страницы"""

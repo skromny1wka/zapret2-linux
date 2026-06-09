@@ -606,6 +606,21 @@ class HostsPageRuntimeTests(unittest.TestCase):
 
         page._request_restore_hosts_permissions.assert_called_once_with()
 
+    def test_restore_permissions_queue_uses_shared_latest_worker_state(self) -> None:
+        from hosts.ui.page import HostsPage
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        page = HostsPage.__new__(HostsPage)
+        page._permission_restore_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+
+        init_source = inspect.getsource(HostsPage.__init__)
+
+        self.assertTrue(hasattr(HostsPage, "_permission_restore_state_obj"))
+        self.assertIsInstance(page._permission_restore_state_obj(), LatestValueWorkerState)
+        self.assertIn("_permission_restore_state = LatestValueWorkerState", init_source)
+        self.assertNotIn("self._permission_restore_pending = False", init_source)
+        self.assertNotIn("self._permission_restore_start_scheduled = False", init_source)
+
     def test_stale_restore_permissions_worker_finished_does_not_restart_pending_restore(self) -> None:
         import hosts.ui.page as hosts_page
         from hosts.ui.page import HostsPage
