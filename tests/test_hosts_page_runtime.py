@@ -505,6 +505,21 @@ class HostsPageRuntimeTests(unittest.TestCase):
         page._request_open_hosts_file.assert_not_called()
         self.assertTrue(page._open_file_pending)
 
+    def test_open_hosts_file_queue_uses_shared_latest_worker_state(self) -> None:
+        from hosts.ui.page import HostsPage
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        page = HostsPage.__new__(HostsPage)
+        page._open_file_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+
+        init_source = inspect.getsource(HostsPage.__init__)
+
+        self.assertTrue(hasattr(HostsPage, "_open_file_state_obj"))
+        self.assertIsInstance(page._open_file_state_obj(), LatestValueWorkerState)
+        self.assertIn("_open_file_state = LatestValueWorkerState", init_source)
+        self.assertNotIn("self._open_file_pending = False", init_source)
+        self.assertNotIn("self._open_file_start_scheduled = False", init_source)
+
     def test_open_hosts_file_request_waits_while_restart_is_scheduled(self) -> None:
         from hosts.ui.page import HostsPage
 

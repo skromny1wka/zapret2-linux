@@ -162,8 +162,7 @@ class HostsPage(BasePage):
         self._state_load_request_context = {"show_access_errors": False, "update_status": False}
         self._state_load_start_scheduled = False
         self._open_file_runtime = OneShotWorkerRuntime()
-        self._open_file_pending = False
-        self._open_file_start_scheduled = False
+        self._open_file_state = LatestValueWorkerState(self._open_file_runtime, empty_value=False)
         self._permission_restore_runtime = OneShotWorkerRuntime()
         self._permission_restore_pending = False
         self._permission_restore_start_scheduled = False
@@ -1018,10 +1017,11 @@ class HostsPage(BasePage):
         return self._hosts.create_open_hosts_file_worker(request_id, self)
 
     def _request_open_hosts_file(self) -> None:
-        if self._open_file_runtime.is_running() or self.__dict__.get("_open_file_start_scheduled", False):
-            self._open_file_pending = True
+        state = self._open_file_state_obj()
+        if state.is_busy():
+            state.pending = True
             return
-        self._open_file_pending = False
+        state.pending = False
         self._open_file_runtime.start_qthread_worker(
             worker_factory=lambda request_id: self.create_open_hosts_file_worker(request_id),
             on_loaded=self._on_open_hosts_file_finished,
@@ -1032,7 +1032,7 @@ class HostsPage(BasePage):
     def _on_open_hosts_file_finished(self, request_id: int, result) -> None:
         if not self._open_file_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
             return
-        if self.__dict__.get("_open_file_pending", False):
+        if self._open_file_state_obj().has_pending():
             return
         if result.success:
             return
@@ -1041,31 +1041,69 @@ class HostsPage(BasePage):
     def _on_open_hosts_file_failed(self, request_id: int, error: str) -> None:
         if not self._open_file_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
             return
-        if self.__dict__.get("_open_file_pending", False):
+        if self._open_file_state_obj().has_pending():
             return
         self._show_open_hosts_file_error(str(error))
 
     def _on_open_hosts_file_worker_finished(self, _worker) -> None:
         if not self._is_current_worker_finish(self.__dict__.get("_open_file_runtime"), _worker):
             return
-        if self._open_file_pending and not self._cleanup_in_progress:
-            self._open_file_pending = False
+        state = self._open_file_state_obj()
+        if state.has_pending() and not self._cleanup_in_progress:
+            state.pending = False
             self._schedule_open_hosts_file_start()
 
     def _schedule_open_hosts_file_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        if self.__dict__.get("_open_file_start_scheduled", False):
-            self._open_file_pending = True
-            return
-        self._open_file_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_open_hosts_file_start)
+        state = self._open_file_state_obj()
+        state.pending = True
+        state.schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_open_hosts_file_start,
+            pending_when_already_scheduled=True,
+        )
 
     def _run_scheduled_open_hosts_file_start(self) -> None:
-        self._open_file_start_scheduled = False
-        if self.__dict__.get("_cleanup_in_progress", False):
+        pending = self._open_file_state_obj().take_pending_for_scheduled_start(
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
+        if not pending:
             return
         self._request_open_hosts_file()
+
+    def _open_file_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_open_file_state")
+        runtime = self.__dict__.get("_open_file_runtime")
+        if state is None:
+            pending = bool(self.__dict__.pop("_open_file_pending", False))
+            start_scheduled = bool(self.__dict__.pop("_open_file_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=False,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_open_file_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _open_file_pending(self) -> bool:
+        return bool(self._open_file_state_obj().pending)
+
+    @_open_file_pending.setter
+    def _open_file_pending(self, value: bool) -> None:
+        self._open_file_state_obj().pending = bool(value)
+
+    @property
+    def _open_file_start_scheduled(self) -> bool:
+        return bool(self._open_file_state_obj().start_scheduled)
+
+    @_open_file_start_scheduled.setter
+    def _open_file_start_scheduled(self, value: bool) -> None:
+        self._open_file_state_obj().start_scheduled = bool(value)
 
     def _show_open_hosts_file_error(self, error: str) -> None:
         if InfoBar:
