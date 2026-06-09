@@ -690,6 +690,22 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         )
         profiles_list.folder_toggled.emit.assert_called_once_with("video", True)
 
+    def test_profile_list_folder_state_requests_worker_view_state_rebuild(self) -> None:
+        profiles_list = ProfilesList.__new__(ProfilesList)
+        profiles_list._model = SimpleNamespace(
+            apply_folder_state=Mock(side_effect=AssertionError("folder state rows must be built in worker")),
+        )
+        profiles_list._request_view_state_rebuild = Mock()
+        folder_state = {"folders": {"common": {"name": "Новая папка"}}}
+
+        self.assertTrue(ProfilesList.apply_profile_folder_state(profiles_list, folder_state))
+
+        profiles_list._model.apply_folder_state.assert_not_called()
+        profiles_list._request_view_state_rebuild.assert_called_once_with(
+            folder_state=folder_state,
+            reset_group_expanded=True,
+        )
+
     def test_profile_list_reserves_space_for_visible_fluent_scrollbar(self) -> None:
         list_source = inspect.getsource(ProfilesList._build_ui)
 

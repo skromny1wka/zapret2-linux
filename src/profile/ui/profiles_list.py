@@ -28,7 +28,8 @@ class ProfileListViewStateWorker(QThread):
         items: tuple[Any, ...],
         active_profile_types: set[str],
         search_query: str,
-        group_expanded: dict[str, bool],
+        group_expanded: dict[str, bool] | None,
+        folder_state: dict[str, Any] | None = None,
         parent=None,
     ):
         super().__init__(parent)
@@ -36,7 +37,8 @@ class ProfileListViewStateWorker(QThread):
         self._items = tuple(items or ())
         self._active_profile_types = set(active_profile_types or {"all"})
         self._search_query = str(search_query or "")
-        self._group_expanded = dict(group_expanded or {})
+        self._group_expanded = dict(group_expanded) if isinstance(group_expanded, dict) else None
+        self._folder_state = dict(folder_state) if isinstance(folder_state, dict) else None
 
     def run(self) -> None:
         try:
@@ -45,6 +47,7 @@ class ProfileListViewStateWorker(QThread):
                 active_profile_types=self._active_profile_types,
                 search_query=self._search_query,
                 group_expanded=self._group_expanded,
+                folder_state=self._folder_state,
             )
         except Exception as exc:
             self.failed.emit(self._request_id, str(exc))
@@ -70,6 +73,8 @@ class ProfilesList(QWidget):
         self._view_state_runtime_worker = None
         self._view_state_rebuild_pending = False
         self._view_state_group_expanded: dict[str, bool] | None = None
+        self._view_state_folder_state: dict[str, Any] | None = None
+        self._view_state_reset_group_expanded = False
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -214,7 +219,13 @@ class ProfilesList(QWidget):
         )
 
     def apply_profile_folder_state(self, folder_state: dict[str, Any]) -> bool:
-        return self._model.apply_folder_state(folder_state)
+        if not isinstance(folder_state, dict):
+            return False
+        self._request_view_state_rebuild(
+            folder_state=folder_state,
+            reset_group_expanded=True,
+        )
+        return True
 
     def set_search_query(self, query: str) -> None:
         value = str(query or "")
@@ -285,9 +296,20 @@ class ProfilesList(QWidget):
             if str(group_key)
         }
 
-    def _request_view_state_rebuild(self, *, group_expanded: dict[str, bool] | None = None) -> None:
+    def _request_view_state_rebuild(
+        self,
+        *,
+        group_expanded: dict[str, bool] | None = None,
+        folder_state: dict[str, Any] | None = None,
+        reset_group_expanded: bool = False,
+    ) -> None:
         if group_expanded is not None:
             self._view_state_group_expanded = dict(group_expanded)
+        if isinstance(folder_state, dict):
+            self._view_state_folder_state = dict(folder_state)
+        if reset_group_expanded:
+            self._view_state_group_expanded = None
+            self._view_state_reset_group_expanded = True
         runtime = self.__dict__.get("_view_state_runtime")
         if runtime is None:
             runtime = OneShotWorkerRuntime()
@@ -304,11 +326,15 @@ class ProfilesList(QWidget):
             self._view_state_runtime = runtime
         options = self._model.view_state_options()
         items = tuple(options.get("items") or ())
-        group_expanded = dict(
-            self.__dict__.get("_view_state_group_expanded")
-            or options.get("group_expanded")
-            or {}
-        )
+        if bool(self.__dict__.pop("_view_state_reset_group_expanded", False)):
+            group_expanded = None
+        else:
+            group_expanded = dict(
+                self.__dict__.get("_view_state_group_expanded")
+                or options.get("group_expanded")
+                or {}
+            )
+        folder_state = self.__dict__.pop("_view_state_folder_state", None)
         active_profile_types = set(self._active_profile_types or {"all"})
         search_query = str(self._search_query or "")
 
@@ -319,6 +345,7 @@ class ProfilesList(QWidget):
                 active_profile_types=active_profile_types,
                 search_query=search_query,
                 group_expanded=group_expanded,
+                folder_state=folder_state,
                 parent=self,
             ),
             on_loaded=self._on_view_state_loaded,

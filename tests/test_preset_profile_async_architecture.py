@@ -1816,6 +1816,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         expand_source = inspect.getsource(ProfilesList.expand_all)
         collapse_source = inspect.getsource(ProfilesList.collapse_all)
         all_groups_source = inspect.getsource(ProfilesList._request_all_groups_expanded)
+        folder_state_source = inspect.getsource(ProfilesList.apply_profile_folder_state)
         worker_source = inspect.getsource(profiles_list_module.ProfileListViewStateWorker.run)
 
         self.assertIn("OneShotWorkerRuntime", list_source)
@@ -1825,12 +1826,15 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_request_all_groups_expanded", expand_source)
         self.assertIn("_request_all_groups_expanded", collapse_source)
         self.assertIn("_request_view_state_rebuild", all_groups_source)
+        self.assertIn("_request_view_state_rebuild", folder_state_source)
         self.assertNotIn("self._model.set_search_query", search_source)
         self.assertNotIn("self._model.set_active_profile_types", type_source)
         self.assertNotIn("self._model.set_group_expanded", toggle_source)
         self.assertNotIn("self._model.set_all_groups_expanded", expand_source)
         self.assertNotIn("self._model.set_all_groups_expanded", collapse_source)
+        self.assertNotIn("self._model.apply_folder_state", folder_state_source)
         self.assertIn("build_profile_list_view_state", worker_source)
+        self.assertIn("folder_state", worker_source)
 
     def test_profile_feature_warms_profile_list_worker_result(self) -> None:
         source = inspect.getsource(ProfileFeature.warm_profile_list)

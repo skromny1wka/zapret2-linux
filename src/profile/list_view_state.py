@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 from folders.defaults import build_default_profile_folders
@@ -25,8 +25,10 @@ def build_profile_list_view_state(
     active_profile_types: set[str] | None = None,
     search_query: str = "",
     group_expanded: dict[str, bool] | None = None,
+    folder_state: dict[str, Any] | None = None,
 ) -> ProfileListViewState:
     display_items = build_profile_display_items(tuple(items or ()))
+    display_items = apply_profile_folder_state_to_items(display_items, folder_state)
     active = _normalized_profile_types(active_profile_types)
     normalized_search = _normalized_search_query(search_query)
     next_group_expanded = dict(group_expanded or _initial_group_expanded(display_items))
@@ -45,6 +47,31 @@ def build_profile_list_view_state(
             search_query=normalized_search,
         ),
     )
+
+
+def apply_profile_folder_state_to_items(
+    items: tuple[ProfileDisplayItem, ...],
+    folder_state: dict[str, Any] | None,
+) -> tuple[ProfileDisplayItem, ...]:
+    if not isinstance(folder_state, dict):
+        return tuple(items or ())
+
+    from profile.folders import profile_folder_collapsed, profile_folder_for_profile
+
+    next_items: list[ProfileDisplayItem] = []
+    for item in tuple(items or ()):
+        folder_key, folder_name, order = profile_folder_for_profile(item, folder_state)
+        next_items.append(
+            replace(
+                item,
+                group=folder_key,
+                group_name=folder_name,
+                order=int(order) if order is not None else int(item.order or 0),
+                order_is_manual=order is not None,
+                group_collapsed=profile_folder_collapsed(folder_key, folder_state),
+            )
+        )
+    return tuple(sorted(next_items, key=profile_display_sort_key))
 
 
 def row_for_profile(item: ProfileDisplayItem) -> dict[str, Any]:
