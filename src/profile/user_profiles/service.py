@@ -12,6 +12,7 @@ from lists.core.layered_files import (
     ensure_profile_user_list_file,
     rename_profile_user_list_file,
     safe_list_file_name,
+    write_profile_user_list_text,
 )
 
 from ..models import EngineName, Profile
@@ -22,6 +23,7 @@ from ..template_catalog import load_profile_templates
 
 _PORTS_RE = re.compile(r"^[0-9*,~-]+$")
 _SLUG_RE = re.compile(r"[^a-z0-9а-яё]+", flags=re.IGNORECASE)
+_DEFAULT_HOSTLIST_TEXT = "www.example.com\n"
 _RU_TRANSLIT = str.maketrans({
     "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e", "ж": "zh",
     "з": "z", "и": "i", "й": "i", "к": "k", "л": "l", "м": "m", "н": "n", "о": "o",
@@ -43,6 +45,7 @@ def create_user_profile(paths: AppPaths, *, name: str, protocol: str, ports: str
     lists_root = Path(paths.user_root) / "lists"
     ensure_profile_user_list_file(lists_root, f"{profile_id}.txt")
     ensure_profile_user_list_file(lists_root, f"ipset-{profile_id}.txt")
+    write_profile_user_list_text(lists_root, f"{profile_id}.txt", _DEFAULT_HOSTLIST_TEXT)
 
     settings = get_user_profiles_settings()
     profiles = dict(settings.get("profiles") or {})

@@ -88,6 +88,8 @@ class UserProfilesTests(unittest.TestCase):
             self.assertTrue((root / "lists" / "user" / "ipset-moi-sait.txt").is_file())
             self.assertTrue((root / "lists" / "moi-sait.txt").is_file())
             self.assertTrue((root / "lists" / "ipset-moi-sait.txt").is_file())
+            self.assertEqual((root / "lists" / "user" / "moi-sait.txt").read_text(encoding="utf-8"), "www.example.com\n")
+            self.assertEqual((root / "lists" / "moi-sait.txt").read_text(encoding="utf-8"), "www.example.com\n")
 
     def test_user_profile_name_must_be_unique_between_user_profiles(self) -> None:
         with TemporaryDirectory() as temp_dir:
