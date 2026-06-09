@@ -72,6 +72,19 @@ class UserPresetsRowsWorkerArchitectureTests(unittest.TestCase):
         self.assertNotIn("build_preset_rows_plan", loaded_source)
         self.assertNotIn("build_preset_rows_plan", apply_source)
 
+    def test_rows_plan_worker_and_gui_apply_have_visible_timing_logs(self) -> None:
+        import presets.user_presets_runtime_service as runtime_service
+
+        module_source = inspect.getsource(runtime_service)
+        worker_source = inspect.getsource(runtime_service.UserPresetsRowsPlanWorker.run)
+        apply_source = inspect.getsource(runtime_service.UserPresetsRuntimeService._run_scheduled_rows_plan_apply)
+
+        self.assertIn('USER_PRESETS_TIMING_LOG_LEVEL = "⏱ PRESETS"', module_source)
+        self.assertIn("user_presets.rows_plan.build", worker_source)
+        self.assertIn("user_presets.rows_plan.apply", apply_source)
+        self.assertIn("_log_user_presets_timing", worker_source)
+        self.assertIn("_log_user_presets_timing", apply_source)
+
     def test_rows_plan_worker_resolves_active_preset_inside_worker(self) -> None:
         import presets.user_presets_runtime_service as runtime_service
 

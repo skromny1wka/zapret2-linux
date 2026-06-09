@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
+import time
 import weakref
 
 from PyQt6.QtCore import QThread, QTimer, pyqtSignal
@@ -10,6 +11,25 @@ from PyQt6.QtCore import QThread, QTimer, pyqtSignal
 from log.log import log
 from presets.icon_color import normalize_preset_icon_color
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
+
+
+USER_PRESETS_TIMING_LOG_LEVEL = "⏱ PRESETS"
+USER_PRESETS_VISIBLE_TIMING_LABELS = frozenset(
+    {
+        "user_presets.rows_plan.build",
+        "user_presets.rows_plan.apply",
+    }
+)
+
+
+def _log_user_presets_timing(label: str, started_at: float, *, extra: str = "") -> None:
+    try:
+        elapsed_ms = (time.perf_counter() - started_at) * 1000.0
+        extra_text = f" | {extra}" if extra else ""
+        level = USER_PRESETS_TIMING_LOG_LEVEL if label in USER_PRESETS_VISIBLE_TIMING_LABELS else "DEBUG"
+        log(f"{label}: {elapsed_ms:.1f}ms{extra_text}", level)
+    except Exception:
+        pass
 
 
 @dataclass(slots=True)
@@ -115,6 +135,7 @@ class UserPresetsRowsPlanWorker(QThread):
         self._started_at = started_at
 
     def run(self) -> None:
+        started_at = time.perf_counter()
         try:
             active_file_name = str(self._selected_source_file_name() or "").strip()
             plan = self._build_rows_plan(
@@ -123,6 +144,11 @@ class UserPresetsRowsPlanWorker(QThread):
                 active_file_name=active_file_name,
                 language=self._language,
                 folder_state=self._folder_state,
+            )
+            _log_user_presets_timing(
+                "user_presets.rows_plan.build",
+                started_at,
+                extra=f"{len(self._all_presets)} presets",
             )
         except Exception as exc:
             self.failed.emit(self._request_id, str(exc))
@@ -1089,7 +1115,11 @@ class UserPresetsRuntimeService:
         _ = self._resolve_page(page)
         adapter = self._resolve_adapter()
         if callable(adapter.apply_rows_plan):
-            adapter.apply_rows_plan(plan, started_at)
+            apply_started_at = time.perf_counter()
+            try:
+                adapter.apply_rows_plan(plan, started_at)
+            finally:
+                _log_user_presets_timing("user_presets.rows_plan.apply", apply_started_at)
 
     def _on_rows_plan_failed(self, request_id: int, error: str, page=None) -> None:
         if request_id != self._rows_plan_request_id:
