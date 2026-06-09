@@ -291,8 +291,10 @@ class PresetRawEditorPage(BasePage):
         self._raw_activate_runtime = OneShotWorkerRuntime()
         self._raw_activate_request_id = 0
         self._raw_activate_runtime_worker = None
-        self._pending_raw_preset_activation = ""
-        self._raw_preset_activation_start_scheduled = False
+        self._raw_preset_activation_state = LatestValueWorkerState(
+            self._raw_activate_runtime,
+            empty_value="",
+        )
         self._raw_action_runtime = OneShotWorkerRuntime()
         self._raw_action_request_id = 0
         self._raw_action_runtime_worker = None
@@ -359,7 +361,7 @@ class PresetRawEditorPage(BasePage):
             return True
         if self._raw_preset_save_state_obj().start_scheduled:
             return True
-        if self.__dict__.get("_raw_preset_activation_start_scheduled", False):
+        if self._raw_preset_activation_state_obj().start_scheduled:
             return True
         for attr in ("_raw_save_runtime", "_raw_activate_runtime", "_raw_action_runtime"):
             runtime = self.__dict__.get(attr)
@@ -392,7 +394,7 @@ class PresetRawEditorPage(BasePage):
         operation = dict(pending.pop(0))
         kind = str(operation.get("kind") or "")
         if kind == "activate":
-            self._pending_raw_preset_activation = ""
+            self._raw_preset_activation_state_obj().pending = ""
             self._start_preset_activation_worker(str(operation.get("file_name") or ""))
             return True
         if kind == "save":
@@ -1406,11 +1408,12 @@ class PresetRawEditorPage(BasePage):
         file_name = str(self._preset_file_name or "").strip()
         if not file_name:
             return
-        if self.__dict__.get("_raw_preset_activation_start_scheduled", False):
-            self._pending_raw_preset_activation = file_name
+        state = self._raw_preset_activation_state_obj()
+        if state.start_scheduled:
+            state.pending = file_name
             return
         if self._raw_preset_write_is_running():
-            self._pending_raw_preset_activation = file_name
+            state.pending = file_name
             self._queue_raw_preset_write_operation({"kind": "activate", "file_name": file_name})
             return
         self._start_preset_activation_worker(file_name)
@@ -1437,7 +1440,7 @@ class PresetRawEditorPage(BasePage):
     def _on_preset_activation_finished(self, request_id: int, activated: bool) -> None:
         if request_id != self._raw_activate_request_id:
             return
-        if self.__dict__.get("_pending_raw_preset_activation"):
+        if self._raw_preset_activation_state_obj().has_pending():
             return
         if activated:
             self._apply_raw_preset_active_state(self._preset_file_name, self._preset_name)
@@ -1450,7 +1453,7 @@ class PresetRawEditorPage(BasePage):
     def _on_preset_activation_failed(self, request_id: int, error: str) -> None:
         if request_id != self._raw_activate_request_id:
             return
-        if self.__dict__.get("_pending_raw_preset_activation"):
+        if self._raw_preset_activation_state_obj().has_pending():
             return
         self._show_error(str(error))
 
@@ -1459,8 +1462,9 @@ class PresetRawEditorPage(BasePage):
             return
         if self._schedule_next_raw_preset_write_operation_start():
             return
-        pending = str(self.__dict__.get("_pending_raw_preset_activation") or "").strip()
-        self._pending_raw_preset_activation = ""
+        state = self._raw_preset_activation_state_obj()
+        pending = str(state.pending or "").strip()
+        state.pending = ""
         if pending and not bool(self.__dict__.get("_cleanup_in_progress", False)):
             self._schedule_preset_activation_worker_start(pending)
             return
@@ -1468,22 +1472,62 @@ class PresetRawEditorPage(BasePage):
             set_enabled_if_changed(self.activateButton, True)
 
     def _schedule_preset_activation_worker_start(self, file_name: str) -> None:
-        self._pending_raw_preset_activation = str(file_name or "").strip()
-        if self.__dict__.get("_raw_preset_activation_start_scheduled", False):
-            return
-        self._raw_preset_activation_start_scheduled = True
-        try:
-            QTimer.singleShot(0, self._run_scheduled_preset_activation_worker_start)
-        except Exception:
-            self._run_scheduled_preset_activation_worker_start()
+        state = self._raw_preset_activation_state_obj()
+        state.pending = str(file_name or "").strip()
+
+        def _single_shot(delay: int, callback) -> None:
+            try:
+                QTimer.singleShot(delay, callback)
+            except Exception:
+                callback()
+
+        state.schedule_start(
+            _single_shot,
+            self._run_scheduled_preset_activation_worker_start,
+            cleanup_in_progress=bool(self.__dict__.get("_cleanup_in_progress", False)),
+        )
 
     def _run_scheduled_preset_activation_worker_start(self) -> None:
-        self._raw_preset_activation_start_scheduled = False
-        pending = str(self.__dict__.get("_pending_raw_preset_activation") or "").strip()
-        self._pending_raw_preset_activation = ""
-        if not pending or bool(self.__dict__.get("_cleanup_in_progress", False)):
+        pending = self._raw_preset_activation_state_obj().take_pending_for_scheduled_start(
+            cleanup_in_progress=bool(self.__dict__.get("_cleanup_in_progress", False)),
+        )
+        pending = str(pending or "").strip()
+        if not pending:
             return
         self._start_preset_activation_worker(pending)
+
+    def _raw_preset_activation_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_raw_preset_activation_state")
+        runtime = self.__dict__.get("_raw_activate_runtime")
+        if state is None:
+            pending = str(self.__dict__.pop("_pending_raw_preset_activation", "") or "").strip()
+            start_scheduled = bool(self.__dict__.pop("_raw_preset_activation_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value="",
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_raw_preset_activation_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _pending_raw_preset_activation(self) -> str:
+        return str(self._raw_preset_activation_state_obj().pending or "")
+
+    @_pending_raw_preset_activation.setter
+    def _pending_raw_preset_activation(self, value: str) -> None:
+        self._raw_preset_activation_state_obj().pending = str(value or "").strip()
+
+    @property
+    def _raw_preset_activation_start_scheduled(self) -> bool:
+        return bool(self._raw_preset_activation_state_obj().start_scheduled)
+
+    @_raw_preset_activation_start_scheduled.setter
+    def _raw_preset_activation_start_scheduled(self, value: bool) -> None:
+        self._raw_preset_activation_state_obj().start_scheduled = bool(value)
 
     def _request_raw_preset_action(self, action: str, **payload) -> None:
         if self._raw_preset_write_is_running():
@@ -1751,8 +1795,7 @@ class PresetRawEditorPage(BasePage):
         self.__dict__.setdefault("_pending_raw_preset_actions", []).clear()
         self._raw_preset_write_operation_start_scheduled = False
         self._raw_preset_save_state_obj().reset()
-        self._raw_preset_activation_start_scheduled = False
-        self._pending_raw_preset_activation = ""
+        self._raw_preset_activation_state_obj().reset()
         self._raw_load_runtime_worker = None
         self._raw_save_runtime_worker = None
         self._raw_activate_runtime_worker = None
