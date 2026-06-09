@@ -5,6 +5,7 @@ from __future__ import annotations
 import telegram_proxy.ui.page_runtime as telegram_proxy_page_runtime
 from qfluentwidgets import FluentIcon
 from ui.fluent_widgets import set_tooltip
+from telegram_proxy.ui.build import update_telegram_proxy_pivot_accessibility
 from telegram_proxy.ui.text_plan import TELEGRAM_PROXY_SETTINGS_TEXT
 
 
@@ -13,6 +14,7 @@ def refresh_pivot_texts(pivot) -> None:
         pivot.setItemText("settings", "Настройки")
         pivot.setItemText("logs", "Логи")
         pivot.setItemText("diag", "Диагностика")
+        update_telegram_proxy_pivot_accessibility(pivot)
     except Exception:
         pass
 

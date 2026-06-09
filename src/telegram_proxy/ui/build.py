@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget
 from qfluentwidgets import FluentIcon
 
-from ui.accessibility import set_control_accessibility
+from ui.accessibility import set_control_accessibility, set_state_text
 from ui.pages.base_page import ScrollBlockingPlainTextEdit
 from ui.log_limits import (
     TELEGRAM_PROXY_DIAG_VIEW_MAX_LINES,
@@ -44,6 +44,30 @@ class TelegramProxyDiagWidgets:
     diag_edit: object
 
 
+def update_telegram_proxy_pivot_accessibility(pivot, *, current: object | None = None) -> None:
+    if pivot is None:
+        return
+    labels = {
+        "settings": "Настройки",
+        "logs": "Логи",
+        "diag": "Диагностика",
+    }
+    key = str(current or "").strip()
+    if not key:
+        try:
+            key = str(pivot.currentItem() or "").strip()
+        except Exception:
+            key = ""
+    selected = labels.get(key, key or "Настройки")
+    state = f"Раздел Telegram Proxy, выбрано: {selected}"
+    set_state_text(pivot, state)
+    set_control_accessibility(
+        pivot,
+        name=state,
+        description="Выберите раздел Telegram Proxy: Настройки, Логи или Диагностика.",
+    )
+
+
 def build_telegram_proxy_shell(*, segmented_widget_cls, parent, on_switch_tab) -> TelegramProxyShellWidgets:
     pivot = segmented_widget_cls(parent)
     stacked = QStackedWidget(parent)
@@ -70,6 +94,10 @@ def build_telegram_proxy_shell(*, segmented_widget_cls, parent, on_switch_tab) -
     pivot.addItem("logs", "Логи", lambda: on_switch_tab(1))
     pivot.addItem("diag", "Диагностика", lambda: on_switch_tab(2))
     pivot.setCurrentItem("settings")
+    update_telegram_proxy_pivot_accessibility(pivot, current="settings")
+    pivot.currentItemChanged.connect(
+        lambda item: update_telegram_proxy_pivot_accessibility(pivot, current=item)
+    )
 
     return TelegramProxyShellWidgets(
         pivot=pivot,

@@ -5,9 +5,13 @@ from types import SimpleNamespace
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtWidgets import QApplication, QLabel, QSpinBox, QVBoxLayout, QWidget
-from qfluentwidgets import CaptionLabel, LineEdit, PrimaryPushButton, PushButton
+from qfluentwidgets import CaptionLabel, LineEdit, PrimaryPushButton, PushButton, SegmentedWidget
 
-from telegram_proxy.ui.build import build_telegram_proxy_diag_panel, build_telegram_proxy_logs_panel
+from telegram_proxy.ui.build import (
+    build_telegram_proxy_diag_panel,
+    build_telegram_proxy_logs_panel,
+    build_telegram_proxy_shell,
+)
 from telegram_proxy.ui.proxy_runtime_workflow import apply_status_changed
 
 
@@ -42,6 +46,26 @@ class TelegramProxyAccessibilityTests(unittest.TestCase):
         parent = QWidget()
         self.addCleanup(parent.deleteLater)
         return QVBoxLayout(parent)
+
+    def test_shell_tabs_read_current_section(self) -> None:
+        parent = QWidget()
+        self.addCleanup(parent.deleteLater)
+        widgets = build_telegram_proxy_shell(
+            segmented_widget_cls=SegmentedWidget,
+            parent=parent,
+            on_switch_tab=lambda _index: None,
+        )
+
+        self.assertEqual(widgets.pivot.accessibleName(), "Раздел Telegram Proxy, выбрано: Настройки")
+        self.assertIn("Настройки, Логи или Диагностика", widgets.pivot.accessibleDescription())
+
+        widgets.pivot.setCurrentItem("logs")
+
+        self.assertEqual(widgets.pivot.accessibleName(), "Раздел Telegram Proxy, выбрано: Логи")
+        self.assertEqual(
+            widgets.pivot.property("screenReaderStateText"),
+            "Раздел Telegram Proxy, выбрано: Логи",
+        )
 
     def test_logs_panel_controls_are_named_for_screen_reader(self) -> None:
         widgets = build_telegram_proxy_logs_panel(
