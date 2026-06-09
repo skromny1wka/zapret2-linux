@@ -689,6 +689,11 @@ def _set_strategy_feedback_button_state(button, *, action_name: str, selected: b
     set_state_text(button, f"{action_name}. Оценка стратегии: {state_text}.")
 
 
+def _set_strategy_favorite_button_state(button, *, action_name: str, favorite: bool) -> None:
+    state_text = "включено" if favorite else "не включено"
+    set_state_text(button, f"{action_name}. Избранное: {state_text}.")
+
+
 def _strategy_screen_reader_text(
     *,
     name: str,
@@ -3137,15 +3142,21 @@ class ProfileSetupPageBase(BasePage):
                 set_widget_enabled_if_changed(button, editable)
         if self._favorite_button is not None:
             favorite_text = "Убрать из избранного" if state.favorite else "В избранное"
+            favorite_action_name = (
+                "Убрать стратегию из избранного"
+                if state.favorite
+                else "Добавить стратегию в избранное"
+            )
             set_widget_text_if_changed(self._favorite_button, favorite_text)
             set_control_accessibility(
                 self._favorite_button,
-                name=(
-                    "Убрать стратегию из избранного"
-                    if state.favorite
-                    else "Добавить стратегию в избранное"
-                ),
+                name=favorite_action_name,
                 description="Добавляет текущую готовую стратегию в избранное или убирает её оттуда.",
+            )
+            _set_strategy_favorite_button_state(
+                self._favorite_button,
+                action_name=favorite_action_name,
+                favorite=state.favorite,
             )
         if self._work_button is not None:
             work_selected = state.rating == "work"
