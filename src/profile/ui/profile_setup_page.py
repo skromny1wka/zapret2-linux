@@ -51,6 +51,7 @@ from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE, is_preset_launch_method, i
 from ui.pages.base_page import BasePage
 from ui.accessibility import set_control_accessibility, set_state_text
 from ui.fluent_widgets import set_tooltip
+from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from app.ui_texts import tr as tr_catalog
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens, to_qcolor
@@ -1014,8 +1015,10 @@ class ProfileSetupPageBase(BasePage):
         self._list_file_load_runtime = OneShotWorkerRuntime()
         self._list_file_load_request_id = 0
         self._list_file_load_runtime_worker = None
-        self._pending_list_file_load = False
-        self._list_file_load_start_scheduled = False
+        self._list_file_load_state = LatestValueWorkerState(
+            self._list_file_load_runtime,
+            empty_value=False,
+        )
         self._list_file_state_apply_scheduled = False
         self._pending_list_file_state_apply = None
         self._list_file_save_runtime = OneShotWorkerRuntime()
@@ -1706,9 +1709,10 @@ class ProfileSetupPageBase(BasePage):
         if not self._editor_tab_built or not self._profile_key:
             return
         runtime = self._worker_runtime("_list_file_load_runtime")
-        if runtime.is_running() or self.__dict__.get("_list_file_load_start_scheduled", False):
+        state = self._list_file_load_state_obj()
+        if state.is_busy():
             self._list_file_load_request_id = int(self.__dict__.get("_list_file_load_request_id", 0) or 0) + 1
-            self._pending_list_file_load = True
+            state.pending = True
             return
         if self._list_file_status_label is not None:
             set_profile_list_status_text(self._list_file_status_label, "Загрузка файла списка...")
@@ -1731,7 +1735,7 @@ class ProfileSetupPageBase(BasePage):
     def _on_list_file_editor_state_loaded(self, request_id: int, state) -> None:
         if request_id != self._list_file_load_request_id:
             return
-        if self.__dict__.get("_pending_list_file_load"):
+        if self._list_file_load_state_obj().has_pending():
             return
         self._list_file_dirty = False
         self._schedule_list_file_editor_state_apply(state)
@@ -1753,8 +1757,8 @@ class ProfileSetupPageBase(BasePage):
         if state is None or self.__dict__.get("_cleanup_in_progress"):
             return
         if (
-            self.__dict__.get("_pending_list_file_load")
-            or self.__dict__.get("_list_file_load_start_scheduled", False)
+            self._list_file_load_state_obj().has_pending()
+            or self._list_file_load_state_obj().start_scheduled
         ):
             return
         self._apply_list_file_editor_state(state)
@@ -1763,8 +1767,8 @@ class ProfileSetupPageBase(BasePage):
         if request_id != self._list_file_load_request_id:
             return
         if (
-            self.__dict__.get("_pending_list_file_load")
-            or self.__dict__.get("_list_file_load_start_scheduled", False)
+            self._list_file_load_state_obj().has_pending()
+            or self._list_file_load_state_obj().start_scheduled
         ):
             return
         if self._list_file_status_label is not None:
@@ -1776,26 +1780,65 @@ class ProfileSetupPageBase(BasePage):
     def _on_list_file_worker_finished(self, _worker) -> None:
         if not self._accept_current_profile_setup_worker_finished("_list_file_load_runtime_worker", _worker):
             return
-        if self.__dict__.get("_pending_list_file_load"):
+        if self._list_file_load_state_obj().has_pending():
             self._schedule_pending_list_file_load_start()
 
     def _schedule_pending_list_file_load_start(self) -> None:
-        if self.__dict__.get("_list_file_load_start_scheduled", False):
-            return
-        self._list_file_load_start_scheduled = True
-        try:
-            QTimer.singleShot(0, self._run_scheduled_list_file_load_start)
-        except Exception:
-            self._run_scheduled_list_file_load_start()
+        state = self._list_file_load_state_obj()
+        state.pending = True
+
+        def _single_shot(delay: int, callback) -> None:
+            try:
+                QTimer.singleShot(delay, callback)
+            except Exception:
+                callback()
+
+        state.schedule_start(
+            _single_shot,
+            self._run_scheduled_list_file_load_start,
+            pending_when_already_scheduled=True,
+        )
 
     def _run_scheduled_list_file_load_start(self) -> None:
-        self._list_file_load_start_scheduled = False
-        if not self.__dict__.get("_pending_list_file_load"):
-            return
-        self._pending_list_file_load = False
-        if self.__dict__.get("_cleanup_in_progress", False):
+        pending = self._list_file_load_state_obj().take_pending_for_scheduled_start(
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
+        if not pending:
             return
         self._request_list_file_editor_state()
+
+    def _list_file_load_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_list_file_load_state")
+        runtime = self.__dict__.get("_list_file_load_runtime")
+        if state is None:
+            pending = bool(self.__dict__.pop("_pending_list_file_load", False))
+            start_scheduled = bool(self.__dict__.pop("_list_file_load_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=False,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_list_file_load_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _pending_list_file_load(self) -> bool:
+        return bool(self._list_file_load_state_obj().pending)
+
+    @_pending_list_file_load.setter
+    def _pending_list_file_load(self, value: bool) -> None:
+        self._list_file_load_state_obj().pending = bool(value)
+
+    @property
+    def _list_file_load_start_scheduled(self) -> bool:
+        return bool(self._list_file_load_state_obj().start_scheduled)
+
+    @_list_file_load_start_scheduled.setter
+    def _list_file_load_start_scheduled(self, value: bool) -> None:
+        self._list_file_load_state_obj().start_scheduled = bool(value)
 
     def _fill_range_combo(self, combo: CompactDisplayComboBox) -> None:
         combo.addItem("a — всегда", userData="a", compactText="a")
@@ -4041,7 +4084,7 @@ class ProfileSetupPageBase(BasePage):
         self._list_file_state_apply_scheduled = False
         self._setup_load_dirty = False
         self._setup_load_start_scheduled = False
-        self._list_file_load_start_scheduled = False
+        self._list_file_load_state_obj().reset()
         self._list_file_save_start_scheduled = False
         self._list_file_validation_start_scheduled = False
         self._enabled_save_start_scheduled = False

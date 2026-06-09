@@ -227,6 +227,27 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
         self.assertEqual(page._list_file_load_request_id, 5)
         page._schedule_list_file_editor_state_apply.assert_not_called()
 
+    def test_list_file_load_queue_uses_shared_latest_worker_state(self) -> None:
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._list_file_load_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+
+        init_source = inspect.getsource(ProfileSetupPageBase.__init__)
+        request_source = inspect.getsource(ProfileSetupPageBase._request_list_file_editor_state)
+        finished_source = inspect.getsource(ProfileSetupPageBase._on_list_file_worker_finished)
+        cleanup_source = inspect.getsource(ProfileSetupPageBase.cleanup)
+
+        self.assertTrue(hasattr(ProfileSetupPageBase, "_list_file_load_state_obj"))
+        self.assertIsInstance(page._list_file_load_state_obj(), LatestValueWorkerState)
+        self.assertIn("_list_file_load_state = LatestValueWorkerState", init_source)
+        self.assertIn("_list_file_load_state_obj()", request_source)
+        self.assertIn("_list_file_load_state_obj()", finished_source)
+        self.assertIn("_list_file_load_state_obj().reset()", cleanup_source)
+        self.assertNotIn("self._pending_list_file_load = False", init_source)
+        self.assertNotIn("self._list_file_load_start_scheduled = False", init_source)
+
     def test_context_action_worker_receives_action_functions(self) -> None:
         from profile.profile_setup_loader import ProfilePresetProfileActionWorker
 
