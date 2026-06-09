@@ -5,6 +5,7 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QWidget
 from PyQt6.QtGui import QColor, QPixmap
 from qfluentwidgets import BodyLabel, CaptionLabel, CheckBox, ColorPickerButton, ComboBox, RadioButton, SegmentedWidget, Slider
@@ -259,6 +260,66 @@ class AppearanceAccessibilityTests(unittest.TestCase):
         self.assertEqual(
             button.property("screenReaderStateText"),
             "Цвет акцента, текущий цвет: #445566",
+        )
+
+    def test_tinted_intensity_slider_reads_saved_and_current_value(self) -> None:
+        from settings.appearance import AppearancePageInitialStatePlan
+        from ui.pages.appearance_page import AppearancePage
+
+        slider = Slider(Qt.Orientation.Horizontal)
+        value_label = CaptionLabel("15")
+        container = QWidget()
+        self.addCleanup(slider.deleteLater)
+        self.addCleanup(value_label.deleteLater)
+        self.addCleanup(container.deleteLater)
+        slider.setRange(0, 30)
+        slider.setValue(15)
+
+        page = AppearancePage.__new__(AppearancePage)
+        page._color_picker_btn = None
+        page._follow_windows_accent_cb = None
+        page._tinted_bg_cb = None
+        page._tinted_intensity_slider = slider
+        page._tinted_intensity_value_label = value_label
+        page._tinted_intensity_container = container
+        page._begin_ui_sync = lambda: None
+        page._end_ui_sync = lambda: None
+        page._is_ui_syncing = lambda: False
+        page._set_slider_value_silently = lambda widget, value: widget.setValue(int(value))
+        page._request_appearance_save = lambda *_args, **_kwargs: None
+        page._schedule_background_refresh = lambda: None
+
+        AppearancePage._apply_initial_accent_state(
+            page,
+            AppearancePageInitialStatePlan(
+                display_mode="dark",
+                ui_language="ru",
+                background_preset="standard",
+                rkn_background=None,
+                mica_enabled=False,
+                window_opacity=100,
+                accent_color=None,
+                follow_windows_accent=False,
+                tinted_background=True,
+                tinted_intensity=22,
+                animations_enabled=True,
+                smooth_scroll_enabled=True,
+                editor_smooth_scroll_enabled=True,
+                sidebar_icon_style="standard",
+                garland_enabled=False,
+                snowflakes_enabled=False,
+            ),
+        )
+
+        self.assertEqual(slider.accessibleName(), "Интенсивность тонировки, значение: 22 из 30")
+        self.assertIn("силу окрашивания фона", slider.accessibleDescription())
+
+        AppearancePage._on_tinted_intensity_changed(page, 9)
+
+        self.assertEqual(slider.accessibleName(), "Интенсивность тонировки, значение: 9 из 30")
+        self.assertEqual(
+            slider.property("screenReaderStateText"),
+            "Интенсивность тонировки, значение: 9 из 30",
         )
 
     def test_saved_sidebar_icon_style_refreshes_screen_reader_state(self) -> None:

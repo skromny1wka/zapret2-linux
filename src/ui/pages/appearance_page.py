@@ -83,6 +83,31 @@ def update_accent_color_button_accessibility(button, *, language: str = "ru", co
     )
 
 
+def update_tinted_intensity_slider_accessibility(slider, *, language: str = "ru", value: object | None = None) -> None:
+    if slider is None:
+        return
+    try:
+        current_value = int(slider.value() if value is None else value)
+    except Exception:
+        current_value = 15
+    try:
+        maximum = int(slider.maximum())
+    except Exception:
+        maximum = 30
+    title = tr_catalog(
+        "page.appearance.accent.tint_intensity.label",
+        language=language,
+        default="Интенсивность тонировки:",
+    ).strip(" :")
+    state = f"{title}, значение: {current_value} из {maximum}"
+    set_state_text(slider, state)
+    set_control_accessibility(
+        slider,
+        name=state,
+        description="Настраивает силу окрашивания фона акцентным цветом.",
+    )
+
+
 class AppearancePage(BasePage):
     """Страница настроек оформления"""
 
@@ -587,6 +612,10 @@ class AppearancePage(BasePage):
         self._tinted_intensity_slider.setRange(0, 30)
         self._tinted_intensity_slider.setValue(15)
         self._tinted_intensity_value_label = CaptionLabel("15")
+        self._update_tinted_intensity_slider_accessibility(15)
+        self._tinted_intensity_slider.valueChanged.connect(
+            lambda value: self._update_tinted_intensity_slider_accessibility(value)
+        )
         self._tinted_intensity_slider.valueChanged.connect(self._on_tinted_intensity_changed)
         intensity_row_layout.addWidget(intensity_label)
         intensity_row_layout.addWidget(self._tinted_intensity_slider, 1)
@@ -1036,6 +1065,7 @@ class AppearancePage(BasePage):
         )
         update_language_combo_accessibility(self._language_combo)
         self._update_accent_color_button_accessibility()
+        self._update_tinted_intensity_slider_accessibility()
         self._update_garland_checkbox_accessibility()
         self._update_snowflakes_checkbox_accessibility()
 
@@ -1378,6 +1408,7 @@ class AppearancePage(BasePage):
 
         if self._tinted_intensity_slider is not None:
             self._set_slider_value_silently(self._tinted_intensity_slider, plan.tinted_intensity)
+            self._update_tinted_intensity_slider_accessibility(plan.tinted_intensity)
 
         if self._tinted_intensity_value_label is not None:
             self._tinted_intensity_value_label.setText(str(plan.tinted_intensity))
@@ -1536,6 +1567,7 @@ class AppearancePage(BasePage):
         self._request_appearance_save("tinted_intensity", int(value))
         if self._tinted_intensity_value_label is not None:
             self._tinted_intensity_value_label.setText(str(value))
+        self._update_tinted_intensity_slider_accessibility(value)
         self._schedule_background_refresh()
 
     def set_premium_status(
@@ -1626,6 +1658,13 @@ class AppearancePage(BasePage):
             self._color_picker_btn,
             language=self.__dict__.get("_ui_language", "ru"),
             color=color,
+        )
+
+    def _update_tinted_intensity_slider_accessibility(self, value: object | None = None) -> None:
+        update_tinted_intensity_slider_accessibility(
+            self._tinted_intensity_slider,
+            language=self.__dict__.get("_ui_language", "ru"),
+            value=value,
         )
 
     def set_opacity_value(self, value: int):
