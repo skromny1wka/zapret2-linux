@@ -124,7 +124,9 @@ class PresetSetupPageBase(BasePage):
         self._profile_move_runtime = OneShotWorkerRuntime()
         self._profile_move_runtime_worker = None
         self._pending_profile_moves: list[dict[str, str]] = []
-        self._pending_profile_preset_write_operations: list[dict[str, object]] = []
+        self._profile_preset_write_state = QueuedWorkerState[dict[str, object]](
+            self._profile_context_action_runtime,
+        )
         self._profile_folder_action_request_id = 0
         self._profile_folder_action_runtime = OneShotWorkerRuntime()
         self._profile_folder_action_runtime_worker = None
@@ -610,7 +612,7 @@ class PresetSetupPageBase(BasePage):
         self._start_profile_context_action_worker(str(action or ""), profile_key, enabled=enabled)
 
     def _profile_preset_write_operation_running(self) -> bool:
-        if self.__dict__.get("_profile_preset_write_operation_start_scheduled", False):
+        if self._profile_preset_write_state_obj().start_scheduled:
             return True
         return (
             self._worker_runtime("_profile_context_action_runtime").is_running()
@@ -653,7 +655,7 @@ class PresetSetupPageBase(BasePage):
             )
             if operation["action"] == "update":
                 profile_id_to_replace = str(operation["profile_id"] or "")
-                pending_operations = self.__dict__.setdefault("_pending_profile_preset_write_operations", [])
+                pending_operations = self._profile_preset_write_state_obj().pending
                 pending_operations[:] = [
                     pending
                     for pending in pending_operations
@@ -674,7 +676,7 @@ class PresetSetupPageBase(BasePage):
                 ]
         if operation["kind"] == "context" and operation["action"] == "set_enabled":
             profile_key_to_replace = str(operation["profile_key"] or "")
-            pending_operations = self.__dict__.setdefault("_pending_profile_preset_write_operations", [])
+            pending_operations = self._profile_preset_write_state_obj().pending
             pending_operations[:] = [
                 pending
                 for pending in pending_operations
@@ -695,7 +697,7 @@ class PresetSetupPageBase(BasePage):
             ]
         if operation["kind"] == "move":
             source_profile_key_to_replace = str(operation["source_profile_key"] or "")
-            pending_operations = self.__dict__.setdefault("_pending_profile_preset_write_operations", [])
+            pending_operations = self._profile_preset_write_state_obj().pending
             pending_operations[:] = [
                 pending
                 for pending in pending_operations
@@ -710,7 +712,7 @@ class PresetSetupPageBase(BasePage):
                 for pending in pending_moves
                 if str(pending.get("source_profile_key") or "") != source_profile_key_to_replace
             ]
-        self.__dict__.setdefault("_pending_profile_preset_write_operations", []).append(operation)
+        self._profile_preset_write_state_obj().append(operation)
         if operation["kind"] == "context":
             self.__dict__.setdefault("_pending_profile_context_actions", []).append(
                 {
@@ -740,7 +742,7 @@ class PresetSetupPageBase(BasePage):
             )
 
     def _pop_next_profile_preset_write_operation(self) -> dict[str, object] | None:
-        pending_operations = self.__dict__.setdefault("_pending_profile_preset_write_operations", [])
+        pending_operations = self._profile_preset_write_state_obj().pending
         if pending_operations:
             operation = dict(pending_operations.pop(0))
             if operation.get("kind") == "context":
@@ -802,21 +804,20 @@ class PresetSetupPageBase(BasePage):
         return any(
             self.__dict__.get(attr)
             for attr in (
-                "_pending_profile_preset_write_operations",
                 "_pending_profile_context_actions",
                 "_pending_profile_moves",
                 "_pending_user_profile_operations",
             )
-        )
+        ) or self._profile_preset_write_state_obj().has_pending()
 
     def _schedule_next_profile_preset_write_operation_start(self) -> bool:
         if self._profile_preset_write_operation_running():
             return True
         if not self._has_pending_profile_preset_write_operation():
             return False
-        if self.__dict__.get("_profile_preset_write_operation_start_scheduled", False):
+        if self._profile_preset_write_state_obj().start_scheduled:
             return True
-        self._profile_preset_write_operation_start_scheduled = True
+        self._profile_preset_write_state_obj().start_scheduled = True
         try:
             QTimer.singleShot(0, self._run_scheduled_profile_preset_write_operation_start)
         except Exception:
@@ -824,10 +825,42 @@ class PresetSetupPageBase(BasePage):
         return True
 
     def _run_scheduled_profile_preset_write_operation_start(self) -> None:
-        self._profile_preset_write_operation_start_scheduled = False
+        self._profile_preset_write_state_obj().start_scheduled = False
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         self._start_next_profile_preset_write_operation()
+
+    def _profile_preset_write_state_obj(self) -> QueuedWorkerState[dict[str, object]]:
+        state = self.__dict__.get("_profile_preset_write_state")
+        runtime = self.__dict__.get("_profile_context_action_runtime")
+        if state is None:
+            pending = list(self.__dict__.pop("_pending_profile_preset_write_operations", []) or [])
+            start_scheduled = bool(self.__dict__.pop("_profile_preset_write_operation_start_scheduled", False))
+            state = QueuedWorkerState(
+                runtime,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_profile_preset_write_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _pending_profile_preset_write_operations(self) -> list[dict[str, object]]:
+        return self._profile_preset_write_state_obj().pending
+
+    @_pending_profile_preset_write_operations.setter
+    def _pending_profile_preset_write_operations(self, value: list[dict[str, object]]) -> None:
+        self._profile_preset_write_state_obj().pending = list(value or [])
+
+    @property
+    def _profile_preset_write_operation_start_scheduled(self) -> bool:
+        return bool(self._profile_preset_write_state_obj().start_scheduled)
+
+    @_profile_preset_write_operation_start_scheduled.setter
+    def _profile_preset_write_operation_start_scheduled(self, value: bool) -> None:
+        self._profile_preset_write_state_obj().start_scheduled = bool(value)
 
     def _start_next_profile_preset_write_operation(self) -> bool:
         if self._profile_preset_write_operation_running():
@@ -1825,7 +1858,7 @@ class PresetSetupPageBase(BasePage):
         self._ui_state_store = None
         self.__dict__.setdefault("_pending_profile_context_actions", []).clear()
         self.__dict__.setdefault("_pending_profile_moves", []).clear()
-        self.__dict__.setdefault("_pending_profile_preset_write_operations", []).clear()
+        self._profile_preset_write_state_obj().reset()
         self.__dict__.setdefault("_pending_user_profile_operations", []).clear()
         self._pending_profile_payload_apply = None
         self._profile_payload_apply_scheduled = False

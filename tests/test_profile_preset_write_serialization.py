@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from profile.ui.preset_setup_page import PresetSetupPageBase
+from ui.queued_worker_state import QueuedWorkerState
 
 
 class _Signal:
@@ -57,6 +58,23 @@ class _Runtime:
 
 
 class ProfilePresetWriteSerializationTests(unittest.TestCase):
+    def test_profile_preset_write_queue_uses_shared_queued_worker_state(self) -> None:
+        import inspect
+
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._profile_context_action_runtime = _Runtime(running=False)
+
+        init_source = inspect.getsource(PresetSetupPageBase.__init__)
+        queue_source = inspect.getsource(PresetSetupPageBase._queue_profile_preset_write_operation)
+        cleanup_source = inspect.getsource(PresetSetupPageBase.cleanup)
+
+        self.assertTrue(hasattr(PresetSetupPageBase, "_profile_preset_write_state_obj"))
+        self.assertIsInstance(page._profile_preset_write_state_obj(), QueuedWorkerState)
+        self.assertIn("_profile_preset_write_state = QueuedWorkerState", init_source)
+        self.assertIn("_profile_preset_write_state_obj()", queue_source)
+        self.assertIn("_profile_preset_write_state_obj().reset()", cleanup_source)
+        self.assertNotIn("self._pending_profile_preset_write_operations: list", init_source)
+
     def test_profile_move_waits_while_context_action_worker_runs(self) -> None:
         page = PresetSetupPageBase.__new__(PresetSetupPageBase)
         page.launch_method = "zapret2_mode"
