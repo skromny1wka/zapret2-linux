@@ -162,6 +162,7 @@ def finish_proxy_start(
     if plan.persist_enabled is not None:
         request_proxy_enabled_save(bool(plan.persist_enabled))
     if plan.should_check_relay:
+        on_status_changed(True)
         check_relay_after_start()
     elif plan.fallback_to_stopped_status:
         on_status_changed(False)

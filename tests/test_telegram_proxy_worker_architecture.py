@@ -129,6 +129,29 @@ class TelegramProxyWorkerArchitectureTests(unittest.TestCase):
         self.assertNotIn("_restart_stop_worker =", page_source)
         self.assertNotIn("_relay_check_worker =", page_source)
 
+    def test_finish_proxy_start_refreshes_running_status_after_start_flag_is_cleared(self) -> None:
+        from telegram_proxy.ui.proxy_runtime_workflow import finish_proxy_start
+
+        state = {"starting": True}
+        btn_toggle = SimpleNamespace(setEnabled=Mock())
+        status_changes = []
+        saved_enabled_values = []
+        check_relay_after_start = Mock()
+
+        finish_proxy_start(
+            start_ok=True,
+            set_starting=lambda value: state.update(starting=bool(value)),
+            btn_toggle=btn_toggle,
+            check_relay_after_start=check_relay_after_start,
+            on_status_changed=status_changes.append,
+            request_proxy_enabled_save=saved_enabled_values.append,
+        )
+
+        self.assertFalse(state["starting"])
+        self.assertEqual(status_changes, [True])
+        self.assertEqual(saved_enabled_values, [True])
+        check_relay_after_start.assert_called_once_with()
+
     def test_page_receives_zapret_running_callable_not_runtime_feature(self) -> None:
         from app.page_names import PageName
         from telegram_proxy.ui.page import TelegramProxyPage
