@@ -1030,8 +1030,10 @@ class ProfileSetupPageBase(BasePage):
         self._list_file_validation_runtime = OneShotWorkerRuntime()
         self._list_file_validation_request_id = 0
         self._list_file_validation_runtime_worker = None
-        self._pending_list_file_validation = None
-        self._list_file_validation_start_scheduled = False
+        self._list_file_validation_state = LatestValueWorkerState(
+            self._list_file_validation_runtime,
+            empty_value=None,
+        )
         self._settings_save_runtime = OneShotWorkerRuntime()
         self._settings_save_request_id = 0
         self._settings_save_runtime_worker = None
@@ -2884,9 +2886,9 @@ class ProfileSetupPageBase(BasePage):
         })
 
     def _request_list_file_validation(self, request: dict) -> None:
-        runtime = self._worker_runtime("_list_file_validation_runtime")
-        if runtime.is_running() or self.__dict__.get("_list_file_validation_start_scheduled", False):
-            self._pending_list_file_validation = dict(request)
+        state = self._list_file_validation_state_obj()
+        if state.is_busy():
+            state.pending = dict(request)
             return
         self._start_list_file_validation_worker(request)
 
@@ -2939,7 +2941,7 @@ class ProfileSetupPageBase(BasePage):
     ) -> None:
         if request_id != int(getattr(self, "_list_file_validation_request_id", 0) or 0):
             return
-        if self.__dict__.get("_pending_list_file_validation"):
+        if self._list_file_validation_state_obj().has_pending():
             return
         if str(kind or "").strip() != str(getattr(self, "_list_file_kind", "") or "").strip():
             return
@@ -2976,7 +2978,7 @@ class ProfileSetupPageBase(BasePage):
     def _on_list_file_validation_failed(self, request_id: int, error: str) -> None:
         if request_id != int(getattr(self, "_list_file_validation_request_id", 0) or 0):
             return
-        if self.__dict__.get("_pending_list_file_validation"):
+        if self._list_file_validation_state_obj().has_pending():
             return
         log(f"{self.__class__.__name__}: не удалось проверить файл списка profile: {error}", "ERROR")
         self._render_list_file_validation((), fallback_error=str(error))
@@ -2988,26 +2990,60 @@ class ProfileSetupPageBase(BasePage):
     def _on_list_file_validation_worker_finished(self, _worker) -> None:
         if not self._accept_current_profile_setup_worker_finished("_list_file_validation_runtime_worker", _worker):
             return
-        pending = self.__dict__.get("_pending_list_file_validation")
-        if pending:
+        if self._list_file_validation_state_obj().has_pending():
             self._schedule_pending_list_file_validation_start()
 
     def _schedule_pending_list_file_validation_start(self) -> None:
-        if self.__dict__.get("_list_file_validation_start_scheduled", False):
-            return
-        self._list_file_validation_start_scheduled = True
-        try:
-            QTimer.singleShot(0, self._run_scheduled_list_file_validation_start)
-        except Exception:
-            self._run_scheduled_list_file_validation_start()
+        state = self._list_file_validation_state_obj()
+
+        def _single_shot(delay: int, callback) -> None:
+            try:
+                QTimer.singleShot(delay, callback)
+            except Exception:
+                callback()
+
+        state.schedule_start(_single_shot, self._run_scheduled_list_file_validation_start)
 
     def _run_scheduled_list_file_validation_start(self) -> None:
-        self._list_file_validation_start_scheduled = False
-        pending = self.__dict__.get("_pending_list_file_validation")
-        self._pending_list_file_validation = None
-        if not pending or self.__dict__.get("_cleanup_in_progress", False):
+        pending = self._list_file_validation_state_obj().take_pending_for_scheduled_start(
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
+        if not pending:
             return
         self._start_list_file_validation_worker(dict(pending or {}))
+
+    def _list_file_validation_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_list_file_validation_state")
+        runtime = self.__dict__.get("_list_file_validation_runtime")
+        if state is None:
+            pending = self.__dict__.pop("_pending_list_file_validation", None)
+            start_scheduled = bool(self.__dict__.pop("_list_file_validation_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=None,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_list_file_validation_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _pending_list_file_validation(self):
+        return self._list_file_validation_state_obj().pending
+
+    @_pending_list_file_validation.setter
+    def _pending_list_file_validation(self, value) -> None:
+        self._list_file_validation_state_obj().pending = value
+
+    @property
+    def _list_file_validation_start_scheduled(self) -> bool:
+        return bool(self._list_file_validation_state_obj().start_scheduled)
+
+    @_list_file_validation_start_scheduled.setter
+    def _list_file_validation_start_scheduled(self, value: bool) -> None:
+        self._list_file_validation_state_obj().start_scheduled = bool(value)
 
     def _on_list_file_save_clicked(self) -> None:
         if self._loading or not self._profile_key or self._list_file_text is None:
@@ -4100,8 +4136,8 @@ class ProfileSetupPageBase(BasePage):
         self._setup_load_dirty = False
         self._setup_load_start_scheduled = False
         self._list_file_load_state_obj().reset()
+        self._list_file_validation_state_obj().reset()
         self._list_file_save_start_scheduled = False
-        self._list_file_validation_start_scheduled = False
         self._enabled_save_start_scheduled = False
         self._strategy_feedback_save_start_scheduled = False
         self._profile_setup_payload_apply_scheduled = False
