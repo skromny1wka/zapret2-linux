@@ -1822,6 +1822,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         replace_item_source = inspect.getsource(ProfilesList.replace_profile_item)
         add_item_source = inspect.getsource(ProfilesList.add_profile_item)
         remove_item_source = inspect.getsource(ProfilesList.remove_profile_item)
+        move_item_source = inspect.getsource(ProfilesList.move_profile_item)
         worker_source = inspect.getsource(profiles_list_module.ProfileListViewStateWorker.run)
 
         self.assertIn("OneShotWorkerRuntime", list_source)
@@ -1837,6 +1838,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_request_view_state_rebuild", replace_item_source)
         self.assertIn("_request_view_state_rebuild", add_item_source)
         self.assertIn("_request_view_state_rebuild", remove_item_source)
+        self.assertIn("_request_view_state_rebuild", move_item_source)
         self.assertNotIn("self._model.set_profiles", build_source)
         self.assertNotIn("self._model.update_profiles", update_source)
         self.assertNotIn("self._model.set_search_query", search_source)
@@ -1848,6 +1850,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("self._model.replace_profile", replace_item_source)
         self.assertNotIn("self._model.add_profile", add_item_source)
         self.assertNotIn("self._model.remove_profile", remove_item_source)
+        self.assertNotIn("self._model.move_profile", move_item_source)
         self.assertIn("build_profile_list_view_state", worker_source)
         self.assertIn("folder_state", worker_source)
 

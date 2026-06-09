@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from types import SimpleNamespace
 from typing import Any
 
 from PyQt6.QtCore import QPoint, QTimer, Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import QListView, QVBoxLayout, QWidget
 
 from log.log import log
-from profile.list_view_state import build_profile_list_view_state
+from profile.display_items import profile_display_sort_key
+from profile.list_view_state import build_profile_list_view_state, group_name_for_key
 from profile.ui.profile_list_delegate import ProfileListDelegate
 from profile.ui.profile_list_model import ProfileListModel
 from profile.ui.profile_list_view import ProfileListView
@@ -264,12 +266,19 @@ class ProfilesList(QWidget):
         destination_profile_key: str = "",
         destination_group_key: str = "",
     ) -> bool:
-        return self._model.move_profile(
+        next_items = self._moved_profile_items(
             source_profile_key,
             destination_kind,
             destination_profile_key,
             destination_group_key,
         )
+        if next_items is None:
+            return False
+        self._request_view_state_rebuild(
+            items=next_items,
+            group_expanded=self._group_expanded_with_target(destination_group_key, next_items),
+        )
+        return True
 
     def apply_profile_folder_state(self, folder_state: dict[str, Any]) -> bool:
         if not isinstance(folder_state, dict):
@@ -420,6 +429,103 @@ class ProfilesList(QWidget):
             options = {}
         return tuple(options.get("items") or ())
 
+    def _moved_profile_items(
+        self,
+        source_profile_key: str,
+        destination_kind: str,
+        destination_profile_key: str = "",
+        destination_group_key: str = "",
+    ) -> tuple[Any, ...] | None:
+        source_key = str(source_profile_key or "").strip()
+        kind = str(destination_kind or "").strip()
+        if not source_key:
+            return None
+        items = self._current_view_state_items()
+        source = next((item for item in items if str(getattr(item, "key", "") or "") == source_key), None)
+        if source is None:
+            return None
+
+        destination_key = str(destination_profile_key or "").strip()
+        destination = next((item for item in items if str(getattr(item, "key", "") or "") == destination_key), None)
+        if kind in {"profile", "profile_after"}:
+            if destination is None or str(getattr(destination, "key", "") or "") == source_key:
+                return None
+            target_group = str(destination_group_key or getattr(destination, "group", "") or getattr(source, "group", "") or "common")
+        elif kind == "folder":
+            target_group = str(destination_group_key or "").strip()
+        elif kind == "end":
+            target_group = str(destination_group_key or getattr(source, "group", "") or "common").strip()
+        else:
+            return None
+        if not target_group:
+            return None
+
+        group_name = group_name_for_key(target_group, tuple(items))
+        source_for_target = _profile_item_with(
+            source,
+            group=target_group,
+            group_name=group_name,
+            order_is_manual=True,
+        )
+        target_items = [
+            item
+            for item in sorted(items, key=profile_display_sort_key)
+            if str(getattr(item, "key", "") or "") != source_key
+            and str(getattr(item, "group", "") or "common") == target_group
+        ]
+
+        if kind == "profile":
+            insert_index = next(
+                (index for index, item in enumerate(target_items) if str(getattr(item, "key", "") or "") == destination_key),
+                -1,
+            )
+            if insert_index < 0:
+                return None
+            target_items.insert(insert_index, source_for_target)
+        elif kind == "profile_after":
+            insert_index = next(
+                (index for index, item in enumerate(target_items) if str(getattr(item, "key", "") or "") == destination_key),
+                -1,
+            )
+            if insert_index < 0:
+                return None
+            target_items.insert(insert_index + 1, source_for_target)
+        else:
+            target_items.append(source_for_target)
+
+        target_order = {str(getattr(item, "key", "") or ""): index for index, item in enumerate(target_items)}
+        next_items: list[Any] = []
+        for item in items:
+            item_key = str(getattr(item, "key", "") or "")
+            if item_key == source_key and item_key not in target_order:
+                continue
+            if item_key in target_order:
+                next_items.append(
+                    _profile_item_with(
+                        source_for_target if item_key == source_key else item,
+                        group=target_group,
+                        group_name=group_name,
+                        order=target_order[item_key],
+                        order_is_manual=True,
+                    )
+                )
+            else:
+                next_items.append(item)
+        return tuple(next_items)
+
+    def _group_expanded_with_target(self, destination_group_key: str, items: tuple[Any, ...]) -> dict[str, bool]:
+        try:
+            options = self._model.view_state_options()
+        except Exception:
+            options = {}
+        group_expanded = dict(options.get("group_expanded") or {})
+        target_group = str(destination_group_key or "").strip()
+        if target_group:
+            group_expanded.setdefault(target_group, True)
+        for item in tuple(items or ()):
+            group_expanded.setdefault(str(getattr(item, "group", "") or "common"), True)
+        return group_expanded
+
     def _on_view_state_loaded(self, request_id: int, state) -> None:
         runtime = self.__dict__.get("_view_state_runtime")
         if runtime is None or not runtime.is_current(request_id):
@@ -456,6 +562,15 @@ class ProfilesList(QWidget):
             if key:
                 keys.append(key)
         return tuple(dict.fromkeys(keys))
+
+
+def _profile_item_with(item: Any, **changes):
+    try:
+        return replace(item, **changes)
+    except Exception:
+        data = dict(getattr(item, "__dict__", {}) or {})
+        data.update(changes)
+        return SimpleNamespace(**data)
 
 
 __all__ = ["ProfilesList"]

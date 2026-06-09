@@ -761,6 +761,37 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             ],
         )
 
+    def test_profile_list_move_requests_worker_view_state_rebuild(self) -> None:
+        first = SimpleNamespace(key="profile-1", group="common", group_name="Общие", order=0, order_is_manual=False)
+        second = SimpleNamespace(key="profile-2", group="video", group_name="Видео", order=1, order_is_manual=False)
+        profiles_list = ProfilesList.__new__(ProfilesList)
+        profiles_list._model = SimpleNamespace(
+            move_profile=Mock(side_effect=AssertionError("move rows must be built in worker")),
+            view_state_options=Mock(return_value={
+                "items": (first, second),
+                "group_expanded": {"common": True, "video": True},
+            }),
+        )
+        profiles_list._request_view_state_rebuild = Mock()
+
+        self.assertTrue(
+            ProfilesList.move_profile_item(
+                profiles_list,
+                "profile-1",
+                "profile_after",
+                "profile-2",
+                "video",
+            )
+        )
+
+        profiles_list._model.move_profile.assert_not_called()
+        moved = profiles_list._request_view_state_rebuild.call_args.kwargs["items"]
+        self.assertEqual([item.key for item in moved], ["profile-1", "profile-2"])
+        self.assertEqual(getattr(moved[0], "group"), "video")
+        self.assertEqual(getattr(moved[0], "group_name"), "Видео")
+        self.assertEqual(getattr(moved[0], "order"), 1)
+        self.assertTrue(getattr(moved[0], "order_is_manual"))
+
     def test_profile_list_reserves_space_for_visible_fluent_scrollbar(self) -> None:
         list_source = inspect.getsource(ProfilesList._build_ui)
 
