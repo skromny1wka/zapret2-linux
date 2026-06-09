@@ -74,6 +74,7 @@ class ProfilesList(QWidget):
         self._view_state_rebuild_pending = False
         self._view_state_group_expanded: dict[str, bool] | None = None
         self._view_state_folder_state: dict[str, Any] | None = None
+        self._view_state_items: tuple[Any, ...] | None = None
         self._view_state_reset_group_expanded = False
         self._build_ui()
 
@@ -144,6 +145,7 @@ class ProfilesList(QWidget):
         except Exception:
             pass
         self._model.apply_view_state(view_state)
+        self._view_state_items = None
 
     def view_state_options(self) -> dict[str, Any]:
         options = self._model.view_state_options()
@@ -171,19 +173,74 @@ class ProfilesList(QWidget):
         return self._model.profile_item_for_key(profile_key)
 
     def replace_profile_item(self, profile_key: str, item) -> bool:
-        return self._model.replace_profile(profile_key, item)
+        source_key = str(profile_key or "").strip()
+        replacement_key = str(getattr(item, "key", "") or source_key).strip()
+        if not source_key or not replacement_key:
+            return False
+        items = self._current_view_state_items()
+        if not any(str(getattr(entry, "key", "") or "") == source_key for entry in items):
+            return False
+        next_items = tuple(
+            item if str(getattr(entry, "key", "") or "") == source_key else entry
+            for entry in items
+        )
+        self._request_view_state_rebuild(items=next_items)
+        return True
 
     def add_profile_item(self, item) -> bool:
-        return self._model.add_profile(item)
+        profile_key = str(getattr(item, "key", "") or "").strip()
+        if not profile_key:
+            return False
+        items = self._current_view_state_items()
+        if any(str(getattr(entry, "key", "") or "") == profile_key for entry in items):
+            return self.replace_profile_item(profile_key, item)
+        self._request_view_state_rebuild(items=tuple((*items, item)))
+        return True
 
     def replace_user_profile_items(self, profile_id: str, items: tuple[Any, ...]) -> bool:
-        return self._model.replace_user_profile_items(profile_id, tuple(items or ()))
+        clean_profile_id = str(profile_id or "").strip()
+        replacement_items = tuple(items or ())
+        if not clean_profile_id or not replacement_items:
+            return False
+        current_items = self._current_view_state_items()
+        if not any(
+            str(getattr(item, "user_profile_id", "") or "").strip() == clean_profile_id
+            for item in current_items
+        ):
+            return False
+        next_items = tuple(
+            item
+            for item in current_items
+            if str(getattr(item, "user_profile_id", "") or "").strip() != clean_profile_id
+        )
+        self._request_view_state_rebuild(items=tuple((*next_items, *replacement_items)))
+        return True
 
     def remove_user_profile_items(self, profile_id: str) -> bool:
-        return self._model.remove_user_profile_items(profile_id)
+        clean_profile_id = str(profile_id or "").strip()
+        if not clean_profile_id:
+            return False
+        current_items = self._current_view_state_items()
+        next_items = tuple(
+            item
+            for item in current_items
+            if str(getattr(item, "user_profile_id", "") or "").strip() != clean_profile_id
+        )
+        if len(next_items) == len(current_items):
+            return False
+        self._request_view_state_rebuild(items=next_items)
+        return True
 
     def remove_profile_item(self, profile_key: str) -> bool:
-        return self._model.remove_profile(profile_key)
+        key = str(profile_key or "").strip()
+        if not key:
+            return False
+        items = self._current_view_state_items()
+        next_items = tuple(item for item in items if str(getattr(item, "key", "") or "") != key)
+        if len(next_items) == len(items):
+            return False
+        self._request_view_state_rebuild(items=next_items)
+        return True
 
     def set_profile_enabled(self, profile_key: str, enabled: bool) -> bool:
         item = self.profile_item_for_key(profile_key)
@@ -301,12 +358,15 @@ class ProfilesList(QWidget):
         *,
         group_expanded: dict[str, bool] | None = None,
         folder_state: dict[str, Any] | None = None,
+        items: tuple[Any, ...] | None = None,
         reset_group_expanded: bool = False,
     ) -> None:
         if group_expanded is not None:
             self._view_state_group_expanded = dict(group_expanded)
         if isinstance(folder_state, dict):
             self._view_state_folder_state = dict(folder_state)
+        if items is not None:
+            self._view_state_items = tuple(items or ())
         if reset_group_expanded:
             self._view_state_group_expanded = None
             self._view_state_reset_group_expanded = True
@@ -325,7 +385,7 @@ class ProfilesList(QWidget):
             runtime = OneShotWorkerRuntime()
             self._view_state_runtime = runtime
         options = self._model.view_state_options()
-        items = tuple(options.get("items") or ())
+        items = tuple(self.__dict__.get("_view_state_items") or options.get("items") or ())
         if bool(self.__dict__.pop("_view_state_reset_group_expanded", False)):
             group_expanded = None
         else:
@@ -353,6 +413,16 @@ class ProfilesList(QWidget):
             on_finished=self._on_view_state_worker_finished,
         )
         self._view_state_runtime_worker = worker
+
+    def _current_view_state_items(self) -> tuple[Any, ...]:
+        pending = self.__dict__.get("_view_state_items")
+        if isinstance(pending, tuple):
+            return pending
+        try:
+            options = self._model.view_state_options()
+        except Exception:
+            options = {}
+        return tuple(options.get("items") or ())
 
     def _on_view_state_loaded(self, request_id: int, state) -> None:
         runtime = self.__dict__.get("_view_state_runtime")

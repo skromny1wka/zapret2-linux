@@ -706,6 +706,35 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             reset_group_expanded=True,
         )
 
+    def test_profile_list_item_changes_request_worker_view_state_rebuild(self) -> None:
+        current = SimpleNamespace(key="profile-1", user_profile_id="", enabled=False)
+        updated = SimpleNamespace(key="profile-1", user_profile_id="", enabled=True)
+        created = SimpleNamespace(key="profile-2", user_profile_id="", enabled=True)
+        profiles_list = ProfilesList.__new__(ProfilesList)
+        profiles_list._model = SimpleNamespace(
+            view_state_options=Mock(return_value={"items": (current,), "group_expanded": {"common": True}}),
+            replace_profile=Mock(side_effect=AssertionError("replace rows must be built in worker")),
+            add_profile=Mock(side_effect=AssertionError("add rows must be built in worker")),
+            remove_profile=Mock(side_effect=AssertionError("remove rows must be built in worker")),
+        )
+        profiles_list._request_view_state_rebuild = Mock()
+
+        self.assertTrue(ProfilesList.replace_profile_item(profiles_list, "profile-1", updated))
+        self.assertTrue(ProfilesList.add_profile_item(profiles_list, created))
+        self.assertTrue(ProfilesList.remove_profile_item(profiles_list, "profile-1"))
+
+        profiles_list._model.replace_profile.assert_not_called()
+        profiles_list._model.add_profile.assert_not_called()
+        profiles_list._model.remove_profile.assert_not_called()
+        self.assertEqual(
+            profiles_list._request_view_state_rebuild.call_args_list,
+            [
+                call(items=(updated,)),
+                call(items=(current, created)),
+                call(items=()),
+            ],
+        )
+
     def test_profile_list_reserves_space_for_visible_fluent_scrollbar(self) -> None:
         list_source = inspect.getsource(ProfilesList._build_ui)
 
