@@ -129,6 +129,12 @@ def set_widget_property_if_changed(widget, name: str, value) -> bool:
     return True
 
 
+def set_profile_list_status_text(label, text: str) -> bool:
+    changed = set_widget_text_if_changed(label, text)
+    set_state_text(label, f"Статус списка profile: {text}")
+    return changed
+
+
 def set_widget_style_sheet_if_changed(widget, style: str) -> bool:
     value = str(style or "")
     try:
@@ -1697,7 +1703,7 @@ class ProfileSetupPageBase(BasePage):
             self._pending_list_file_load = True
             return
         if self._list_file_status_label is not None:
-            set_widget_text_if_changed(self._list_file_status_label, "Загрузка файла списка...")
+            set_profile_list_status_text(self._list_file_status_label, "Загрузка файла списка...")
         self._list_file_load_request_id = int(self.__dict__.get("_list_file_load_request_id", 0) or 0) + 1
         request_id = self._list_file_load_request_id
         _request_id, worker = runtime.start_qthread_worker(
@@ -1754,7 +1760,7 @@ class ProfileSetupPageBase(BasePage):
         ):
             return
         if self._list_file_status_label is not None:
-            set_widget_text_if_changed(
+            set_profile_list_status_text(
                 self._list_file_status_label,
                 f"Ошибка загрузки файла списка: {error}",
             )
@@ -2763,12 +2769,12 @@ class ProfileSetupPageBase(BasePage):
             if editable:
                 base_count = self._list_file_base_entries_count
                 user_count = self._list_file_user_entries_count
-                set_widget_text_if_changed(
+                set_profile_list_status_text(
                     self._list_file_status_label,
                     f"Записей всего: {base_count + user_count} • ваших: {user_count}"
                 )
             else:
-                set_widget_text_if_changed(
+                set_profile_list_status_text(
                     self._list_file_status_label,
                     error_text or "Файл списка недоступен для редактирования.",
                 )
@@ -2788,7 +2794,7 @@ class ProfileSetupPageBase(BasePage):
             except TypeError:
                 timer.start()
         if self._list_file_status_label is not None:
-            set_widget_text_if_changed(self._list_file_status_label, "Проверка списка...")
+            set_profile_list_status_text(self._list_file_status_label, "Проверка списка...")
         if timer is not None:
             return
         self._run_scheduled_list_file_validation()
@@ -2897,14 +2903,14 @@ class ProfileSetupPageBase(BasePage):
             set_widget_enabled_if_changed(self._list_file_save_button, not invalid_lines and editable)
         if self._list_file_status_label is not None:
             if invalid_lines:
-                set_widget_text_if_changed(
+                set_profile_list_status_text(
                     self._list_file_status_label,
                     "Исправьте ошибки перед сохранением.",
                 )
             else:
                 user_count = int(self.__dict__.get("_list_file_user_entries_count", 0) or 0)
                 base_count = int(self.__dict__.get("_list_file_base_entries_count", 0) or 0)
-                set_widget_text_if_changed(
+                set_profile_list_status_text(
                     self._list_file_status_label,
                     f"Записей всего: {base_count + user_count} • ваших: {user_count} • есть несохранённые изменения",
                 )
@@ -2919,7 +2925,7 @@ class ProfileSetupPageBase(BasePage):
         if self._list_file_save_button is not None:
             set_widget_enabled_if_changed(self._list_file_save_button, False)
         if self._list_file_status_label is not None:
-            set_widget_text_if_changed(self._list_file_status_label, "Ошибка проверки списка.")
+            set_profile_list_status_text(self._list_file_status_label, "Ошибка проверки списка.")
 
     def _on_list_file_validation_worker_finished(self, _worker) -> None:
         if not self._accept_current_profile_setup_worker_finished("_list_file_validation_runtime_worker", _worker):
@@ -2971,7 +2977,7 @@ class ProfileSetupPageBase(BasePage):
         self._list_file_save_request_id += 1
         request_id = self._list_file_save_request_id
         if self._list_file_status_label is not None:
-            set_widget_text_if_changed(self._list_file_status_label, "Сохранение списка...")
+            set_profile_list_status_text(self._list_file_status_label, "Сохранение списка...")
         if self._list_file_save_button is not None:
             set_widget_enabled_if_changed(self._list_file_save_button, False)
         _request_id, worker = runtime.start_qthread_worker(
@@ -2997,7 +3003,7 @@ class ProfileSetupPageBase(BasePage):
         if state is not None:
             self._apply_list_file_editor_state(state)
         if self._list_file_status_label is not None:
-            set_widget_text_if_changed(self._list_file_status_label, "Список сохранён.")
+            set_profile_list_status_text(self._list_file_status_label, "Список сохранён.")
         if payload is None:
             self.reload_current_profile()
             self._on_profile_changed_callback(self._profile_key, "list_file")

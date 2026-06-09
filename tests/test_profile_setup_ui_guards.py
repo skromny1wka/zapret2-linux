@@ -1046,6 +1046,40 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
             "Записей всего: 3 • ваших: 2 • есть несохранённые изменения",
         )
 
+    def test_list_file_status_updates_screen_reader_state(self) -> None:
+        from unittest.mock import Mock
+
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._list_file_validation_request_id = 7
+        page._pending_list_file_validation = None
+        page._list_file_kind = "hostlist"
+        page._list_file_text = _PlainTextWidget("user.example\nsecond.example", read_only=False)
+        page._list_file_save_button = _BoolWidget(enabled=False)
+        page._list_file_status_label = _PropertyWidget()
+        page._list_file_text_snapshot = "user.example\nsecond.example"
+        page._list_file_user_entries_count = 2
+        page._list_file_base_entries_count = 1
+        page._render_list_file_validation = Mock()
+
+        ProfileSetupPageBase._on_list_file_validation_finished(
+            page,
+            7,
+            "hostlist",
+            "user.example\nsecond.example",
+            (),
+        )
+
+        self.assertEqual(
+            page._list_file_status_label.accessibleName(),
+            "Статус списка profile: Записей всего: 3 • ваших: 2 • есть несохранённые изменения",
+        )
+        self.assertEqual(
+            page._list_file_status_label.property("screenReaderStateText"),
+            "Статус списка profile: Записей всего: 3 • ваших: 2 • есть несохранённые изменения",
+        )
+
     def test_list_file_text_change_defers_large_editor_read_until_timer(self) -> None:
         from unittest.mock import Mock
 
