@@ -140,12 +140,7 @@ def build_force_dns_status_plan(
     details_fallback: str = "",
     language: str = "ru",
 ) -> NetworkForceDnsStatusPlan:
-    status = (
-        tr_catalog("page.network.force_dns.status.enabled", language=language, default="Принудительный DNS включен")
-        if enabled
-        else tr_catalog("page.network.force_dns.status.disabled", language=language, default="Принудительный DNS отключен")
-    )
-
+    _ = enabled
     details_text = ""
     if details_key:
         details_default = details_fallback or ""
@@ -157,10 +152,7 @@ def build_force_dns_status_plan(
     elif details_fallback:
         details_text = details_fallback
 
-    if details_text:
-        status = f"{status} ({details_text})"
-
-    return NetworkForceDnsStatusPlan(text=status, enabled=bool(enabled))
+    return NetworkForceDnsStatusPlan(text=details_text, enabled=bool(enabled))
 
 
 def build_force_dns_toggle_plan(

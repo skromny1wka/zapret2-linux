@@ -1550,8 +1550,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Prepare report",
     },
     "page.network.subtitle": {
-        "ru": "DNS-серверы и проверка DNS",
-        "en": "DNS servers and DNS checks",
+        "ru": "Здесь можно выбрать DNS-серверы, включить принудительный DNS и проверить, помогает ли настройка обходу блокировок.",
+        "en": "Choose DNS servers, enable forced DNS, and check whether the setting helps bypass blocking.",
     },
     "page.network.section.dns_servers": {
         "ru": "DNS Серверы",
@@ -1566,8 +1566,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Utilities",
     },
     "page.network.section.force_dns": {
-        "ru": "DNS",
-        "en": "DNS",
+        "ru": "",
+        "en": "",
     },
     "page.network.loading": {
         "ru": "⏳ Загрузка...",

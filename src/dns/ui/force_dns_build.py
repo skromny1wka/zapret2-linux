@@ -44,8 +44,6 @@ def build_force_dns_card_ui(
     tokens = get_theme_tokens_fn()
     force_dns_active = get_force_dns_status_fn()
 
-    add_section_title_fn(text_key="page.network.section.force_dns")
-
     force_dns_description = tr_fn(
         "page.network.force_dns.card.title",
         "Принудительно прописывает Google DNS + OpenDNS для обхода блокировок",

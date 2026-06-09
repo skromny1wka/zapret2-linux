@@ -26,11 +26,12 @@ class ForceDnsBuildTests(unittest.TestCase):
     def test_reset_button_uses_fluent_icon_keyword_for_plain_push_button(self) -> None:
         parent = QWidget()
         added_widgets = []
+        section_titles = []
 
         _active, widgets = build_force_dns_card_ui(
             parent=parent,
             content_parent=parent,
-            add_section_title_fn=lambda **_kwargs: None,
+            add_section_title_fn=lambda **kwargs: section_titles.append(kwargs),
             tr_fn=lambda _key, default: default,
             add_widget_fn=added_widgets.append,
             get_theme_tokens_fn=get_theme_tokens,
@@ -50,6 +51,7 @@ class ForceDnsBuildTests(unittest.TestCase):
         )
 
         self.assertEqual(1, len(added_widgets))
+        self.assertEqual([], section_titles)
         self.assertFalse(widgets.reset_button.icon().isNull())
 
     def test_reset_button_has_screen_reader_text(self) -> None:

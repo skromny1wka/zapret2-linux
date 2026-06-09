@@ -29,6 +29,7 @@ def update_force_dns_status_label(
         language=language,
     )
     label.setText(plan.text)
+    label.setVisible(bool(str(plan.text).strip()))
 
 
 def update_dns_selection_block_state(*, blocked: bool, dns_cards_container, custom_card) -> None:
