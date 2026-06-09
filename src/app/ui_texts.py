@@ -1601,45 +1601,37 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Сбросить?",
         "en": "Flush?",
     },
-    "page.network.force_dns.card.title": {
-        "ru": "Принудительно прописывает Google DNS + OpenDNS для обхода блокировок",
-        "en": "Force-sets Google DNS + OpenDNS to bypass blocking",
+    "page.network.force_dns.action.enable.button": {
+        "ru": "Включить принудительный DNS",
+        "en": "Enable forced DNS",
     },
-    "page.network.force_dns.toggle.title": {
-        "ru": "Принудительный DNS",
-        "en": "Forced DNS",
+    "page.network.force_dns.action.disable.button": {
+        "ru": "Выключить принудительный DNS",
+        "en": "Disable forced DNS",
     },
-    "page.network.force_dns.toggle.description": {
-        "ru": "Устанавливает Google DNS + OpenDNS на активные адаптеры",
-        "en": "Sets Google DNS + OpenDNS on active adapters",
+    "page.network.force_dns.action.enable.description": {
+        "ru": "Программа пропишет DNS-серверы для обхода блокировок. Это поможет, если провайдер подменяет DNS.",
+        "en": "The app will set DNS servers for bypassing blocks. This helps when the provider tampers with DNS.",
+    },
+    "page.network.force_dns.action.disable.description": {
+        "ru": "Программа уберёт принудительные DNS и вернёт обычный режим.",
+        "en": "The app will remove forced DNS and return to the normal mode.",
+    },
+    "page.network.force_dns.action.reset.description": {
+        "ru": "DNS будет снова получаться автоматически от роутера или провайдера через DHCP. Это полезно, если интернет работает нестабильно после ручной настройки DNS.",
+        "en": "DNS will be received automatically from the router or provider through DHCP again. This is useful if the internet is unstable after manual DNS setup.",
     },
     "page.network.force_dns.reset.button": {
-        "ru": "Сбросить DNS на DHCP",
-        "en": "Reset DNS to DHCP",
+        "ru": "Вернуть DNS автоматически",
+        "en": "Restore automatic DNS",
     },
     "page.network.force_dns.reset.confirm": {
         "ru": "Отключить Force DNS и сбросить DNS на DHCP для всех адаптеров?",
         "en": "Disable Force DNS and reset DNS to DHCP for all adapters?",
     },
-    "page.network.force_dns.status.enabled": {
-        "ru": "Принудительный DNS включен",
-        "en": "Forced DNS is enabled",
-    },
-    "page.network.force_dns.status.disabled": {
-        "ru": "Принудительный DNS отключен",
-        "en": "Forced DNS is disabled",
-    },
-    "page.network.force_dns.status.details.adapters_applied": {
-        "ru": "{ok_count}/{total} адаптеров",
-        "en": "{ok_count}/{total} adapters",
-    },
     "page.network.force_dns.status.details.enable_failed": {
         "ru": "Не удалось включить",
         "en": "Failed to enable",
-    },
-    "page.network.force_dns.status.details.dns_saved": {
-        "ru": "Текущий DNS сохранен",
-        "en": "Current DNS preserved",
     },
     "page.network.force_dns.status.details.disable_failed": {
         "ru": "Не удалось отключить",
@@ -1648,10 +1640,6 @@ TEXTS: dict[str, dict[str, str]] = {
     "page.network.force_dns.status.details.apply_error": {
         "ru": "Ошибка применения",
         "en": "Apply error",
-    },
-    "page.network.force_dns.status.details.dhcp_reset": {
-        "ru": "DNS сброшен на DHCP",
-        "en": "DNS reset to DHCP",
     },
     "page.network.force_dns.status.details.dhcp_not_applied": {
         "ru": "Force DNS отключен, DHCP не применён",

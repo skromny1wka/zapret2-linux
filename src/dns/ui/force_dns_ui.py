@@ -5,8 +5,18 @@ from __future__ import annotations
 from PyQt6.QtWidgets import QGraphicsOpacityEffect
 
 
-def set_force_dns_toggle(toggle_row, checked: bool) -> None:
-    toggle_row.setChecked(checked, block_signals=True)
+def set_force_dns_toggle(toggle_row, checked: bool, *, text: str | None = None) -> None:
+    try:
+        toggle_row.setChecked(checked, block_signals=True)
+    except TypeError:
+        toggle_row.setChecked(checked)
+    except Exception:
+        pass
+    if text is not None:
+        try:
+            toggle_row.setText(text)
+        except Exception:
+            pass
 
 
 def update_force_dns_status_label(
@@ -30,6 +40,14 @@ def update_force_dns_status_label(
     )
     label.setText(plan.text)
     label.setVisible(bool(str(plan.text).strip()))
+    try:
+        parent = label.parentWidget()
+        refresh = getattr(parent, "_refresh_minimum_height", None)
+        if callable(refresh):
+            refresh()
+        parent.updateGeometry()
+    except Exception:
+        pass
 
 
 def update_dns_selection_block_state(*, blocked: bool, dns_cards_container, custom_card) -> None:

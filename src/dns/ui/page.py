@@ -18,6 +18,7 @@ from qfluentwidgets import (
 from ui.pages.base_page import BasePage
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.widgets.win11_controls import Win11ToggleRow
+from ui.accessibility import set_control_accessibility
 from ui.fluent_widgets import (
     SettingsCard,
     QuickActionsBar,
@@ -150,7 +151,6 @@ class NetworkPage(BasePage):
         self._isp_warning_accept_btn = None
         self._isp_warning_dismiss_btn = None
         self._auto_icon_label = None
-        self._force_dns_reset_row = None
         self._tools_card = None
         self._tools_actions_bar = None
         self._tools_section_label = None
@@ -287,24 +287,24 @@ class NetworkPage(BasePage):
                     title_label.hide()
             except Exception:
                 pass
-        if hasattr(self, "force_dns_toggle"):
-            self.force_dns_toggle.set_texts(
-                self._tr("page.network.force_dns.toggle.title", "Принудительный DNS"),
-                self._tr(
-                    "page.network.force_dns.card.title",
-                    "Принудительно прописывает Google DNS + OpenDNS для обхода блокировок",
-                ),
-            )
+        if hasattr(self, "force_dns_action_btn"):
+            self._sync_force_dns_action_button(bool(self._force_dns_active))
         if hasattr(self, "force_dns_reset_dhcp_btn"):
             self.force_dns_reset_dhcp_btn.setText(
-                self._tr("page.network.force_dns.reset.button", "Сбросить DNS на DHCP")
+                self._tr("page.network.force_dns.reset.button", "Вернуть DNS автоматически")
+            )
+            reset_description = self._tr(
+                "page.network.force_dns.action.reset.description",
+                "DNS будет снова получаться автоматически от роутера или провайдера через DHCP. Это полезно, если интернет работает нестабильно после ручной настройки DNS.",
             )
             set_tooltip(
                 self.force_dns_reset_dhcp_btn,
-                self._tr(
-                    "page.network.force_dns.reset.description",
-                    "Отключить Force DNS и вернуть получение DNS через DHCP для всех адаптеров.",
-                )
+                reset_description,
+            )
+            set_control_accessibility(
+                self.force_dns_reset_dhcp_btn,
+                name=self._tr("page.network.force_dns.reset.accessible_name", "Вернуть DNS автоматически"),
+                description=reset_description,
             )
 
         if hasattr(self, "force_dns_status_label"):
@@ -889,14 +889,13 @@ class NetworkPage(BasePage):
             qt_namespace=Qt,
             insert_widget_into_setting_card_group_fn=insert_widget_into_setting_card_group,
             enable_setting_card_group_auto_height_fn=enable_setting_card_group_auto_height,
-            on_toggle=self._on_force_dns_toggled,
+            on_toggle=self._on_force_dns_action_clicked,
             on_confirm_reset=self._confirm_reset_dns_to_dhcp,
         )
         self.force_dns_card = force_dns_widgets.card
-        self.force_dns_toggle = force_dns_widgets.toggle
+        self.force_dns_action_btn = force_dns_widgets.force_button
         self.force_dns_status_label = force_dns_widgets.status_label
         self.force_dns_reset_dhcp_btn = force_dns_widgets.reset_button
-        self._force_dns_reset_row = force_dns_widgets.reset_row
 
         self._update_force_dns_status(self._force_dns_active)
         self._update_dns_selection_state()
@@ -904,7 +903,7 @@ class NetworkPage(BasePage):
     def _apply_loaded_force_dns_state(self) -> None:
         if self._cleanup_in_progress:
             return
-        if not hasattr(self, "force_dns_toggle"):
+        if not hasattr(self, "force_dns_action_btn"):
             return
         self._set_force_dns_toggle(bool(self._force_dns_active))
         self._update_force_dns_status(bool(self._force_dns_active))
@@ -975,6 +974,11 @@ class NetworkPage(BasePage):
     def _on_force_dns_toggled(self, enabled: bool):
         """Обработчик переключения принудительного DNS"""
         self._request_force_dns_action("toggle", enabled=bool(enabled))
+
+    def _on_force_dns_action_clicked(self) -> None:
+        enabled = not bool(self._force_dns_active)
+        self._update_force_dns_status(enabled, self._force_dns_action_description_key(enabled))
+        self._on_force_dns_toggled(enabled)
 
     def create_force_dns_action_worker(self, request_id: int, *, action: str, enabled=None, adapters=None):
         return self._dns_feature().create_force_dns_action_worker(
@@ -1239,7 +1243,46 @@ class NetworkPage(BasePage):
     
     def _set_force_dns_toggle(self, checked: bool):
         """Устанавливает состояние переключателя без триггера сигналов"""
-        set_force_dns_toggle(self.force_dns_toggle, checked)
+        self._sync_force_dns_action_button(bool(checked))
+        set_force_dns_toggle(
+            self.force_dns_action_btn,
+            checked,
+            text=self._force_dns_action_button_text(bool(checked)),
+        )
+
+    def _force_dns_action_button_text(self, active: bool) -> str:
+        if active:
+            return self._tr("page.network.force_dns.action.disable.button", "Выключить принудительный DNS")
+        return self._tr("page.network.force_dns.action.enable.button", "Включить принудительный DNS")
+
+    def _force_dns_action_description_key(self, enabled: bool) -> str:
+        if enabled:
+            return "page.network.force_dns.action.enable.description"
+        return "page.network.force_dns.action.disable.description"
+
+    def _force_dns_action_description(self, active: bool) -> str:
+        if active:
+            return self._tr(
+                "page.network.force_dns.action.disable.description",
+                "Программа уберёт принудительные DNS и вернёт обычный режим.",
+            )
+        return self._tr(
+            "page.network.force_dns.action.enable.description",
+            "Программа пропишет DNS-серверы для обхода блокировок. Это поможет, если провайдер подменяет DNS.",
+        )
+
+    def _sync_force_dns_action_button(self, active: bool) -> None:
+        button = getattr(self, "force_dns_action_btn", None)
+        if button is None:
+            return
+        text = self._force_dns_action_button_text(active)
+        description = self._force_dns_action_description(active)
+        try:
+            button.setText(text)
+        except Exception:
+            pass
+        set_tooltip(button, description)
+        set_control_accessibility(button, name=text, description=description)
     
     def _update_force_dns_status(
         self,
@@ -1305,11 +1348,12 @@ class NetworkPage(BasePage):
     def _confirm_reset_dns_to_dhcp(self):
         if not self._confirm_action(
             "page.network.force_dns.reset.button",
-            "Сбросить DNS на DHCP",
+            "Вернуть DNS автоматически",
             "page.network.force_dns.reset.confirm",
             "Отключить Force DNS и сбросить DNS на DHCP для всех адаптеров?",
         ):
             return
+        self._update_force_dns_status(False, "page.network.force_dns.action.reset.description")
         self._reset_dns_to_dhcp()
 
     def _test_connection(self):

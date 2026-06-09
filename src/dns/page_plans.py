@@ -167,9 +167,9 @@ def build_force_dns_toggle_plan(
             return NetworkForceDnsTogglePlan(
                 final_checked=True,
                 force_dns_active=True,
-                details_key="page.network.force_dns.status.details.adapters_applied",
-                details_kwargs={"ok_count": ok_count, "total": total},
-                details_fallback=f"{ok_count}/{total} адаптеров",
+                details_key="page.network.force_dns.action.enable.description",
+                details_kwargs={},
+                details_fallback="Программа пропишет DNS-серверы для обхода блокировок. Это поможет, если провайдер подменяет DNS.",
             )
         return NetworkForceDnsTogglePlan(
             final_checked=False,
@@ -183,9 +183,9 @@ def build_force_dns_toggle_plan(
         return NetworkForceDnsTogglePlan(
             final_checked=False,
             force_dns_active=False,
-            details_key="page.network.force_dns.status.details.dns_saved",
+            details_key="page.network.force_dns.action.disable.description",
             details_kwargs={},
-            details_fallback="",
+            details_fallback="Программа уберёт принудительные DNS и вернёт обычный режим.",
         )
 
     return NetworkForceDnsTogglePlan(
@@ -348,7 +348,7 @@ def build_reset_dhcp_result_plan(
         return NetworkResetDhcpResultPlan(
             force_dns_active=bool(force_dns_active),
             should_select_auto=not force_dns_active,
-            status_details_key="page.network.force_dns.status.details.dhcp_reset",
+            status_details_key="page.network.force_dns.action.reset.description",
             infobar_level="success",
             infobar_title=title,
             infobar_content=tr_catalog(

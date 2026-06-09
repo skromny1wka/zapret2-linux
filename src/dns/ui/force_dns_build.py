@@ -7,16 +7,15 @@ from dataclasses import dataclass
 from qfluentwidgets import FluentIcon
 
 from ui.accessibility import set_control_accessibility
-from ui.fluent_widgets import set_tooltip
+from ui.fluent_widgets import QuickActionsBar, set_tooltip
 
 
 @dataclass(slots=True)
 class ForceDnsCardWidgets:
     card: object
-    toggle: object
+    force_button: object
     status_label: object
     reset_button: object
-    reset_row: object | None
 
 
 def build_force_dns_card_ui(
@@ -43,85 +42,67 @@ def build_force_dns_card_ui(
 ) -> tuple[bool, ForceDnsCardWidgets]:
     tokens = get_theme_tokens_fn()
     force_dns_active = get_force_dns_status_fn()
-
-    force_dns_description = tr_fn(
-        "page.network.force_dns.card.title",
-        "Принудительно прописывает Google DNS + OpenDNS для обхода блокировок",
-    )
+    _ = tokens
     _ = parent
+    _ = setting_card_group_cls
+    _ = win11_toggle_row_cls
+    _ = qwidget_cls
     _ = qvbox_layout_cls
-    force_dns_card = setting_card_group_cls("", content_parent)
-    title_label = getattr(force_dns_card, "titleLabel", None)
-    if title_label is not None:
-        try:
-            title_label.setText("")
-            title_label.hide()
-        except Exception:
-            pass
-    dns_layout = None
+    _ = qhbox_layout_cls
+    _ = qt_namespace
+    _ = insert_widget_into_setting_card_group_fn
+    _ = enable_setting_card_group_auto_height_fn
 
-    force_dns_toggle = win11_toggle_row_cls(
-        "fa5s.shield-alt",
-        tr_fn("page.network.force_dns.toggle.title", "Принудительный DNS"),
-        force_dns_description,
-        tokens.accent_hex,
+    force_dns_card = QuickActionsBar(content_parent)
+    force_dns_button_text = tr_fn(
+        "page.network.force_dns.action.disable.button" if force_dns_active else "page.network.force_dns.action.enable.button",
+        "Выключить принудительный DNS" if force_dns_active else "Включить принудительный DNS",
     )
-    force_dns_toggle.setChecked(force_dns_active)
-    force_dns_toggle.toggled.connect(on_toggle)
-    if hasattr(force_dns_card, "addSettingCard"):
-        force_dns_card.addSettingCard(force_dns_toggle)
-    else:
-        dns_layout.addWidget(force_dns_toggle)
-
-    force_dns_status_label = caption_label_cls("")
-    if dns_layout is not None:
-        dns_layout.addWidget(force_dns_status_label)
-    else:
-        try:
-            insert_widget_into_setting_card_group_fn(force_dns_card, 1, force_dns_status_label)
-        except Exception:
-            pass
+    force_dns_button_description = tr_fn(
+        "page.network.force_dns.action.disable.description" if force_dns_active else "page.network.force_dns.action.enable.description",
+        (
+            "Программа уберёт принудительные DNS и вернёт обычный режим."
+            if force_dns_active
+            else "Программа пропишет DNS-серверы для обхода блокировок. Это поможет, если провайдер подменяет DNS."
+        ),
+    )
+    force_dns_btn = action_button_cls(force_dns_button_text, icon=FluentIcon.POWER_BUTTON)
+    force_dns_btn.clicked.connect(lambda _checked=False: on_toggle())
+    set_tooltip(force_dns_btn, force_dns_button_description)
+    set_control_accessibility(
+        force_dns_btn,
+        name=force_dns_button_text,
+        description=force_dns_button_description,
+    )
 
     force_dns_reset_dhcp_btn = action_button_cls(
-        tr_fn("page.network.force_dns.reset.button", "Сбросить DNS на DHCP"),
+        tr_fn("page.network.force_dns.reset.button", "Вернуть DNS автоматически"),
         icon=FluentIcon.RETURN,
     )
-    force_dns_reset_dhcp_btn.setFixedHeight(30)
     force_dns_reset_dhcp_btn.clicked.connect(on_confirm_reset)
     reset_description = tr_fn(
-        "page.network.force_dns.reset.description",
-        "Отключить Force DNS и вернуть получение DNS через DHCP для всех адаптеров.",
+        "page.network.force_dns.action.reset.description",
+        "DNS будет снова получаться автоматически от роутера или провайдера через DHCP. Это полезно, если интернет работает нестабильно после ручной настройки DNS.",
     )
-    set_tooltip(
-        force_dns_reset_dhcp_btn,
-        reset_description,
-    )
+    set_tooltip(force_dns_reset_dhcp_btn, reset_description)
     set_control_accessibility(
         force_dns_reset_dhcp_btn,
-        name=tr_fn("page.network.force_dns.reset.accessible_name", "Сбросить DNS на DHCP"),
+        name=tr_fn("page.network.force_dns.reset.accessible_name", "Вернуть DNS автоматически"),
         description=reset_description,
     )
 
-    reset_row = None
-    if dns_layout is None:
-        reset_row = qwidget_cls(force_dns_card)
-        reset_row_layout = qhbox_layout_cls(reset_row)
-        reset_row_layout.setContentsMargins(0, 4, 0, 0)
-        reset_row_layout.setSpacing(8)
-        reset_row_layout.addStretch()
-        reset_row_layout.addWidget(force_dns_reset_dhcp_btn, 0, qt_namespace.AlignmentFlag.AlignRight)
-        insert_widget_into_setting_card_group_fn(force_dns_card, 2, reset_row)
-        enable_setting_card_group_auto_height_fn(force_dns_card)
-    else:
-        dns_layout.addWidget(force_dns_reset_dhcp_btn, alignment=qt_namespace.AlignmentFlag.AlignLeft)
-        force_dns_card.add_layout(dns_layout)
+    force_dns_status_label = caption_label_cls("")
+    force_dns_status_label.setWordWrap(True)
+    force_dns_status_label.setVisible(False)
+
+    force_dns_card.add_buttons((force_dns_btn, force_dns_reset_dhcp_btn))
+    force_dns_card.actions_layout.addWidget(force_dns_status_label)
 
     add_widget_fn(force_dns_card)
 
     return force_dns_active, ForceDnsCardWidgets(
         card=force_dns_card,
-        toggle=force_dns_toggle,
+        force_button=force_dns_btn,
         status_label=force_dns_status_label,
         reset_button=force_dns_reset_dhcp_btn,
-        reset_row=reset_row,
     )
