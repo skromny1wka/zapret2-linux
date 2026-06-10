@@ -151,7 +151,7 @@ class ControlTopSummaryRefreshGuardTests(unittest.TestCase):
 
                 page._request_top_summary_worker.assert_not_called()
                 self.assertEqual(callbacks, [])
-                self.assertTrue(runtime.top_summary_reload_after_preset_apply_pending)
+                self.assertTrue(runtime.top_summary_preset_apply_reload_state.has_pending())
 
                 with patch(
                     f"{module_name}.QTimer.singleShot",
@@ -163,7 +163,7 @@ class ControlTopSummaryRefreshGuardTests(unittest.TestCase):
                         frozenset({"launch_busy", "launch_busy_text"}),
                     )
 
-                self.assertFalse(runtime.top_summary_reload_after_preset_apply_pending)
+                self.assertFalse(runtime.top_summary_preset_apply_reload_state.has_pending())
                 self.assertEqual(len(callbacks), 1)
                 callbacks[0][1]()
                 page._request_top_summary_worker.assert_called_once_with()

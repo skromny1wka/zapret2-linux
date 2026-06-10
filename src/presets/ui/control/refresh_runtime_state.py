@@ -16,7 +16,10 @@ class ModeControlRefreshRuntime:
             None,
             empty_value=False,
         )
-        self.additional_settings_reload_after_preset_apply_pending = False
+        self.additional_settings_preset_apply_reload_state = LatestValueWorkerState(
+            None,
+            empty_value=False,
+        )
         self.additional_settings_save_runtime = OneShotWorkerRuntime()
         self.additional_settings_save_state = QueuedWorkerState[tuple[str, bool, str]](
             self.additional_settings_save_runtime,
@@ -30,7 +33,15 @@ class ModeControlRefreshRuntime:
             None,
             empty_value=False,
         )
-        self.top_summary_reload_after_preset_apply_pending = False
+        self.top_summary_preset_apply_reload_state = LatestValueWorkerState(
+            None,
+            empty_value=False,
+        )
+        self.top_summary_profile_retry_state = LatestValueWorkerState(
+            None,
+            empty_value=False,
+        )
+        self.top_summary_profile_retry_count = 0
         self.top_summary_request_id = 0
         self.program_settings_load_runtime = OneShotWorkerRuntime()
         self.program_settings_load_state = LatestValueWorkerState(
@@ -72,6 +83,22 @@ class ModeControlRefreshRuntime:
             pending.insert(0, item)
         else:
             pending.append(item)
+
+    def queue_top_summary_preset_apply_reload(self) -> None:
+        self.top_summary_preset_apply_reload_state.pending = True
+
+    def take_top_summary_preset_apply_reload(self) -> bool:
+        pending = bool(self.top_summary_preset_apply_reload_state.has_pending())
+        self.top_summary_preset_apply_reload_state.reset()
+        return pending
+
+    def queue_additional_settings_preset_apply_reload(self) -> None:
+        self.additional_settings_preset_apply_reload_state.pending = True
+
+    def take_additional_settings_preset_apply_reload(self) -> bool:
+        pending = bool(self.additional_settings_preset_apply_reload_state.has_pending())
+        self.additional_settings_preset_apply_reload_state.reset()
+        return pending
 
     def has_pending_refresh(self) -> bool:
         return bool(self.additional_settings_dirty)
@@ -228,11 +255,13 @@ class ModeControlRefreshRuntime:
     def stop_workers(self, *, log_fn=None) -> None:
         self.additional_settings_load_start_scheduled = False
         self.additional_settings_preset_switch_reload_state.reset()
-        self.additional_settings_reload_after_preset_apply_pending = False
+        self.additional_settings_preset_apply_reload_state.reset()
         self.additional_settings_save_start_scheduled = False
         self.top_summary_start_scheduled = False
         self.top_summary_preset_switch_reload_state.reset()
-        self.top_summary_reload_after_preset_apply_pending = False
+        self.top_summary_preset_apply_reload_state.reset()
+        self.top_summary_profile_retry_state.reset()
+        self.top_summary_profile_retry_count = 0
         self.program_settings_load_start_scheduled = False
         self.program_settings_save_start_scheduled = False
         for runtime, label in (

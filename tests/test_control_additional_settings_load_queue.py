@@ -348,7 +348,7 @@ class ControlAdditionalSettingsLoadQueueTests(unittest.TestCase):
 
                 page._schedule_additional_settings_reload.assert_not_called()
                 self.assertEqual(callbacks, [])
-                self.assertTrue(runtime.additional_settings_reload_after_preset_apply_pending)
+                self.assertTrue(runtime.additional_settings_preset_apply_reload_state.has_pending())
 
                 with patch(
                     f"{module_name}.QTimer.singleShot",
@@ -360,7 +360,7 @@ class ControlAdditionalSettingsLoadQueueTests(unittest.TestCase):
                         frozenset({"launch_busy", "launch_busy_text"}),
                     )
 
-                self.assertFalse(runtime.additional_settings_reload_after_preset_apply_pending)
+                self.assertFalse(runtime.additional_settings_preset_apply_reload_state.has_pending())
                 self.assertEqual(len(callbacks), 1)
                 callbacks[0][1]()
                 page._schedule_additional_settings_reload.assert_called_once_with(force=True)

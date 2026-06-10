@@ -112,8 +112,6 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         self._cleanup_in_progress = False
         self._last_known_dpi_running = False
         self._program_settings_runtime_attached = False
-        self._top_summary_profile_retry_count = 0
-        self._top_summary_profile_retry_pending = False
         self._refresh_runtime = winws1_page_runtime.create_refresh_runtime()
         self.top_summary = None
         self.program_settings_card = None
@@ -488,17 +486,34 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
     def _schedule_top_summary_profile_retry(self) -> None:
         if self._cleanup_in_progress:
             return
-        if bool(getattr(self, "_top_summary_profile_retry_pending", False)):
+        runtime = self._refresh_runtime
+        state = runtime.top_summary_profile_retry_state
+        if state.start_scheduled:
             return
-        retry_count = int(getattr(self, "_top_summary_profile_retry_count", 0) or 0)
+        retry_count = int(getattr(runtime, "top_summary_profile_retry_count", 0) or 0)
         if retry_count >= TOP_SUMMARY_PROFILE_RETRY_LIMIT:
             return
-        self._top_summary_profile_retry_count = retry_count + 1
-        self._top_summary_profile_retry_pending = True
-        QTimer.singleShot(TOP_SUMMARY_PROFILE_RETRY_MS, self._retry_top_summary_profile_count)
+        runtime.top_summary_profile_retry_count = retry_count + 1
+        state.pending = True
+
+        def _single_shot(_delay: int, callback) -> None:
+            QTimer.singleShot(TOP_SUMMARY_PROFILE_RETRY_MS, callback)
+
+        try:
+            state.schedule_start(
+                _single_shot,
+                self._retry_top_summary_profile_count,
+                pending_when_already_scheduled=True,
+            )
+        except Exception:
+            self._retry_top_summary_profile_count()
 
     def _retry_top_summary_profile_count(self) -> None:
-        self._top_summary_profile_retry_pending = False
+        pending = self._refresh_runtime.top_summary_profile_retry_state.take_pending_for_scheduled_start(
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
+        if not pending:
+            return
         if self._cleanup_in_progress:
             return
         self._refresh_top_summary()
@@ -543,8 +558,8 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         if profile_count is None:
             self._schedule_top_summary_profile_retry()
         else:
-            self._top_summary_profile_retry_count = 0
-            self._top_summary_profile_retry_pending = False
+            runtime.top_summary_profile_retry_count = 0
+            runtime.top_summary_profile_retry_state.reset()
 
     def _on_top_summary_failed(self, request_id: int, error: str) -> None:
         if request_id != self._refresh_runtime.top_summary_request_id or self._cleanup_in_progress:
@@ -768,8 +783,8 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         if "active_preset_revision" in changed and runtime is not None:
             runtime.additional_settings_dirty = True
             if preset_apply_busy:
-                runtime.top_summary_reload_after_preset_apply_pending = True
-                runtime.additional_settings_reload_after_preset_apply_pending = True
+                runtime.queue_top_summary_preset_apply_reload()
+                runtime.queue_additional_settings_preset_apply_reload()
             else:
                 self._schedule_top_summary_reload_after_preset_switch()
                 self._schedule_additional_settings_reload_after_preset_switch()
@@ -800,11 +815,9 @@ class Zapret1ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
         if runtime_status_changed:
             self.set_loading(bool(state.launch_busy), str(state.launch_busy_text or ""))
             if runtime is not None and not preset_apply_busy:
-                if bool(getattr(runtime, "top_summary_reload_after_preset_apply_pending", False)):
-                    runtime.top_summary_reload_after_preset_apply_pending = False
+                if runtime.take_top_summary_preset_apply_reload():
                     self._schedule_top_summary_reload_after_preset_switch()
-                if bool(getattr(runtime, "additional_settings_reload_after_preset_apply_pending", False)):
-                    runtime.additional_settings_reload_after_preset_apply_pending = False
+                if runtime.take_additional_settings_preset_apply_reload():
                     self._schedule_additional_settings_reload_after_preset_switch()
         if not changed or "last_status_message" in changed:
             self._refresh_last_status_message(state)
