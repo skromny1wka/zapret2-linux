@@ -120,6 +120,7 @@ def build_hosts_status_section(
         status=status_text,
     )
     set_state_text(status_label, status_accessible_text)
+    set_state_text(status_card, status_accessible_text)
     set_control_accessibility(
         status_card,
         name=status_accessible_text,

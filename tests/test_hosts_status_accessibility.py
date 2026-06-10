@@ -47,10 +47,12 @@ class HostsStatusAccessibilityTests(unittest.TestCase):
         self.assertEqual(active_widgets.status_label.accessibleName(), "Статус hosts: Активно 3 доменов")
         self.assertEqual(active_widgets.status_dot.accessibleName(), "Индикатор hosts: есть активные домены")
         self.assertEqual(active_widgets.card.accessibleName(), "Статус hosts: Активно 3 доменов")
+        self.assertEqual(active_widgets.card.property("screenReaderStateText"), "Статус hosts: Активно 3 доменов")
 
         self.assertEqual(inactive_widgets.status_label.accessibleName(), "Статус hosts: Нет активных")
         self.assertEqual(inactive_widgets.status_dot.accessibleName(), "Индикатор hosts: нет активных доменов")
         self.assertEqual(inactive_widgets.card.accessibleName(), "Статус hosts: Нет активных")
+        self.assertEqual(inactive_widgets.card.property("screenReaderStateText"), "Статус hosts: Нет активных")
 
     def test_adobe_switch_reads_current_state(self) -> None:
         widgets = build_hosts_adobe_section(
