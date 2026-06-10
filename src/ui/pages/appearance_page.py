@@ -15,6 +15,7 @@ from ui.pages.appearance_page_lower_build import (
     build_performance_section,
     update_holiday_checkbox_accessibility,
     update_opacity_slider_accessibility,
+    update_opacity_value_label_accessibility,
 )
 from ui.pages.appearance_page_runtime_helpers import (
     apply_appearance_language,
@@ -1379,6 +1380,7 @@ class AppearancePage(BasePage):
         # Обновляем лейбл
         if self._opacity_label:
             self._opacity_label.setText(f"{value}%")
+            update_opacity_value_label_accessibility(self._opacity_label, value)
 
         self._request_appearance_save("window_opacity", int(value))
         self._on_opacity_changed_callback(int(value))
@@ -1714,6 +1716,7 @@ class AppearancePage(BasePage):
             update_opacity_slider_accessibility(self._opacity_slider, value)
         if self._opacity_label:
             self._opacity_label.setText(f"{value}%")
+            update_opacity_value_label_accessibility(self._opacity_label, value)
 
     def _current_appearance_state(self) -> tuple[bool, bool, bool, int]:
         store = self._ui_state_store

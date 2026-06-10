@@ -245,6 +245,7 @@ def build_opacity_section(
     opacity_label = caption_label_cls(f"{initial_opacity}%")
     opacity_label.setMinimumWidth(40)
     opacity_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+    update_opacity_value_label_accessibility(opacity_label, initial_opacity)
     opacity_row.addWidget(opacity_label)
     opacity_layout.addLayout(opacity_row)
 
@@ -358,3 +359,16 @@ def update_opacity_slider_accessibility(slider, value: object | None = None) -> 
         name=state,
         description=description or "Настройка прозрачности окна приложения.",
     )
+
+
+def update_opacity_value_label_accessibility(label, value: object | None = None) -> None:
+    if label is None:
+        return
+    try:
+        current_value = int(value)
+    except Exception:
+        try:
+            current_value = int(str(label.text() or "").strip().rstrip("%"))
+        except Exception:
+            current_value = 100
+    set_state_text(label, f"Текущее значение прозрачности окна: {current_value}%")

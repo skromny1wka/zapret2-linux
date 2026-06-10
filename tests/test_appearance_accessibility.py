@@ -133,6 +133,11 @@ class AppearanceAccessibilityTests(unittest.TestCase):
 
         self.assertEqual(widgets.opacity_slider.accessibleName(), "Прозрачность окна, значение: 72%")
         self.assertIn("Настройка прозрачности", widgets.opacity_slider.accessibleDescription())
+        self.assertEqual(widgets.opacity_label.accessibleName(), "Текущее значение прозрачности окна: 72%")
+        self.assertEqual(
+            widgets.opacity_label.property("screenReaderStateText"),
+            "Текущее значение прозрачности окна: 72%",
+        )
 
         widgets.opacity_slider.setValue(85)
 
@@ -140,6 +145,22 @@ class AppearanceAccessibilityTests(unittest.TestCase):
         self.assertEqual(
             widgets.opacity_slider.property("screenReaderStateText"),
             "Прозрачность окна, значение: 85%",
+        )
+
+        from ui.pages.appearance_page import AppearancePage
+
+        page_for_update = AppearancePage.__new__(AppearancePage)
+        page_for_update._opacity_label = widgets.opacity_label
+        page_for_update._is_ui_syncing = lambda: False
+        page_for_update._request_appearance_save = lambda *_args, **_kwargs: None
+        page_for_update._on_opacity_changed_callback = lambda _value: None
+
+        AppearancePage._on_opacity_changed(page_for_update, 64)
+
+        self.assertEqual(widgets.opacity_label.accessibleName(), "Текущее значение прозрачности окна: 64%")
+        self.assertEqual(
+            widgets.opacity_label.property("screenReaderStateText"),
+            "Текущее значение прозрачности окна: 64%",
         )
 
     def test_holiday_switches_read_premium_limit_and_state(self) -> None:
