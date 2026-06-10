@@ -1918,10 +1918,9 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertIn(".cancel()", source)
 
     def test_stale_profile_load_worker_finished_does_not_schedule_refresh(self) -> None:
-        old_worker = object()
-        current_worker = object()
+        old_worker = SimpleNamespace(_request_id=6)
         page = PresetSetupPageBase.__new__(PresetSetupPageBase)
-        page._profile_load_runtime_worker = current_worker
+        page._profile_load_runtime_request_id = 7
         page._profile_load_refresh_pending = True
         page._profile_payload_dirty = True
         page._cleanup_in_progress = False
@@ -1931,7 +1930,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         PresetSetupPageBase._on_profile_worker_finished(page, old_worker)
 
-        self.assertIs(page._profile_load_runtime_worker, current_worker)
+        self.assertEqual(page._profile_load_runtime_request_id, 7)
         self.assertTrue(page._profile_load_refresh_pending)
         page._schedule_profiles_payload_request.assert_not_called()
 

@@ -119,6 +119,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         init_source = inspect.getsource(PresetSetupPageBase.__init__)
         request_source = inspect.getsource(PresetSetupPageBase._request_profiles_payload)
         run_source = inspect.getsource(PresetSetupPageBase._run_scheduled_profiles_payload_request)
+        finished_source = inspect.getsource(PresetSetupPageBase._on_profile_worker_finished)
+        cleanup_source = inspect.getsource(PresetSetupPageBase.cleanup)
 
         self.assertNotIn(".list_profiles(", refresh_source)
         self.assertIn("_schedule_profiles_payload_request(force=True)", refresh_source)
@@ -129,6 +131,11 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_request_profiles_payload", run_source)
         self.assertIn("_profile_payload_dirty", request_source)
         self.assertIn("_profile_payload_loaded_once", request_source)
+        self.assertIn("_profile_load_runtime_request_id", request_source)
+        self.assertNotIn("_profile_load_runtime_worker", init_source)
+        self.assertNotIn("_profile_load_runtime_worker", request_source)
+        self.assertNotIn("_profile_load_runtime_worker", finished_source)
+        self.assertNotIn("_profile_load_runtime_worker", cleanup_source)
 
     def test_preset_setup_page_refreshes_after_active_preset_content_change_signal(self) -> None:
         init_source = inspect.getsource(PresetSetupPageBase.__init__)

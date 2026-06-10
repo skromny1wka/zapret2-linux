@@ -115,7 +115,7 @@ class PresetSetupPageBase(BasePage):
         self._toolbar_actions_bar = None
         self._profile_load_request_id = 0
         self._profile_load_runtime = OneShotWorkerRuntime()
-        self._profile_load_runtime_worker = None
+        self._profile_load_runtime_request_id = 0
         self._profile_context_action_request_id = 0
         self._profile_context_action_runtime = OneShotWorkerRuntime()
         self._profile_context_action_runtime_worker = None
@@ -329,7 +329,7 @@ class PresetSetupPageBase(BasePage):
             worker.loaded.connect(self._on_profile_payload_loaded)
             worker.failed.connect(self._on_profile_payload_failed)
 
-        _request_id, worker = runtime.start_qthread_worker(
+        runtime.start_qthread_worker(
             worker_factory=lambda _runtime_request_id: self._create_profile_list_load_worker(
                 request_id,
                 self.launch_method,
@@ -339,7 +339,7 @@ class PresetSetupPageBase(BasePage):
             bind_worker=_bind_worker,
             on_finished=self._on_profile_worker_finished,
         )
-        self._profile_load_runtime_worker = worker
+        self._profile_load_runtime_request_id = request_id
 
     def _profile_list_view_state_options(self) -> dict[str, object]:
         profiles_list = self.__dict__.get("_profiles_list")
@@ -408,11 +408,24 @@ class PresetSetupPageBase(BasePage):
         )
 
     def _on_profile_worker_finished(self, worker) -> None:
-        if not self._accept_current_preset_setup_worker_finished("_profile_load_runtime_worker", worker):
+        if not self._accept_current_profile_load_worker_finished(worker):
             return
         self._profile_load_refresh_pending = False
         if self._profile_payload_dirty and not self._cleanup_in_progress:
             self._schedule_profiles_payload_request(force=True)
+
+    def _accept_current_profile_load_worker_finished(self, worker) -> bool:
+        request_id = getattr(worker, "_request_id", None)
+        if request_id is None:
+            return False
+        try:
+            current_request_id = int(self.__dict__.get("_profile_load_runtime_request_id", 0) or 0)
+            if int(request_id) != current_request_id:
+                return False
+        except (TypeError, ValueError):
+            return False
+        self._profile_load_runtime_request_id = 0
+        return True
 
     def _apply_payload(self, payload, *, view_state=None, apply_signature_base=None) -> None:
         if self._content_host_layout is None:
@@ -1928,7 +1941,7 @@ class PresetSetupPageBase(BasePage):
                 warning_prefix=label,
             )
             runtime.cancel()
-        self._profile_load_runtime_worker = None
+        self._profile_load_runtime_request_id = 0
         self._profile_context_action_runtime_worker = None
         self._profile_move_runtime_worker = None
         self._profile_folder_action_runtime_worker = None
