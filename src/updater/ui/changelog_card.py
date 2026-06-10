@@ -193,6 +193,19 @@ class ChangelogCard(CardWidget):
             description="Запускает установку доступного обновления.",
         )
         set_state_text(self.install_btn, install_name)
+        self._update_progress_accessibility()
+
+    def _update_progress_accessibility(self) -> None:
+        self._set_label_state(self.progress_label, "Ход скачивания обновления")
+        self._set_label_state(self.speed_label, "Скорость скачивания обновления")
+        self._set_label_state(self.eta_label, "Осталось до завершения обновления")
+
+    def _set_label_state(self, label, prefix: str) -> None:
+        try:
+            value = str(label.text() or "").strip()
+        except Exception:
+            value = ""
+        set_state_text(label, f"{prefix}: {value or '—'}")
 
     def _apply_theme(self, tokens=None, force: bool = False) -> None:
         _ = force

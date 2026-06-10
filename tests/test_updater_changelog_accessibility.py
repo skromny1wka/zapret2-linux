@@ -31,6 +31,27 @@ class UpdaterChangelogAccessibilityTests(unittest.TestCase):
         self.assertEqual(card.install_btn.property("screenReaderStateText"), "Установить обновление 9.9.9")
         self.assertIn("установку", card.install_btn.accessibleDescription().lower())
 
+    def test_download_progress_labels_have_screen_reader_state_text(self) -> None:
+        card = ChangelogCard(language="ru")
+
+        card.start_download("9.9.9")
+
+        self.assertEqual(card.progress_label.accessibleName(), "Ход скачивания обновления: 0%")
+        self.assertEqual(
+            card.progress_label.property("screenReaderStateText"),
+            "Ход скачивания обновления: 0%",
+        )
+        self.assertEqual(card.speed_label.accessibleName(), "Скорость скачивания обновления: Скорость: —")
+        self.assertEqual(
+            card.speed_label.property("screenReaderStateText"),
+            "Скорость скачивания обновления: Скорость: —",
+        )
+        self.assertEqual(card.eta_label.accessibleName(), "Осталось до завершения обновления: Осталось: —")
+        self.assertEqual(
+            card.eta_label.property("screenReaderStateText"),
+            "Осталось до завершения обновления: Осталось: —",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
