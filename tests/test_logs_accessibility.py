@@ -43,6 +43,7 @@ class _FakeLogCombo:
         self.current_index = -1
         self.accessible_name = ""
         self.accessible_description = ""
+        self.properties = {}
 
     def blockSignals(self, _blocked: bool) -> None:  # noqa: N802
         pass
@@ -68,6 +69,12 @@ class _FakeLogCombo:
 
     def setAccessibleDescription(self, text: str) -> None:  # noqa: N802
         self.accessible_description = str(text)
+
+    def property(self, name: str) -> object:
+        return self.properties.get(name)
+
+    def setProperty(self, name: str, value: object) -> None:  # noqa: N802
+        self.properties[name] = value
 
 
 class LogsAccessibilityTests(unittest.TestCase):
@@ -131,6 +138,10 @@ class LogsAccessibilityTests(unittest.TestCase):
 
         self.assertEqual(page.log_combo.accessible_name, "Выбор файла лога, выбрано: current.log")
         self.assertEqual(page.log_combo.accessible_description, "Доступных файлов логов: 2.")
+        self.assertEqual(
+            page.log_combo.property("screenReaderStateText"),
+            "Выбор файла лога, выбрано: current.log",
+        )
 
     def test_send_status_label_updates_screen_reader_state(self) -> None:
         label = _FakeLabel()

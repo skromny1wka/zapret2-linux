@@ -956,6 +956,7 @@ class LogsPage(BasePage):
             )
             if current_display:
                 combo_name = f"{combo_name}, выбрано: {current_display}"
+            set_state_text(self.log_combo, combo_name)
             set_control_accessibility(
                 self.log_combo,
                 name=combo_name,
