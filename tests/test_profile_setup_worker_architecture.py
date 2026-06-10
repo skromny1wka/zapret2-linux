@@ -202,6 +202,27 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
         self.assertEqual(callbacks, [])
         self.assertTrue(page._setup_load_dirty)
 
+    def test_profile_setup_load_queue_uses_shared_latest_worker_state(self) -> None:
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
+        page._setup_load_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+
+        init_source = inspect.getsource(ProfileSetupPageBase.__init__)
+        request_source = inspect.getsource(ProfileSetupPageBase._request_profile_setup_payload)
+        finished_source = inspect.getsource(ProfileSetupPageBase._on_profile_setup_worker_finished)
+        cleanup_source = inspect.getsource(ProfileSetupPageBase.cleanup)
+
+        self.assertTrue(hasattr(ProfileSetupPageBase, "_setup_load_state_obj"))
+        self.assertIsInstance(page._setup_load_state_obj(), LatestValueWorkerState)
+        self.assertIn("_setup_load_state = LatestValueWorkerState", init_source)
+        self.assertIn("_setup_load_state_obj()", request_source)
+        self.assertIn("_setup_load_state_obj()", finished_source)
+        self.assertIn("_setup_load_state_obj().reset()", cleanup_source)
+        self.assertNotIn("self._setup_load_dirty = False", init_source)
+        self.assertNotIn("self._setup_load_start_scheduled = False", init_source)
+
     def test_list_file_reload_invalidates_running_load_result(self) -> None:
         from profile.ui.profile_setup_page import ProfileSetupPageBase
 

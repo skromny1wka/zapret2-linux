@@ -1010,8 +1010,10 @@ class ProfileSetupPageBase(BasePage):
         self._setup_load_runtime = OneShotWorkerRuntime()
         self._setup_load_request_id = 0
         self._setup_load_runtime_worker = None
-        self._setup_load_dirty = False
-        self._setup_load_start_scheduled = False
+        self._setup_load_state = LatestValueWorkerState(
+            self._setup_load_runtime,
+            empty_value=False,
+        )
         self._list_file_load_runtime = OneShotWorkerRuntime()
         self._list_file_load_request_id = 0
         self._list_file_load_runtime_worker = None
@@ -2505,10 +2507,9 @@ class ProfileSetupPageBase(BasePage):
     def _request_profile_setup_payload(self) -> None:
         if not self._profile_key:
             return
-        runtime = self._worker_runtime("_setup_load_runtime")
-        if runtime.is_running() or self.__dict__.get("_setup_load_start_scheduled", False):
+        if self._setup_load_state_obj().is_busy():
             self._setup_load_request_id += 1
-            self._setup_load_dirty = True
+            self._setup_load_state_obj().pending = True
             return
 
         self._start_profile_setup_load_worker()
@@ -2537,7 +2538,7 @@ class ProfileSetupPageBase(BasePage):
     def _on_profile_setup_payload_loaded(self, request_id: int, payload) -> None:
         if request_id != self._setup_load_request_id:
             return
-        if self.__dict__.get("_setup_load_dirty"):
+        if self._setup_load_state_obj().has_pending():
             return
         payload, apply_signature = _profile_setup_payload_and_apply_signature(payload)
         if payload is None:
@@ -2584,8 +2585,8 @@ class ProfileSetupPageBase(BasePage):
         if payload is None or self.__dict__.get("_cleanup_in_progress"):
             return
         if (
-            self.__dict__.get("_setup_load_dirty")
-            or self.__dict__.get("_setup_load_start_scheduled", False)
+            self._setup_load_state_obj().has_pending()
+            or self._setup_load_state_obj().start_scheduled
         ):
             return
         if (
@@ -2602,8 +2603,8 @@ class ProfileSetupPageBase(BasePage):
         if request_id != self._setup_load_request_id:
             return
         if (
-            self.__dict__.get("_setup_load_dirty")
-            or self.__dict__.get("_setup_load_start_scheduled", False)
+            self._setup_load_state_obj().has_pending()
+            or self._setup_load_state_obj().start_scheduled
         ):
             return
         log(f"{self.__class__.__name__}: не удалось прочитать профиль {self._profile_key}: {error}", "ERROR")
@@ -2616,26 +2617,65 @@ class ProfileSetupPageBase(BasePage):
     def _on_profile_setup_worker_finished(self, _worker) -> None:
         if not self._accept_current_profile_setup_worker_finished("_setup_load_runtime_worker", _worker):
             return
-        if self.__dict__.get("_setup_load_dirty") and not self.__dict__.get("_cleanup_in_progress", False):
+        if self._setup_load_state_obj().has_pending() and not self.__dict__.get("_cleanup_in_progress", False):
             self._schedule_profile_setup_load_start()
 
     def _schedule_profile_setup_load_start(self) -> None:
-        if self.__dict__.get("_setup_load_start_scheduled", False):
-            return
-        self._setup_load_start_scheduled = True
-        try:
-            QTimer.singleShot(0, self._run_scheduled_profile_setup_load_start)
-        except Exception:
-            self._run_scheduled_profile_setup_load_start()
+        state = self._setup_load_state_obj()
+        state.pending = True
+
+        def _single_shot(delay: int, callback) -> None:
+            try:
+                QTimer.singleShot(delay, callback)
+            except Exception:
+                callback()
+
+        state.schedule_start(
+            _single_shot,
+            self._run_scheduled_profile_setup_load_start,
+            pending_when_already_scheduled=True,
+        )
 
     def _run_scheduled_profile_setup_load_start(self) -> None:
-        self._setup_load_start_scheduled = False
-        if self.__dict__.get("_cleanup_in_progress", False):
+        pending = self._setup_load_state_obj().take_pending_for_scheduled_start(
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
+        if not pending:
             return
-        if not self.__dict__.get("_setup_load_dirty"):
-            return
-        self._setup_load_dirty = False
         self._request_profile_setup_payload()
+
+    def _setup_load_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_setup_load_state")
+        runtime = self.__dict__.get("_setup_load_runtime")
+        if state is None:
+            pending = bool(self.__dict__.pop("_setup_load_dirty", False))
+            start_scheduled = bool(self.__dict__.pop("_setup_load_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=False,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_setup_load_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _setup_load_dirty(self) -> bool:
+        return bool(self._setup_load_state_obj().pending)
+
+    @_setup_load_dirty.setter
+    def _setup_load_dirty(self, value: bool) -> None:
+        self._setup_load_state_obj().pending = bool(value)
+
+    @property
+    def _setup_load_start_scheduled(self) -> bool:
+        return bool(self._setup_load_state_obj().start_scheduled)
+
+    @_setup_load_start_scheduled.setter
+    def _setup_load_start_scheduled(self, value: bool) -> None:
+        self._setup_load_state_obj().start_scheduled = bool(value)
 
     def _restore_loaded_payload_header(self, payload) -> None:
         item = getattr(payload, "item", None)
@@ -4333,8 +4373,7 @@ class ProfileSetupPageBase(BasePage):
         ):
             setattr(self, attr, None)
         self._list_file_state_apply_scheduled = False
-        self._setup_load_dirty = False
-        self._setup_load_start_scheduled = False
+        self._setup_load_state_obj().reset()
         self._list_file_load_state_obj().reset()
         self._list_file_validation_state_obj().reset()
         self._list_file_save_state_obj().reset()
