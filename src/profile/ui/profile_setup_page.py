@@ -1019,7 +1019,7 @@ class ProfileSetupPageBase(BasePage):
         self._loading = False
         self._setup_load_runtime = OneShotWorkerRuntime()
         self._setup_load_request_id = 0
-        self._setup_load_runtime_worker = None
+        self._setup_load_runtime_request_id = 0
         self._setup_load_state = LatestValueWorkerState(
             self._setup_load_runtime,
             empty_value=False,
@@ -2692,7 +2692,7 @@ class ProfileSetupPageBase(BasePage):
         set_widget_text_if_changed(self._summary, "Загрузка profile...")
         set_widget_enabled_if_changed(self._enabled_checkbox, False)
         runtime = self._worker_runtime("_setup_load_runtime")
-        started = runtime.start_qthread_worker(
+        runtime.start_qthread_worker(
             worker_factory=lambda _runtime_request_id: self.create_profile_setup_load_worker(
                 request_id,
                 self._profile_key,
@@ -2702,8 +2702,7 @@ class ProfileSetupPageBase(BasePage):
             on_failed=self._on_profile_setup_payload_failed,
             on_finished=self._on_profile_setup_worker_finished,
         )
-        worker = started[1] if isinstance(started, tuple) and len(started) > 1 else getattr(runtime, "worker", None)
-        self._setup_load_runtime_worker = worker
+        self._setup_load_runtime_request_id = request_id
 
     def _on_profile_setup_payload_loaded(self, request_id: int, payload) -> None:
         if request_id != self._setup_load_request_id:
@@ -2785,10 +2784,23 @@ class ProfileSetupPageBase(BasePage):
         set_widget_enabled_if_changed(self._enabled_checkbox, False)
 
     def _on_profile_setup_worker_finished(self, _worker) -> None:
-        if not self._accept_current_profile_setup_worker_finished("_setup_load_runtime_worker", _worker):
+        if not self._accept_current_profile_setup_load_worker_finished(_worker):
             return
         if self._setup_load_state_obj().has_pending() and not self.__dict__.get("_cleanup_in_progress", False):
             self._schedule_profile_setup_load_start()
+
+    def _accept_current_profile_setup_load_worker_finished(self, worker) -> bool:
+        request_id = getattr(worker, "_request_id", None)
+        if request_id is None:
+            return False
+        try:
+            current_request_id = int(self.__dict__.get("_setup_load_runtime_request_id", 0) or 0)
+            if int(request_id) != current_request_id:
+                return False
+        except (TypeError, ValueError):
+            return False
+        self._setup_load_runtime_request_id = 0
+        return True
 
     def _schedule_profile_setup_load_start(self) -> None:
         state = self._setup_load_state_obj()
@@ -4580,6 +4592,7 @@ class ProfileSetupPageBase(BasePage):
             runtime.cancel()
         self._strategy_apply_runtime_strategy_id = ""
         self._enabled_save_runtime_enabled = None
+        self._setup_load_runtime_request_id = 0
         self._list_file_load_runtime_worker = None
         self._list_file_save_runtime_worker = None
         self._list_file_validation_runtime_worker = None

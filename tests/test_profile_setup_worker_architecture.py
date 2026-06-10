@@ -136,7 +136,7 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
     def test_profile_setup_pending_reload_starts_after_worker_signal(self) -> None:
         from profile.ui.profile_setup_page import ProfileSetupPageBase
 
-        worker = object()
+        worker = SimpleNamespace(_request_id=1)
         runtime = SimpleNamespace(
             is_running=Mock(return_value=False),
             start_qthread_worker=Mock(return_value=(1, worker)),
@@ -144,8 +144,8 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
         page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
         page._profile_key = "profile-1"
         page._setup_load_runtime = runtime
-        page._setup_load_runtime_worker = worker
-        page._setup_load_request_id = 0
+        page._setup_load_runtime_request_id = 1
+        page._setup_load_request_id = 2
         page._setup_load_dirty = True
         page._setup_load_start_scheduled = False
         page._cleanup_in_progress = False
@@ -173,8 +173,7 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
     def test_stale_profile_setup_worker_finished_does_not_restart_pending_reload(self) -> None:
         from profile.ui.profile_setup_page import ProfileSetupPageBase
 
-        current_worker = object()
-        stale_worker = object()
+        stale_worker = SimpleNamespace(_request_id=3)
         runtime = SimpleNamespace(
             is_running=Mock(return_value=False),
             start_qthread_worker=Mock(),
@@ -182,8 +181,8 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
         page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
         page._profile_key = "profile-1"
         page._setup_load_runtime = runtime
-        page._setup_load_runtime_worker = current_worker
-        page._setup_load_request_id = 4
+        page._setup_load_runtime_request_id = 4
+        page._setup_load_request_id = 5
         page._setup_load_dirty = True
         page._setup_load_start_scheduled = False
         page._cleanup_in_progress = False
@@ -211,6 +210,7 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
 
         init_source = inspect.getsource(ProfileSetupPageBase.__init__)
         request_source = inspect.getsource(ProfileSetupPageBase._request_profile_setup_payload)
+        start_source = inspect.getsource(ProfileSetupPageBase._start_profile_setup_load_worker)
         finished_source = inspect.getsource(ProfileSetupPageBase._on_profile_setup_worker_finished)
         cleanup_source = inspect.getsource(ProfileSetupPageBase.cleanup)
 
@@ -220,6 +220,12 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("_setup_load_state_obj()", request_source)
         self.assertIn("_setup_load_state_obj()", finished_source)
         self.assertIn("_setup_load_state_obj().reset()", cleanup_source)
+        self.assertIn("_setup_load_runtime_request_id", start_source)
+        self.assertIn("_setup_load_runtime_request_id = 0", cleanup_source)
+        self.assertNotIn("_setup_load_runtime_worker", init_source)
+        self.assertNotIn("_setup_load_runtime_worker", start_source)
+        self.assertNotIn("_setup_load_runtime_worker", finished_source)
+        self.assertNotIn("_setup_load_runtime_worker", cleanup_source)
         self.assertNotIn("self._setup_load_dirty = False", init_source)
         self.assertNotIn("self._setup_load_start_scheduled = False", init_source)
 
