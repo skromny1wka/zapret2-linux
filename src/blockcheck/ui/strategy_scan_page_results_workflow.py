@@ -116,10 +116,17 @@ def add_strategy_result_row(
 
 
 def _strategy_result_accessible_text(row_plan) -> str:
+    number = str(getattr(row_plan, "number_text", "") or "").strip()
     name = str(getattr(row_plan, "strategy_name", "") or "").strip()
     status = str(getattr(row_plan, "status_text", "") or "").strip()
     time_text = str(getattr(row_plan, "time_text", "") or "").strip() or "-"
-    return f"Стратегия {name}, статус {status}, время {time_text}"
+    parts = []
+    if number:
+        parts.append(f"Строка {number}")
+    parts.append(f"Стратегия {name}, статус {status}, время {time_text}")
+    if bool(getattr(row_plan, "can_apply", False)):
+        parts.append("Доступно действие: применить")
+    return ". ".join(parts) + "."
 
 
 def _set_strategy_scan_status(status_label, text: object) -> None:

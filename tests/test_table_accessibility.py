@@ -46,9 +46,10 @@ class TableAccessibilityTests(unittest.TestCase):
             on_apply_strategy=lambda _args, _name: None,
         )
 
-        expected = "Стратегия TLS fake, статус OK, время 120 ms"
+        expected = "Строка 1. Стратегия TLS fake, статус OK, время 120 ms. Доступно действие: применить."
         self.assertEqual(table.item(0, 1).data(Qt.ItemDataRole.AccessibleTextRole), expected)
         self.assertEqual(table.item(0, 2).data(Qt.ItemDataRole.AccessibleTextRole), expected)
+        self.assertEqual(table.item(0, 3).data(Qt.ItemDataRole.AccessibleTextRole), expected)
         self.assertEqual(table.cellWidget(0, 4).accessibleName(), "Применить стратегию TLS fake")
 
     def test_updater_server_row_has_screen_reader_text(self) -> None:
