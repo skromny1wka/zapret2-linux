@@ -19,13 +19,46 @@ class PresetSummaryRefreshRuntimeTests(unittest.TestCase):
 
         self.assertIn("OneShotWorkerRuntime", init_source)
         self.assertIn("_summary_runtime", class_source)
-        self.assertIn("_summary_runtime.is_running()", request_source)
+        self.assertIn("state.is_busy()", request_source)
         self.assertIn("start_qthread_worker", start_source)
         self.assertNotIn("worker.start()", start_source)
         self.assertNotIn("self._worker", class_source)
         self.assertNotIn("worker.deleteLater()", finish_source)
         self.assertIn("_summary_runtime.stop", cleanup_source)
         self.assertIn("_summary_runtime.cancel", cleanup_source)
+
+    def test_summary_refresh_queue_lives_in_latest_worker_state(self) -> None:
+        from presets.display_state_refresh import PresetProfileStrategySummaryRefreshRuntime
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        runtime = PresetProfileStrategySummaryRefreshRuntime.__new__(
+            PresetProfileStrategySummaryRefreshRuntime
+        )
+        runtime._summary_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+
+        init_source = inspect.getsource(PresetProfileStrategySummaryRefreshRuntime.__init__)
+        request_source = inspect.getsource(PresetProfileStrategySummaryRefreshRuntime.request_refresh)
+        start_source = inspect.getsource(PresetProfileStrategySummaryRefreshRuntime._start_worker)
+        loaded_source = inspect.getsource(PresetProfileStrategySummaryRefreshRuntime._on_summary_loaded)
+        failed_source = inspect.getsource(PresetProfileStrategySummaryRefreshRuntime._on_summary_failed)
+        finished_source = inspect.getsource(PresetProfileStrategySummaryRefreshRuntime._on_worker_finished)
+        run_source = inspect.getsource(PresetProfileStrategySummaryRefreshRuntime._run_scheduled_refresh_start)
+        cleanup_source = inspect.getsource(PresetProfileStrategySummaryRefreshRuntime.cleanup)
+
+        self.assertIsInstance(
+            PresetProfileStrategySummaryRefreshRuntime._summary_state_obj(runtime),
+            LatestValueWorkerState,
+        )
+        self.assertIn("_summary_state = LatestValueWorkerState", init_source)
+        self.assertIn("_summary_state_obj()", request_source)
+        self.assertIn("_summary_state_obj()", start_source)
+        self.assertIn("state_obj.has_pending()", loaded_source)
+        self.assertIn("state.has_pending()", failed_source)
+        self.assertIn("state.has_pending()", finished_source)
+        self.assertIn("state.start_scheduled", run_source)
+        self.assertIn("_summary_state_obj().reset()", cleanup_source)
+        self.assertNotIn("self._pending = False", init_source)
+        self.assertNotIn("self._start_scheduled = False", init_source)
 
     def test_cleanup_does_not_wait_for_summary_refresh_worker(self) -> None:
         from presets.display_state_refresh import PresetProfileStrategySummaryRefreshRuntime

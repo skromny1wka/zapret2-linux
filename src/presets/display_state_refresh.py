@@ -6,6 +6,7 @@ from PyQt6.QtCore import QObject, QThread, QTimer, pyqtSignal
 
 from log.log import log
 from settings.mode import is_preset_launch_method, normalize_launch_method
+from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 
 
@@ -60,22 +61,25 @@ class PresetProfileStrategySummaryRefreshRuntime(QObject):
         self._state_store = state_store
         self._get_launch_method = get_launch_method
         self._summary_runtime = OneShotWorkerRuntime()
-        self._pending = False
-        self._start_scheduled = False
+        self._summary_state = LatestValueWorkerState(
+            self._summary_runtime,
+            empty_value=False,
+        )
 
     def request_refresh(self) -> None:
         method = normalize_launch_method(self._get_launch_method(), default="")
         if not method or not is_preset_launch_method(method):
             return
 
-        if self._summary_runtime.is_running() or self.__dict__.get("_start_scheduled", False):
-            self._pending = True
+        state = self._summary_state_obj()
+        if state.is_busy():
+            state.pending = True
             return
 
         self._start_worker(method)
 
     def _start_worker(self, method: str) -> None:
-        self._pending = False
+        self._summary_state_obj().pending = False
         self._summary_runtime.start_qthread_worker(
             worker_factory=lambda request_id: PresetProfileStrategySummaryWorker(
                 request_id,
@@ -91,7 +95,8 @@ class PresetProfileStrategySummaryRefreshRuntime(QObject):
     def _on_summary_loaded(self, request_id: int, state) -> None:
         if not self._summary_runtime.is_current(request_id):
             return
-        if self.__dict__.get("_pending", False):
+        state_obj = self._summary_state_obj()
+        if state_obj.has_pending():
             return
         from presets.display_state import publish_profile_strategy_summary_in_store
 
@@ -103,14 +108,16 @@ class PresetProfileStrategySummaryRefreshRuntime(QObject):
     def _on_summary_failed(self, request_id: int, error: str) -> None:
         if not self._summary_runtime.is_current(request_id):
             return
-        if self.__dict__.get("_pending", False):
+        state = self._summary_state_obj()
+        if state.has_pending():
             return
         log(f"Preset summary refresh skipped: {error}", "DEBUG")
 
     def _on_worker_finished(self, worker) -> None:
         if not self._is_current_worker_finish(worker):
             return
-        if self._pending:
+        state = self._summary_state_obj()
+        if state.has_pending():
             self._schedule_refresh_start()
 
     def _is_current_worker_finish(self, worker) -> bool:
@@ -127,20 +134,54 @@ class PresetProfileStrategySummaryRefreshRuntime(QObject):
             return False
 
     def _schedule_refresh_start(self) -> None:
-        if self.__dict__.get("_start_scheduled", False):
+        state = self._summary_state_obj()
+        if state.start_scheduled:
             return
-        self._start_scheduled = True
+        state.start_scheduled = True
         QTimer.singleShot(0, self._run_scheduled_refresh_start)
 
     def _run_scheduled_refresh_start(self) -> None:
-        self._start_scheduled = False
-        if not self._pending:
+        state = self._summary_state_obj()
+        state.start_scheduled = False
+        if not state.has_pending():
             return
         self.request_refresh()
 
+    def _summary_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_summary_state")
+        runtime = self.__dict__.get("_summary_runtime")
+        if state is None:
+            pending = bool(self.__dict__.pop("_pending", False))
+            start_scheduled = bool(self.__dict__.pop("_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=False,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_summary_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _pending(self) -> bool:
+        return bool(self._summary_state_obj().pending)
+
+    @_pending.setter
+    def _pending(self, value: bool) -> None:
+        self._summary_state_obj().pending = bool(value)
+
+    @property
+    def _start_scheduled(self) -> bool:
+        return bool(self._summary_state_obj().start_scheduled)
+
+    @_start_scheduled.setter
+    def _start_scheduled(self, value: bool) -> None:
+        self._summary_state_obj().start_scheduled = bool(value)
+
     def cleanup(self) -> None:
-        self._pending = False
-        self._start_scheduled = False
+        self._summary_state_obj().reset()
         self._summary_runtime.stop(
             blocking=False,
             log_fn=log,
