@@ -158,6 +158,42 @@ class TelegramProxyDiagnosticsTests(unittest.TestCase):
         self.assertIn("проверьте тип прокси и secret", plan.stats_text)
         self.assertIn("dd/ee", plan.stats_text)
 
+    def test_stats_plan_tells_user_what_to_do_when_media_fallback_fails(self) -> None:
+        stats = ProxyStats(
+            active_connections=1,
+            total_connections=5,
+            bytes_sent=1024,
+            bytes_received=2048,
+        )
+        stats.record_route_event(
+            dc=1,
+            is_media=True,
+            route="Cloudflare",
+            status="ошибка",
+            reason="ConnectionResetError",
+        )
+        stats.record_route_event(
+            dc=203,
+            is_media=False,
+            route="TCP",
+            status="ошибка",
+            reason="TimeoutError",
+        )
+
+        plan = build_stats_plan(
+            stats=stats,
+            prev_sent=0,
+            prev_recv=0,
+            speed_hist_up=(),
+            speed_hist_down=(),
+            interval=2.0,
+        )
+
+        self.assertIn("Что сделать:", plan.stats_text)
+        self.assertIn("смайлики/медиа", plan.stats_text)
+        self.assertIn("включите внешний SOCKS5", plan.stats_text)
+        self.assertIn("свой Worker/CF-домен", plan.stats_text)
+
 
 if __name__ == "__main__":
     unittest.main()

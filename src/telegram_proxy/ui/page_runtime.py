@@ -364,17 +364,36 @@ def build_stats_plan(
             mtproxy_problem_str = f"{mtproxy_problem_str}; последнее: {last_problem}"
 
     recent_route_parts: list[str] = []
+    media_or_cdn_fallback_failed = False
     for event in list(getattr(stats, "route_events", ()) or ())[-3:]:
         dc = int(getattr(event, "dc", 0) or 0)
-        media = "media" if bool(getattr(event, "is_media", False)) else "обычный"
+        is_media = bool(getattr(event, "is_media", False))
+        media = "media" if is_media else "обычный"
         route = str(getattr(event, "route", "") or "?")
         status = str(getattr(event, "status", "") or "?")
         reason = str(getattr(event, "reason", "") or "")
+        route_lower = route.lower()
+        status_lower = status.lower()
+        if (
+            "ошиб" in status_lower
+            and (is_media or dc == 203)
+            and (
+                "cloudflare" in route_lower
+                or route_lower in {"tcp", "tcp fallback"}
+            )
+        ):
+            media_or_cdn_fallback_failed = True
         text = f"DC{dc} {media} {route} {status}"
         if reason:
             text = f"{text}: {reason}"
         recent_route_parts.append(text)
     recent_routes_str = f"  |  Последнее: {'; '.join(recent_route_parts)}" if recent_route_parts else ""
+    user_hint_str = ""
+    if media_or_cdn_fallback_failed:
+        user_hint_str = (
+            "  |  Что сделать: смайлики/медиа упали на запасном пути; "
+            "включите внешний SOCKS5 или настройте свой Worker/CF-домен"
+        )
 
     text = (
         f"Подключения: {getattr(stats, 'active_connections', 0)} акт. / "
@@ -382,7 +401,7 @@ def build_stats_plan(
         f"↑ {_fmt_bytes(now_sent)} ({_fmt_speed(avg_sent, interval)})  "
         f"↓ {_fmt_bytes(now_recv)} ({_fmt_speed(avg_recv, interval)})  |  "
         f"Uptime: {uptime_str}{routes_str}{pool_str}{recv_zero_str}"
-        f"{mtproxy_problem_str}{recent_routes_str}"
+        f"{mtproxy_problem_str}{recent_routes_str}{user_hint_str}"
     )
 
     return TelegramProxyStatsPlan(
