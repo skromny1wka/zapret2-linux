@@ -811,6 +811,27 @@ class HostsPageRuntimeTests(unittest.TestCase):
         page._state_load_runtime.start_qthread_worker.assert_not_called()
         self.assertEqual(page._state_load_pending, {"show_access_errors": True, "update_status": False})
 
+    def test_hosts_state_load_queue_uses_shared_latest_worker_state(self) -> None:
+        from hosts.ui.page import HostsPage
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        page = HostsPage.__new__(HostsPage)
+        page._state_load_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+
+        init_source = inspect.getsource(HostsPage.__init__)
+        request_source = inspect.getsource(HostsPage._request_hosts_state_load)
+        finished_source = inspect.getsource(HostsPage._on_hosts_state_worker_finished)
+        cleanup_source = inspect.getsource(HostsPage.cleanup)
+
+        self.assertTrue(hasattr(HostsPage, "_state_load_state_obj"))
+        self.assertIsInstance(page._state_load_state_obj(), LatestValueWorkerState)
+        self.assertIn("_state_load_state = LatestValueWorkerState", init_source)
+        self.assertIn("_state_load_state_obj()", request_source)
+        self.assertIn("_state_load_state_obj()", finished_source)
+        self.assertIn("_state_load_state_obj().reset()", cleanup_source)
+        self.assertNotIn("self._state_load_pending = {", init_source)
+        self.assertNotIn("self._state_load_start_scheduled = False", init_source)
+
     def test_hosts_state_scheduled_start_merges_latest_pending_flags(self) -> None:
         import hosts.ui.page as hosts_page
         from hosts.ui.page import HostsPage

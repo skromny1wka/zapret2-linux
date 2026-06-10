@@ -157,9 +157,11 @@ class HostsPage(BasePage):
         self._selection_save_runtime = OneShotWorkerRuntime()
         self._selection_save_state = LatestValueWorkerState(self._selection_save_runtime, empty_value=None)
         self._state_load_runtime = OneShotWorkerRuntime()
-        self._state_load_pending = {"show_access_errors": False, "update_status": False}
+        self._state_load_state = LatestValueWorkerState(
+            self._state_load_runtime,
+            empty_value=None,
+        )
         self._state_load_request_context = {"show_access_errors": False, "update_status": False}
-        self._state_load_start_scheduled = False
         self._open_file_runtime = OneShotWorkerRuntime()
         self._open_file_state = LatestValueWorkerState(self._open_file_runtime, empty_value=False)
         self._permission_restore_runtime = OneShotWorkerRuntime()
@@ -1356,13 +1358,13 @@ class HostsPage(BasePage):
             "update_status": bool(update_status),
             "started_at": started_at,
         }
-        if self._state_load_runtime.is_running() or self.__dict__.get("_state_load_start_scheduled", False):
-            self._state_load_pending["show_access_errors"] = (
-                bool(self._state_load_pending.get("show_access_errors")) or bool(show_access_errors)
-            )
-            self._state_load_pending["update_status"] = (
-                bool(self._state_load_pending.get("update_status")) or bool(update_status)
-            )
+        state = self._state_load_state_obj()
+        if self._state_load_runtime.is_running() or state.start_scheduled:
+            pending = dict(state.pending or {})
+            state.pending = {
+                "show_access_errors": bool(pending.get("show_access_errors")) or bool(show_access_errors),
+                "update_status": bool(pending.get("update_status")) or bool(update_status),
+            }
             return
 
         self._state_load_request_context = context
@@ -1383,7 +1385,7 @@ class HostsPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        pending = dict(self.__dict__.get("_state_load_pending") or {})
+        pending = dict(self._state_load_state_obj().pending or {})
         if bool(pending.get("show_access_errors")) or bool(pending.get("update_status")):
             return
         self._runtime_cache.runtime_state = runtime_state
@@ -1400,7 +1402,7 @@ class HostsPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        pending = dict(self.__dict__.get("_state_load_pending") or {})
+        pending = dict(self._state_load_state_obj().pending or {})
         if bool(pending.get("show_access_errors")) or bool(pending.get("update_status")):
             return
         log(f"Hosts: ошибка загрузки состояния: {error}", "ERROR")
@@ -1412,7 +1414,7 @@ class HostsPage(BasePage):
     def _on_hosts_state_worker_finished(self, _worker) -> None:
         if not self._is_current_worker_finish(self.__dict__.get("_state_load_runtime"), _worker):
             return
-        pending = dict(self._state_load_pending or {})
+        pending = dict(self._state_load_state_obj().pending or {})
         if self._cleanup_in_progress:
             return
         if bool(pending.get("show_access_errors")) or bool(pending.get("update_status")):
@@ -1421,17 +1423,19 @@ class HostsPage(BasePage):
     def _schedule_hosts_state_load_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        if self.__dict__.get("_state_load_start_scheduled", False):
-            return
-        self._state_load_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_hosts_state_load_start)
+        self._state_load_state_obj().schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_hosts_state_load_start,
+            pending_when_already_scheduled=self._state_load_state_obj().pending,
+        )
 
     def _run_scheduled_hosts_state_load_start(self) -> None:
-        self._state_load_start_scheduled = False
-        if self.__dict__.get("_cleanup_in_progress", False):
-            return
-        pending = dict(self.__dict__.get("_state_load_pending") or {})
-        self._state_load_pending = {"show_access_errors": False, "update_status": False}
+        pending = dict(
+            self._state_load_state_obj().take_pending_for_scheduled_start(
+                cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+            )
+            or {}
+        )
         show_access_errors = bool(pending.get("show_access_errors"))
         update_status = bool(pending.get("update_status"))
         if not show_access_errors and not update_status:
@@ -1440,6 +1444,63 @@ class HostsPage(BasePage):
             show_access_errors=show_access_errors,
             update_status=update_status,
         )
+
+    def _state_load_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_state_load_state")
+        runtime = self.__dict__.get("_state_load_runtime")
+        if state is None:
+            pending = dict(
+                self.__dict__.pop(
+                    "_state_load_pending",
+                    {"show_access_errors": False, "update_status": False},
+                )
+                or {}
+            )
+            start_scheduled = bool(self.__dict__.pop("_state_load_start_scheduled", False))
+            if not bool(pending.get("show_access_errors")) and not bool(pending.get("update_status")):
+                pending_value = None
+            else:
+                pending_value = {
+                    "show_access_errors": bool(pending.get("show_access_errors")),
+                    "update_status": bool(pending.get("update_status")),
+                }
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=None,
+                pending=pending_value,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_state_load_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _state_load_pending(self) -> dict[str, bool]:
+        pending = dict(self._state_load_state_obj().pending or {})
+        return {
+            "show_access_errors": bool(pending.get("show_access_errors")),
+            "update_status": bool(pending.get("update_status")),
+        }
+
+    @_state_load_pending.setter
+    def _state_load_pending(self, value: dict[str, bool]) -> None:
+        pending = dict(value or {})
+        if not bool(pending.get("show_access_errors")) and not bool(pending.get("update_status")):
+            self._state_load_state_obj().pending = None
+            return
+        self._state_load_state_obj().pending = {
+            "show_access_errors": bool(pending.get("show_access_errors")),
+            "update_status": bool(pending.get("update_status")),
+        }
+
+    @property
+    def _state_load_start_scheduled(self) -> bool:
+        return bool(self._state_load_state_obj().start_scheduled)
+
+    @_state_load_start_scheduled.setter
+    def _state_load_start_scheduled(self, value: bool) -> None:
+        self._state_load_state_obj().start_scheduled = bool(value)
 
     def _apply_hosts_runtime_state_to_ui(self, runtime_state, *, started_at: float | None = None) -> None:
         started_at = float(started_at or time.perf_counter())
@@ -1539,6 +1600,7 @@ class HostsPage(BasePage):
                 log_fn=log,
                 warning_prefix="Hosts state load worker",
             )
+            self._state_load_state_obj().reset()
             self._open_file_runtime.stop(
                 blocking=False,
                 log_fn=log,
