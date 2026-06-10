@@ -118,29 +118,23 @@ class PresetSetupPageBase(BasePage):
         self._profile_load_runtime_request_id = 0
         self._profile_context_action_request_id = 0
         self._profile_context_action_runtime = OneShotWorkerRuntime()
-        self._profile_context_action_runtime_worker = None
         self._profile_move_request_id = 0
         self._profile_move_runtime = OneShotWorkerRuntime()
-        self._profile_move_runtime_worker = None
         self._profile_preset_write_state = QueuedWorkerState[dict[str, object]](
             self._profile_context_action_runtime,
         )
         self._profile_folder_action_request_id = 0
         self._profile_folder_action_runtime = OneShotWorkerRuntime()
-        self._profile_folder_action_runtime_worker = None
         self._profile_folder_action_state = QueuedWorkerState[dict[str, object]](
             self._profile_folder_action_runtime,
         )
         self._profile_folder_action_refresh_by_request: dict[int, bool] = {}
         self._user_profile_create_request_id = 0
         self._user_profile_create_runtime = OneShotWorkerRuntime()
-        self._user_profile_create_runtime_worker = None
         self._user_profile_update_request_id = 0
         self._user_profile_update_runtime = OneShotWorkerRuntime()
-        self._user_profile_update_runtime_worker = None
         self._user_profile_delete_request_id = 0
         self._user_profile_delete_runtime = OneShotWorkerRuntime()
-        self._user_profile_delete_runtime_worker = None
         self._profile_payload_loaded_once = False
         self._profile_payload_dirty = True
         self._profile_load_refresh_pending = False
@@ -172,16 +166,14 @@ class PresetSetupPageBase(BasePage):
             return False
         return bool(runtime.is_running())
 
-    def _accept_current_preset_setup_worker_finished(self, attr: str, worker) -> bool:
-        missing = object()
-        current_worker = self.__dict__.get(attr, missing)
-        if current_worker is missing:
-            setattr(self, attr, None)
-            return True
-        if worker is not current_worker:
+    def _accept_current_preset_setup_worker_finished(self, request_attr: str, worker) -> bool:
+        request_id = getattr(worker, "_request_id", None)
+        if request_id is None:
             return False
-        setattr(self, attr, None)
-        return True
+        try:
+            return int(request_id) == int(self.__dict__.get(request_attr, 0) or 0)
+        except (TypeError, ValueError):
+            return False
 
     def _schedule_profiles_payload_request(self, *, force: bool = False) -> None:
         if bool(force) and self.__dict__.get("_profile_load_refresh_pending", False):
@@ -985,7 +977,7 @@ class PresetSetupPageBase(BasePage):
             worker.finished_action.connect(self._on_profile_context_action_finished)
             worker.failed.connect(self._on_profile_context_action_failed)
 
-        _request_id, worker = runtime.start_qthread_worker(
+        runtime.start_qthread_worker(
             worker_factory=lambda _runtime_request_id: self._create_profile_context_action_worker(
                 request_id,
                 self.launch_method,
@@ -997,7 +989,6 @@ class PresetSetupPageBase(BasePage):
             bind_worker=_bind_worker,
             on_finished=self._on_profile_context_action_worker_finished,
         )
-        self._profile_context_action_runtime_worker = worker
 
     def _on_profile_context_action_finished(self, request_id: int, action: str, profile_key: str, result) -> None:
         if request_id != int(getattr(self, "_profile_context_action_request_id", 0) or 0):
@@ -1049,7 +1040,7 @@ class PresetSetupPageBase(BasePage):
         InfoBar.error(title="Ошибка", content=str(error), parent=self.window())
 
     def _on_profile_context_action_worker_finished(self, worker) -> None:
-        if not self._accept_current_preset_setup_worker_finished("_profile_context_action_runtime_worker", worker):
+        if not self._accept_current_preset_setup_worker_finished("_profile_context_action_request_id", worker):
             return
         self._schedule_next_profile_preset_write_operation_start()
 
@@ -1261,7 +1252,7 @@ class PresetSetupPageBase(BasePage):
             worker.created.connect(self._on_user_profile_create_finished)
             worker.failed.connect(self._on_user_profile_create_failed)
 
-        _request_id, worker = runtime.start_qthread_worker(
+        runtime.start_qthread_worker(
             worker_factory=lambda _runtime_request_id: self._create_user_profile_create_worker(
                 request_id,
                 name=name,
@@ -1271,7 +1262,6 @@ class PresetSetupPageBase(BasePage):
             bind_worker=_bind_worker,
             on_finished=self._on_user_profile_create_worker_finished,
         )
-        self._user_profile_create_runtime_worker = worker
 
     def _on_user_profile_create_finished(self, request_id: int, _profile_id: str, profile_item=None) -> None:
         if request_id != int(getattr(self, "_user_profile_create_request_id", 0) or 0):
@@ -1305,7 +1295,7 @@ class PresetSetupPageBase(BasePage):
         InfoBar.error(title="Ошибка", content=str(error), parent=self.window())
 
     def _on_user_profile_create_worker_finished(self, worker) -> None:
-        if not self._accept_current_preset_setup_worker_finished("_user_profile_create_runtime_worker", worker):
+        if not self._accept_current_preset_setup_worker_finished("_user_profile_create_request_id", worker):
             return
         if self._schedule_next_profile_preset_write_operation_start():
             return
@@ -1335,7 +1325,7 @@ class PresetSetupPageBase(BasePage):
             worker.updated.connect(self._on_user_profile_update_finished)
             worker.failed.connect(self._on_user_profile_update_failed)
 
-        _request_id, worker = runtime.start_qthread_worker(
+        runtime.start_qthread_worker(
             worker_factory=lambda _runtime_request_id: self._create_user_profile_update_worker(
                 request_id,
                 profile_id=profile_id,
@@ -1346,7 +1336,6 @@ class PresetSetupPageBase(BasePage):
             bind_worker=_bind_worker,
             on_finished=self._on_user_profile_update_worker_finished,
         )
-        self._user_profile_update_runtime_worker = worker
 
     def _on_user_profile_update_finished(
         self,
@@ -1386,7 +1375,7 @@ class PresetSetupPageBase(BasePage):
         InfoBar.error(title="Ошибка", content=str(error), parent=self.window())
 
     def _on_user_profile_update_worker_finished(self, worker) -> None:
-        if not self._accept_current_preset_setup_worker_finished("_user_profile_update_runtime_worker", worker):
+        if not self._accept_current_preset_setup_worker_finished("_user_profile_update_request_id", worker):
             return
         if self._schedule_next_profile_preset_write_operation_start():
             return
@@ -1413,7 +1402,7 @@ class PresetSetupPageBase(BasePage):
             worker.deleted.connect(self._on_user_profile_delete_finished)
             worker.failed.connect(self._on_user_profile_delete_failed)
 
-        _request_id, worker = runtime.start_qthread_worker(
+        runtime.start_qthread_worker(
             worker_factory=lambda _runtime_request_id: self._create_user_profile_delete_worker(
                 request_id,
                 profile_id=profile_id,
@@ -1421,7 +1410,6 @@ class PresetSetupPageBase(BasePage):
             bind_worker=_bind_worker,
             on_finished=self._on_user_profile_delete_worker_finished,
         )
-        self._user_profile_delete_runtime_worker = worker
 
     def _on_user_profile_delete_finished(self, request_id: int, _profile_id: str, changed: int) -> None:
         if request_id != int(getattr(self, "_user_profile_delete_request_id", 0) or 0):
@@ -1455,7 +1443,7 @@ class PresetSetupPageBase(BasePage):
         InfoBar.error(title="Ошибка", content=str(error), parent=self.window())
 
     def _on_user_profile_delete_worker_finished(self, worker) -> None:
-        if not self._accept_current_preset_setup_worker_finished("_user_profile_delete_runtime_worker", worker):
+        if not self._accept_current_preset_setup_worker_finished("_user_profile_delete_request_id", worker):
             return
         if self._schedule_next_profile_preset_write_operation_start():
             return
@@ -1537,7 +1525,7 @@ class PresetSetupPageBase(BasePage):
             worker.moved.connect(self._on_profile_move_finished)
             worker.failed.connect(self._on_profile_move_failed)
 
-        _request_id, worker = runtime.start_qthread_worker(
+        runtime.start_qthread_worker(
             worker_factory=lambda _runtime_request_id: self._create_profile_move_worker(
                 request_id,
                 self.launch_method,
@@ -1549,7 +1537,6 @@ class PresetSetupPageBase(BasePage):
             bind_worker=_bind_worker,
             on_finished=self._on_profile_move_worker_finished,
         )
-        self._profile_move_runtime_worker = worker
 
     def _on_profile_move_finished(
         self,
@@ -1588,7 +1575,7 @@ class PresetSetupPageBase(BasePage):
         self.refresh_from_preset_switch()
 
     def _on_profile_move_worker_finished(self, worker) -> None:
-        if not self._accept_current_preset_setup_worker_finished("_profile_move_runtime_worker", worker):
+        if not self._accept_current_preset_setup_worker_finished("_profile_move_request_id", worker):
             return
         self._schedule_next_profile_preset_write_operation_start()
 
@@ -1725,7 +1712,7 @@ class PresetSetupPageBase(BasePage):
             worker.completed.connect(self._on_profile_folder_action_finished)
             worker.failed.connect(self._on_profile_folder_action_failed)
 
-        _request_id, worker = runtime.start_qthread_worker(
+        runtime.start_qthread_worker(
             worker_factory=lambda _runtime_request_id: self._create_profile_folder_action_worker(
                 request_id,
                 action=str(action or ""),
@@ -1738,7 +1725,6 @@ class PresetSetupPageBase(BasePage):
             bind_worker=_bind_worker,
             on_finished=self._on_profile_folder_action_worker_finished,
         )
-        self._profile_folder_action_runtime_worker = worker
 
     def _queue_profile_folder_action(self, payload: dict[str, object]) -> None:
         queued = dict(payload or {})
@@ -1803,7 +1789,7 @@ class PresetSetupPageBase(BasePage):
         log(f"{self.__class__.__name__}: не удалось выполнить действие папки profile ({action}): {error}", "ERROR")
 
     def _on_profile_folder_action_worker_finished(self, worker) -> None:
-        if not self._accept_current_preset_setup_worker_finished("_profile_folder_action_runtime_worker", worker):
+        if not self._accept_current_preset_setup_worker_finished("_profile_folder_action_request_id", worker):
             return
         if not self.__dict__.get("_cleanup_in_progress", False):
             pending = self._profile_folder_action_state_obj().pop_next()
@@ -1942,12 +1928,15 @@ class PresetSetupPageBase(BasePage):
             )
             runtime.cancel()
         self._profile_load_runtime_request_id = 0
-        self._profile_context_action_runtime_worker = None
-        self._profile_move_runtime_worker = None
-        self._profile_folder_action_runtime_worker = None
-        self._user_profile_create_runtime_worker = None
-        self._user_profile_update_runtime_worker = None
-        self._user_profile_delete_runtime_worker = None
+        for attr in (
+            "_profile_context_action_request_id",
+            "_profile_move_request_id",
+            "_profile_folder_action_request_id",
+            "_user_profile_create_request_id",
+            "_user_profile_update_request_id",
+            "_user_profile_delete_request_id",
+        ):
+            setattr(self, attr, int(getattr(self, attr, 0) or 0) + 1)
 
     def _expand_all(self) -> None:
         if self._profiles_list is not None:

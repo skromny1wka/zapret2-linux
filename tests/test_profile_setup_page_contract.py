@@ -87,6 +87,21 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         ):
             self.assertNotIn(attr, page_source)
 
+    def test_preset_setup_page_tracks_detail_workers_by_request_id(self) -> None:
+        page_source = inspect.getsource(PresetSetupPageBase)
+
+        self.assertIn("_accept_current_preset_setup_worker_finished", page_source)
+        self.assertIn("_request_id", page_source)
+        for attr in (
+            "_profile_context_action_runtime_worker",
+            "_profile_move_runtime_worker",
+            "_profile_folder_action_runtime_worker",
+            "_user_profile_create_runtime_worker",
+            "_user_profile_update_runtime_worker",
+            "_user_profile_delete_runtime_worker",
+        ):
+            self.assertNotIn(attr, page_source)
+
     def test_preset_setup_title_shows_selected_preset_name(self) -> None:
         payload = SimpleNamespace(
             selected_preset_name="YouTube Russia RTMPS",
@@ -1954,70 +1969,62 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._schedule_profiles_payload_request.assert_not_called()
 
     def test_stale_profile_context_worker_finished_does_not_drive_write_queue(self) -> None:
-        old_worker = object()
-        current_worker = object()
         page = PresetSetupPageBase.__new__(PresetSetupPageBase)
-        page._profile_context_action_runtime_worker = current_worker
+        page._profile_context_action_request_id = 7
         page._schedule_next_profile_preset_write_operation_start = Mock(
             side_effect=AssertionError("stale context worker must not drive write queue")
         )
 
-        PresetSetupPageBase._on_profile_context_action_worker_finished(page, old_worker)
+        PresetSetupPageBase._on_profile_context_action_worker_finished(page, SimpleNamespace(_request_id=6))
 
-        self.assertIs(page._profile_context_action_runtime_worker, current_worker)
+        self.assertEqual(page._profile_context_action_request_id, 7)
         page._schedule_next_profile_preset_write_operation_start.assert_not_called()
 
     def test_stale_profile_move_worker_finished_does_not_drive_write_queue(self) -> None:
-        old_worker = object()
-        current_worker = object()
         page = PresetSetupPageBase.__new__(PresetSetupPageBase)
-        page._profile_move_runtime_worker = current_worker
+        page._profile_move_request_id = 7
         page._schedule_next_profile_preset_write_operation_start = Mock(
             side_effect=AssertionError("stale move worker must not drive write queue")
         )
 
-        PresetSetupPageBase._on_profile_move_worker_finished(page, old_worker)
+        PresetSetupPageBase._on_profile_move_worker_finished(page, SimpleNamespace(_request_id=6))
 
-        self.assertIs(page._profile_move_runtime_worker, current_worker)
+        self.assertEqual(page._profile_move_request_id, 7)
         page._schedule_next_profile_preset_write_operation_start.assert_not_called()
 
     def test_stale_profile_folder_worker_finished_does_not_pop_pending_action(self) -> None:
-        old_worker = object()
-        current_worker = object()
         page = PresetSetupPageBase.__new__(PresetSetupPageBase)
-        page._profile_folder_action_runtime_worker = current_worker
+        page._profile_folder_action_request_id = 7
         page._cleanup_in_progress = False
         page._profile_folder_action_pending = [{"action": "set_collapsed", "folder_key": "video"}]
         page._schedule_profile_folder_action_start = Mock(
             side_effect=AssertionError("stale folder worker must not start pending action")
         )
 
-        PresetSetupPageBase._on_profile_folder_action_worker_finished(page, old_worker)
+        PresetSetupPageBase._on_profile_folder_action_worker_finished(page, SimpleNamespace(_request_id=6))
 
-        self.assertIs(page._profile_folder_action_runtime_worker, current_worker)
+        self.assertEqual(page._profile_folder_action_request_id, 7)
         self.assertEqual(page._profile_folder_action_pending, [{"action": "set_collapsed", "folder_key": "video"}])
         page._schedule_profile_folder_action_start.assert_not_called()
 
     def test_stale_user_profile_workers_finished_do_not_enable_actions_or_drive_queue(self) -> None:
         for attr, handler_name in (
-            ("_user_profile_create_runtime_worker", "_on_user_profile_create_worker_finished"),
-            ("_user_profile_update_runtime_worker", "_on_user_profile_update_worker_finished"),
-            ("_user_profile_delete_runtime_worker", "_on_user_profile_delete_worker_finished"),
+            ("_user_profile_create_request_id", "_on_user_profile_create_worker_finished"),
+            ("_user_profile_update_request_id", "_on_user_profile_update_worker_finished"),
+            ("_user_profile_delete_request_id", "_on_user_profile_delete_worker_finished"),
         ):
             with self.subTest(attr=attr):
-                old_worker = object()
-                current_worker = object()
                 page = PresetSetupPageBase.__new__(PresetSetupPageBase)
-                setattr(page, attr, current_worker)
+                setattr(page, attr, 7)
                 page._schedule_next_profile_preset_write_operation_start = Mock(
                     side_effect=AssertionError("stale user profile worker must not drive write queue")
                 )
                 page._user_profile_operation_running = Mock(return_value=False)
                 page._set_user_profile_actions_enabled = Mock()
 
-                getattr(PresetSetupPageBase, handler_name)(page, old_worker)
+                getattr(PresetSetupPageBase, handler_name)(page, SimpleNamespace(_request_id=6))
 
-                self.assertIs(getattr(page, attr), current_worker)
+                self.assertEqual(getattr(page, attr), 7)
                 page._schedule_next_profile_preset_write_operation_start.assert_not_called()
                 page._set_user_profile_actions_enabled.assert_not_called()
 

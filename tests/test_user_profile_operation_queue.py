@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
@@ -151,7 +152,9 @@ class UserProfileOperationQueueTests(unittest.TestCase):
             "profile.ui.preset_setup_page.QTimer.singleShot",
             side_effect=lambda _delay, callback: callbacks.append(callback),
         ):
-            PresetSetupPageBase._on_user_profile_create_worker_finished(page, _Worker())
+            PresetSetupPageBase._on_user_profile_create_worker_finished(
+                page, SimpleNamespace(_request_id=0)
+            )
 
         page._create_user_profile_update_worker.assert_not_called()
         next_worker.start.assert_not_called()
