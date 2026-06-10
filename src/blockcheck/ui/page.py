@@ -323,6 +323,12 @@ class BlockcheckPage(BasePage):
         self._progress_bar = IndeterminateProgressBar()
         self._progress_bar.setVisible(False)
         self._progress_bar.setFixedHeight(4)
+        set_control_accessibility(
+            self._progress_bar,
+            name="Ход BlockCheck: не выполняется",
+            description="Показывает, что проверка BlockCheck выполняется.",
+        )
+        set_state_text(self._progress_bar, "Ход BlockCheck: не выполняется")
         self._control_card.add_widget(self._progress_bar)
 
         # Status label

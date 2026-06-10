@@ -5,6 +5,8 @@ from collections.abc import Callable
 
 from PyQt6.QtCore import QTimer
 
+from ui.accessibility import set_state_text
+
 
 @dataclass(frozen=True)
 class BlockcheckRunStartResult:
@@ -57,6 +59,7 @@ def start_blockcheck_page_run(
     mode_combo.setEnabled(False)
     skip_failed_checkbox.setEnabled(False)
     progress_bar.setVisible(True)
+    set_state_text(progress_bar, "Ход BlockCheck: выполняется")
     if hasattr(progress_bar, "start"):
         progress_bar.start()
     status_label.setText(
@@ -120,5 +123,6 @@ def reset_blockcheck_running_ui(
     mode_combo.setEnabled(True)
     skip_failed_checkbox.setEnabled(True)
     progress_bar.setVisible(False)
+    set_state_text(progress_bar, "Ход BlockCheck: не выполняется")
     if hasattr(progress_bar, "stop"):
         progress_bar.stop()
