@@ -65,6 +65,15 @@ class UserPresetWriteSerializationTests(unittest.TestCase):
         self.assertIn("_preset_write_state_obj().reset()", cleanup_source)
         self.assertNotIn("self._pending_preset_write_actions: list", init_source)
 
+    def test_activation_finish_uses_shared_write_queue_without_legacy_scheduler(self) -> None:
+        import inspect
+
+        finished_source = inspect.getsource(UserPresetsPageBase._on_preset_activate_worker_finished)
+
+        self.assertIn("_start_next_preset_write_action()", finished_source)
+        self.assertNotIn("_schedule_pending_preset_activation_start", finished_source)
+        self.assertFalse(hasattr(UserPresetsPageBase, "_schedule_pending_preset_activation_start"))
+
     def test_storage_action_waits_while_item_action_worker_runs(self) -> None:
         page = UserPresetsPageBase.__new__(UserPresetsPageBase)
         page._preset_item_action_runtime = _Runtime(running=True)
@@ -317,7 +326,7 @@ class UserPresetWriteSerializationTests(unittest.TestCase):
             "presets.ui.common.user_presets_page.QTimer.singleShot",
             side_effect=lambda _delay, callback: callbacks.append(callback),
         ):
-            UserPresetsPageBase._on_preset_item_action_worker_finished(page, object())
+            UserPresetsPageBase._on_preset_item_action_worker_finished(page, SimpleNamespace(_request_id=0))
 
         page.create_preset_activate_worker.assert_not_called()
         self.assertEqual(len(callbacks), 1)
@@ -483,7 +492,7 @@ class UserPresetWriteSerializationTests(unittest.TestCase):
             "presets.ui.common.user_presets_page.QTimer.singleShot",
             side_effect=lambda _delay, callback: callbacks.append(callback),
         ):
-            UserPresetsPageBase._on_preset_activate_worker_finished(page, object())
+            UserPresetsPageBase._on_preset_activate_worker_finished(page, SimpleNamespace(_request_id=0))
 
         page.create_preset_edit_action_worker.assert_not_called()
         self.assertEqual(len(callbacks), 1)
@@ -529,7 +538,7 @@ class UserPresetWriteSerializationTests(unittest.TestCase):
             "presets.ui.common.user_presets_page.QTimer.singleShot",
             side_effect=lambda _delay, callback: callbacks.append(callback),
         ):
-            UserPresetsPageBase._on_preset_edit_action_worker_finished(page, object())
+            UserPresetsPageBase._on_preset_edit_action_worker_finished(page, SimpleNamespace(_request_id=0))
 
         page.create_preset_bulk_action_worker.assert_not_called()
         self.assertEqual(len(callbacks), 1)
@@ -569,7 +578,7 @@ class UserPresetWriteSerializationTests(unittest.TestCase):
             "presets.ui.common.user_presets_page.QTimer.singleShot",
             side_effect=lambda _delay, callback: callbacks.append(callback),
         ):
-            UserPresetsPageBase._on_preset_storage_action_worker_finished(page, object())
+            UserPresetsPageBase._on_preset_storage_action_worker_finished(page, SimpleNamespace(_request_id=0))
 
         page.create_preset_folder_action_worker.assert_not_called()
         self.assertEqual(len(callbacks), 1)
@@ -636,7 +645,7 @@ class UserPresetWriteSerializationTests(unittest.TestCase):
             "presets.ui.common.user_presets_page.QTimer.singleShot",
             side_effect=lambda _delay, callback: callbacks.append(callback),
         ):
-            UserPresetsPageBase._on_preset_folder_action_worker_finished(page, object())
+            UserPresetsPageBase._on_preset_folder_action_worker_finished(page, SimpleNamespace(_request_id=0))
 
         page.create_preset_storage_action_worker.assert_not_called()
         self.assertEqual(len(callbacks), 1)
@@ -841,7 +850,7 @@ class UserPresetWriteSerializationTests(unittest.TestCase):
             "presets.ui.common.user_presets_page.QTimer.singleShot",
             side_effect=lambda _delay, callback: callbacks.append(callback),
         ):
-            UserPresetsPageBase._on_preset_edit_action_worker_finished(page, object())
+            UserPresetsPageBase._on_preset_edit_action_worker_finished(page, SimpleNamespace(_request_id=0))
 
         page.create_preset_edit_action_worker.assert_not_called()
         self.assertEqual(len(callbacks), 1)
@@ -876,7 +885,7 @@ class UserPresetWriteSerializationTests(unittest.TestCase):
             "presets.ui.common.user_presets_page.QTimer.singleShot",
             side_effect=lambda _delay, callback: callbacks.append(callback),
         ):
-            UserPresetsPageBase._on_preset_bulk_action_worker_finished(page, object())
+            UserPresetsPageBase._on_preset_bulk_action_worker_finished(page, SimpleNamespace(_request_id=0))
 
         page.create_preset_bulk_action_worker.assert_not_called()
         self.assertEqual(len(callbacks), 1)

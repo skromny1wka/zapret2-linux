@@ -2182,27 +2182,7 @@ class UserPresetsPageBase(BasePage):
     def _on_preset_activate_worker_finished(self, worker) -> None:
         if not self._accept_current_preset_worker_request_finished("_preset_activate_request_id", worker):
             return
-        if self._start_next_preset_write_action():
-            return
-        pending = self._pending_preset_activation
-        if pending:
-            self._replace_preset_write_operations("activate", [])
-            self._schedule_pending_preset_activation_start(pending[0], pending[1])
-
-    def _schedule_pending_preset_activation_start(self, file_name: str, display_name: str) -> None:
-        try:
-            QTimer.singleShot(
-                0,
-                lambda: self._start_preset_activation_worker(
-                    str(file_name or ""),
-                    str(display_name or ""),
-                ),
-            )
-        except Exception:
-            self._start_preset_activation_worker(
-                str(file_name or ""),
-                str(display_name or ""),
-            )
+        self._start_next_preset_write_action()
 
     def _on_edit_preset(self, name: str, global_pos: QPoint | None = None):
         open_edit_preset_menu_action(

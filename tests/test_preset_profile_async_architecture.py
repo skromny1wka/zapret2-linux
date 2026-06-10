@@ -606,7 +606,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         page._runtime_service.apply_active_preset_marker.assert_not_called()
         page._runtime_service.apply_active_preset_marker_for_file.assert_called_once_with("Before.txt")
 
-    def test_user_presets_pending_activation_restarts_after_worker_signal(self) -> None:
+    def test_user_presets_pending_activation_uses_shared_write_queue_after_worker_signal(self) -> None:
         page = UserPresetsPageBase.__new__(UserPresetsPageBase)
         page._preset_activate_request_id = 5
         page._pending_preset_activation = ("Next.txt", "Next")
@@ -621,12 +621,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
             UserPresetsPageBase._on_preset_activate_worker_finished(page, SimpleNamespace(_request_id=5))
 
         page._start_preset_activation_worker.assert_not_called()
-        self.assertIsNone(page._pending_preset_activation)
-        self.assertEqual(len(callbacks), 1)
-
-        callbacks[0]()
-
-        page._start_preset_activation_worker.assert_called_once_with("Next.txt", "Next")
+        page._start_next_preset_write_action.assert_called_once_with()
+        self.assertEqual(callbacks, [])
 
     def test_preset_model_removes_visible_preset_without_full_reset(self) -> None:
         model = PresetListModel()
