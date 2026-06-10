@@ -70,6 +70,7 @@ class ProfileSetupEditorReadDeferTests(unittest.TestCase):
         page._cleanup_in_progress = False
         page._list_file_kind = "hostlist"
         page._list_file_text = _RawTextEditor("latest.example")
+        page._list_file_text_snapshot = "latest.example"
         page._list_file_validation_timer = None
         page._list_file_validation_runtime = _Runtime(running=True)
         page._list_file_validation_request_id = 0
@@ -98,7 +99,7 @@ class ProfileSetupEditorReadDeferTests(unittest.TestCase):
         page._list_file_validation_runtime = _StartRuntime()
         callbacks[0]()
 
-        self.assertEqual(page._list_file_text.read_calls, 1)
+        self.assertEqual(page._list_file_text.read_calls, 0)
         page.create_profile_list_file_validation_worker.assert_called_once_with(
             1,
             kind="hostlist",
@@ -159,12 +160,12 @@ class ProfileSetupEditorReadDeferTests(unittest.TestCase):
         )
         self.assertIsNone(page._pending_raw_profile_save)
 
-    def test_raw_profile_save_worker_start_reads_editor_once(self) -> None:
+    def test_raw_profile_save_worker_start_uses_cached_text_without_editor_read(self) -> None:
         from profile.ui.profile_setup_page import ProfileSetupPageBase
 
         page = ProfileSetupPageBase.__new__(ProfileSetupPageBase)
         page._raw_profile_text = _RawTextEditor("--new\n--lua-desync=latest")
-        page._raw_profile_text_cache = None
+        page._raw_profile_text_cache = "--new\n--lua-desync=latest"
         page._raw_profile_save_runtime = _StartRuntime()
         page._raw_profile_save_request_id = 0
         page._raw_profile_save_button = None
@@ -172,7 +173,7 @@ class ProfileSetupEditorReadDeferTests(unittest.TestCase):
 
         ProfileSetupPageBase._start_raw_profile_save_worker(page, "profile-1", None)
 
-        self.assertEqual(page._raw_profile_text.read_calls, 1)
+        self.assertEqual(page._raw_profile_text.read_calls, 0)
         page.create_profile_raw_text_save_worker.assert_called_once_with(
             1,
             "profile-1",

@@ -3136,14 +3136,7 @@ class ProfileSetupPageBase(BasePage):
         request = dict(request or {})
         raw_text = request.get("text")
         if raw_text is None:
-            if "_list_file_text_snapshot" in self.__dict__:
-                text = str(self.__dict__.get("_list_file_text_snapshot", "") or "")
-            else:
-                editor = self.__dict__.get("_list_file_text")
-                try:
-                    text = str(editor.toPlainText() if editor is not None else "")
-                except Exception:
-                    text = ""
+            text = str(self.__dict__.get("_list_file_text_snapshot", "") or "")
         else:
             text = str(raw_text or "")
         self._list_file_text_snapshot = text
@@ -3808,13 +3801,7 @@ class ProfileSetupPageBase(BasePage):
         cached = self.__dict__.get("_raw_profile_text_cache")
         if cached is not None:
             return str(cached or "")
-        editor = self.__dict__.get("_raw_profile_text")
-        try:
-            text = str(editor.toPlainText() if editor is not None else "")
-        except Exception:
-            text = ""
-        self._raw_profile_text_cache = text
-        return text
+        return ""
 
     def _request_raw_profile_save(self, profile_key: str, raw_text: str | None) -> None:
         profile_key = str(profile_key or "").strip()
