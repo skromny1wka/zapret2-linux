@@ -18,6 +18,7 @@ from donater.ui.pairing_workflow import apply_pair_code_result_ui, apply_pair_co
 from donater.ui.page_lifecycle import apply_premium_language, render_activation_status_label
 from donater.ui.status_workflow import apply_connection_test_plan, render_server_status_label
 from donater.ui.page import PremiumPage
+from donater.ui.status_card import StatusCard
 
 
 class PremiumControlsAccessibilityTests(unittest.TestCase):
@@ -213,6 +214,18 @@ class PremiumControlsAccessibilityTests(unittest.TestCase):
         self.assertEqual(
             activation.activation_status.property("screenReaderStateText"),
             "Статус Premium-активации: Код создан: ABCD12EF",
+        )
+
+    def test_premium_status_card_exposes_state_text(self) -> None:
+        card = StatusCard()
+        self.addCleanup(card.deleteLater)
+
+        card.set_status("Premium активен", "Осталось 7 дней", "active")
+
+        self.assertEqual(card.accessibleName(), "Статус Premium: Premium активен. Осталось 7 дней")
+        self.assertEqual(
+            card.property("screenReaderStateText"),
+            "Статус Premium: Premium активен. Осталось 7 дней",
         )
 
 

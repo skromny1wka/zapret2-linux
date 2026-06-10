@@ -5,6 +5,8 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QSizePolicy
 
+from ui.accessibility import set_state_text
+
 
 class StatusCard(QFrame):
     """Full-width subscription status card."""
@@ -58,6 +60,11 @@ class StatusCard(QFrame):
             "color: rgba(255,255,255,180); font-size: 13px; background: transparent;"
         )
         self._detail_lbl.setVisible(bool(details))
+
+        spoken_parts = [str(text or "").strip(), str(details or "").strip()]
+        spoken_text = ". ".join(part for part in spoken_parts if part)
+        if spoken_text:
+            set_state_text(self, f"Статус Premium: {spoken_text}")
 
         self.setStyleSheet(f"""
             StatusCard {{
