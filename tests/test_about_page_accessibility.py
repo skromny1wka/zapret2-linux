@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import QApplication, QVBoxLayout, QWidget
 
 from ui.pages.about_page_about_build import build_about_page_about_content
 from ui.pages.about_page import AboutPage
+from ui.pages.about_page_tabs_build import build_about_page_tabs
 from ui.theme import get_theme_tokens
 
 
@@ -35,6 +36,24 @@ class AboutPageAccessibilityTests(unittest.TestCase):
         self.assertIn("автоматической проверки", widgets.update_btn.accessibleDescription())
         self.assertEqual(widgets.premium_btn.accessibleName(), "Открыть Premium и VPN")
         self.assertIn("Premium", widgets.premium_btn.accessibleDescription())
+
+    def test_about_tabs_read_current_section_for_screen_reader(self) -> None:
+        widgets = build_about_page_tabs(
+            tr_fn=lambda _key, default: default,
+            on_switch_tab=lambda _index: None,
+        )
+        self.addCleanup(widgets.stacked_widget.deleteLater)
+
+        self.assertEqual(widgets.tabs_pivot.accessibleName(), "Вкладки страницы о программе, выбрано: О программе")
+        self.assertIn("О программе, Поддержка, Справка или Zapret KVN", widgets.tabs_pivot.accessibleDescription())
+
+        widgets.tabs_pivot.setCurrentItem("support")
+
+        self.assertEqual(widgets.tabs_pivot.accessibleName(), "Вкладки страницы о программе, выбрано: Поддержка")
+        self.assertEqual(
+            widgets.tabs_pivot.property("screenReaderStateText"),
+            "Вкладки страницы о программе, выбрано: Поддержка",
+        )
 
     def test_about_language_refresh_keeps_screen_reader_names(self) -> None:
         page = AboutPage.__new__(AboutPage)
