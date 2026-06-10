@@ -40,6 +40,31 @@ class _ActivationWorker(_Worker):
 
 
 class UserPresetWriteSerializationTests(unittest.TestCase):
+    def test_preset_write_queue_lives_in_queued_worker_state(self) -> None:
+        import inspect
+        from ui.queued_worker_state import QueuedWorkerState
+
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        module_source = inspect.getsource(
+            __import__("presets.ui.common.user_presets_page", fromlist=[""])
+        )
+        init_source = inspect.getsource(UserPresetsPageBase.__init__)
+        queue_source = inspect.getsource(UserPresetsPageBase._queue_preset_write_action)
+        pop_source = inspect.getsource(UserPresetsPageBase._pop_next_preset_write_action)
+        has_pending_source = inspect.getsource(UserPresetsPageBase._has_pending_preset_write_action)
+        schedule_source = inspect.getsource(UserPresetsPageBase._schedule_preset_write_action_start)
+        cleanup_source = inspect.getsource(UserPresetsPageBase._stop_action_workers_for_cleanup)
+
+        self.assertIsInstance(UserPresetsPageBase._preset_write_state_obj(page), QueuedWorkerState)
+        self.assertIn("from ui.queued_worker_state import QueuedWorkerState", module_source)
+        self.assertIn("_preset_write_state = QueuedWorkerState", init_source)
+        self.assertIn("_preset_write_state_obj()", queue_source)
+        self.assertIn("state.pop_next()", pop_source)
+        self.assertIn("_preset_write_state_obj().has_pending()", has_pending_source)
+        self.assertIn("state.start_scheduled", schedule_source)
+        self.assertIn("_preset_write_state_obj().reset()", cleanup_source)
+        self.assertNotIn("self._pending_preset_write_actions: list", init_source)
+
     def test_storage_action_waits_while_item_action_worker_runs(self) -> None:
         page = UserPresetsPageBase.__new__(UserPresetsPageBase)
         page._preset_item_action_runtime = _Runtime(running=True)
