@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import QLabel, QHBoxLayout, QVBoxLayout, QWidget
 from config.build_info import APP_VERSION
 
 from app.ui_texts import tr as tr_catalog
-from ui.accessibility import set_control_accessibility
+from ui.accessibility import set_control_accessibility, set_state_text
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens
 from ui.theme_refresh import ThemeRefreshBinding
 import updater.update_page_plans as update_page_plans
@@ -176,20 +176,25 @@ class UpdateStatusCard(CardWidget):
             name=card_name,
             description="Карточка проверки обновлений. Сообщает текущий статус проверки и доступное действие.",
         )
+        set_state_text(self, card_name)
 
         if self._is_checking:
+            button_state = "Проверка обновлений выполняется"
             set_control_accessibility(
                 self.check_btn,
-                name="Проверка обновлений выполняется",
+                name=button_state,
                 description="Дождитесь завершения проверки обновлений.",
             )
+            set_state_text(self.check_btn, button_state)
         else:
             button_text = str(self.check_btn.text() or "").strip()
+            button_state = button_text or "Проверить обновления"
             set_control_accessibility(
                 self.check_btn,
-                name=button_text or "Проверить обновления",
+                name=button_state,
                 description="Запускает проверку доступных обновлений.",
             )
+            set_state_text(self.check_btn, button_state)
 
     def _apply_transition_plan(self, plan) -> None:
         self._is_checking = plan.is_checking
