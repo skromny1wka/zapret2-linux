@@ -734,6 +734,24 @@ class DnsWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("_connectivity_test_state_obj()", schedule_source)
         self.assertIn("_connectivity_test_state_obj().reset()", cleanup_source)
 
+    def test_isp_warning_uses_shared_latest_worker_state(self) -> None:
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        page = NetworkPage.__new__(NetworkPage)
+        page._isp_warning_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+
+        init_source = inspect.getsource(NetworkPage.__init__)
+        request_source = inspect.getsource(NetworkPage._request_isp_dns_warning_plan)
+        schedule_source = inspect.getsource(NetworkPage._schedule_isp_warning_worker_start)
+        cleanup_source = inspect.getsource(NetworkPage.cleanup)
+
+        self.assertIsInstance(NetworkPage._isp_warning_state_obj(page), LatestValueWorkerState)
+        self.assertNotIn("_isp_warning_pending = False", init_source)
+        self.assertNotIn("_isp_warning_start_scheduled = False", init_source)
+        self.assertIn("_isp_warning_state_obj()", request_source)
+        self.assertIn("_isp_warning_state_obj()", schedule_source)
+        self.assertIn("_isp_warning_state_obj().reset()", cleanup_source)
+
     def test_network_page_load_and_connectivity_use_feature_worker_runtime(self) -> None:
         feature_source = inspect.getsource(build_dns_feature)
         page_source = inspect.getsource(NetworkPage)

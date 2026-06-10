@@ -148,8 +148,10 @@ class NetworkPage(BasePage):
         self._scheduled_dns_apply_request = None
         self._dns_mutation_pending_order: list[str] = []
         self._isp_warning_runtime = OneShotWorkerRuntime()
-        self._isp_warning_pending = False
-        self._isp_warning_start_scheduled = False
+        self._isp_warning_state = LatestValueWorkerState(
+            self._isp_warning_runtime,
+            empty_value=False,
+        )
         
         self.dns_cards = {}
         self.adapter_cards = []
@@ -1306,6 +1308,39 @@ class NetworkPage(BasePage):
     def _connectivity_test_start_scheduled(self, value: bool) -> None:
         self._connectivity_test_state_obj().start_scheduled = bool(value)
 
+    def _isp_warning_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_isp_warning_state")
+        runtime = self.__dict__.get("_isp_warning_runtime")
+        if state is None:
+            pending = bool(self.__dict__.pop("_isp_warning_pending", False))
+            start_scheduled = bool(self.__dict__.pop("_isp_warning_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=False,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_isp_warning_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _isp_warning_pending(self) -> bool:
+        return bool(self._isp_warning_state_obj().pending)
+
+    @_isp_warning_pending.setter
+    def _isp_warning_pending(self, value: bool) -> None:
+        self._isp_warning_state_obj().pending = bool(value)
+
+    @property
+    def _isp_warning_start_scheduled(self) -> bool:
+        return bool(self._isp_warning_state_obj().start_scheduled)
+
+    @_isp_warning_start_scheduled.setter
+    def _isp_warning_start_scheduled(self, value: bool) -> None:
+        self._isp_warning_state_obj().start_scheduled = bool(value)
+
     def _schedule_dns_flush_cache_worker_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
@@ -1636,13 +1671,11 @@ class NetworkPage(BasePage):
         self._request_isp_dns_warning_plan()
 
     def _request_isp_dns_warning_plan(self) -> None:
-        if (
-            self._isp_warning_runtime.is_running()
-            or self.__dict__.get("_isp_warning_start_scheduled", False)
-        ):
-            self._isp_warning_pending = True
+        state = self._isp_warning_state_obj()
+        if state.is_busy():
+            state.pending = True
             return
-        self._isp_warning_pending = False
+        state.pending = False
         self._isp_warning_runtime.start_qthread_worker(
             worker_factory=lambda request_id: self._dns.create_isp_dns_warning_worker(
                 request_id,
@@ -1666,7 +1699,7 @@ class NetworkPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_isp_warning_pending", False):
+        if self._isp_warning_state_obj().has_pending():
             return
         show_isp_dns_warning(
             cleanup_in_progress=self._cleanup_in_progress,
@@ -1703,14 +1736,14 @@ class NetworkPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_isp_warning_pending", False):
+        if self._isp_warning_state_obj().has_pending():
             return
         log(f"Ошибка подготовки ISP DNS предупреждения: {error}", "DEBUG")
 
     def _on_isp_dns_warning_worker_finished(self, _worker) -> None:
         if not self._is_current_worker_finish(self.__dict__.get("_isp_warning_runtime"), _worker):
             return
-        if self.__dict__.get("_isp_warning_pending", False):
+        if self._isp_warning_state_obj().has_pending():
             self._schedule_isp_warning_worker_start()
 
     def _is_current_worker_finish(self, runtime, worker) -> bool:
@@ -1728,19 +1761,20 @@ class NetworkPage(BasePage):
             return False
 
     def _schedule_isp_warning_worker_start(self) -> None:
-        if self.__dict__.get("_cleanup_in_progress", False):
-            return
-        if self.__dict__.get("_isp_warning_start_scheduled", False):
-            self._isp_warning_pending = True
-            return
-        self._isp_warning_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_isp_warning_worker_start)
+        self._isp_warning_state_obj().schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_isp_warning_worker_start,
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+            pending_when_already_scheduled=True,
+        )
 
     def _run_scheduled_isp_warning_worker_start(self) -> None:
-        self._isp_warning_start_scheduled = False
-        pending = bool(self.__dict__.get("_isp_warning_pending", False))
-        self._isp_warning_pending = False
-        if self.__dict__.get("_cleanup_in_progress", False) or not pending:
+        pending = bool(
+            self._isp_warning_state_obj().take_pending_for_scheduled_start(
+                cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+            )
+        )
+        if not pending:
             return
         self._request_isp_dns_warning_plan()
 
@@ -1822,8 +1856,7 @@ class NetworkPage(BasePage):
             warning_prefix="dns_apply_worker",
         )
         self._dns_apply_runtime.cancel()
-        self._isp_warning_pending = False
-        self._isp_warning_start_scheduled = False
+        self._isp_warning_state_obj().reset()
         self._isp_warning_runtime.stop(
             blocking=False,
             log_fn=log,
