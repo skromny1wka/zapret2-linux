@@ -184,6 +184,18 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
         ):
             self.assertNotIn(attr, page_source)
 
+        for attr in (
+            "_preset_activate_runtime_worker",
+            "_preset_item_action_runtime_worker",
+            "_preset_bulk_action_runtime_worker",
+            "_preset_edit_action_runtime_worker",
+            "_preset_storage_action_runtime_worker",
+            "_preset_folder_action_runtime_worker",
+            "_preset_open_folder_runtime_worker",
+            "_preset_link_action_runtime_worker",
+        ):
+            self.assertNotIn(attr, page_source)
+
     def test_user_presets_link_actions_queue_while_worker_runs(self) -> None:
         from presets.ui.common.user_presets_page import UserPresetsPageBase
 
@@ -282,7 +294,7 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
         page = UserPresetsPageBase.__new__(UserPresetsPageBase)
         page._cleanup_in_progress = False
         page._preset_link_action_runtime = OneShotWorkerRuntime()
-        page._preset_link_action_request_id = 0
+        page._preset_link_action_request_id = 4
         page._preset_link_action_pending = ["info", "new_configs"]
         page.create_preset_link_action_worker = Mock(return_value=worker)
 
@@ -291,7 +303,7 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
             "presets.ui.common.user_presets_page.QTimer.singleShot",
             side_effect=lambda _delay, callback: callbacks.append(callback),
         ):
-            UserPresetsPageBase._on_preset_link_action_worker_finished(page, object())
+            UserPresetsPageBase._on_preset_link_action_worker_finished(page, SimpleNamespace(_request_id=4))
 
         page.create_preset_link_action_worker.assert_not_called()
         worker.start.assert_not_called()
@@ -299,27 +311,25 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
 
         callbacks[0]()
 
-        page.create_preset_link_action_worker.assert_called_once_with(1, action="info")
+        page.create_preset_link_action_worker.assert_called_once_with(5, action="info")
         worker.start.assert_called_once()
         self.assertEqual(page._preset_link_action_pending, ["new_configs"])
 
     def test_stale_user_presets_link_worker_finished_does_not_start_pending_action(self) -> None:
         from presets.ui.common.user_presets_page import UserPresetsPageBase
 
-        current_worker = object()
-        old_worker = object()
         page = UserPresetsPageBase.__new__(UserPresetsPageBase)
         page._cleanup_in_progress = False
-        page._preset_link_action_runtime_worker = current_worker
+        page._preset_link_action_request_id = 4
         page._preset_link_action_pending = ["info"]
         page._schedule_preset_link_action_start = Mock(
             side_effect=AssertionError("stale link worker must not start pending action")
         )
 
-        UserPresetsPageBase._on_preset_link_action_worker_finished(page, old_worker)
+        UserPresetsPageBase._on_preset_link_action_worker_finished(page, SimpleNamespace(_request_id=3))
 
         self.assertEqual(page._preset_link_action_pending, ["info"])
-        self.assertIs(page._preset_link_action_runtime_worker, current_worker)
+        self.assertEqual(page._preset_link_action_request_id, 4)
 
     def test_user_presets_link_scheduled_start_queues_next_action(self) -> None:
         from presets.ui.common.user_presets_page import UserPresetsPageBase
@@ -398,6 +408,7 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
 
         page = UserPresetsPageBase.__new__(UserPresetsPageBase)
         page._cleanup_in_progress = False
+        page._preset_open_folder_request_id = 4
         page._preset_open_folder_pending = True
         page._start_preset_open_folder_worker = Mock()
         callbacks = []
@@ -406,7 +417,7 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
             "presets.ui.common.user_presets_page.QTimer.singleShot",
             side_effect=lambda _delay, callback: callbacks.append(callback),
         ):
-            UserPresetsPageBase._on_preset_open_folder_worker_finished(page, object())
+            UserPresetsPageBase._on_preset_open_folder_worker_finished(page, SimpleNamespace(_request_id=4))
 
         page._start_preset_open_folder_worker.assert_not_called()
         self.assertEqual(len(callbacks), 1)
@@ -418,20 +429,18 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
     def test_stale_user_presets_open_folder_worker_finish_does_not_restart_pending_open(self) -> None:
         from presets.ui.common.user_presets_page import UserPresetsPageBase
 
-        current_worker = object()
-        old_worker = object()
         page = UserPresetsPageBase.__new__(UserPresetsPageBase)
         page._cleanup_in_progress = False
         page._preset_open_folder_pending = True
-        page._preset_open_folder_runtime_worker = current_worker
+        page._preset_open_folder_request_id = 4
         page._schedule_preset_open_folder_worker_start = Mock(
             side_effect=AssertionError("stale open-folder worker must not restart pending open")
         )
 
-        UserPresetsPageBase._on_preset_open_folder_worker_finished(page, old_worker)
+        UserPresetsPageBase._on_preset_open_folder_worker_finished(page, SimpleNamespace(_request_id=3))
 
         self.assertTrue(page._preset_open_folder_pending)
-        self.assertIs(page._preset_open_folder_runtime_worker, current_worker)
+        self.assertEqual(page._preset_open_folder_request_id, 4)
 
     def test_user_presets_open_folder_waits_while_restart_is_scheduled(self) -> None:
         from presets.ui.common.user_presets_page import UserPresetsPageBase
@@ -469,6 +478,7 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
 
         page = UserPresetsPageBase.__new__(UserPresetsPageBase)
         page._cleanup_in_progress = False
+        page._preset_folder_action_request_id = 4
         page._preset_folder_action_pending = [
             {
                 "action": "move",
@@ -486,7 +496,7 @@ class UserPresetsDependencyBoundaryTests(unittest.TestCase):
             "presets.ui.common.user_presets_page.QTimer.singleShot",
             side_effect=lambda _delay, callback: callbacks.append(callback),
         ):
-            UserPresetsPageBase._on_preset_folder_action_worker_finished(page, object())
+            UserPresetsPageBase._on_preset_folder_action_worker_finished(page, SimpleNamespace(_request_id=4))
 
         page._request_preset_folder_action.assert_not_called()
         self.assertEqual(len(callbacks), 1)

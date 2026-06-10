@@ -608,6 +608,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
     def test_user_presets_pending_activation_restarts_after_worker_signal(self) -> None:
         page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._preset_activate_request_id = 5
         page._pending_preset_activation = ("Next.txt", "Next")
         page._start_next_preset_write_action = Mock(return_value=False)
         page._start_preset_activation_worker = Mock()
@@ -617,7 +618,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
             "presets.ui.common.user_presets_page.QTimer.singleShot",
             side_effect=lambda _delay, callback: callbacks.append(callback),
         ):
-            UserPresetsPageBase._on_preset_activate_worker_finished(page, object())
+            UserPresetsPageBase._on_preset_activate_worker_finished(page, SimpleNamespace(_request_id=5))
 
         page._start_preset_activation_worker.assert_not_called()
         self.assertIsNone(page._pending_preset_activation)
