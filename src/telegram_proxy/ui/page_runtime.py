@@ -365,6 +365,9 @@ def build_stats_plan(
 
     recent_route_parts: list[str] = []
     media_or_cdn_fallback_failed = False
+    http_direct_failed = False
+    cloudflare_failed = False
+    tcp_fallback_failed = False
     for event in list(getattr(stats, "route_events", ()) or ())[-3:]:
         dc = int(getattr(event, "dc", 0) or 0)
         is_media = bool(getattr(event, "is_media", False))
@@ -374,8 +377,20 @@ def build_stats_plan(
         reason = str(getattr(event, "reason", "") or "")
         route_lower = route.lower()
         status_lower = status.lower()
-        if (
+        is_error = (
             "ошиб" in status_lower
+            or "error" in status_lower
+            or "fail" in status_lower
+            or "exhaust" in status_lower
+        )
+        if is_error and route_lower.startswith("http"):
+            http_direct_failed = True
+        if is_error and "cloudflare" in route_lower:
+            cloudflare_failed = True
+        if is_error and route_lower in {"tcp", "tcp fallback"}:
+            tcp_fallback_failed = True
+        if (
+            is_error
             and (is_media or dc == 203)
             and (
                 "cloudflare" in route_lower
@@ -389,9 +404,19 @@ def build_stats_plan(
         recent_route_parts.append(text)
     recent_routes_str = f"  |  Последнее: {'; '.join(recent_route_parts)}" if recent_route_parts else ""
     user_hint_str = ""
-    if media_or_cdn_fallback_failed:
+    if http_direct_failed:
+        user_hint_str = (
+            "  |  Что сделать: HTTP/80 Telegram не проходит; "
+            "включите внешний SOCKS5. WSS/Worker этот путь не спасают"
+        )
+    elif media_or_cdn_fallback_failed:
         user_hint_str = (
             "  |  Что сделать: смайлики/медиа упали на запасном пути; "
+            "включите внешний SOCKS5 или настройте свой Worker/CF-домен"
+        )
+    elif cloudflare_failed and tcp_fallback_failed:
+        user_hint_str = (
+            "  |  Что сделать: встроенный Cloudflare и прямой TCP не проходят; "
             "включите внешний SOCKS5 или настройте свой Worker/CF-домен"
         )
 
