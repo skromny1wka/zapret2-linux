@@ -626,6 +626,56 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("_profile_preset_write_state_obj().reset()", cleanup_source)
         self.assertNotIn("self._pending_user_profile_operations", init_source)
 
+    def test_context_and_move_write_queues_use_shared_profile_preset_queued_state(self) -> None:
+        from profile.ui.preset_setup_page import PresetSetupPageBase
+
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._profile_context_action_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+
+        init_source = inspect.getsource(PresetSetupPageBase.__init__)
+        queue_source = inspect.getsource(PresetSetupPageBase._queue_profile_preset_write_operation)
+        pop_source = inspect.getsource(PresetSetupPageBase._pop_next_profile_preset_write_operation)
+        has_pending_source = inspect.getsource(PresetSetupPageBase._has_pending_profile_preset_write_operation)
+        cleanup_source = inspect.getsource(PresetSetupPageBase.cleanup)
+
+        page._pending_profile_context_actions = [
+            {
+                "action": "set_enabled",
+                "profile_key": "profile-a",
+                "enabled": False,
+            }
+        ]
+        page._pending_profile_moves = [
+            {
+                "action": "folder",
+                "source_profile_key": "profile-b",
+                "destination_profile_key": "",
+                "destination_group_key": "games",
+            }
+        ]
+
+        self.assertEqual(
+            [
+                (
+                    operation.get("kind"),
+                    operation.get("action"),
+                    operation.get("profile_key"),
+                    operation.get("source_profile_key"),
+                )
+                for operation in page._profile_preset_write_state_obj().pending
+            ],
+            [
+                ("context", "set_enabled", "profile-a", ""),
+                ("move", "folder", "profile-b", "profile-b"),
+            ],
+        )
+        self.assertIn("_profile_preset_write_state_obj()", queue_source)
+        self.assertIn("_profile_preset_write_state_obj()", pop_source)
+        self.assertIn("_profile_preset_write_state_obj()", has_pending_source)
+        self.assertIn("_profile_preset_write_state_obj().reset()", cleanup_source)
+        self.assertNotIn("self._pending_profile_context_actions", init_source)
+        self.assertNotIn("self._pending_profile_moves", init_source)
+
     def test_profile_folder_action_waits_while_restart_is_scheduled(self) -> None:
         from profile.ui.preset_setup_page import PresetSetupPageBase
 

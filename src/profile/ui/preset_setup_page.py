@@ -119,11 +119,9 @@ class PresetSetupPageBase(BasePage):
         self._profile_context_action_request_id = 0
         self._profile_context_action_runtime = OneShotWorkerRuntime()
         self._profile_context_action_runtime_worker = None
-        self._pending_profile_context_actions: list[dict[str, object]] = []
         self._profile_move_request_id = 0
         self._profile_move_runtime = OneShotWorkerRuntime()
         self._profile_move_runtime_worker = None
-        self._pending_profile_moves: list[dict[str, str]] = []
         self._profile_preset_write_state = QueuedWorkerState[dict[str, object]](
             self._profile_context_action_runtime,
         )
@@ -676,15 +674,6 @@ class PresetSetupPageBase(BasePage):
                     and str(pending.get("profile_key") or "") == profile_key_to_replace
                 )
             ]
-            pending_context = self.__dict__.setdefault("_pending_profile_context_actions", [])
-            pending_context[:] = [
-                pending
-                for pending in pending_context
-                if not (
-                    str(pending.get("action") or "") == "set_enabled"
-                    and str(pending.get("profile_key") or "") == profile_key_to_replace
-                )
-            ]
         if operation["kind"] == "move":
             source_profile_key_to_replace = str(operation["source_profile_key"] or "")
             pending_operations = self._profile_preset_write_state_obj().pending
@@ -696,78 +685,16 @@ class PresetSetupPageBase(BasePage):
                     and str(pending.get("source_profile_key") or "") == source_profile_key_to_replace
                 )
             ]
-            pending_moves = self.__dict__.setdefault("_pending_profile_moves", [])
-            pending_moves[:] = [
-                pending
-                for pending in pending_moves
-                if str(pending.get("source_profile_key") or "") != source_profile_key_to_replace
-            ]
         self._profile_preset_write_state_obj().append(operation)
-        if operation["kind"] == "context":
-            self.__dict__.setdefault("_pending_profile_context_actions", []).append(
-                {
-                    "action": operation["action"],
-                    "profile_key": operation["profile_key"],
-                    "enabled": operation["enabled"],
-                }
-            )
-        elif operation["kind"] == "move":
-            self.__dict__.setdefault("_pending_profile_moves", []).append(
-                {
-                    "action": operation["action"],
-                    "source_profile_key": operation["source_profile_key"],
-                    "destination_profile_key": operation["destination_profile_key"],
-                    "destination_group_key": operation["destination_group_key"],
-                }
-            )
 
     def _pop_next_profile_preset_write_operation(self) -> dict[str, object] | None:
         pending_operations = self._profile_preset_write_state_obj().pending
         if pending_operations:
-            operation = dict(pending_operations.pop(0))
-            if operation.get("kind") == "context":
-                pending_context = self.__dict__.setdefault("_pending_profile_context_actions", [])
-                if pending_context:
-                    pending_context.pop(0)
-            elif operation.get("kind") == "move":
-                pending_moves = self.__dict__.setdefault("_pending_profile_moves", [])
-                if pending_moves:
-                    pending_moves.pop(0)
-            return operation
-        pending_context = self.__dict__.setdefault("_pending_profile_context_actions", [])
-        if pending_context:
-            pending = dict(pending_context.pop(0))
-            return {
-                "kind": "context",
-                "action": str(pending.get("action") or ""),
-                "profile_key": str(pending.get("profile_key") or ""),
-                "enabled": pending.get("enabled"),
-                "source_profile_key": "",
-                "destination_profile_key": "",
-                "destination_group_key": "",
-            }
-        pending_moves = self.__dict__.setdefault("_pending_profile_moves", [])
-        if pending_moves:
-            pending = dict(pending_moves.pop(0))
-            return {
-                "kind": "move",
-                "action": str(pending.get("action") or ""),
-                "profile_key": str(pending.get("source_profile_key") or ""),
-                "enabled": None,
-                "source_profile_key": str(pending.get("source_profile_key") or ""),
-                "destination_profile_key": str(pending.get("destination_profile_key") or ""),
-                "destination_group_key": str(pending.get("destination_group_key") or ""),
-            }
+            return dict(pending_operations.pop(0))
         return None
 
     def _has_pending_profile_preset_write_operation(self) -> bool:
-        return any(
-            self.__dict__.get(attr)
-            for attr in (
-                "_pending_profile_context_actions",
-                "_pending_profile_moves",
-            )
-        ) or self._profile_preset_write_state_obj().has_pending()
+        return self._profile_preset_write_state_obj().has_pending()
 
     def _has_pending_user_profile_operation(self) -> bool:
         return bool(self._pending_user_profile_operations)
@@ -798,6 +725,14 @@ class PresetSetupPageBase(BasePage):
         if state is None:
             pending = list(self.__dict__.pop("_pending_profile_preset_write_operations", []) or [])
             pending.extend(
+                self._profile_preset_write_operation_from_context_action(operation)
+                for operation in list(self.__dict__.pop("_pending_profile_context_actions", []) or [])
+            )
+            pending.extend(
+                self._profile_preset_write_operation_from_move_operation(operation)
+                for operation in list(self.__dict__.pop("_pending_profile_moves", []) or [])
+            )
+            pending.extend(
                 self._profile_preset_write_operation_from_user_profile_operation(operation)
                 for operation in list(self.__dict__.pop("_pending_user_profile_operations", []) or [])
             )
@@ -827,6 +762,56 @@ class PresetSetupPageBase(BasePage):
     @_profile_preset_write_operation_start_scheduled.setter
     def _profile_preset_write_operation_start_scheduled(self, value: bool) -> None:
         self._profile_preset_write_state_obj().start_scheduled = bool(value)
+
+    @staticmethod
+    def _profile_preset_write_operation_from_context_action(operation) -> dict[str, object]:
+        pending = dict(operation or {})
+        return {
+            "kind": "context",
+            "action": str(pending.get("action") or ""),
+            "profile_key": str(pending.get("profile_key") or ""),
+            "enabled": pending.get("enabled"),
+            "source_profile_key": "",
+            "destination_profile_key": "",
+            "destination_group_key": "",
+        }
+
+    @staticmethod
+    def _context_action_from_profile_preset_write_operation(operation) -> dict[str, object] | None:
+        pending = dict(operation or {})
+        if str(pending.get("kind") or "") != "context":
+            return None
+        return {
+            "action": str(pending.get("action") or ""),
+            "profile_key": str(pending.get("profile_key") or ""),
+            "enabled": pending.get("enabled"),
+        }
+
+    @staticmethod
+    def _profile_preset_write_operation_from_move_operation(operation) -> dict[str, object]:
+        pending = dict(operation or {})
+        source_profile_key = str(pending.get("source_profile_key") or "")
+        return {
+            "kind": "move",
+            "action": str(pending.get("action") or ""),
+            "profile_key": source_profile_key,
+            "enabled": None,
+            "source_profile_key": source_profile_key,
+            "destination_profile_key": str(pending.get("destination_profile_key") or ""),
+            "destination_group_key": str(pending.get("destination_group_key") or ""),
+        }
+
+    @staticmethod
+    def _move_operation_from_profile_preset_write_operation(operation) -> dict[str, str] | None:
+        pending = dict(operation or {})
+        if str(pending.get("kind") or "") != "move":
+            return None
+        return {
+            "action": str(pending.get("action") or ""),
+            "source_profile_key": str(pending.get("source_profile_key") or pending.get("profile_key") or ""),
+            "destination_profile_key": str(pending.get("destination_profile_key") or ""),
+            "destination_group_key": str(pending.get("destination_group_key") or ""),
+        }
 
     @staticmethod
     def _profile_preset_write_operation_from_user_profile_operation(operation) -> dict[str, object]:
@@ -878,6 +863,50 @@ class PresetSetupPageBase(BasePage):
         ]
         state.pending.extend(
             self._profile_preset_write_operation_from_user_profile_operation(operation)
+            for operation in list(value or [])
+        )
+
+    @property
+    def _pending_profile_context_actions(self) -> list[dict[str, object]]:
+        operations: list[dict[str, object]] = []
+        for operation in self._profile_preset_write_state_obj().pending:
+            context_action = self._context_action_from_profile_preset_write_operation(operation)
+            if context_action is not None:
+                operations.append(context_action)
+        return operations
+
+    @_pending_profile_context_actions.setter
+    def _pending_profile_context_actions(self, value: list[dict[str, object]]) -> None:
+        state = self._profile_preset_write_state_obj()
+        state.pending[:] = [
+            operation
+            for operation in state.pending
+            if str(operation.get("kind") or "") != "context"
+        ]
+        state.pending.extend(
+            self._profile_preset_write_operation_from_context_action(operation)
+            for operation in list(value or [])
+        )
+
+    @property
+    def _pending_profile_moves(self) -> list[dict[str, str]]:
+        operations: list[dict[str, str]] = []
+        for operation in self._profile_preset_write_state_obj().pending:
+            move_operation = self._move_operation_from_profile_preset_write_operation(operation)
+            if move_operation is not None:
+                operations.append(move_operation)
+        return operations
+
+    @_pending_profile_moves.setter
+    def _pending_profile_moves(self, value: list[dict[str, str]]) -> None:
+        state = self._profile_preset_write_state_obj()
+        state.pending[:] = [
+            operation
+            for operation in state.pending
+            if str(operation.get("kind") or "") != "move"
+        ]
+        state.pending.extend(
+            self._profile_preset_write_operation_from_move_operation(operation)
             for operation in list(value or [])
         )
 
@@ -1875,8 +1904,6 @@ class PresetSetupPageBase(BasePage):
                 pass
         self._ui_state_unsubscribe = None
         self._ui_state_store = None
-        self.__dict__.setdefault("_pending_profile_context_actions", []).clear()
-        self.__dict__.setdefault("_pending_profile_moves", []).clear()
         self._profile_preset_write_state_obj().reset()
         self._pending_profile_payload_apply = None
         self._profile_payload_apply_scheduled = False
