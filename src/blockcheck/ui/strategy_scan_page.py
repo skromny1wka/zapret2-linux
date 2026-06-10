@@ -566,6 +566,7 @@ class StrategyScanPage(BasePage):
         self._apply_interaction_plan(self._blockcheck.build_running_interaction_plan())
         self._progress_bar.setVisible(True)
         self._progress_bar.setValue(self._scan_cursor)
+        set_state_text(self._progress_bar, "Ход подбора стратегии: выполняется")
         self._set_status_text(run_result.status_text)
         start_strategy_scan_worker(
             run_result.worker,

@@ -1,5 +1,6 @@
 import os
 import unittest
+from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -8,7 +9,11 @@ from qfluentwidgets import CaptionLabel
 
 from blockcheck import public as blockcheck_public
 from blockcheck.ui.strategy_scan_page import StrategyScanPage
-from blockcheck.ui.strategy_scan_page_results_workflow import apply_phase_change
+from blockcheck.ui.strategy_scan_page_results_workflow import (
+    apply_finished_scan,
+    apply_phase_change,
+    apply_strategy_started_progress,
+)
 
 
 class _BlockcheckFeatureStub:
@@ -53,6 +58,12 @@ class StrategyScanPageAccessibilityTests(unittest.TestCase):
         self.assertEqual(page._quick_domain_btn.accessibleName(), "Быстрый выбор цели")
         self.assertEqual(page._start_btn.accessibleName(), "Начать подбор стратегии")
         self.assertEqual(page._stop_btn.accessibleName(), "Остановить подбор стратегии")
+        self.assertEqual(page._progress_bar.accessibleName(), "Ход подбора стратегии: не выполняется")
+        self.assertEqual(
+            page._progress_bar.property("screenReaderStateText"),
+            "Ход подбора стратегии: не выполняется",
+        )
+        self.assertIn("Показывает", page._progress_bar.accessibleDescription())
         self.assertEqual(page._status_label.accessibleName(), "Статус подбора стратегии: Готово к сканированию")
         self.assertEqual(page._table.accessibleName(), "Результаты подбора стратегии")
         self.assertEqual(page._log_edit.accessibleName(), "Подробный лог подбора стратегии")
@@ -69,6 +80,88 @@ class StrategyScanPageAccessibilityTests(unittest.TestCase):
             label.property("screenReaderStateText"),
             "Статус подбора стратегии: Проверяется стратегия TLS fake",
         )
+
+    def test_progress_bar_reads_runtime_state_for_screen_reader(self) -> None:
+        progress_bar = _FakeProgressBar()
+        status_label = CaptionLabel()
+
+        apply_strategy_started_progress(
+            blockcheck_feature=_ProgressFeatureStub(),
+            strategy_name="TLS fake",
+            index=1,
+            total=3,
+            result_rows=[],
+            progress_bar=progress_bar,
+            status_label=status_label,
+            scan_cursor=1,
+        )
+
+        self.assertEqual(progress_bar.accessibleName(), "Ход подбора стратегии: выполняется")
+        self.assertEqual(progress_bar.property("screenReaderStateText"), "Ход подбора стратегии: выполняется")
+
+        apply_finished_scan(
+            blockcheck_feature=_ProgressFeatureStub(),
+            finish_plan=SimpleNamespace(
+                total_available=3,
+                total_count=3,
+                status_text="Подбор завершён",
+                support_status_code="ready_after_error",
+                cancelled=False,
+            ),
+            reset_ui=lambda: None,
+            scan_protocol="tcp",
+            progress_bar=progress_bar,
+            status_label=status_label,
+            set_support_status=lambda _text: None,
+            parent_widget=None,
+        )
+
+        self.assertEqual(progress_bar.accessibleName(), "Ход подбора стратегии: не выполняется")
+        self.assertEqual(progress_bar.property("screenReaderStateText"), "Ход подбора стратегии: не выполняется")
+
+
+class _ProgressFeatureStub:
+    def build_progress_plan(self, **_kwargs):
+        return SimpleNamespace(total=3, status_text="Проверяется стратегия TLS fake")
+
+
+class _FakeProgressBar:
+    def __init__(self) -> None:
+        self.properties = {}
+        self.accessible_name = ""
+        self.accessible_description = ""
+        self._value = 0
+        self._maximum = 100
+
+    def setRange(self, _minimum: int, maximum: int) -> None:  # noqa: N802
+        self._maximum = int(maximum)
+
+    def value(self) -> int:
+        return self._value
+
+    def setValue(self, value: int) -> None:  # noqa: N802
+        self._value = int(value)
+
+    def maximum(self) -> int:
+        return self._maximum
+
+    def accessibleName(self) -> str:  # noqa: N802
+        return self.accessible_name
+
+    def setAccessibleName(self, text: str) -> None:  # noqa: N802
+        self.accessible_name = str(text)
+
+    def accessibleDescription(self) -> str:  # noqa: N802
+        return self.accessible_description
+
+    def setAccessibleDescription(self, text: str) -> None:  # noqa: N802
+        self.accessible_description = str(text)
+
+    def property(self, name: str) -> object:
+        return self.properties.get(name)
+
+    def setProperty(self, name: str, value: object) -> None:  # noqa: N802
+        self.properties[name] = value
 
 
 if __name__ == "__main__":

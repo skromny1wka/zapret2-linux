@@ -35,6 +35,7 @@ def apply_strategy_started_progress(
         progress_bar.setRange(0, progress_plan.total)
     if progress_bar.value() < scan_cursor:
         progress_bar.setValue(scan_cursor)
+    set_state_text(progress_bar, "Ход подбора стратегии: выполняется")
     _set_strategy_scan_status(status_label, progress_plan.status_text)
 
 
@@ -146,6 +147,7 @@ def apply_finished_scan(
 
     _set_strategy_scan_status(status_label, finish_plan.status_text)
     progress_bar.setValue(min(finish_plan.total_count, progress_bar.maximum()))
+    set_state_text(progress_bar, "Ход подбора стратегии: не выполняется")
     if finish_plan.support_status_code == "ready_after_error":
         set_support_status(
             tr_catalog(

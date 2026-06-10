@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import QHBoxLayout, QHeaderView
 from qfluentwidgets import CaptionLabel, FluentIcon
 
 from ui.fluent_widgets import QuickActionsBar, SettingsCard, set_tooltip
-from ui.accessibility import set_control_accessibility
+from ui.accessibility import set_control_accessibility, set_state_text
 from ui.log_limits import BLOCKCHECK_LOG_VIEW_MAX_LINES, apply_text_line_limit
 from ui.pages.base_page import ScrollBlockingTextEdit
 from ui.widgets.fluent_item_tooltip import install_fluent_item_tooltips
@@ -174,6 +174,12 @@ def build_strategy_scan_control_section(
     progress_bar.setFixedHeight(4)
     progress_bar.setRange(0, 100)
     progress_bar.setValue(0)
+    set_control_accessibility(
+        progress_bar,
+        name="Ход подбора стратегии: не выполняется",
+        description="Показывает, что подбор стратегии выполняется.",
+    )
+    set_state_text(progress_bar, "Ход подбора стратегии: не выполняется")
     control_card.add_widget(progress_bar)
 
     status_label = caption_label_cls(
