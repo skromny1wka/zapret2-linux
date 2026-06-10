@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import time
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,6 +15,16 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls._app = QApplication.instance() or QApplication([])
+
+    def _process_events_until(self, predicate, *, timeout_s: float = 0.5) -> bool:
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            self._app.processEvents()
+            if predicate():
+                return True
+            time.sleep(0.001)
+        self._app.processEvents()
+        return bool(predicate())
 
     def test_runtime_command_passes_preset_source_resolver_to_coordinator(self) -> None:
         from winws_runtime.runtime import commands as runtime_commands
@@ -242,10 +253,7 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
         coordinator.handle_preset_switched(ZAPRET2_MODE, "Default v5.txt")
 
         self.assertEqual(watched_paths, [])
-        for _ in range(100):
-            self._app.processEvents()
-            if watched_paths:
-                break
+        self.assertTrue(self._process_events_until(lambda: bool(watched_paths)))
         self.assertEqual(watched_paths, ["C:/Zapret/Dev/presets/winws2/Default v5.txt"])
 
     def test_preset_switch_watcher_uses_switched_file_name_not_selected_lookup(self) -> None:
@@ -383,10 +391,7 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
         self.assertEqual(watched_paths, [])
         self.assertEqual(ui_state.active_revision, 0)
 
-        for _ in range(100):
-            self._app.processEvents()
-            if watched_paths:
-                break
+        self.assertTrue(self._process_events_until(lambda: bool(watched_paths)))
 
         self.assertEqual(watched_paths, ["C:/Zapret/Dev/presets/winws2/Default v3.txt"])
         self.assertEqual(ui_state.active_revision, 1)
@@ -650,6 +655,39 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
 
             launch_runtime.switch_presets_async.assert_called_once_with(ZAPRET2_MODE, delay_ms=900)
             launch_runtime.stop_dpi_async.assert_not_called()
+
+    def test_selected_source_preset_apply_is_debounced_before_runtime_switch(self) -> None:
+        from unittest.mock import Mock
+
+        from settings.mode import ZAPRET2_MODE
+        from winws_runtime.flow.preset_switch_policy import (
+            SELECTED_SOURCE_PRESET_APPLY_DEBOUNCE_MS,
+            request_selected_source_preset_apply,
+        )
+
+        launch_runtime = SimpleNamespace(
+            is_running=Mock(return_value=True),
+            switch_presets_async=Mock(),
+            restart_dpi_async=Mock(),
+        )
+        runtime_feature = SimpleNamespace(
+            objects=SimpleNamespace(launch_runtime=launch_runtime),
+        )
+
+        self.assertTrue(
+            request_selected_source_preset_apply(
+                runtime_feature=runtime_feature,
+                launch_method=ZAPRET2_MODE,
+                reason="preset_switched",
+                preset_file_name="Default v5.txt",
+            )
+        )
+
+        launch_runtime.switch_presets_async.assert_called_once_with(
+            ZAPRET2_MODE,
+            delay_ms=SELECTED_SOURCE_PRESET_APPLY_DEBOUNCE_MS,
+        )
+        launch_runtime.restart_dpi_async.assert_not_called()
 
     def test_preset_content_apply_does_not_validate_preset_on_ui_request_path(self) -> None:
         from pathlib import Path

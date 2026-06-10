@@ -4,6 +4,9 @@ from log.log import log
 from settings.mode import is_preset_launch_method, normalize_launch_method
 
 
+SELECTED_SOURCE_PRESET_APPLY_DEBOUNCE_MS = 700
+
+
 def request_selected_source_preset_apply(
     *,
     runtime_feature,
@@ -47,7 +50,10 @@ def request_selected_source_preset_apply(
             f"Применение выбранного source preset ({method}, reason={reason}{preset_info}) -> preset mode switch pipeline",
             "INFO",
         )
-        launch_runtime.switch_presets_async(method)
+        launch_runtime.switch_presets_async(
+            method,
+            delay_ms=SELECTED_SOURCE_PRESET_APPLY_DEBOUNCE_MS,
+        )
         return True
 
     log(
