@@ -868,6 +868,15 @@ def _strategy_branch_label(branch) -> str:
     return f"{' · '.join(parts)} — {strategy_name}"
 
 
+def _join_accessible_options(labels: list[str]) -> str:
+    clean_labels = [str(label or "").strip() for label in labels if str(label or "").strip()]
+    if not clean_labels:
+        return ""
+    if len(clean_labels) == 1:
+        return clean_labels[0]
+    return f"{', '.join(clean_labels[:-1])} или {clean_labels[-1]}"
+
+
 def _update_strategy_branch_combo_in_place(
     combo,
     rows: tuple[tuple[str, str], ...] | list[tuple[str, str]],
@@ -1391,6 +1400,7 @@ class ProfileSetupPageBase(BasePage):
         self._strategy_tabs.addItem("match", "Когда применяется", lambda: self._switch_strategy_tab(2))
         set_segmented_current_item_if_changed(self._strategy_tabs, "strategies")
         self._sync_editor_tab_label(None)
+        self._strategy_tabs.currentItemChanged.connect(self._update_strategy_tabs_accessibility)
         self.layout.addWidget(self._strategy_tabs)
 
         self._strategy_branch_bar = QWidget(self)
@@ -1467,6 +1477,39 @@ class ProfileSetupPageBase(BasePage):
             name="Ветка готовой стратегии",
             description="Выберите ветку готовой стратегии для этого profile.",
         )
+        self._update_strategy_tabs_accessibility()
+
+    def _strategy_tab_accessible_labels(self) -> dict[str, str]:
+        labels = {
+            "strategies": "Готовые стратегии",
+            "match": "Когда применяется",
+        }
+        if bool(getattr(self, "_editor_tab_available", False)):
+            labels["editor"] = _profile_editor_tab_title(getattr(self, "_payload", None))
+        return labels
+
+    def _update_strategy_tabs_accessibility(self, current: object | None = None) -> None:
+        tabs = self.__dict__.get("_strategy_tabs")
+        if tabs is None:
+            return
+        key = str(current or "").strip()
+        if not key:
+            try:
+                key = str(tabs.currentRouteKey() or "").strip()
+            except Exception:
+                key = ""
+        labels = self._strategy_tab_accessible_labels()
+        label = labels.get(key) or labels.get("strategies") or "Готовые стратегии"
+        state = f"Разделы profile, выбрано: {label}"
+        ordered_keys = ["strategies", "editor", "match"]
+        options = _join_accessible_options([labels[key] for key in ordered_keys if key in labels])
+        description = f"Выберите раздел настройки profile: {options}." if options else "Выберите раздел настройки profile."
+        set_state_text(tabs, state)
+        set_control_accessibility(
+            tabs,
+            name=state,
+            description=description,
+        )
 
     def _switch_strategy_tab(self, index: int) -> None:
         if index == 1 and not self._editor_tab_available:
@@ -1480,6 +1523,9 @@ class ProfileSetupPageBase(BasePage):
             self._ensure_match_tab_built()
             self._apply_match_tab_payload()
         set_current_index_if_changed(self._strategy_stack, index)
+        if self._strategy_tabs is not None:
+            key = "editor" if index == 1 else "match" if index == 2 else "strategies"
+            self._update_strategy_tabs_accessibility(key)
 
     def _ensure_editor_tab_built(self) -> None:
         if self._editor_tab_built:
@@ -2784,12 +2830,14 @@ class ProfileSetupPageBase(BasePage):
         if available:
             editor_title = _profile_editor_tab_title(self._payload)
             self._strategy_tabs.insertItem(1, "editor", editor_title, lambda: self._switch_strategy_tab(1))
+            self._update_strategy_tabs_accessibility()
             return
 
         if self._strategy_stack.currentIndex() == 1:
             set_current_index_if_changed(self._strategy_stack, 0)
             set_segmented_current_item_if_changed(self._strategy_tabs, "strategies")
         self._strategy_tabs.removeWidget("editor")
+        self._update_strategy_tabs_accessibility()
 
     def _sync_editor_tab_label(self, payload) -> None:
         editor_title = _profile_editor_tab_title(payload)
@@ -2799,6 +2847,7 @@ class ProfileSetupPageBase(BasePage):
                 self._strategy_tabs,
                 f"Готовые стратегии меняют строки --lua-desync. «{editor_title}» меняет файл hostlist/ipset. «Когда применяется» показывает условия profile и итоговый текст.",
             )
+            self._update_strategy_tabs_accessibility()
 
     def _apply_list_file_editor_state(self, state) -> None:
         kind = str(getattr(state, "kind", "") or "").strip().lower()

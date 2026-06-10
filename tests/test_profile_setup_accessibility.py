@@ -60,6 +60,21 @@ class ProfileSetupAccessibilityTests(unittest.TestCase):
         self.assertEqual(page._favorite_button.accessibleName(), "Добавить стратегию в избранное")
         self.assertEqual(page._clear_feedback_button.accessibleName(), "Убрать оценку стратегии")
 
+    def test_strategy_tabs_read_current_section_for_screen_reader(self) -> None:
+        page = self._make_page()
+        self.addCleanup(page.deleteLater)
+
+        self.assertEqual(page._strategy_tabs.accessibleName(), "Разделы profile, выбрано: Готовые стратегии")
+        self.assertIn("Готовые стратегии, Редактор или Когда применяется", page._strategy_tabs.accessibleDescription())
+
+        page._strategy_tabs.setCurrentItem("match")
+
+        self.assertEqual(page._strategy_tabs.accessibleName(), "Разделы profile, выбрано: Когда применяется")
+        self.assertEqual(
+            page._strategy_tabs.property("screenReaderStateText"),
+            "Разделы profile, выбрано: Когда применяется",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
