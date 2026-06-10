@@ -698,6 +698,24 @@ class DnsWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("_dns_flush_cache_state_obj()", schedule_source)
         self.assertIn("_dns_flush_cache_state_obj().reset()", cleanup_source)
 
+    def test_network_page_load_uses_shared_latest_worker_state(self) -> None:
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        page = NetworkPage.__new__(NetworkPage)
+        page._page_load_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+
+        init_source = inspect.getsource(NetworkPage.__init__)
+        loading_source = inspect.getsource(NetworkPage._start_loading)
+        schedule_source = inspect.getsource(NetworkPage._schedule_page_load_worker_start)
+        cleanup_source = inspect.getsource(NetworkPage.cleanup)
+
+        self.assertIsInstance(NetworkPage._page_load_state_obj(page), LatestValueWorkerState)
+        self.assertNotIn("_page_load_pending = False", init_source)
+        self.assertNotIn("_page_load_start_scheduled = False", init_source)
+        self.assertIn("_page_load_state_obj()", loading_source)
+        self.assertIn("_page_load_state_obj()", schedule_source)
+        self.assertIn("_page_load_state_obj().reset()", cleanup_source)
+
     def test_network_page_load_and_connectivity_use_feature_worker_runtime(self) -> None:
         feature_source = inspect.getsource(build_dns_feature)
         page_source = inspect.getsource(NetworkPage)

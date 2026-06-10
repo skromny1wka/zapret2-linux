@@ -122,8 +122,10 @@ class NetworkPage(BasePage):
         self._cleanup_in_progress = False
         self._dns_selection_sync_queued = False
         self._page_load_runtime = OneShotWorkerRuntime()
-        self._page_load_pending = False
-        self._page_load_start_scheduled = False
+        self._page_load_state = LatestValueWorkerState(
+            self._page_load_runtime,
+            empty_value=False,
+        )
         self._connectivity_test_runtime = OneShotWorkerRuntime()
         self._connectivity_test_pending = False
         self._connectivity_test_start_scheduled = False
@@ -453,13 +455,11 @@ class NetworkPage(BasePage):
         """Запускает асинхронную загрузку данных"""
         if self._cleanup_in_progress:
             return
-        if (
-            self._page_load_runtime.is_running()
-            or self.__dict__.get("_page_load_start_scheduled", False)
-        ):
-            self._page_load_pending = True
+        state = self._page_load_state_obj()
+        if state.is_busy():
+            state.pending = True
             return
-        self._page_load_pending = False
+        state.pending = False
         try:
             cached_state = self._dns_feature().consume_warmed_page_data()
         except Exception:
@@ -482,30 +482,32 @@ class NetworkPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_page_load_pending", False):
+        if self._page_load_state_obj().has_pending():
             return
         self._on_page_state_loaded(state)
 
     def _on_page_load_worker_finished(self, _worker) -> None:
         if not self._is_current_worker_finish(self.__dict__.get("_page_load_runtime"), _worker):
             return
-        if self.__dict__.get("_page_load_pending", False):
+        if self._page_load_state_obj().has_pending():
             self._schedule_page_load_worker_start()
 
     def _schedule_page_load_worker_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        if self.__dict__.get("_page_load_start_scheduled", False):
-            self._page_load_pending = True
-            return
-        self._page_load_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_page_load_worker_start)
+        self._page_load_state_obj().schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_page_load_worker_start,
+            pending_when_already_scheduled=True,
+        )
 
     def _run_scheduled_page_load_worker_start(self) -> None:
-        self._page_load_start_scheduled = False
-        pending = bool(self.__dict__.get("_page_load_pending", False))
-        self._page_load_pending = False
-        if self.__dict__.get("_cleanup_in_progress", False) or not pending:
+        pending = bool(
+            self._page_load_state_obj().take_pending_for_scheduled_start(
+                cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+            )
+        )
+        if not pending:
             return
         self._start_loading()
     
@@ -1236,6 +1238,39 @@ class NetworkPage(BasePage):
             self._dns_flush_cache_state_obj().pending = False
             self._schedule_dns_flush_cache_worker_start()
 
+    def _page_load_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_page_load_state")
+        runtime = self.__dict__.get("_page_load_runtime")
+        if state is None:
+            pending = bool(self.__dict__.pop("_page_load_pending", False))
+            start_scheduled = bool(self.__dict__.pop("_page_load_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=False,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_page_load_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _page_load_pending(self) -> bool:
+        return bool(self._page_load_state_obj().pending)
+
+    @_page_load_pending.setter
+    def _page_load_pending(self, value: bool) -> None:
+        self._page_load_state_obj().pending = bool(value)
+
+    @property
+    def _page_load_start_scheduled(self) -> bool:
+        return bool(self._page_load_state_obj().start_scheduled)
+
+    @_page_load_start_scheduled.setter
+    def _page_load_start_scheduled(self, value: bool) -> None:
+        self._page_load_state_obj().start_scheduled = bool(value)
+
     def _schedule_dns_flush_cache_worker_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
@@ -1715,8 +1750,7 @@ class NetworkPage(BasePage):
             self.loading_bar.stop()
         except Exception:
             pass
-        self._page_load_pending = False
-        self._page_load_start_scheduled = False
+        self._page_load_state_obj().reset()
         self._connectivity_test_pending = False
         self._connectivity_test_start_scheduled = False
         self._force_dns_action_state_obj().reset()
