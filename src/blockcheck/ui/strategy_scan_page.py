@@ -106,18 +106,21 @@ class StrategyScanPage(BasePage):
         self._cleanup_in_progress = False
         self._strategy_scan_run_runtime = OneShotWorkerRuntime()
         self._strategy_apply_runtime = OneShotWorkerRuntime()
-        self._strategy_apply_pending = None
-        self._strategy_apply_start_scheduled = False
+        self._strategy_apply_state = LatestValueWorkerState(self._strategy_apply_runtime, empty_value=None)
         self._support_prepare_runtime = OneShotWorkerRuntime()
         self._support_prepare_state = LatestValueWorkerState(self._support_prepare_runtime, empty_value=None)
         self._quick_targets_runtime = OneShotWorkerRuntime()
         self._quick_targets_state = LatestValueWorkerState(self._quick_targets_runtime, empty_value=None)
         self._strategy_scan_resume_save_runtime = OneShotWorkerRuntime()
-        self._strategy_scan_resume_save_pending = None
-        self._strategy_scan_resume_save_start_scheduled = False
+        self._strategy_scan_resume_save_state = LatestValueWorkerState(
+            self._strategy_scan_resume_save_runtime,
+            empty_value=None,
+        )
         self._strategy_scan_finalize_runtime = OneShotWorkerRuntime()
-        self._strategy_scan_finalize_pending = None
-        self._strategy_scan_finalize_start_scheduled = False
+        self._strategy_scan_finalize_state = LatestValueWorkerState(
+            self._strategy_scan_finalize_runtime,
+            empty_value=None,
+        )
 
         self._build_ui()
         if self._embedded:
@@ -655,14 +658,12 @@ class StrategyScanPage(BasePage):
             "udp_games_scope": udp_games_scope,
             "next_index": int(next_index),
         }
-        if (
-            self._strategy_scan_resume_save_runtime.is_running()
-            or bool(self.__dict__.get("_strategy_scan_resume_save_start_scheduled", False))
-        ):
-            self._strategy_scan_resume_save_pending = payload
+        state = self._strategy_scan_resume_save_state_obj()
+        if state.is_busy():
+            state.pending = payload
             return
 
-        self._strategy_scan_resume_save_pending = None
+        state.pending = None
         self._start_strategy_scan_resume_save_worker(payload)
 
     def _start_strategy_scan_resume_save_worker(self, payload: dict) -> None:
@@ -698,27 +699,30 @@ class StrategyScanPage(BasePage):
         logger.warning("Failed to save strategy-scan resume progress: %s", error)
 
     def _on_strategy_scan_resume_save_runtime_finished(self, _worker) -> None:
-        if not self._is_current_worker_finish(self.__dict__.get("_strategy_scan_resume_save_runtime"), _worker):
-            return
-        pending = self.__dict__.get("_strategy_scan_resume_save_pending")
-        if pending is not None and not self._cleanup_in_progress:
-            self._strategy_scan_resume_save_pending = None
-            self._schedule_strategy_scan_resume_save_worker_start(pending)
+        self._strategy_scan_resume_save_state_obj().schedule_pending_after_finish(
+            _worker,
+            is_current_worker_finish=self._is_current_worker_finish,
+            single_shot=QTimer.singleShot,
+            run_scheduled=self._run_scheduled_strategy_scan_resume_save_worker_start,
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
 
     def _schedule_strategy_scan_resume_save_worker_start(self, payload: dict) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        self._strategy_scan_resume_save_pending = dict(payload or {})
-        if bool(self.__dict__.get("_strategy_scan_resume_save_start_scheduled", False)):
-            return
-        self._strategy_scan_resume_save_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_strategy_scan_resume_save_worker_start)
+        state = self._strategy_scan_resume_save_state_obj()
+        state.pending = dict(payload or {})
+        state.schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_strategy_scan_resume_save_worker_start,
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
 
     def _run_scheduled_strategy_scan_resume_save_worker_start(self) -> None:
-        self._strategy_scan_resume_save_start_scheduled = False
-        pending = self.__dict__.get("_strategy_scan_resume_save_pending")
-        self._strategy_scan_resume_save_pending = None
-        if pending is None or self.__dict__.get("_cleanup_in_progress", False):
+        pending = self._strategy_scan_resume_save_state_obj().take_pending_for_scheduled_start(
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
+        if pending is None:
             return
         self._start_strategy_scan_resume_save_worker(pending)
 
@@ -746,13 +750,11 @@ class StrategyScanPage(BasePage):
         self._request_strategy_scan_finalize(report)
 
     def _request_strategy_scan_finalize(self, report) -> None:
-        if (
-            self._strategy_scan_finalize_runtime.is_running()
-            or self.__dict__.get("_strategy_scan_finalize_start_scheduled", False)
-        ):
-            self._strategy_scan_finalize_pending = report
+        state = self._strategy_scan_finalize_state_obj()
+        if state.is_busy():
+            state.pending = report
             return
-        self._strategy_scan_finalize_pending = None
+        state.pending = None
 
         def worker_factory(request_id: int):
             return self.create_strategy_scan_finalize_worker(request_id, report=report)
@@ -773,7 +775,7 @@ class StrategyScanPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_strategy_scan_finalize_pending") is not None:
+        if self._strategy_scan_finalize_state_obj().has_pending():
             return
         apply_finished_scan(
             blockcheck_feature=self._blockcheck,
@@ -793,7 +795,7 @@ class StrategyScanPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_strategy_scan_finalize_pending") is not None:
+        if self._strategy_scan_finalize_state_obj().has_pending():
             return
         logger.warning("Failed to finalize strategy scan: %s", error)
         self._reset_ui()
@@ -806,27 +808,25 @@ class StrategyScanPage(BasePage):
         )
 
     def _on_strategy_scan_finalize_worker_finished(self, worker) -> None:
-        if not self._is_current_worker_finish(self.__dict__.get("_strategy_scan_finalize_runtime"), worker):
-            return
-        if self.__dict__.get("_cleanup_in_progress", False):
-            return
-        if self.__dict__.get("_strategy_scan_finalize_pending") is not None:
-            self._schedule_strategy_scan_finalize_start()
+        self._strategy_scan_finalize_state_obj().schedule_pending_after_finish(
+            worker,
+            is_current_worker_finish=self._is_current_worker_finish,
+            single_shot=QTimer.singleShot,
+            run_scheduled=self._run_scheduled_strategy_scan_finalize_start,
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
 
     def _schedule_strategy_scan_finalize_start(self) -> None:
-        if self.__dict__.get("_cleanup_in_progress", False):
-            return
-        if self.__dict__.get("_strategy_scan_finalize_start_scheduled", False):
-            return
-        self._strategy_scan_finalize_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_strategy_scan_finalize_start)
+        self._strategy_scan_finalize_state_obj().schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_strategy_scan_finalize_start,
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
 
     def _run_scheduled_strategy_scan_finalize_start(self) -> None:
-        self._strategy_scan_finalize_start_scheduled = False
-        if self.__dict__.get("_cleanup_in_progress", False):
-            return
-        pending = self.__dict__.get("_strategy_scan_finalize_pending")
-        self._strategy_scan_finalize_pending = None
+        pending = self._strategy_scan_finalize_state_obj().take_pending_for_scheduled_start(
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
         if pending is None:
             return
         self._request_strategy_scan_finalize(pending)
@@ -911,6 +911,105 @@ class StrategyScanPage(BasePage):
     def _quick_targets_start_scheduled(self, value: bool) -> None:
         self._quick_targets_state_obj().start_scheduled = bool(value)
 
+    def _strategy_scan_resume_save_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_strategy_scan_resume_save_state")
+        runtime = self.__dict__.get("_strategy_scan_resume_save_runtime")
+        if state is None:
+            pending = self.__dict__.pop("_strategy_scan_resume_save_pending", None)
+            start_scheduled = bool(self.__dict__.pop("_strategy_scan_resume_save_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=None,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_strategy_scan_resume_save_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _strategy_scan_resume_save_pending(self):
+        return self._strategy_scan_resume_save_state_obj().pending
+
+    @_strategy_scan_resume_save_pending.setter
+    def _strategy_scan_resume_save_pending(self, value) -> None:
+        self._strategy_scan_resume_save_state_obj().pending = value
+
+    @property
+    def _strategy_scan_resume_save_start_scheduled(self) -> bool:
+        return bool(self._strategy_scan_resume_save_state_obj().start_scheduled)
+
+    @_strategy_scan_resume_save_start_scheduled.setter
+    def _strategy_scan_resume_save_start_scheduled(self, value: bool) -> None:
+        self._strategy_scan_resume_save_state_obj().start_scheduled = bool(value)
+
+    def _strategy_scan_finalize_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_strategy_scan_finalize_state")
+        runtime = self.__dict__.get("_strategy_scan_finalize_runtime")
+        if state is None:
+            pending = self.__dict__.pop("_strategy_scan_finalize_pending", None)
+            start_scheduled = bool(self.__dict__.pop("_strategy_scan_finalize_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=None,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_strategy_scan_finalize_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _strategy_scan_finalize_pending(self):
+        return self._strategy_scan_finalize_state_obj().pending
+
+    @_strategy_scan_finalize_pending.setter
+    def _strategy_scan_finalize_pending(self, value) -> None:
+        self._strategy_scan_finalize_state_obj().pending = value
+
+    @property
+    def _strategy_scan_finalize_start_scheduled(self) -> bool:
+        return bool(self._strategy_scan_finalize_state_obj().start_scheduled)
+
+    @_strategy_scan_finalize_start_scheduled.setter
+    def _strategy_scan_finalize_start_scheduled(self, value: bool) -> None:
+        self._strategy_scan_finalize_state_obj().start_scheduled = bool(value)
+
+    def _strategy_apply_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_strategy_apply_state")
+        runtime = self.__dict__.get("_strategy_apply_runtime")
+        if state is None:
+            pending = self.__dict__.pop("_strategy_apply_pending", None)
+            start_scheduled = bool(self.__dict__.pop("_strategy_apply_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=None,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_strategy_apply_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _strategy_apply_pending(self):
+        return self._strategy_apply_state_obj().pending
+
+    @_strategy_apply_pending.setter
+    def _strategy_apply_pending(self, value) -> None:
+        self._strategy_apply_state_obj().pending = value
+
+    @property
+    def _strategy_apply_start_scheduled(self) -> bool:
+        return bool(self._strategy_apply_state_obj().start_scheduled)
+
+    @_strategy_apply_start_scheduled.setter
+    def _strategy_apply_start_scheduled(self, value: bool) -> None:
+        self._strategy_apply_state_obj().start_scheduled = bool(value)
+
     # ------------------------------------------------------------------
     # Apply strategy
     # ------------------------------------------------------------------
@@ -935,12 +1034,11 @@ class StrategyScanPage(BasePage):
             "strategy_args": str(strategy_args or ""),
             "strategy_name": str(strategy_name or ""),
         }
-        if (
-            self._strategy_apply_runtime.is_running()
-            or self.__dict__.get("_strategy_apply_start_scheduled", False)
-        ):
-            self._strategy_apply_pending = dict(payload)
+        state = self._strategy_apply_state_obj()
+        if state.is_busy():
+            state.pending = dict(payload)
             return
+        state.pending = None
         self._start_strategy_apply_worker(payload)
 
     def _start_strategy_apply_worker(self, payload: dict) -> None:
@@ -967,7 +1065,7 @@ class StrategyScanPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_strategy_apply_pending") is not None:
+        if self._strategy_apply_state_obj().has_pending():
             return
         message_plan = self._blockcheck.build_apply_success_plan(result)
 
@@ -983,7 +1081,7 @@ class StrategyScanPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_strategy_apply_pending") is not None:
+        if self._strategy_apply_state_obj().has_pending():
             return
         logger.warning("Failed to apply strategy: %s", error)
         try:
@@ -997,26 +1095,30 @@ class StrategyScanPage(BasePage):
             pass
 
     def _on_strategy_apply_runtime_finished(self, _worker) -> None:
-        if not self._is_current_worker_finish(self.__dict__.get("_strategy_apply_runtime"), _worker):
-            return
-        pending = self.__dict__.get("_strategy_apply_pending")
-        if pending is not None and not self._cleanup_in_progress:
-            self._schedule_strategy_apply_worker_start(dict(pending or {}))
+        self._strategy_apply_state_obj().schedule_pending_after_finish(
+            _worker,
+            is_current_worker_finish=self._is_current_worker_finish,
+            single_shot=QTimer.singleShot,
+            run_scheduled=self._run_scheduled_strategy_apply_worker_start,
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
 
     def _schedule_strategy_apply_worker_start(self, payload: dict) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        self._strategy_apply_pending = dict(payload or {})
-        if self.__dict__.get("_strategy_apply_start_scheduled", False):
-            return
-        self._strategy_apply_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_strategy_apply_worker_start)
+        state = self._strategy_apply_state_obj()
+        state.pending = dict(payload or {})
+        state.schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_strategy_apply_worker_start,
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
 
     def _run_scheduled_strategy_apply_worker_start(self) -> None:
-        self._strategy_apply_start_scheduled = False
-        pending = self.__dict__.get("_strategy_apply_pending")
-        self._strategy_apply_pending = None
-        if pending is None or self.__dict__.get("_cleanup_in_progress", False):
+        pending = self._strategy_apply_state_obj().take_pending_for_scheduled_start(
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
+        if pending is None:
             return
         self._start_strategy_apply_worker(dict(pending or {}))
 
@@ -1276,8 +1378,7 @@ class StrategyScanPage(BasePage):
             warning_prefix="strategy scan apply worker",
         )
         self._strategy_apply_runtime.cancel()
-        self._strategy_apply_pending = None
-        self._strategy_apply_start_scheduled = False
+        self._strategy_apply_state_obj().reset()
         self._support_prepare_runtime.stop(
             blocking=False,
             warning_prefix="strategy scan support prepare worker",
@@ -1290,15 +1391,13 @@ class StrategyScanPage(BasePage):
             warning_prefix="strategy scan quick targets worker",
         )
         self._quick_targets_runtime.cancel()
-        self._strategy_scan_resume_save_pending = None
-        self._strategy_scan_resume_save_start_scheduled = False
+        self._strategy_scan_resume_save_state_obj().reset()
         self._strategy_scan_resume_save_runtime.stop(
             blocking=False,
             warning_prefix="strategy scan resume save worker",
         )
         self._strategy_scan_resume_save_runtime.cancel()
-        self._strategy_scan_finalize_pending = None
-        self._strategy_scan_finalize_start_scheduled = False
+        self._strategy_scan_finalize_state_obj().reset()
         self._strategy_scan_finalize_runtime.stop(
             blocking=False,
             warning_prefix="strategy scan finalize worker",
