@@ -4027,6 +4027,23 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("create_log_history_load_worker", feature_source)
         self.assertIn("load_log_history", worker_source)
 
+    def test_orchestra_log_actions_use_shared_worker_queue_state(self) -> None:
+        page_source = inspect.getsource(OrchestraPage)
+        request_history_source = inspect.getsource(OrchestraPage._request_log_history_action)
+        finished_history_source = inspect.getsource(OrchestraPage._on_log_history_action_worker_finished)
+        request_context_source = inspect.getsource(OrchestraPage._request_log_context_action)
+        finished_context_source = inspect.getsource(OrchestraPage._on_log_context_action_worker_finished)
+
+        self.assertIn("QueuedWorkerState", page_source)
+        self.assertIn("_log_history_action_state_obj", page_source)
+        self.assertIn("_log_context_action_state_obj", page_source)
+        self.assertIn("_log_history_action_state_obj().is_busy()", request_history_source)
+        self.assertIn("_log_context_action_state_obj().is_busy()", request_context_source)
+        self.assertIn("pop_next_after_finish", finished_history_source)
+        self.assertIn("pop_next_after_finish", finished_context_source)
+        self.assertNotIn("_log_history_action_pending.pop(0)", finished_history_source)
+        self.assertNotIn("_log_context_action_pending.pop(0)", finished_context_source)
+
     def test_orchestra_whitelist_actions_run_through_worker(self) -> None:
         whitelist_workers = importlib.import_module("orchestra.managed_lists_workers")
 

@@ -39,6 +39,7 @@ from orchestra.ui.page_log_context_workflow import (
     show_log_context_menu,
 )
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
+from ui.queued_worker_state import QueuedWorkerState
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens
 from app.ui_texts import tr as tr_catalog
 from qfluentwidgets import (
@@ -100,11 +101,13 @@ class OrchestraPage(BasePage):
         self._log_history_pending = False
         self._log_history_start_scheduled = False
         self._log_history_action_runtime = OneShotWorkerRuntime()
-        self._log_history_action_pending = []
-        self._log_history_action_start_scheduled = False
+        self._log_history_action_state = QueuedWorkerState[tuple[str, str]](
+            self._log_history_action_runtime,
+        )
         self._log_context_action_runtime = OneShotWorkerRuntime()
-        self._log_context_action_pending = []
-        self._log_context_action_start_scheduled = False
+        self._log_context_action_state = QueuedWorkerState[tuple[str, str, int, str]](
+            self._log_context_action_runtime,
+        )
         self._clear_learned_reset_timer = QTimer(self)
         self._clear_learned_reset_timer.setSingleShot(True)
         self._clear_learned_reset_timer.timeout.connect(self._reset_clear_learned_button)
@@ -738,10 +741,7 @@ class OrchestraPage(BasePage):
         if normalized_action in {"view", "delete"} and not normalized_log_id:
             return
         payload = (normalized_action, normalized_log_id)
-        if (
-            self._log_history_action_runtime.is_running()
-            or self.__dict__.get("_log_history_action_start_scheduled", False)
-        ):
+        if self._log_history_action_state_obj().is_busy():
             self._queue_log_history_action(payload)
             return
         self._start_log_history_action_worker(payload)
@@ -749,10 +749,7 @@ class OrchestraPage(BasePage):
     def _queue_log_history_action(self, payload) -> None:
         action, log_id = payload
         queued = (str(action or "").strip(), str(log_id or "").strip())
-        pending = self.__dict__.setdefault("_log_history_action_pending", [])
-        if queued in pending:
-            return
-        pending.append(queued)
+        self._log_history_action_state_obj().append_unique(queued, key=lambda item: item)
 
     def _start_log_history_action_worker(self, payload) -> None:
         action, log_id = payload
@@ -798,28 +795,70 @@ class OrchestraPage(BasePage):
         log(f"Ошибка действия истории логов {action}: {error}", "DEBUG")
 
     def _on_log_history_action_worker_finished(self, worker) -> None:
-        if not self._is_current_worker_finish(self.__dict__.get("_log_history_action_runtime"), worker):
+        pending = self._log_history_action_state_obj().pop_next_after_finish(
+            worker,
+            is_current_worker_finish=self._is_current_worker_finish,
+            cleanup_in_progress=self._cleanup_in_progress,
+        )
+        if pending is None:
             return
-        if self._log_history_action_pending and not self._cleanup_in_progress:
-            pending = self._log_history_action_pending.pop(0)
-            self._schedule_log_history_action_worker_start(pending)
+        self._schedule_log_history_action_worker_start(pending)
 
     def _schedule_log_history_action_worker_start(self, payload) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         action, log_id = payload
         queued = (str(action or "").strip(), str(log_id or "").strip())
-        if self.__dict__.get("_log_history_action_start_scheduled", False):
+        state = self._log_history_action_state_obj()
+        if state.start_scheduled:
             self._queue_log_history_action(queued)
             return
-        self._log_history_action_start_scheduled = True
+        state.start_scheduled = True
         QTimer.singleShot(0, lambda value=queued: self._run_scheduled_log_history_action_worker_start(value))
 
     def _run_scheduled_log_history_action_worker_start(self, payload) -> None:
-        self._log_history_action_start_scheduled = False
+        self._log_history_action_state_obj().start_scheduled = False
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         self._start_log_history_action_worker(payload)
+
+    def _log_history_action_state_obj(self) -> QueuedWorkerState[tuple[str, str]]:
+        state = self.__dict__.get("_log_history_action_state")
+        runtime = self.__dict__.get("_log_history_action_runtime")
+        if state is None:
+            pending = [
+                (str(action or "").strip(), str(log_id or "").strip())
+                for action, log_id in list(self.__dict__.pop("_log_history_action_pending", []) or [])
+            ]
+            start_scheduled = bool(self.__dict__.pop("_log_history_action_start_scheduled", False))
+            state = QueuedWorkerState(
+                runtime,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_log_history_action_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _log_history_action_pending(self) -> list[tuple[str, str]]:
+        return self._log_history_action_state_obj().pending
+
+    @_log_history_action_pending.setter
+    def _log_history_action_pending(self, value) -> None:
+        self._log_history_action_state_obj().pending = [
+            (str(action or "").strip(), str(log_id or "").strip())
+            for action, log_id in list(value or [])
+        ]
+
+    @property
+    def _log_history_action_start_scheduled(self) -> bool:
+        return bool(self._log_history_action_state_obj().start_scheduled)
+
+    @_log_history_action_start_scheduled.setter
+    def _log_history_action_start_scheduled(self, value: bool) -> None:
+        self._log_history_action_state_obj().start_scheduled = bool(value)
 
     def _view_log_history(self):
         """Просматривает выбранный лог из истории"""
@@ -855,13 +894,13 @@ class OrchestraPage(BasePage):
             log_fn=log,
             warning_prefix="Orchestra log history worker",
         )
-        self._log_history_action_pending.clear()
+        self._log_history_action_state_obj().reset()
         self._log_history_action_runtime.stop(
             blocking=False,
             log_fn=log,
             warning_prefix="Orchestra log history action worker",
         )
-        self._log_context_action_pending.clear()
+        self._log_context_action_state_obj().reset()
         self._log_context_action_runtime.stop(
             blocking=False,
             log_fn=log,
@@ -958,10 +997,7 @@ class OrchestraPage(BasePage):
         )
         if not payload[0] or not payload[1]:
             return
-        if (
-            self._log_context_action_runtime.is_running()
-            or self.__dict__.get("_log_context_action_start_scheduled", False)
-        ):
+        if self._log_context_action_state_obj().is_busy():
             self._queue_log_context_action(payload)
             return
         self._start_log_context_action_worker(payload)
@@ -974,10 +1010,7 @@ class OrchestraPage(BasePage):
             int(strategy or 0),
             str(protocol or "").strip(),
         )
-        pending = self.__dict__.setdefault("_log_context_action_pending", [])
-        if queued in pending:
-            return
-        pending.append(queued)
+        self._log_context_action_state_obj().append_unique(queued, key=lambda item: item)
 
     def _start_log_context_action_worker(self, payload) -> None:
         action, domain, strategy, protocol = payload
@@ -1015,11 +1048,14 @@ class OrchestraPage(BasePage):
         self.append_log(self._tr("page.orchestra.log.error", "[ERROR] Ошибка: {error}", error=error))
 
     def _on_log_context_action_worker_finished(self, worker) -> None:
-        if not self._is_current_worker_finish(self.__dict__.get("_log_context_action_runtime"), worker):
+        pending = self._log_context_action_state_obj().pop_next_after_finish(
+            worker,
+            is_current_worker_finish=self._is_current_worker_finish,
+            cleanup_in_progress=self._cleanup_in_progress,
+        )
+        if pending is None:
             return
-        if self._log_context_action_pending and not self._cleanup_in_progress:
-            pending = self._log_context_action_pending.pop(0)
-            self._schedule_log_context_action_worker_start(pending)
+        self._schedule_log_context_action_worker_start(pending)
 
     def _is_current_worker_finish(self, runtime, worker) -> bool:
         request_id = getattr(worker, "_request_id", None)
@@ -1045,17 +1081,68 @@ class OrchestraPage(BasePage):
             int(strategy or 0),
             str(protocol or "").strip(),
         )
-        if self.__dict__.get("_log_context_action_start_scheduled", False):
+        state = self._log_context_action_state_obj()
+        if state.start_scheduled:
             self._queue_log_context_action(queued)
             return
-        self._log_context_action_start_scheduled = True
+        state.start_scheduled = True
         QTimer.singleShot(0, lambda value=queued: self._run_scheduled_log_context_action_worker_start(value))
 
     def _run_scheduled_log_context_action_worker_start(self, payload) -> None:
-        self._log_context_action_start_scheduled = False
+        self._log_context_action_state_obj().start_scheduled = False
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         self._start_log_context_action_worker(payload)
+
+    def _log_context_action_state_obj(self) -> QueuedWorkerState[tuple[str, str, int, str]]:
+        state = self.__dict__.get("_log_context_action_state")
+        runtime = self.__dict__.get("_log_context_action_runtime")
+        if state is None:
+            pending = [
+                (
+                    str(action or "").strip(),
+                    str(domain or "").strip(),
+                    int(strategy or 0),
+                    str(protocol or "").strip(),
+                )
+                for action, domain, strategy, protocol in list(
+                    self.__dict__.pop("_log_context_action_pending", []) or []
+                )
+            ]
+            start_scheduled = bool(self.__dict__.pop("_log_context_action_start_scheduled", False))
+            state = QueuedWorkerState(
+                runtime,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_log_context_action_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _log_context_action_pending(self) -> list[tuple[str, str, int, str]]:
+        return self._log_context_action_state_obj().pending
+
+    @_log_context_action_pending.setter
+    def _log_context_action_pending(self, value) -> None:
+        self._log_context_action_state_obj().pending = [
+            (
+                str(action or "").strip(),
+                str(domain or "").strip(),
+                int(strategy or 0),
+                str(protocol or "").strip(),
+            )
+            for action, domain, strategy, protocol in list(value or [])
+        ]
+
+    @property
+    def _log_context_action_start_scheduled(self) -> bool:
+        return bool(self._log_context_action_state_obj().start_scheduled)
+
+    @_log_context_action_start_scheduled.setter
+    def _log_context_action_start_scheduled(self, value: bool) -> None:
+        self._log_context_action_state_obj().start_scheduled = bool(value)
 
     def _lock_strategy_from_log(self, domain: str, strategy: int, protocol: str):
         """Залочивает стратегию из контекстного меню лога"""
