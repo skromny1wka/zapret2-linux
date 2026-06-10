@@ -157,12 +157,13 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
         self.assertNotIn("os.stat", apply_source)
         self.assertNotIn("open(", handle_source + apply_source)
         self.assertNotIn(".read(", handle_source + apply_source)
+        self.assertNotIn("setup_active_preset_file_watcher()", apply_source)
 
     def test_preset_content_change_defers_watcher_and_apply_after_signal(self) -> None:
         from core.runtime.preset_runtime_coordinator import PresetRuntimeCoordinator
         from settings.mode import ZAPRET2_MODE
 
-        watcher_calls: list[str] = []
+        watched_paths: list[str] = []
         content_calls: list[tuple[str, str, str]] = []
         ui_state = SimpleNamespace(
             content_revision=0,
@@ -188,17 +189,17 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
             )
             or True,
         )
-        coordinator.setup_active_preset_file_watcher = lambda: watcher_calls.append("watcher")
+        coordinator._apply_active_preset_watch_path = lambda path: watched_paths.append(path)
 
         coordinator.handle_preset_content_changed(ZAPRET2_MODE, "Default v5.txt")
 
-        self.assertEqual(watcher_calls, [])
+        self.assertEqual(watched_paths, [])
         self.assertEqual(content_calls, [])
         self.assertEqual(ui_state.content_revision, 0)
 
-        self._app.processEvents()
+        self.assertTrue(self._process_events_until(lambda: bool(watched_paths)))
 
-        self.assertEqual(watcher_calls, ["watcher"])
+        self.assertEqual(watched_paths, ["C:/Zapret/Dev/presets/winws2/Default v5.txt"])
         self.assertEqual(
             content_calls,
             [(ZAPRET2_MODE, "preset_content_changed", "Default v5.txt")],
@@ -296,6 +297,8 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
         self.assertIn("PresetWatchPathResolveWorker", start_source)
         self.assertIn("start_qthread_worker", start_source)
         self.assertNotIn("setup_active_preset_file_watcher()", schedule_source)
+        self.assertNotIn("setup_active_preset_file_watcher()", start_source)
+        self.assertNotIn("_active_preset_watch_runtime_worker", start_source)
         self.assertIn("_apply_active_preset_watch_path", loaded_source)
 
     def test_preset_watch_path_worker_uses_switched_file_name(self) -> None:
@@ -322,8 +325,8 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
         self.assertEqual(path_calls, [(ZAPRET2_MODE, "Default v5.txt")])
         self.assertEqual(loaded, [(7, "C:/Zapret/Dev/presets/winws2/Default v5.txt")])
 
-    def test_preset_watch_worker_start_fallback_keeps_switched_file_name(self) -> None:
-        from core.runtime.preset_runtime_coordinator import PresetRuntimeCoordinator
+    def test_preset_watch_worker_start_failure_does_not_resolve_path_on_gui_thread(self) -> None:
+        from core.runtime.preset_runtime_coordinator import PendingPresetWatch, PresetRuntimeCoordinator
         from settings.mode import ZAPRET2_MODE
 
         path_calls: list[tuple[str, str]] = []
@@ -349,8 +352,12 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
 
         coordinator.handle_preset_switched(ZAPRET2_MODE, "Default v5.txt")
 
-        self.assertEqual(path_calls, [(ZAPRET2_MODE, "Default v5.txt")])
+        self.assertEqual(path_calls, [])
         self.assertEqual(fallback_calls, [])
+        self.assertEqual(
+            coordinator._pending_active_preset_watch,
+            PendingPresetWatch(ZAPRET2_MODE, "Default v5.txt"),
+        )
 
     def test_rapid_preset_switches_coalesce_deferred_ui_work(self) -> None:
         from core.runtime.preset_runtime_coordinator import PresetRuntimeCoordinator

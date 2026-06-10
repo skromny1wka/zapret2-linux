@@ -110,7 +110,7 @@ class PresetRuntimeCoordinator(QObject):
         self._pending_active_preset_watch: PendingPresetWatch | None = None
         self._preset_content_apply_timer: QTimer | None = None
         self._active_preset_watch_runtime = OneShotWorkerRuntime()
-        self._active_preset_watch_runtime_worker = None
+        self._active_preset_watch_runtime_request_id = 0
 
     def setup_active_preset_file_watcher(self) -> None:
         watched_path = self._resolve_active_preset_watch_path()
@@ -308,11 +308,10 @@ class PresetRuntimeCoordinator(QObject):
         if pending is None:
             return
 
-        self._pending_active_preset_watch = PendingPresetWatch(
+        self._schedule_active_preset_file_watcher_setup(
             launch_method=pending.launch_method,
             preset_file_name=pending.preset_file_name,
         )
-        self.setup_active_preset_file_watcher()
         self._publish_active_preset_content_changed(pending.preset_file_name)
         self._request_preset_content_apply(
             pending.launch_method,
@@ -398,7 +397,7 @@ class PresetRuntimeCoordinator(QObject):
         pending = self._pending_active_preset_watch
         self._pending_active_preset_watch = None
         try:
-            _request_id, worker = runtime.start_qthread_worker(
+            request_id, _worker = runtime.start_qthread_worker(
                 worker_factory=lambda request_id: PresetWatchPathResolveWorker(
                     request_id,
                     pending=pending,
@@ -410,10 +409,10 @@ class PresetRuntimeCoordinator(QObject):
                 on_failed=self._on_active_preset_watch_path_failed,
                 on_finished=self._on_active_preset_watch_worker_finished,
             )
-            self._active_preset_watch_runtime_worker = worker
+            self._active_preset_watch_runtime_request_id = request_id
         except Exception:
             self._pending_active_preset_watch = pending
-            self.setup_active_preset_file_watcher()
+            log("PresetRuntimeCoordinator: не удалось запустить Worker watcher активного preset", "DEBUG")
 
     def _on_active_preset_watch_path_loaded(self, request_id: int, watched_path: str) -> None:
         runtime = self.__dict__.get("_active_preset_watch_runtime")
@@ -430,9 +429,8 @@ class PresetRuntimeCoordinator(QObject):
         log(f"PresetRuntimeCoordinator: не удалось подготовить watcher активного preset: {error}", "DEBUG")
 
     def _on_active_preset_watch_worker_finished(self, worker) -> None:
-        if worker is not self.__dict__.get("_active_preset_watch_runtime_worker"):
+        if not self._accept_current_active_preset_watch_worker_finished(worker):
             return
-        self._active_preset_watch_runtime_worker = None
         if not self.__dict__.get("_active_preset_file_watcher_setup_pending", False):
             return
         self._active_preset_file_watcher_setup_pending = False
@@ -440,6 +438,19 @@ class PresetRuntimeCoordinator(QObject):
             QTimer.singleShot(0, self._start_active_preset_watch_worker)
         except Exception:
             self._start_active_preset_watch_worker()
+
+    def _accept_current_active_preset_watch_worker_finished(self, worker) -> bool:
+        request_id = getattr(worker, "_request_id", None)
+        if request_id is None:
+            return False
+        try:
+            current_request_id = int(self.__dict__.get("_active_preset_watch_runtime_request_id", 0) or 0)
+            if int(request_id) != current_request_id:
+                return False
+        except (TypeError, ValueError):
+            return False
+        self._active_preset_watch_runtime_request_id = 0
+        return True
 
     def _is_selected_source_preset(self, launch_method: str, preset_file_name: str) -> bool:
         try:
