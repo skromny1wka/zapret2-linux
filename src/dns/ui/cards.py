@@ -21,7 +21,7 @@ from qfluentwidgets import (
 )
 
 from ui.fluent_widgets import SettingsCard, set_tooltip
-from ui.accessibility import set_control_accessibility
+from ui.accessibility import set_control_accessibility, set_state_text
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens
 from ui.theme_refresh import ThemeRefreshBinding
 from app.ui_texts import tr as tr_catalog
@@ -238,9 +238,11 @@ class DNSProviderCard(SettingsCard):
             parts.append(description)
         if ip_text and ip_text != "-":
             parts.append(ip_text)
+        state_text = ", ".join(parts)
+        set_state_text(self, state_text)
         set_control_accessibility(
             self,
-            name=", ".join(parts),
+            name=state_text,
             description="Нажмите Enter или пробел, чтобы выбрать этого DNS-провайдера.",
         )
 
@@ -402,8 +404,10 @@ class AdapterCard(SettingsCard):
         parts = [f"Сетевой адаптер {self.adapter_name}", checked_text]
         if dns_text:
             parts.append(f"DNS {dns_text}")
+        state_text = ", ".join(parts)
+        set_state_text(self, state_text)
         set_control_accessibility(
             self,
-            name=", ".join(parts),
+            name=state_text,
             description="Нажмите Enter или пробел, чтобы включить или исключить этот адаптер.",
         )

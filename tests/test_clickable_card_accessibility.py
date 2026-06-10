@@ -46,6 +46,17 @@ class ClickableCardAccessibilityTests(unittest.TestCase):
 
         self.assertEqual(card.focusPolicy(), Qt.FocusPolicy.StrongFocus)
         self.assertIn("DNS Cloudflare", card.accessibleName())
+        self.assertEqual(
+            card.property("screenReaderStateText"),
+            "DNS Cloudflare, не выбран, быстрый DNS, 1.1.1.1",
+        )
+
+        card.set_selected(True)
+
+        self.assertEqual(
+            card.property("screenReaderStateText"),
+            "DNS Cloudflare, выбран, быстрый DNS, 1.1.1.1",
+        )
 
         self._press_key(card, Qt.Key.Key_Space)
 
@@ -58,11 +69,19 @@ class ClickableCardAccessibilityTests(unittest.TestCase):
 
         self.assertEqual(card.focusPolicy(), Qt.FocusPolicy.StrongFocus)
         self.assertIn("Сетевой адаптер Ethernet", card.accessibleName())
+        self.assertEqual(
+            card.property("screenReaderStateText"),
+            "Сетевой адаптер Ethernet, выбран, DNS v4 8.8.8.8",
+        )
         self.assertTrue(card.checkbox.isChecked())
 
         self._press_key(card, Qt.Key.Key_Return)
 
         self.assertFalse(card.checkbox.isChecked())
+        self.assertEqual(
+            card.property("screenReaderStateText"),
+            "Сетевой адаптер Ethernet, не выбран, DNS v4 8.8.8.8",
+        )
 
 
 if __name__ == "__main__":
