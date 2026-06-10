@@ -352,12 +352,15 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertTrue(hasattr(runtime_service, "UserPresetsSingleMetadataWorker"))
         changed_source = inspect.getsource(UserPresetsRuntimeService.on_store_content_changed)
         request_source = inspect.getsource(UserPresetsRuntimeService._request_single_metadata_refresh)
+        start_source = inspect.getsource(UserPresetsRuntimeService._start_single_metadata_refresh_worker)
         loaded_source = inspect.getsource(UserPresetsRuntimeService._on_single_metadata_loaded)
         worker_source = inspect.getsource(runtime_service.UserPresetsSingleMetadataWorker.run)
 
         self.assertNotIn("adapter.read_single_metadata(file_name)", changed_source)
         self.assertIn("_request_single_metadata_refresh", changed_source)
-        self.assertIn("UserPresetsSingleMetadataWorker", request_source)
+        self.assertIn("_single_metadata_state_obj", request_source)
+        self.assertIn("_start_single_metadata_refresh_worker", request_source)
+        self.assertIn("UserPresetsSingleMetadataWorker", start_source)
         self.assertIn("_read_single_metadata", worker_source)
         self.assertIn("try_apply_single_preset_metadata_update", loaded_source)
 

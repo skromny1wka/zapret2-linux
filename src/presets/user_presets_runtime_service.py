@@ -12,6 +12,7 @@ from log.log import log
 from presets.icon_color import normalize_preset_icon_color
 from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
+from ui.queued_worker_state import QueuedWorkerState
 
 
 USER_PRESETS_TIMING_LOG_LEVEL = "⏱ PRESETS"
@@ -214,8 +215,7 @@ class UserPresetsRuntimeService:
         self._metadata_load_state = LatestValueWorkerState(self._metadata_load_runtime, empty_value=None)
         self._single_metadata_request_id = 0
         self._single_metadata_runtime = OneShotWorkerRuntime()
-        self._single_metadata_pending: list[str] = []
-        self._single_metadata_start_scheduled = False
+        self._single_metadata_state = QueuedWorkerState[str](self._single_metadata_runtime)
         self._rows_plan_request_id = 0
         self._rows_plan_runtime = OneShotWorkerRuntime()
         self._rows_plan_state = LatestValueWorkerState(self._rows_plan_runtime, empty_value=None, pending=None)
@@ -328,12 +328,26 @@ class UserPresetsRuntimeService:
         if not normalized_file_name:
             return
 
-        if (
-            self._single_metadata_runtime.is_running()
-            or self.__dict__.get("_single_metadata_start_scheduled", False)
-        ):
-            if normalized_file_name not in self._single_metadata_pending:
-                self._single_metadata_pending.append(normalized_file_name)
+        state = self._single_metadata_state_obj()
+        if state.is_busy():
+            self._queue_single_metadata_refresh(normalized_file_name)
+            return
+
+        self._start_single_metadata_refresh_worker(normalized_file_name, page)
+
+    def _queue_single_metadata_refresh(self, file_name: str) -> None:
+        normalized_file_name = str(file_name or "").strip()
+        if not normalized_file_name:
+            return
+        state = self._single_metadata_state_obj()
+        if normalized_file_name not in state.pending:
+            state.pending.append(normalized_file_name)
+
+    def _start_single_metadata_refresh_worker(self, file_name: str, page=None) -> None:
+        page = self._resolve_page(page)
+        adapter = self._resolve_adapter()
+        normalized_file_name = str(file_name or "").strip()
+        if not normalized_file_name:
             return
 
         def bind_worker(worker) -> None:
@@ -369,7 +383,7 @@ class UserPresetsRuntimeService:
     def _on_single_metadata_loaded(self, request_id: int, file_name: str, refreshed, page=None) -> None:
         if request_id != self._single_metadata_request_id:
             return
-        if str(file_name or "").strip() in self.__dict__.get("_single_metadata_pending", []):
+        if str(file_name or "").strip() in self._single_metadata_state_obj().pending:
             return
         page = self._resolve_page(page)
         adapter = self._resolve_adapter()
@@ -402,7 +416,7 @@ class UserPresetsRuntimeService:
     def _on_single_metadata_failed(self, request_id: int, file_name: str, error: str, page=None) -> None:
         if request_id != self._single_metadata_request_id:
             return
-        if str(file_name or "").strip() in self.__dict__.get("_single_metadata_pending", []):
+        if str(file_name or "").strip() in self._single_metadata_state_obj().pending:
             return
         page = self._resolve_page(page)
         self._ui_dirty = True
@@ -413,24 +427,53 @@ class UserPresetsRuntimeService:
     def _on_single_metadata_worker_finished(self, worker: UserPresetsSingleMetadataWorker, page=None) -> None:
         if not self._is_current_worker_finish(worker, "_single_metadata_request_id"):
             return
-        if self._single_metadata_pending:
+        if self._single_metadata_state_obj().has_pending():
             self._schedule_single_metadata_refresh(page)
 
     def _schedule_single_metadata_refresh(self, page=None) -> None:
-        if self.__dict__.get("_single_metadata_start_scheduled", False):
+        state = self._single_metadata_state_obj()
+        if state.start_scheduled:
             return
-        self._single_metadata_start_scheduled = True
+        state.start_scheduled = True
         try:
             QTimer.singleShot(0, lambda p=page: self._run_scheduled_single_metadata_refresh(p))
         except Exception:
             self._run_scheduled_single_metadata_refresh(page)
 
     def _run_scheduled_single_metadata_refresh(self, page=None) -> None:
-        self._single_metadata_start_scheduled = False
-        if not self._single_metadata_pending:
+        state = self._single_metadata_state_obj()
+        state.start_scheduled = False
+        if not state.has_pending():
             return
-        pending_file_name = self._single_metadata_pending.pop(0)
+        pending_file_name = state.pop_next()
         self._request_single_metadata_refresh(pending_file_name, page)
+
+    def _single_metadata_state_obj(self) -> QueuedWorkerState[str]:
+        state = self.__dict__.get("_single_metadata_state")
+        if state is None:
+            runtime = self.__dict__.get("_single_metadata_runtime")
+            if runtime is None:
+                runtime = OneShotWorkerRuntime()
+                self._single_metadata_runtime = runtime
+            state = QueuedWorkerState[str](runtime)
+            self._single_metadata_state = state
+        return state
+
+    @property
+    def _single_metadata_pending(self):
+        return self._single_metadata_state_obj().pending
+
+    @_single_metadata_pending.setter
+    def _single_metadata_pending(self, value) -> None:
+        self._single_metadata_state_obj().pending = list(value or [])
+
+    @property
+    def _single_metadata_start_scheduled(self) -> bool:
+        return bool(self._single_metadata_state_obj().start_scheduled)
+
+    @_single_metadata_start_scheduled.setter
+    def _single_metadata_start_scheduled(self, value: bool) -> None:
+        self._single_metadata_state_obj().start_scheduled = bool(value)
 
     def current_search_query(self, page=None) -> str:
         page = self._resolve_page(page)
@@ -678,8 +721,7 @@ class UserPresetsRuntimeService:
         self._single_metadata_request_id += 1
         self._rows_plan_request_id += 1
         self._metadata_load_state_obj().reset()
-        self._single_metadata_pending.clear()
-        self._single_metadata_start_scheduled = False
+        self._single_metadata_state_obj().reset()
         self._rows_plan_state_obj().reset()
         self._rows_plan_apply_scheduled = False
         self._pending_rows_plan_apply = None

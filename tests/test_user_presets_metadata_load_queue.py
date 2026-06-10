@@ -143,6 +143,27 @@ class UserPresetsMetadataLoadQueueTests(unittest.TestCase):
         _SingleMetadataWorker.instances.clear()
         _RowsPlanWorker.instances.clear()
 
+    def test_single_metadata_queue_state_lives_in_queued_worker_state(self) -> None:
+        import inspect
+        from presets.user_presets_runtime_service import UserPresetsRuntimeService
+        from ui.queued_worker_state import QueuedWorkerState
+
+        service = UserPresetsRuntimeService()
+        module_source = inspect.getsource(
+            __import__("presets.user_presets_runtime_service", fromlist=[""])
+        )
+        init_source = inspect.getsource(UserPresetsRuntimeService.__init__)
+        request_source = inspect.getsource(UserPresetsRuntimeService._request_single_metadata_refresh)
+        finished_source = inspect.getsource(UserPresetsRuntimeService._on_single_metadata_worker_finished)
+        run_scheduled_source = inspect.getsource(UserPresetsRuntimeService._run_scheduled_single_metadata_refresh)
+
+        self.assertIsInstance(service._single_metadata_state_obj(), QueuedWorkerState)
+        self.assertIn("from ui.queued_worker_state import QueuedWorkerState", module_source)
+        self.assertIn("_single_metadata_state = QueuedWorkerState", init_source)
+        self.assertIn("_single_metadata_state_obj()", request_source)
+        self.assertIn("_single_metadata_state_obj().has_pending()", finished_source)
+        self.assertIn("state.pop_next()", run_scheduled_source)
+
     def test_full_metadata_load_replays_latest_request_after_running_worker_finishes(self) -> None:
         from presets.user_presets_runtime_service import UserPresetsRuntimeAdapter, UserPresetsRuntimeService
 
