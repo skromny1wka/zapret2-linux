@@ -1017,6 +1017,27 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("create_whitelist_snapshot_load_worker", feature_source)
         self.assertIn("create_whitelist_action_worker", feature_source)
 
+    def test_whitelist_page_uses_shared_worker_state_helpers(self) -> None:
+        import orchestra.ui.whitelist_page as whitelist_page
+        from orchestra.ui.whitelist_page import OrchestraWhitelistPage
+        from ui.latest_value_worker_state import LatestValueWorkerState
+        from ui.queued_worker_state import QueuedWorkerState
+
+        init_source = inspect.getsource(OrchestraWhitelistPage.__init__)
+        page_source = inspect.getsource(OrchestraWhitelistPage)
+        cleanup_source = inspect.getsource(OrchestraWhitelistPage.cleanup)
+
+        self.assertTrue(hasattr(whitelist_page, "LatestValueWorkerState"))
+        self.assertTrue(hasattr(whitelist_page, "QueuedWorkerState"))
+        self.assertIs(whitelist_page.LatestValueWorkerState, LatestValueWorkerState)
+        self.assertIs(whitelist_page.QueuedWorkerState, QueuedWorkerState)
+        self.assertIn("_snapshot_refresh_state = LatestValueWorkerState", init_source)
+        self.assertIn("_whitelist_action_state = QueuedWorkerState", init_source)
+        self.assertIn("_snapshot_refresh_state_obj()", page_source)
+        self.assertIn("_whitelist_action_state_obj()", page_source)
+        self.assertIn("_snapshot_refresh_state_obj().reset()", cleanup_source)
+        self.assertIn("_whitelist_action_state_obj().reset()", cleanup_source)
+
     def test_locked_blocked_pages_use_feature_without_controller_wrappers(self) -> None:
         from app.feature_facades.orchestra import OrchestraFeature
         from orchestra.ui.blocked_page import OrchestraBlockedPage

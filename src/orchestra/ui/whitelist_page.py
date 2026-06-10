@@ -24,7 +24,9 @@ from qfluentwidgets import (
 from ui.pages.base_page import BasePage
 from ui.accessibility import set_control_accessibility
 from ui.fluent_widgets import set_tooltip
+from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
+from ui.queued_worker_state import QueuedWorkerState
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens
 from ui.theme_refresh import ThemeRefreshBinding
 from app.ui_texts import tr as tr_catalog
@@ -181,11 +183,9 @@ class OrchestraWhitelistPage(BasePage):
         self._runtime_initialized = False
         self._last_snapshot_revision = None
         self._snapshot_runtime = OneShotWorkerRuntime()
-        self._snapshot_refresh_pending = False
-        self._snapshot_refresh_start_scheduled = False
+        self._snapshot_refresh_state = LatestValueWorkerState(self._snapshot_runtime, empty_value=False)
         self._action_runtime = OneShotWorkerRuntime()
-        self._whitelist_action_pending: list[dict[str, object]] = []
-        self._whitelist_action_start_scheduled = False
+        self._whitelist_action_state = QueuedWorkerState[dict[str, object]](self._action_runtime)
 
         self._setup_ui()
         self._apply_page_theme(force=True)
@@ -458,9 +458,10 @@ class OrchestraWhitelistPage(BasePage):
         )
 
     def _start_snapshot_worker(self, *, refresh: bool) -> None:
-        if self._snapshot_runtime.is_running() or self.__dict__.get("_snapshot_refresh_start_scheduled", False):
+        state = self._snapshot_refresh_state_obj()
+        if state.is_busy():
             if refresh:
-                self._snapshot_refresh_pending = True
+                state.pending = True
             return
         self._snapshot_runtime.start_qthread_worker(
             worker_factory=lambda request_id: self.create_snapshot_worker(
@@ -478,7 +479,7 @@ class OrchestraWhitelistPage(BasePage):
             cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
         ):
             return
-        if self.__dict__.get("_snapshot_refresh_pending", False):
+        if self._snapshot_refresh_state_obj().has_pending():
             return
         if not refresh and snapshot.revision == self._last_snapshot_revision:
             return
@@ -490,31 +491,36 @@ class OrchestraWhitelistPage(BasePage):
             cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
         ):
             return
-        if self.__dict__.get("_snapshot_refresh_pending", False):
+        if self._snapshot_refresh_state_obj().has_pending():
             return
         log(f"Не удалось загрузить whitelist: {error}", "WARNING")
 
     def _on_snapshot_finished(self, worker) -> None:
-        if not self._is_current_worker_finish(self.__dict__.get("_snapshot_runtime"), worker):
-            return
-        if self._snapshot_refresh_pending and not bool(getattr(self, "_cleanup_in_progress", False)):
-            self._snapshot_refresh_pending = False
-            self._schedule_snapshot_refresh_start()
-            return
-        self._snapshot_refresh_pending = False
+        self._snapshot_refresh_state_obj().schedule_pending_after_finish(
+            worker,
+            is_current_worker_finish=self._is_current_worker_finish,
+            single_shot=QTimer.singleShot,
+            run_scheduled=self._run_scheduled_snapshot_refresh_start,
+            cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
+        )
 
     def _schedule_snapshot_refresh_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        if self.__dict__.get("_snapshot_refresh_start_scheduled", False):
-            self._snapshot_refresh_pending = True
-            return
-        self._snapshot_refresh_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_snapshot_refresh_start)
+        state = self._snapshot_refresh_state_obj()
+        state.pending = True
+        state.schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_snapshot_refresh_start,
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+            pending_when_already_scheduled=True,
+        )
 
     def _run_scheduled_snapshot_refresh_start(self) -> None:
-        self._snapshot_refresh_start_scheduled = False
-        if self.__dict__.get("_cleanup_in_progress", False):
+        pending = self._snapshot_refresh_state_obj().take_pending_for_scheduled_start(
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
+        if not pending:
             return
         self._start_snapshot_worker(refresh=True)
 
@@ -720,13 +726,17 @@ class OrchestraWhitelistPage(BasePage):
         domain: str = "",
         user_domains: list[str] | None = None,
     ) -> None:
-        if self._action_runtime.is_running() or self.__dict__.get("_whitelist_action_start_scheduled", False):
-            self._queue_whitelist_action(
-                action=action,
-                domain=domain,
-                user_domains=user_domains,
-            )
+        queued = self._whitelist_action_payload(action=action, domain=domain, user_domains=user_domains)
+        state = self._whitelist_action_state_obj()
+        if state.is_busy():
+            self._queue_whitelist_action_payload(queued)
             return
+        self._start_whitelist_action_worker(queued)
+
+    def _start_whitelist_action_worker(self, queued: dict[str, object]) -> None:
+        action = str((queued or {}).get("action") or "")
+        domain = str((queued or {}).get("domain") or "")
+        user_domains = (queued or {}).get("user_domains")
         self._action_runtime.start_qthread_worker(
             worker_factory=lambda request_id: self.create_action_worker(
                 request_id,
@@ -739,6 +749,19 @@ class OrchestraWhitelistPage(BasePage):
             on_finished=self._on_whitelist_action_finished,
         )
 
+    def _whitelist_action_payload(
+        self,
+        *,
+        action: str,
+        domain: str = "",
+        user_domains: list[str] | None = None,
+    ) -> dict[str, object]:
+        return {
+            "action": str(action or ""),
+            "domain": str(domain or ""),
+            "user_domains": list(user_domains) if user_domains is not None else None,
+        }
+
     def _queue_whitelist_action(
         self,
         *,
@@ -747,12 +770,11 @@ class OrchestraWhitelistPage(BasePage):
         user_domains: list[str] | None = None,
         prepend: bool = False,
     ) -> None:
-        queued = {
-            "action": str(action or ""),
-            "domain": str(domain or ""),
-            "user_domains": list(user_domains) if user_domains is not None else None,
-        }
-        pending = self.__dict__.setdefault("_whitelist_action_pending", [])
+        queued = self._whitelist_action_payload(action=action, domain=domain, user_domains=user_domains)
+        self._queue_whitelist_action_payload(queued, prepend=prepend)
+
+    def _queue_whitelist_action_payload(self, queued: dict[str, object], *, prepend: bool = False) -> None:
+        pending = self._whitelist_action_state_obj().pending
         if queued in pending:
             return
         if prepend:
@@ -799,10 +821,9 @@ class OrchestraWhitelistPage(BasePage):
             self._action_runtime.worker = None
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        pending_actions = self.__dict__.setdefault("_whitelist_action_pending", [])
-        pending = dict(pending_actions.pop(0)) if pending_actions else None
+        pending = self._whitelist_action_state_obj().pop_next()
         if pending is not None:
-            self._schedule_whitelist_action_start(pending)
+            self._schedule_whitelist_action_start(dict(pending or {}))
 
     def _is_current_worker_finish(self, runtime, worker) -> bool:
         request_id = getattr(worker, "_request_id", None)
@@ -821,19 +842,15 @@ class OrchestraWhitelistPage(BasePage):
     def _schedule_whitelist_action_start(self, pending: dict[str, object]) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        if self.__dict__.get("_whitelist_action_start_scheduled", False):
-            self._queue_whitelist_action(
-                action=str((pending or {}).get("action") or ""),
-                domain=str((pending or {}).get("domain") or ""),
-                user_domains=(pending or {}).get("user_domains"),
-                prepend=True,
-            )
+        state = self._whitelist_action_state_obj()
+        if state.start_scheduled:
+            self._queue_whitelist_action_payload(dict(pending or {}), prepend=True)
             return
-        self._whitelist_action_start_scheduled = True
+        state.start_scheduled = True
         QTimer.singleShot(0, lambda value=dict(pending or {}): self._run_scheduled_whitelist_action_start(value))
 
     def _run_scheduled_whitelist_action_start(self, pending: dict[str, object]) -> None:
-        self._whitelist_action_start_scheduled = False
+        self._whitelist_action_state_obj().start_scheduled = False
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         self._request_whitelist_action(
@@ -842,12 +859,75 @@ class OrchestraWhitelistPage(BasePage):
             user_domains=pending.get("user_domains"),
         )
 
+    def _snapshot_refresh_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_snapshot_refresh_state")
+        runtime = self.__dict__.get("_snapshot_runtime")
+        if state is None:
+            pending = bool(self.__dict__.pop("_snapshot_refresh_pending", False))
+            start_scheduled = bool(self.__dict__.pop("_snapshot_refresh_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=False,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_snapshot_refresh_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _snapshot_refresh_pending(self) -> bool:
+        return bool(self._snapshot_refresh_state_obj().pending)
+
+    @_snapshot_refresh_pending.setter
+    def _snapshot_refresh_pending(self, value: bool) -> None:
+        self._snapshot_refresh_state_obj().pending = bool(value)
+
+    @property
+    def _snapshot_refresh_start_scheduled(self) -> bool:
+        return bool(self._snapshot_refresh_state_obj().start_scheduled)
+
+    @_snapshot_refresh_start_scheduled.setter
+    def _snapshot_refresh_start_scheduled(self, value: bool) -> None:
+        self._snapshot_refresh_state_obj().start_scheduled = bool(value)
+
+    def _whitelist_action_state_obj(self) -> QueuedWorkerState[dict[str, object]]:
+        state = self.__dict__.get("_whitelist_action_state")
+        runtime = self.__dict__.get("_action_runtime")
+        if state is None:
+            pending = list(self.__dict__.pop("_whitelist_action_pending", []) or [])
+            start_scheduled = bool(self.__dict__.pop("_whitelist_action_start_scheduled", False))
+            state = QueuedWorkerState[dict[str, object]](
+                runtime,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_whitelist_action_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _whitelist_action_pending(self) -> list[dict[str, object]]:
+        return self._whitelist_action_state_obj().pending
+
+    @_whitelist_action_pending.setter
+    def _whitelist_action_pending(self, value: list[dict[str, object]]) -> None:
+        self._whitelist_action_state_obj().pending = list(value or [])
+
+    @property
+    def _whitelist_action_start_scheduled(self) -> bool:
+        return bool(self._whitelist_action_state_obj().start_scheduled)
+
+    @_whitelist_action_start_scheduled.setter
+    def _whitelist_action_start_scheduled(self, value: bool) -> None:
+        self._whitelist_action_state_obj().start_scheduled = bool(value)
+
     def cleanup(self) -> None:
         super().cleanup()
-        self._snapshot_refresh_pending = False
-        self._snapshot_refresh_start_scheduled = False
-        self.__dict__.setdefault("_whitelist_action_pending", []).clear()
-        self._whitelist_action_start_scheduled = False
+        self._snapshot_refresh_state_obj().reset()
+        self._whitelist_action_state_obj().reset()
         self._snapshot_runtime.stop(
             blocking=False,
             log_fn=log,
