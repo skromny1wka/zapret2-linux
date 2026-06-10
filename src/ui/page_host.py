@@ -117,6 +117,21 @@ class WindowPageHost:
             except Exception:
                 animation_flag_known = False
 
+        updates_were_enabled = True
+        updates_toggled = False
+        set_updates_enabled = getattr(stack, "setUpdatesEnabled", None)
+        if callable(set_updates_enabled):
+            try:
+                updates_were_enabled = bool(stack.updatesEnabled())
+            except Exception:
+                updates_were_enabled = True
+            if updates_were_enabled:
+                try:
+                    set_updates_enabled(False)
+                    updates_toggled = True
+                except Exception:
+                    updates_toggled = False
+
         try:
             try:
                 stack.setCurrentWidget(page, False)
@@ -126,6 +141,14 @@ class WindowPageHost:
         except Exception:
             return False
         finally:
+            if updates_toggled:
+                try:
+                    set_updates_enabled(True)
+                    update = getattr(stack, "update", None)
+                    if callable(update):
+                        update()
+                except Exception:
+                    pass
             if animation_flag_known:
                 try:
                     stack.isAnimationEnabled = bool(previous_animation_enabled)

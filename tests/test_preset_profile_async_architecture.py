@@ -4154,6 +4154,43 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertFalse(stack.animation_seen_during_switch)
         self.assertTrue(stack.isAnimationEnabled)
 
+    def test_page_host_defers_stack_repaint_during_direct_switch(self) -> None:
+        class _FakeStack:
+            def __init__(self) -> None:
+                self.isAnimationEnabled = True
+                self.updates_enabled = True
+                self.updates_seen_during_switch = None
+                self.calls: list[tuple[str, bool | None]] = []
+
+            def setUpdatesEnabled(self, enabled):  # noqa: N802
+                self.updates_enabled = bool(enabled)
+                self.calls.append(("updates", self.updates_enabled))
+
+            def setCurrentWidget(self, page, need_pop_out=False):
+                _ = page
+                _ = need_pop_out
+                self.updates_seen_during_switch = self.updates_enabled
+                self.calls.append(("switch", self.updates_seen_during_switch))
+
+            def update(self):
+                self.calls.append(("update", None))
+
+        stack = _FakeStack()
+        host = WindowPageHost(window=type("Window", (), {"stackedWidget": stack})(), page_factory=None)
+
+        self.assertTrue(host.set_stacked_widget_current_page(object(), animate=False))
+        self.assertFalse(stack.updates_seen_during_switch)
+        self.assertTrue(stack.updates_enabled)
+        self.assertEqual(
+            stack.calls,
+            [
+                ("updates", False),
+                ("switch", False),
+                ("updates", True),
+                ("update", None),
+            ],
+        )
+
     def test_telegram_proxy_builds_secondary_tabs_lazily(self) -> None:
         setup_source = inspect.getsource(TelegramProxyPage._setup_ui)
         after_source = inspect.getsource(TelegramProxyPage._after_ui_built)

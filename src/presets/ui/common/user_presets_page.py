@@ -1660,9 +1660,22 @@ class UserPresetsPageBase(BasePage):
 
     @_pending_preset_storage_actions.setter
     def _pending_preset_storage_actions(self, value: list[dict[str, object]]) -> None:
+        pending = self._preset_write_state_obj().pending
+        storage_operations = [
+            operation
+            for operation in pending
+            if str(operation.get("kind") or "") == "storage"
+        ]
+        next_storage_actions = list(value or [])
+        if storage_operations and len(storage_operations) == len(next_storage_actions):
+            for operation, next_action in zip(storage_operations, next_storage_actions):
+                next_action = dict(next_action or {})
+                for key, next_value in next_action.items():
+                    operation[key] = next_value
+            return
         self._replace_preset_write_operations(
             "storage",
-            [self._preset_write_operation_from_storage_action(operation) for operation in list(value or [])],
+            [self._preset_write_operation_from_storage_action(operation) for operation in next_storage_actions],
         )
 
     @property
@@ -2186,7 +2199,27 @@ class UserPresetsPageBase(BasePage):
     def _on_preset_activate_worker_finished(self, worker) -> None:
         if not self._accept_current_preset_write_worker_finished("_preset_activate_runtime_worker", worker):
             return
-        self._start_next_preset_write_action()
+        if self._start_next_preset_write_action():
+            return
+        pending = self._pending_preset_activation
+        if pending:
+            self._replace_preset_write_operations("activate", [])
+            self._schedule_pending_preset_activation_start(pending[0], pending[1])
+
+    def _schedule_pending_preset_activation_start(self, file_name: str, display_name: str) -> None:
+        try:
+            QTimer.singleShot(
+                0,
+                lambda: self._start_preset_activation_worker(
+                    str(file_name or ""),
+                    str(display_name or ""),
+                ),
+            )
+        except Exception:
+            self._start_preset_activation_worker(
+                str(file_name or ""),
+                str(display_name or ""),
+            )
 
     def _on_edit_preset(self, name: str, global_pos: QPoint | None = None):
         open_edit_preset_menu_action(
