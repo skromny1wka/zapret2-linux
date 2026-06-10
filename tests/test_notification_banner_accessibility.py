@@ -22,6 +22,8 @@ class NotificationBannerAccessibilityTests(unittest.TestCase):
         banner.show_error("Не удалось запустить Zapret", auto_hide_ms=0)
 
         self.assertEqual(banner.accessibleName(), "Ошибка: Не удалось запустить Zapret")
+        self.assertEqual(banner.property("screenReaderStateText"), "Ошибка: Не удалось запустить Zapret")
+        self.assertEqual(banner.message_label.property("screenReaderStateText"), "Ошибка: Не удалось запустить Zapret")
         self.assertIn("уведомление", banner.accessibleDescription().lower())
 
     def test_close_button_has_screen_reader_name_and_description(self) -> None:
