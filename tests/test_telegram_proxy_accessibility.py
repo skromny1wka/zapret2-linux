@@ -158,6 +158,17 @@ class TelegramProxyAccessibilityTests(unittest.TestCase):
         self.assertEqual(widgets.upstream_user_edit.accessibleName(), "Логин upstream-прокси Telegram Proxy")
         self.assertEqual(widgets.upstream_pass_edit.accessibleName(), "Пароль upstream-прокси Telegram Proxy")
         self.assertEqual(widgets.mtproxy_action_btn.accessibleName(), "Открыть MTProxy в Telegram")
+        self.assertEqual(widgets.cloudflare_domains_edit.accessibleName(), "Домены Cloudflare для Telegram Proxy")
+        self.assertIn("запасного WSS-пути", widgets.cloudflare_domains_edit.accessibleDescription())
+        self.assertEqual(widgets.cloudflare_test_btn.accessibleName(), "Проверить Cloudflare-домен Telegram Proxy")
+        self.assertEqual(widgets.cloudflare_dns_btn.accessibleName(), "Скопировать DNS-записи Cloudflare Telegram Proxy")
+        self.assertEqual(widgets.cloudflare_worker_domains_edit.accessibleName(), "Домены Cloudflare Worker для Telegram Proxy")
+        self.assertEqual(widgets.cloudflare_worker_test_btn.accessibleName(), "Проверить Cloudflare Worker Telegram Proxy")
+        self.assertEqual(widgets.cloudflare_worker_code_btn.accessibleName(), "Скопировать код Cloudflare Worker")
+        self.assertEqual(widgets.dc_ip_edit.accessibleName(), "Ручные адреса Telegram DC")
+        self.assertIn("номер дата-центра и IP", widgets.dc_ip_edit.accessibleDescription())
+        self.assertEqual(widgets.pool_size_spin.accessibleName(), "Пул WSS Telegram Proxy")
+        self.assertEqual(widgets.buffer_kb_spin.accessibleName(), "Размер буфера Telegram Proxy")
 
     def test_status_change_sets_screen_reader_state_text(self) -> None:
         status_dot = _AccessibleStatusDot()

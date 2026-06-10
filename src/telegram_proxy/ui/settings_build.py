@@ -605,15 +605,30 @@ def build_telegram_proxy_advanced_settings_panel(
     cloudflare_domains_edit.setPlaceholderText("Пусто = авто, или example.com, backup.example.com")
     cloudflare_domains_edit.setClearButtonEnabled(True)
     set_tooltip(cloudflare_domains_edit, "Cloudflare-домены для запасного WSS-пути. Оставьте пустым для авто-списка.")
+    set_control_accessibility(
+        cloudflare_domains_edit,
+        name="Домены Cloudflare для Telegram Proxy",
+        description="Cloudflare-домены для запасного WSS-пути. Оставьте пустым для авто-списка.",
+    )
     cloudflare_domains_layout.addWidget(cloudflare_domains_edit)
     cloudflare_test_btn = push_button_cls("Проверить", icon=FluentIcon.SEARCH)
     cloudflare_test_btn.setMinimumWidth(116)
     set_tooltip(cloudflare_test_btn, "Проверить, отвечает ли ваш Cloudflare-домен для Telegram.")
+    set_control_accessibility(
+        cloudflare_test_btn,
+        name="Проверить Cloudflare-домен Telegram Proxy",
+        description="Проверить, отвечает ли ваш Cloudflare-домен для Telegram.",
+    )
     cloudflare_test_btn.clicked.connect(on_test_cloudflare)
     cloudflare_domains_layout.addWidget(cloudflare_test_btn)
     cloudflare_dns_btn = push_button_cls("DNS", icon=FluentIcon.COPY)
     cloudflare_dns_btn.setMinimumWidth(84)
     set_tooltip(cloudflare_dns_btn, "Скопировать DNS-записи kws1, kws2, kws3, kws4, kws5 и kws203.")
+    set_control_accessibility(
+        cloudflare_dns_btn,
+        name="Скопировать DNS-записи Cloudflare Telegram Proxy",
+        description="Скопировать DNS-записи kws1, kws2, kws3, kws4, kws5 и kws203.",
+    )
     cloudflare_dns_btn.clicked.connect(on_copy_cloudflare_dns)
     cloudflare_domains_layout.addWidget(cloudflare_dns_btn)
     cloudflare_domains_layout.addStretch()
@@ -639,15 +654,30 @@ def build_telegram_proxy_advanced_settings_panel(
     cloudflare_worker_domains_edit.setPlaceholderText("worker-name.workers.dev")
     cloudflare_worker_domains_edit.setClearButtonEnabled(True)
     set_tooltip(cloudflare_worker_domains_edit, "Домены Cloudflare Worker для отдельного запасного пути.")
+    set_control_accessibility(
+        cloudflare_worker_domains_edit,
+        name="Домены Cloudflare Worker для Telegram Proxy",
+        description="Домены Cloudflare Worker для отдельного запасного пути Telegram Proxy.",
+    )
     cloudflare_worker_domains_layout.addWidget(cloudflare_worker_domains_edit)
     cloudflare_worker_test_btn = push_button_cls("Проверить", icon=FluentIcon.SEARCH)
     cloudflare_worker_test_btn.setMinimumWidth(116)
     set_tooltip(cloudflare_worker_test_btn, "Проверить, отвечает ли ваш Cloudflare Worker.")
+    set_control_accessibility(
+        cloudflare_worker_test_btn,
+        name="Проверить Cloudflare Worker Telegram Proxy",
+        description="Проверить, отвечает ли ваш Cloudflare Worker.",
+    )
     cloudflare_worker_test_btn.clicked.connect(on_test_cloudflare_worker)
     cloudflare_worker_domains_layout.addWidget(cloudflare_worker_test_btn)
     cloudflare_worker_code_btn = push_button_cls("Код Worker", icon=FluentIcon.COPY)
     cloudflare_worker_code_btn.setMinimumWidth(120)
     set_tooltip(cloudflare_worker_code_btn, "Скопировать готовый код для Cloudflare Worker.")
+    set_control_accessibility(
+        cloudflare_worker_code_btn,
+        name="Скопировать код Cloudflare Worker",
+        description="Скопировать готовый код для Cloudflare Worker.",
+    )
     cloudflare_worker_code_btn.clicked.connect(on_copy_cloudflare_worker_code)
     cloudflare_worker_domains_layout.addWidget(cloudflare_worker_code_btn)
     cloudflare_worker_domains_layout.addStretch()
@@ -665,6 +695,11 @@ def build_telegram_proxy_advanced_settings_panel(
     dc_ip_edit.setPlaceholderText("4:149.154.167.220, 5:91.108.56.100")
     dc_ip_edit.setClearButtonEnabled(True)
     set_tooltip(dc_ip_edit, "Ручные адреса дата-центров Telegram. Формат: номер:IP, через запятую.")
+    set_control_accessibility(
+        dc_ip_edit,
+        name="Ручные адреса Telegram DC",
+        description="Введите номер дата-центра и IP-адрес в формате номер:IP, через запятую.",
+    )
     dc_ip_layout.addWidget(dc_ip_edit)
     dc_ip_layout.addStretch()
     upstream_card.addSettingCard(dc_ip_row)
@@ -685,6 +720,11 @@ def build_telegram_proxy_advanced_settings_panel(
     pool_size_spin.setValue(4)
     pool_size_spin.setFixedWidth(120)
     set_tooltip(pool_size_spin, "Сколько запасных WSS-соединений держать в пуле. 4 — обычное значение.")
+    set_control_accessibility(
+        pool_size_spin,
+        name="Пул WSS Telegram Proxy",
+        description="Сколько запасных WSS-соединений держать в пуле. 4 — обычное значение.",
+    )
     performance_layout.addWidget(pool_size_spin)
     performance_layout.addSpacing(16)
     buffer_kb_label = body_label_cls("Буфер, КБ:")
@@ -694,6 +734,11 @@ def build_telegram_proxy_advanced_settings_panel(
     buffer_kb_spin.setValue(256)
     buffer_kb_spin.setFixedWidth(120)
     set_tooltip(buffer_kb_spin, "Размер сетевого буфера. 256 КБ обычно достаточно.")
+    set_control_accessibility(
+        buffer_kb_spin,
+        name="Размер буфера Telegram Proxy",
+        description="Размер сетевого буфера. 256 КБ обычно достаточно.",
+    )
     performance_layout.addWidget(buffer_kb_spin)
     performance_layout.addStretch()
     upstream_card.addSettingCard(performance_row)
