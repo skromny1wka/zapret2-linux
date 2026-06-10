@@ -150,8 +150,7 @@ class HostsPage(BasePage):
         self._operation_runtime = OneShotWorkerRuntime()
         self._services_catalog_runtime = OneShotWorkerRuntime()
         self._catalog_refresh_runtime = OneShotWorkerRuntime()
-        self._catalog_refresh_pending_trigger = ""
-        self._catalog_refresh_start_scheduled = False
+        self._catalog_refresh_state = LatestValueWorkerState(self._catalog_refresh_runtime, empty_value="")
         self._selection_load_runtime = OneShotWorkerRuntime()
         self._selection_load_show_access_errors = False
         self._selection_load_state = LatestValueWorkerState(self._selection_load_runtime, empty_value=False)
@@ -508,10 +507,11 @@ class HostsPage(BasePage):
             self._catalog_dirty = False
 
     def _refresh_catalog_if_needed(self, trigger: str) -> None:
-        if self._catalog_refresh_runtime.is_running() or self.__dict__.get("_catalog_refresh_start_scheduled", False):
-            self._catalog_refresh_pending_trigger = str(trigger or "watcher")
+        state = self._catalog_refresh_state_obj()
+        if self._catalog_refresh_runtime.is_running() or state.start_scheduled:
+            state.pending = str(trigger or "watcher")
             return
-        self._catalog_refresh_pending_trigger = ""
+        state.pending = ""
         self._catalog_refresh_runtime.start_qthread_worker(
             worker_factory=lambda request_id: self._hosts.create_catalog_refresh_worker(
                 request_id,
@@ -529,7 +529,7 @@ class HostsPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_catalog_refresh_pending_trigger"):
+        if self._catalog_refresh_state_obj().has_pending():
             return
         result = apply_catalog_refresh_signature(
             current_signature=self._catalog_sig,
@@ -552,7 +552,7 @@ class HostsPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_catalog_refresh_pending_trigger"):
+        if self._catalog_refresh_state_obj().has_pending():
             return
         log(f"Hosts: ошибка проверки каталога ({trigger}): {error}", "ERROR")
 
@@ -561,27 +561,62 @@ class HostsPage(BasePage):
             return
         if self._cleanup_in_progress:
             return
-        trigger = str(self._catalog_refresh_pending_trigger or "").strip()
+        trigger = str(self._catalog_refresh_state_obj().pending or "").strip()
         if trigger:
             self._schedule_catalog_refresh_start()
 
     def _schedule_catalog_refresh_start(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        if self.__dict__.get("_catalog_refresh_start_scheduled", False):
-            return
-        self._catalog_refresh_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_catalog_refresh_start)
+        self._catalog_refresh_state_obj().schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_catalog_refresh_start,
+            pending_when_already_scheduled=self._catalog_refresh_state_obj().pending,
+        )
 
     def _run_scheduled_catalog_refresh_start(self) -> None:
-        self._catalog_refresh_start_scheduled = False
-        if self.__dict__.get("_cleanup_in_progress", False):
-            return
-        trigger = str(self.__dict__.get("_catalog_refresh_pending_trigger") or "").strip()
-        self._catalog_refresh_pending_trigger = ""
+        trigger = str(
+            self._catalog_refresh_state_obj().take_pending_for_scheduled_start(
+                cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+            )
+            or ""
+        ).strip()
         if not trigger:
             return
         self._refresh_catalog_if_needed(trigger)
+
+    def _catalog_refresh_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_catalog_refresh_state")
+        runtime = self.__dict__.get("_catalog_refresh_runtime")
+        if state is None:
+            pending = str(self.__dict__.pop("_catalog_refresh_pending_trigger", "") or "")
+            start_scheduled = bool(self.__dict__.pop("_catalog_refresh_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value="",
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_catalog_refresh_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _catalog_refresh_pending_trigger(self) -> str:
+        return str(self._catalog_refresh_state_obj().pending or "")
+
+    @_catalog_refresh_pending_trigger.setter
+    def _catalog_refresh_pending_trigger(self, value: str) -> None:
+        self._catalog_refresh_state_obj().pending = str(value or "")
+
+    @property
+    def _catalog_refresh_start_scheduled(self) -> bool:
+        return bool(self._catalog_refresh_state_obj().start_scheduled)
+
+    @_catalog_refresh_start_scheduled.setter
+    def _catalog_refresh_start_scheduled(self, value: bool) -> None:
+        self._catalog_refresh_state_obj().start_scheduled = bool(value)
 
     def _services_add_section_title(self, text: str) -> None:
         if self._services_layout is None:
@@ -1486,6 +1521,7 @@ class HostsPage(BasePage):
                 log_fn=log,
                 warning_prefix="Hosts catalog refresh worker",
             )
+            self._catalog_refresh_state_obj().reset()
             self._selection_load_runtime.stop(
                 blocking=False,
                 log_fn=log,

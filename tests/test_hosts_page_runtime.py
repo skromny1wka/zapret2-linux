@@ -407,6 +407,27 @@ class HostsPageRuntimeTests(unittest.TestCase):
         page._catalog_refresh_runtime.start_qthread_worker.assert_not_called()
         self.assertEqual(page._catalog_refresh_pending_trigger, "watcher")
 
+    def test_catalog_refresh_queue_uses_shared_latest_worker_state(self) -> None:
+        from hosts.ui.page import HostsPage
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        page = HostsPage.__new__(HostsPage)
+        page._catalog_refresh_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+
+        init_source = inspect.getsource(HostsPage.__init__)
+        request_source = inspect.getsource(HostsPage._refresh_catalog_if_needed)
+        finished_source = inspect.getsource(HostsPage._on_catalog_refresh_worker_finished)
+        cleanup_source = inspect.getsource(HostsPage.cleanup)
+
+        self.assertTrue(hasattr(HostsPage, "_catalog_refresh_state_obj"))
+        self.assertIsInstance(page._catalog_refresh_state_obj(), LatestValueWorkerState)
+        self.assertIn("_catalog_refresh_state = LatestValueWorkerState", init_source)
+        self.assertIn("_catalog_refresh_state_obj()", request_source)
+        self.assertIn("_catalog_refresh_state_obj()", finished_source)
+        self.assertIn("_catalog_refresh_state_obj().reset()", cleanup_source)
+        self.assertNotIn("self._catalog_refresh_pending_trigger = \"\"", init_source)
+        self.assertNotIn("self._catalog_refresh_start_scheduled = False", init_source)
+
     def test_catalog_refresh_scheduled_start_uses_latest_pending_trigger(self) -> None:
         import hosts.ui.page as hosts_page
         from hosts.ui.page import HostsPage
