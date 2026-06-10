@@ -8,6 +8,8 @@ from PyQt6.QtWidgets import QWidget, QHBoxLayout
 from PyQt6.QtCore import pyqtSignal
 from qfluentwidgets import PillPushButton
 
+from ui.accessibility import set_accessible_description, set_control_accessibility, set_state_text
+
 
 def set_button_checked_if_changed(button, checked: bool) -> bool:
     value = bool(checked)
@@ -67,6 +69,11 @@ class ProfileTypeSelector(QWidget):
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 8)
         layout.setSpacing(6)
+        set_control_accessibility(
+            self,
+            name="Фильтр типов profile",
+            description="Выберите один или несколько типов, чтобы отфильтровать список profile.",
+        )
 
         for profile_type, label in self.PROFILE_TYPES:
             btn = _ProfileTypeButton(label, profile_type, self)
@@ -78,6 +85,7 @@ class ProfileTypeSelector(QWidget):
                 btn.setChecked(True)
 
         layout.addStretch()
+        self._refresh_accessibility()
 
     def _on_button_clicked(self):
         sender = self.sender()
@@ -103,6 +111,7 @@ class ProfileTypeSelector(QWidget):
                 if not self._has_other_selected():
                     set_button_checked_if_changed(self._buttons["all"], True)
 
+        self._refresh_accessibility()
         self._emit_profile_types_changed_if_needed(previous_types)
 
     def _has_other_selected(self) -> bool:
@@ -131,6 +140,19 @@ class ProfileTypeSelector(QWidget):
                 if key != "all":
                     set_button_checked_if_changed(btn, False)
         self.blockSignals(False)
+        refresh_accessibility = getattr(self, "_refresh_accessibility", None)
+        if callable(refresh_accessibility):
+            refresh_accessibility()
+
+    def _refresh_accessibility(self) -> None:
+        for _key, btn in self._buttons.items():
+            label = str(btn.text() or "").strip()
+            state = "выбрано" if btn.isChecked() else "не выбрано"
+            set_state_text(btn, f"Тип profile: {label}, {state}")
+            set_accessible_description(
+                btn,
+                "Фильтрует список profile. Можно выбрать несколько типов.",
+            )
 
     def reset(self):
         previous_types = self.get_active_profile_types()

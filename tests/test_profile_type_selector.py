@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import os
 import unittest
 from types import SimpleNamespace
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+from PyQt6.QtWidgets import QApplication
 
 
 class _Button:
@@ -19,6 +24,10 @@ class _Button:
 
 
 class ProfileTypeSelectorTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._app = QApplication.instance() or QApplication([])
+
     def test_set_button_checked_skips_duplicate_state(self) -> None:
         from profile.ui.widgets.profile_type_selector import set_button_checked_if_changed
 
@@ -69,6 +78,24 @@ class ProfileTypeSelectorTests(unittest.TestCase):
 
         self.assertFalse(changed)
         self.assertEqual(emitted, [])
+
+    def test_buttons_expose_selected_state_to_screen_reader(self) -> None:
+        from profile.ui.widgets.profile_type_selector import ProfileTypeSelector
+
+        selector = ProfileTypeSelector()
+        self.addCleanup(selector.deleteLater)
+
+        self.assertEqual(selector.accessibleName(), "Фильтр типов profile")
+        self.assertIn("Выберите один или несколько типов", selector.accessibleDescription())
+        self.assertEqual(selector._buttons["all"].accessibleName(), "Тип profile: Все, выбрано")
+        self.assertEqual(selector._buttons["tcp"].accessibleName(), "Тип profile: TCP, не выбрано")
+        self.assertIn("Фильтрует список profile", selector._buttons["tcp"].accessibleDescription())
+
+        selector.set_active_profile_types({"tcp"})
+
+        self.assertEqual(selector._buttons["all"].accessibleName(), "Тип profile: Все, не выбрано")
+        self.assertEqual(selector._buttons["tcp"].accessibleName(), "Тип profile: TCP, выбрано")
+        self.assertEqual(selector._buttons["tcp"].property("screenReaderStateText"), "Тип profile: TCP, выбрано")
 
 
 if __name__ == "__main__":
