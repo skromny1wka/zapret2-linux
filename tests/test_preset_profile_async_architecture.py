@@ -155,12 +155,16 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
     def test_preset_setup_page_ignores_stale_profile_worker_after_preset_switch(self) -> None:
         request_source = inspect.getsource(PresetSetupPageBase._request_profiles_payload)
         finished_source = inspect.getsource(PresetSetupPageBase._on_profile_worker_finished)
+        scheduled_source = inspect.getsource(PresetSetupPageBase._run_scheduled_profile_load_refresh_start)
 
-        running_branch = request_source.split("runtime.is_running():", 1)[1].split("return", 1)[0]
-        self.assertIn("if force:", running_branch)
-        self.assertIn("_profile_load_request_id += 1", running_branch)
-        self.assertIn("_profile_payload_dirty = True", running_branch)
-        self.assertIn("_schedule_profiles_payload_request(force=True)", finished_source)
+        self.assertIn("_profile_load_refresh_state_obj()", request_source)
+        self.assertIn("runtime.is_running() or refresh_state.start_scheduled", request_source)
+        self.assertIn("if force:", request_source)
+        self.assertIn("refresh_state.pending = True", request_source)
+        self.assertIn("_profile_load_request_id += 1", request_source)
+        self.assertIn("_profile_payload_dirty = True", request_source)
+        self.assertIn("_schedule_profile_load_refresh_start", finished_source)
+        self.assertIn("_schedule_profiles_payload_request(force=True)", scheduled_source)
 
     def test_profile_folder_worker_returns_folder_state_after_write_action(self) -> None:
         worker_source = inspect.getsource(profile_setup_loader.ProfileFolderActionWorker.run)

@@ -590,6 +590,30 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
         ):
             self.assertNotIn(attr, page_source)
 
+    def test_preset_setup_profile_load_refresh_uses_shared_latest_worker_state(self) -> None:
+        from profile.ui.preset_setup_page import PresetSetupPageBase
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._profile_load_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+
+        init_source = inspect.getsource(PresetSetupPageBase.__init__)
+        request_source = inspect.getsource(PresetSetupPageBase._request_profiles_payload)
+        loaded_source = inspect.getsource(PresetSetupPageBase._on_profile_payload_loaded)
+        failed_source = inspect.getsource(PresetSetupPageBase._on_profile_payload_failed)
+        finished_source = inspect.getsource(PresetSetupPageBase._on_profile_worker_finished)
+        cleanup_source = inspect.getsource(PresetSetupPageBase.cleanup)
+
+        self.assertTrue(hasattr(PresetSetupPageBase, "_profile_load_refresh_state_obj"))
+        self.assertIsInstance(page._profile_load_refresh_state_obj(), LatestValueWorkerState)
+        self.assertIn("_profile_load_refresh_state = LatestValueWorkerState", init_source)
+        self.assertIn("_profile_load_refresh_state_obj()", request_source)
+        self.assertIn("_profile_load_refresh_state_obj()", loaded_source)
+        self.assertIn("_profile_load_refresh_state_obj()", failed_source)
+        self.assertIn("_profile_load_refresh_state_obj()", finished_source)
+        self.assertIn("_profile_load_refresh_state_obj().reset()", cleanup_source)
+        self.assertNotIn("self._profile_load_refresh_pending = False", init_source)
+
     def test_user_profile_write_queue_uses_shared_profile_preset_queued_state(self) -> None:
         from profile.ui.preset_setup_page import PresetSetupPageBase
         from ui.queued_worker_state import QueuedWorkerState

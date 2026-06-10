@@ -16,6 +16,7 @@ from qfluentwidgets import BodyLabel, InfoBar, MessageBox
 from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE
 from ui.pages.base_page import BasePage
 from app.ui_texts import tr as tr_catalog
+from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.queued_worker_state import QueuedWorkerState
 
@@ -137,7 +138,7 @@ class PresetSetupPageBase(BasePage):
         self._user_profile_delete_runtime = OneShotWorkerRuntime()
         self._profile_payload_loaded_once = False
         self._profile_payload_dirty = True
-        self._profile_load_refresh_pending = False
+        self._profile_load_refresh_state = LatestValueWorkerState(self._profile_load_runtime, empty_value=False)
         self._profile_payload_request_scheduled = False
         self._profile_payload_request_force = False
         self._profile_payload_reload_after_preset_switch_scheduled = False
@@ -176,7 +177,7 @@ class PresetSetupPageBase(BasePage):
             return False
 
     def _schedule_profiles_payload_request(self, *, force: bool = False) -> None:
-        if bool(force) and self.__dict__.get("_profile_load_refresh_pending", False):
+        if bool(force) and self._profile_load_refresh_state_obj().has_pending():
             if self._worker_runtime_is_running("_profile_load_runtime"):
                 self._profile_payload_dirty = True
                 return
@@ -303,14 +304,16 @@ class PresetSetupPageBase(BasePage):
             return
         self._profile_payload_dirty = True
         runtime = self._worker_runtime("_profile_load_runtime")
-        if runtime.is_running():
+        refresh_state = self._profile_load_refresh_state_obj()
+        if runtime.is_running() or refresh_state.start_scheduled:
             if force:
                 self._profile_payload_dirty = True
-                if not self.__dict__.get("_profile_load_refresh_pending", False):
-                    self._profile_load_refresh_pending = True
-                    self._profile_load_request_id += 1
+                if not refresh_state.has_pending():
+                    refresh_state.pending = True
+                    if runtime.is_running():
+                        self._profile_load_request_id += 1
             return
-        self._profile_load_refresh_pending = False
+        refresh_state.pending = False
         self._profile_load_request_id += 1
         request_id = self._profile_load_request_id
         if self.__dict__.get("_profiles_list") is None:
@@ -350,7 +353,7 @@ class PresetSetupPageBase(BasePage):
     def _on_profile_payload_loaded(self, request_id: int, payload) -> None:
         if request_id != self._profile_load_request_id or self._cleanup_in_progress:
             return
-        if self.__dict__.get("_profile_load_refresh_pending", False):
+        if self._profile_load_refresh_state_obj().has_pending():
             return
         view_state = getattr(payload, "view_state", None)
         apply_signature_base = getattr(payload, "apply_signature_base", None)
@@ -376,7 +379,7 @@ class PresetSetupPageBase(BasePage):
         if pending is None or self._cleanup_in_progress:
             return
         if (
-            self.__dict__.get("_profile_load_refresh_pending", False)
+            self._profile_load_refresh_state_obj().has_pending()
             or self.__dict__.get("_profile_payload_request_scheduled", False)
         ):
             return
@@ -387,7 +390,7 @@ class PresetSetupPageBase(BasePage):
         if request_id != self._profile_load_request_id or self._cleanup_in_progress:
             return
         if (
-            self.__dict__.get("_profile_load_refresh_pending", False)
+            self._profile_load_refresh_state_obj().has_pending()
             or self.__dict__.get("_profile_payload_request_scheduled", False)
         ):
             return
@@ -402,9 +405,28 @@ class PresetSetupPageBase(BasePage):
     def _on_profile_worker_finished(self, worker) -> None:
         if not self._accept_current_profile_load_worker_finished(worker):
             return
-        self._profile_load_refresh_pending = False
-        if self._profile_payload_dirty and not self._cleanup_in_progress:
-            self._schedule_profiles_payload_request(force=True)
+        state = self._profile_load_refresh_state_obj()
+        if not self._cleanup_in_progress and (state.has_pending() or self._profile_payload_dirty):
+            state.pending = True
+            self._schedule_profile_load_refresh_start()
+            return
+        state.pending = False
+
+    def _schedule_profile_load_refresh_start(self) -> None:
+        self._profile_load_refresh_state_obj().schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_profile_load_refresh_start,
+            cleanup_in_progress=bool(self.__dict__.get("_cleanup_in_progress", False)),
+            pending_when_already_scheduled=True,
+        )
+
+    def _run_scheduled_profile_load_refresh_start(self) -> None:
+        pending = self._profile_load_refresh_state_obj().take_pending_for_scheduled_start(
+            cleanup_in_progress=bool(self.__dict__.get("_cleanup_in_progress", False)),
+        )
+        if not pending:
+            return
+        self._schedule_profiles_payload_request(force=True)
 
     def _accept_current_profile_load_worker_finished(self, worker) -> bool:
         request_id = getattr(worker, "_request_id", None)
@@ -723,6 +745,39 @@ class PresetSetupPageBase(BasePage):
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         self._start_next_profile_preset_write_operation()
+
+    def _profile_load_refresh_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_profile_load_refresh_state")
+        runtime = self.__dict__.get("_profile_load_runtime")
+        if state is None:
+            pending = bool(self.__dict__.pop("_profile_load_refresh_pending", False))
+            start_scheduled = bool(self.__dict__.pop("_profile_load_refresh_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=False,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_profile_load_refresh_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _profile_load_refresh_pending(self) -> bool:
+        return bool(self._profile_load_refresh_state_obj().pending)
+
+    @_profile_load_refresh_pending.setter
+    def _profile_load_refresh_pending(self, value: bool) -> None:
+        self._profile_load_refresh_state_obj().pending = bool(value)
+
+    @property
+    def _profile_load_refresh_start_scheduled(self) -> bool:
+        return bool(self._profile_load_refresh_state_obj().start_scheduled)
+
+    @_profile_load_refresh_start_scheduled.setter
+    def _profile_load_refresh_start_scheduled(self, value: bool) -> None:
+        self._profile_load_refresh_state_obj().start_scheduled = bool(value)
 
     def _profile_preset_write_state_obj(self) -> QueuedWorkerState[dict[str, object]]:
         state = self.__dict__.get("_profile_preset_write_state")
@@ -1906,6 +1961,7 @@ class PresetSetupPageBase(BasePage):
         self._profile_preset_write_state_obj().reset()
         self._pending_profile_payload_apply = None
         self._profile_payload_apply_scheduled = False
+        self._profile_load_refresh_state_obj().reset()
         self._profile_folder_action_state_obj().reset()
         self.__dict__.setdefault("_profile_folder_action_refresh_by_request", {}).clear()
         self.__dict__.setdefault("_profile_context_action_enabled_by_request", {}).clear()
