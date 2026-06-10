@@ -51,6 +51,7 @@ from telegram_proxy.ui.upstream_workflow import (
 )
 from telegram_proxy.ui.settings_save_flow import merge_restart_request
 from telegram_proxy.ui.settings_build import (
+    build_telegram_proxy_advanced_settings_panel,
     build_telegram_proxy_settings_panel,
 )
 from telegram_proxy.ui.worker_state import (
@@ -154,10 +155,13 @@ class TelegramProxyPage(BasePage):
         self._cleanup_in_progress = False
         self._runtime_initialized = False
         self._built_panel_indexes: set[int] = set()
+        self._advanced_settings_built = False
+        self._advanced_signals_connected = False
         self._initial_state = telegram_proxy_settings.TelegramProxyPageInitialStatePlan(
             upstream_catalog=telegram_proxy_settings.UpstreamCatalog(),
             settings=telegram_proxy_settings.default_state(),
         )
+        self._current_settings_state = self._initial_state.settings
         self._btn_copy_logs = None
         self._btn_open_log_file = None
         self._btn_clear_logs = None
@@ -260,6 +264,7 @@ class TelegramProxyPage(BasePage):
         )
         self._pivot = shell.pivot
         self._stacked = shell.stacked
+        self._settings_layout = shell.settings_layout
 
         self._build_settings_panel(shell.settings_layout)
         self._built_panel_indexes.add(0)
@@ -426,6 +431,97 @@ class TelegramProxyPage(BasePage):
         self._instr1_label = widgets.instr1_label
         self._instr2_label = widgets.instr2_label
         self._manual_host_port_label = widgets.manual_host_port_label
+
+    def _assign_advanced_settings_widgets(self, widgets) -> None:
+        self._advanced_card = widgets.advanced_card
+        self._upstream_card = widgets.upstream_card
+        self._mtproxy_secret_row = widgets.mtproxy_secret_row
+        self._mtproxy_secret_label = widgets.mtproxy_secret_label
+        self._mtproxy_secret_edit = widgets.mtproxy_secret_edit
+        self._mtproxy_generate_btn = widgets.mtproxy_generate_btn
+        self._fake_tls_domain_row = widgets.fake_tls_domain_row
+        self._fake_tls_domain_label = widgets.fake_tls_domain_label
+        self._fake_tls_domain_edit = widgets.fake_tls_domain_edit
+        self._fake_tls_nginx_btn = widgets.fake_tls_nginx_btn
+        self._upstream_card = widgets.upstream_card
+        self._upstream_desc_label = widgets.upstream_desc_label
+        self._upstream_toggle = widgets.upstream_toggle
+        self._upstream_catalog = widgets.upstream_catalog
+        self._upstream_preset_row = widgets.upstream_preset_row
+        self._upstream_catalog_hint = widgets.upstream_catalog_hint
+        self._upstream_manual_widget = widgets.upstream_manual_widget
+        self._upstream_host_label = widgets.upstream_host_label
+        self._upstream_host_edit = widgets.upstream_host_edit
+        self._upstream_port_label = widgets.upstream_port_label
+        self._upstream_port_spin = widgets.upstream_port_spin
+        self._upstream_user_label = widgets.upstream_user_label
+        self._upstream_user_edit = widgets.upstream_user_edit
+        self._upstream_pass_label = widgets.upstream_pass_label
+        self._upstream_pass_edit = widgets.upstream_pass_edit
+        self._mtproxy_action_btn = widgets.mtproxy_action_btn
+        self._mtproxy_action_widget = widgets.mtproxy_action_widget
+        self._upstream_mode_toggle = widgets.upstream_mode_toggle
+        self._cloudflare_toggle = widgets.cloudflare_toggle
+        self._cloudflare_domains_row = widgets.cloudflare_domains_row
+        self._cloudflare_domains_label = widgets.cloudflare_domains_label
+        self._cloudflare_domains_edit = widgets.cloudflare_domains_edit
+        self._cloudflare_test_btn = widgets.cloudflare_test_btn
+        self._cloudflare_dns_btn = widgets.cloudflare_dns_btn
+        self._cloudflare_worker_toggle = widgets.cloudflare_worker_toggle
+        self._cloudflare_worker_domains_row = widgets.cloudflare_worker_domains_row
+        self._cloudflare_worker_domains_label = widgets.cloudflare_worker_domains_label
+        self._cloudflare_worker_domains_edit = widgets.cloudflare_worker_domains_edit
+        self._cloudflare_worker_test_btn = widgets.cloudflare_worker_test_btn
+        self._cloudflare_worker_code_btn = widgets.cloudflare_worker_code_btn
+        self._dc_ip_row = widgets.dc_ip_row
+        self._dc_ip_label = widgets.dc_ip_label
+        self._dc_ip_edit = widgets.dc_ip_edit
+        self._performance_label = widgets.performance_label
+        self._pool_size_label = widgets.pool_size_label
+        self._pool_size_spin = widgets.pool_size_spin
+        self._buffer_kb_label = widgets.buffer_kb_label
+        self._buffer_kb_spin = widgets.buffer_kb_spin
+        self._proxy_protocol_toggle = widgets.proxy_protocol_toggle
+        self._manual_section_label = widgets.manual_section_label
+        self._instructions_card = widgets.instructions_card
+        self._instr1_label = widgets.instr1_label
+        self._instr2_label = widgets.instr2_label
+        self._manual_host_port_label = widgets.manual_host_port_label
+
+    def _ensure_advanced_settings_built(self) -> None:
+        if self.__dict__.get("_advanced_settings_built", False):
+            return
+        started_at = time.perf_counter()
+        from ui.widgets.win11_controls import Win11ToggleRow, Win11ComboRow
+
+        widgets = build_telegram_proxy_advanced_settings_panel(
+            self._settings_layout,
+            content_parent=self.content,
+            strong_body_label_cls=StrongBodyLabel,
+            caption_label_cls=CaptionLabel,
+            body_label_cls=BodyLabel,
+            push_button_cls=PushButton,
+            setting_card_group_cls=SettingCardGroup,
+            line_edit_cls=LineEdit,
+            spin_box_cls=SpinBox,
+            password_line_edit_cls=PasswordLineEdit,
+            win11_toggle_row_cls=Win11ToggleRow,
+            win11_combo_row_cls=Win11ComboRow,
+            on_open_mtproxy=self._on_open_mtproxy,
+            on_generate_mtproxy_secret=self._on_generate_mtproxy_secret,
+            on_copy_fake_tls_nginx_config=self._on_copy_fake_tls_nginx_config,
+            on_test_cloudflare=self._on_test_cloudflare,
+            on_copy_cloudflare_dns=self._on_copy_cloudflare_dns,
+            on_test_cloudflare_worker=self._on_test_cloudflare_worker,
+            on_copy_cloudflare_worker_code=self._on_copy_cloudflare_worker_code,
+            upstream_catalog=self._upstream_catalog,
+        )
+        self._assign_advanced_settings_widgets(widgets)
+        self._advanced_settings_built = True
+        self._connect_advanced_signals()
+        self._apply_ui_texts()
+        self._apply_advanced_settings_state(self._current_settings_state)
+        self._log_ui_timing("telegram_proxy_ui.advanced_settings.build", started_at)
 
     def _build_logs_panel(self, layout: QVBoxLayout):
         widgets = build_telegram_proxy_logs_panel(
@@ -609,6 +705,8 @@ class TelegramProxyPage(BasePage):
                 pass
 
     def _apply_upstream_preset_ui(self, index: int) -> None:
+        if not self.__dict__.get("_advanced_settings_built", False):
+            return
         self._current_mtproxy_link = apply_upstream_preset_ui(
             upstream_toggle=self._upstream_toggle,
             upstream_catalog=self._upstream_catalog,
@@ -625,6 +723,8 @@ class TelegramProxyPage(BasePage):
         if upstream_catalog is None:
             return
         self._upstream_catalog = upstream_catalog
+        if not self.__dict__.get("_advanced_settings_built", False):
+            return
         combo = self._upstream_preset_row.combo
         combo.blockSignals(True)
         try:
@@ -642,6 +742,16 @@ class TelegramProxyPage(BasePage):
         self._host_edit.editingFinished.connect(self._on_host_changed)
         self._advanced_toggle.toggled.connect(self._on_advanced_toggled)
         self._proxy_mode_row.currentIndexChanged.connect(self._on_proxy_mode_changed)
+        self._connect_advanced_signals()
+
+        # Sync initial state — proxy may already be running (e.g., started from tray)
+        self._on_status_changed(mgr.is_running)
+
+    def _connect_advanced_signals(self) -> None:
+        if self.__dict__.get("_advanced_signals_connected", False):
+            return
+        if not self.__dict__.get("_advanced_settings_built", False):
+            return
         self._mtproxy_secret_edit.editingFinished.connect(self._on_mtproxy_secret_changed)
         self._fake_tls_domain_edit.editingFinished.connect(self._on_fake_tls_domain_changed)
         self._proxy_protocol_toggle.toggled.connect(self._on_proxy_protocol_changed)
@@ -663,12 +773,11 @@ class TelegramProxyPage(BasePage):
         self._cloudflare_domains_edit.editingFinished.connect(self._on_cloudflare_domains_changed)
         self._cloudflare_worker_toggle.toggled.connect(self._on_cloudflare_worker_changed)
         self._cloudflare_worker_domains_edit.editingFinished.connect(self._on_cloudflare_worker_domains_changed)
-
-        # Sync initial state — proxy may already be running (e.g., started from tray)
-        self._on_status_changed(mgr.is_running)
+        self._advanced_signals_connected = True
 
     def _apply_initial_settings_state(self, state: telegram_proxy_settings.TelegramProxySettingsState) -> None:
         started_at = time.perf_counter()
+        self._current_settings_state = state
         self._port_spin.blockSignals(True)
         self._port_spin.setValue(state.port)
         self._port_spin.blockSignals(False)
@@ -677,6 +786,16 @@ class TelegramProxyPage(BasePage):
         self._update_manual_instructions()
 
         self._proxy_mode_row.setCurrentData(state.mode, block_signals=True)
+        advanced_should_open = self._advanced_settings_should_open(state)
+        self._advanced_toggle.setChecked(advanced_should_open, block_signals=True)
+        if advanced_should_open:
+            self._ensure_advanced_settings_built()
+        self._apply_advanced_settings_state(state)
+        self._log_ui_timing("telegram_proxy_ui.settings.apply", started_at)
+
+    def _apply_advanced_settings_state(self, state: telegram_proxy_settings.TelegramProxySettingsState) -> None:
+        if not self.__dict__.get("_advanced_settings_built", False):
+            return
         self._mtproxy_secret_edit.setText(state.mtproxy_secret)
         self._fake_tls_domain_edit.setText(state.fake_tls_domain)
         self._proxy_protocol_toggle.setChecked(state.proxy_protocol, block_signals=True)
@@ -707,11 +826,9 @@ class TelegramProxyPage(BasePage):
         self._cloudflare_domains_edit.setText(", ".join(state.cloudflare_domains))
         self._cloudflare_worker_toggle.setChecked(state.cloudflare_worker_enabled, block_signals=True)
         self._cloudflare_worker_domains_edit.setText(", ".join(state.cloudflare_worker_domains))
-        self._advanced_toggle.setChecked(self._advanced_settings_should_open(state), block_signals=True)
         self._apply_advanced_settings_ui()
         self._apply_local_proxy_mode_ui()
         self._apply_cloudflare_ui()
-        self._log_ui_timing("telegram_proxy_ui.settings.apply", started_at)
 
     def _advanced_settings_should_open(self, state: telegram_proxy_settings.TelegramProxySettingsState) -> bool:
         return bool(
@@ -1516,6 +1633,7 @@ class TelegramProxyPage(BasePage):
     def _ensure_mtproxy_secret_if_needed(self) -> str:
         if self._local_proxy_mode() != "mtproxy":
             return ""
+        self._ensure_advanced_settings_built()
         secret = self._local_mtproxy_secret()
         if secret:
             return secret
@@ -1561,6 +1679,11 @@ class TelegramProxyPage(BasePage):
 
     def _apply_advanced_settings_ui(self) -> None:
         advanced = bool(self._advanced_toggle.isChecked())
+        if advanced:
+            self._ensure_advanced_settings_built()
+        if not self.__dict__.get("_advanced_settings_built", False):
+            enable_setting_card_group_auto_height(self._settings_card)
+            return
         self._advanced_card.setVisible(advanced)
         self._apply_local_proxy_mode_ui()
         self._apply_cloudflare_ui()
@@ -1569,8 +1692,14 @@ class TelegramProxyPage(BasePage):
 
     def _apply_local_proxy_mode_ui(self) -> None:
         is_mtproxy = self._local_proxy_mode() == "mtproxy"
+        if is_mtproxy:
+            self._ensure_advanced_settings_built()
         if is_mtproxy and not self._advanced_toggle.isChecked():
             self._advanced_toggle.setChecked(True)
+        if not self.__dict__.get("_advanced_settings_built", False):
+            self._update_manual_instructions()
+            enable_setting_card_group_auto_height(self._settings_card)
+            return
         self._mtproxy_secret_row.setVisible(is_mtproxy)
         self._fake_tls_domain_row.setVisible(is_mtproxy)
         self._proxy_protocol_toggle.setVisible(is_mtproxy)
@@ -1579,6 +1708,8 @@ class TelegramProxyPage(BasePage):
         enable_setting_card_group_auto_height(self._advanced_card)
 
     def _apply_cloudflare_ui(self) -> None:
+        if not self.__dict__.get("_advanced_settings_built", False):
+            return
         cloudflare_enabled = bool(self._cloudflare_toggle.isChecked())
         worker_enabled = bool(self._cloudflare_worker_toggle.isChecked())
         self._cloudflare_domains_row.setVisible(cloudflare_enabled)
@@ -1587,6 +1718,9 @@ class TelegramProxyPage(BasePage):
         enable_setting_card_group_auto_height(self._advanced_card)
 
     def _on_advanced_toggled(self, _checked: bool):
+        if _checked:
+            self._ensure_advanced_settings_built()
+            self._apply_advanced_settings_state(self._current_settings_state)
         self._apply_advanced_settings_ui()
 
     def _on_proxy_mode_changed(self, _index: int):
@@ -1924,7 +2058,10 @@ class TelegramProxyPage(BasePage):
 
     def _update_manual_instructions(self):
         """Update manual instructions label with current host/port."""
-        self._manual_host_port_label.setText(
+        label = getattr(self, "_manual_host_port_label", None)
+        if label is None:
+            return
+        label.setText(
             telegram_proxy_settings.build_manual_instruction_text(
                 self._host_edit.text().strip(),
                 self._port_spin.value(),

@@ -94,6 +94,68 @@ class TelegramProxySettingsPanelWidgets:
     manual_host_port_label: object
 
 
+@dataclass(slots=True)
+class TelegramProxyAdvancedSettingsWidgets:
+    advanced_card: object
+    upstream_card: object
+    mtproxy_secret_row: object
+    mtproxy_secret_label: object
+    mtproxy_secret_edit: object
+    mtproxy_generate_btn: object
+    fake_tls_domain_row: object
+    fake_tls_domain_label: object
+    fake_tls_domain_edit: object
+    fake_tls_nginx_btn: object
+    upstream_desc_label: object
+    upstream_toggle: object
+    upstream_catalog: object
+    upstream_preset_row: object
+    upstream_catalog_hint: object
+    upstream_manual_widget: object
+    upstream_host_label: object
+    upstream_host_edit: object
+    upstream_port_label: object
+    upstream_port_spin: object
+    upstream_user_label: object
+    upstream_user_edit: object
+    upstream_pass_label: object
+    upstream_pass_edit: object
+    mtproxy_action_btn: object
+    mtproxy_action_widget: object
+    upstream_mode_toggle: object
+    cloudflare_toggle: object
+    cloudflare_domains_row: object
+    cloudflare_domains_label: object
+    cloudflare_domains_edit: object
+    cloudflare_test_btn: object
+    cloudflare_dns_btn: object
+    cloudflare_worker_toggle: object
+    cloudflare_worker_domains_row: object
+    cloudflare_worker_domains_label: object
+    cloudflare_worker_domains_edit: object
+    cloudflare_worker_test_btn: object
+    cloudflare_worker_code_btn: object
+    dc_ip_row: object
+    dc_ip_label: object
+    dc_ip_edit: object
+    performance_label: object
+    pool_size_label: object
+    pool_size_spin: object
+    buffer_kb_label: object
+    buffer_kb_spin: object
+    proxy_protocol_toggle: object
+    manual_section_label: object
+    instructions_card: object
+    instr1_label: object
+    instr2_label: object
+    manual_host_port_label: object
+
+
+def _insert_before_trailing_stretch(layout: QVBoxLayout, widget) -> None:
+    index = max(layout.count() - 1, 0)
+    layout.insertWidget(index, widget)
+
+
 def build_telegram_proxy_settings_panel(
     layout: QVBoxLayout,
     *,
@@ -232,6 +294,109 @@ def build_telegram_proxy_settings_panel(
 
     layout.addWidget(settings_card)
 
+    layout.addStretch()
+
+    return TelegramProxySettingsPanelWidgets(
+        status_card=status_card,
+        status_dot=status_dot,
+        status_label=status_label,
+        btn_toggle=btn_toggle,
+        stats_label=stats_label,
+        setup_section_label=setup_section_label,
+        setup_desc_label=setup_desc_label,
+        setup_fallback_label=setup_fallback_label,
+        setup_card=setup_card,
+        setup_open_btn=setup_open_btn,
+        setup_copy_btn=setup_copy_btn,
+        settings_card=settings_card,
+        settings_host_row=settings_host_row,
+        host_label=host_label,
+        host_edit=host_edit,
+        port_label=port_label,
+        port_spin=port_spin,
+        proxy_mode_row=proxy_mode_row,
+        mtproxy_secret_row=None,
+        mtproxy_secret_label=None,
+        mtproxy_secret_edit=None,
+        mtproxy_generate_btn=None,
+        fake_tls_domain_row=None,
+        fake_tls_domain_label=None,
+        fake_tls_domain_edit=None,
+        fake_tls_nginx_btn=None,
+        auto_deeplink_toggle=auto_deeplink_toggle,
+        advanced_toggle=advanced_toggle,
+        advanced_card=None,
+        upstream_card=None,
+        upstream_desc_label=None,
+        upstream_toggle=None,
+        upstream_catalog=upstream_catalog,
+        upstream_preset_row=None,
+        upstream_catalog_hint=None,
+        upstream_manual_widget=None,
+        upstream_host_label=None,
+        upstream_host_edit=None,
+        upstream_port_label=None,
+        upstream_port_spin=None,
+        upstream_user_label=None,
+        upstream_user_edit=None,
+        upstream_pass_label=None,
+        upstream_pass_edit=None,
+        mtproxy_action_btn=None,
+        mtproxy_action_widget=None,
+        upstream_mode_toggle=None,
+        cloudflare_toggle=None,
+        cloudflare_domains_row=None,
+        cloudflare_domains_label=None,
+        cloudflare_domains_edit=None,
+        cloudflare_test_btn=None,
+        cloudflare_dns_btn=None,
+        cloudflare_worker_toggle=None,
+        cloudflare_worker_domains_row=None,
+        cloudflare_worker_domains_label=None,
+        cloudflare_worker_domains_edit=None,
+        cloudflare_worker_test_btn=None,
+        cloudflare_worker_code_btn=None,
+        dc_ip_row=None,
+        dc_ip_label=None,
+        dc_ip_edit=None,
+        performance_label=None,
+        pool_size_label=None,
+        pool_size_spin=None,
+        buffer_kb_label=None,
+        buffer_kb_spin=None,
+        proxy_protocol_toggle=None,
+        manual_section_label=None,
+        instructions_card=None,
+        instr1_label=None,
+        instr2_label=None,
+        manual_host_port_label=None,
+    )
+
+
+def build_telegram_proxy_advanced_settings_panel(
+    layout: QVBoxLayout,
+    *,
+    content_parent,
+    strong_body_label_cls,
+    caption_label_cls,
+    body_label_cls,
+    push_button_cls,
+    setting_card_group_cls,
+    line_edit_cls,
+    spin_box_cls,
+    password_line_edit_cls,
+    win11_toggle_row_cls,
+    win11_combo_row_cls,
+    on_open_mtproxy,
+    on_generate_mtproxy_secret,
+    on_copy_fake_tls_nginx_config,
+    on_test_cloudflare,
+    on_copy_cloudflare_dns,
+    on_test_cloudflare_worker,
+    on_copy_cloudflare_worker_code,
+    upstream_catalog,
+) -> TelegramProxyAdvancedSettingsWidgets:
+    text = TELEGRAM_PROXY_SETTINGS_TEXT
     advanced_card = setting_card_group_cls(text.advanced_title, content_parent)
     advanced_card.setVisible(False)
 
@@ -489,11 +654,11 @@ def build_telegram_proxy_settings_panel(
 
     enable_setting_card_group_auto_height(upstream_card)
 
-    layout.addWidget(upstream_card)
+    _insert_before_trailing_stretch(layout, upstream_card)
 
     manual_section_label = strong_body_label_cls(text.manual_hidden_title)
     manual_section_label.setVisible(False)
-    layout.addWidget(manual_section_label)
+    _insert_before_trailing_stretch(layout, manual_section_label)
 
     instructions_card = SettingsCard()
     instr1_label = caption_label_cls("Если автоматическая настройка не сработала:")
@@ -508,29 +673,12 @@ def build_telegram_proxy_settings_panel(
     manual_host_port_label.setWordWrap(True)
     instructions_card.add_widget(manual_host_port_label)
 
-    layout.addWidget(instructions_card)
+    _insert_before_trailing_stretch(layout, instructions_card)
     instructions_card.setVisible(False)
-    layout.addStretch()
 
-    return TelegramProxySettingsPanelWidgets(
-        status_card=status_card,
-        status_dot=status_dot,
-        status_label=status_label,
-        btn_toggle=btn_toggle,
-        stats_label=stats_label,
-        setup_section_label=setup_section_label,
-        setup_desc_label=setup_desc_label,
-        setup_fallback_label=setup_fallback_label,
-        setup_card=setup_card,
-        setup_open_btn=setup_open_btn,
-        setup_copy_btn=setup_copy_btn,
-        settings_card=settings_card,
-        settings_host_row=settings_host_row,
-        host_label=host_label,
-        host_edit=host_edit,
-        port_label=port_label,
-        port_spin=port_spin,
-        proxy_mode_row=proxy_mode_row,
+    return TelegramProxyAdvancedSettingsWidgets(
+        advanced_card=advanced_card,
+        upstream_card=upstream_card,
         mtproxy_secret_row=mtproxy_secret_row,
         mtproxy_secret_label=mtproxy_secret_label,
         mtproxy_secret_edit=mtproxy_secret_edit,
@@ -539,10 +687,6 @@ def build_telegram_proxy_settings_panel(
         fake_tls_domain_label=fake_tls_domain_label,
         fake_tls_domain_edit=fake_tls_domain_edit,
         fake_tls_nginx_btn=fake_tls_nginx_btn,
-        auto_deeplink_toggle=auto_deeplink_toggle,
-        advanced_toggle=advanced_toggle,
-        advanced_card=advanced_card,
-        upstream_card=upstream_card,
         upstream_desc_label=upstream_desc_label,
         upstream_toggle=upstream_toggle,
         upstream_catalog=upstream_catalog,

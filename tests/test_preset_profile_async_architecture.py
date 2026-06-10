@@ -4226,6 +4226,32 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_ensure_panel_built(index)", switch_source)
         self.assertIn("self._stacked.currentIndex() == 1", timer_source)
 
+    def test_telegram_proxy_builds_advanced_settings_lazily(self) -> None:
+        setup_source = inspect.getsource(TelegramProxyPage._setup_ui)
+        settings_build_source = inspect.getsource(telegram_proxy_settings_build.build_telegram_proxy_settings_panel)
+        initial_apply_source = inspect.getsource(TelegramProxyPage._apply_initial_settings_state)
+        advanced_toggle_source = inspect.getsource(TelegramProxyPage._on_advanced_toggled)
+        ensure_method = getattr(TelegramProxyPage, "_ensure_advanced_settings_built", None)
+        advanced_builder = getattr(
+            telegram_proxy_settings_build,
+            "build_telegram_proxy_advanced_settings_panel",
+            None,
+        )
+
+        self.assertIsNotNone(ensure_method)
+        self.assertIsNotNone(advanced_builder)
+        if ensure_method is None or advanced_builder is None:
+            return
+        ensure_source = inspect.getsource(ensure_method)
+        advanced_build_source = inspect.getsource(advanced_builder)
+
+        self.assertNotIn("build_telegram_proxy_advanced_settings_panel(", setup_source)
+        self.assertNotIn("advanced_card = setting_card_group_cls", settings_build_source)
+        self.assertIn("build_telegram_proxy_advanced_settings_panel", ensure_source)
+        self.assertIn("_ensure_advanced_settings_built", initial_apply_source)
+        self.assertIn("_ensure_advanced_settings_built", advanced_toggle_source)
+        self.assertIn("advanced_card = setting_card_group_cls", advanced_build_source)
+
     def test_user_presets_hide_keeps_clean_cache_clean(self) -> None:
         source = inspect.getsource(UserPresetsPageBase.on_page_hidden)
 
