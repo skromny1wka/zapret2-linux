@@ -40,6 +40,8 @@ class AboutKvnAccessibilityTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertEqual(card.accessibleName(), name)
                 self.assertIn(description, card.accessibleDescription())
+                self.assertEqual(card.button.accessibleName(), name)
+                self.assertIn(description, card.button.accessibleDescription())
 
 
 if __name__ == "__main__":

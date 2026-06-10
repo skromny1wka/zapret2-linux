@@ -32,10 +32,16 @@ class AboutSupportAccessibilityTests(unittest.TestCase):
 
         self.assertEqual(widgets.discussions_card.accessibleName(), "Открыть GitHub Discussions")
         self.assertIn("Основной канал поддержки", widgets.discussions_card.accessibleDescription())
+        self.assertEqual(widgets.discussions_card.button.accessibleName(), "Открыть GitHub Discussions")
+        self.assertIn("Основной канал поддержки", widgets.discussions_card.button.accessibleDescription())
         self.assertEqual(widgets.telegram_card.accessibleName(), "Открыть Telegram")
         self.assertIn("сообществом", widgets.telegram_card.accessibleDescription())
+        self.assertEqual(widgets.telegram_card.button.accessibleName(), "Открыть Telegram")
+        self.assertIn("сообществом", widgets.telegram_card.button.accessibleDescription())
         self.assertEqual(widgets.discord_card.accessibleName(), "Открыть Discord")
         self.assertIn("живое общение", widgets.discord_card.accessibleDescription())
+        self.assertEqual(widgets.discord_card.button.accessibleName(), "Открыть Discord")
+        self.assertIn("живое общение", widgets.discord_card.button.accessibleDescription())
 
 
 if __name__ == "__main__":

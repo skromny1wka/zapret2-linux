@@ -51,6 +51,10 @@ class AboutHelpAccessibilityTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertEqual(card.accessibleName(), name)
                 self.assertIn(description, card.accessibleDescription())
+                button = getattr(card, "button", None)
+                if button is not None:
+                    self.assertEqual(button.accessibleName(), name)
+                    self.assertIn(description, button.accessibleDescription())
 
 
 if __name__ == "__main__":
