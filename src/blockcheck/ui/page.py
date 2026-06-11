@@ -37,6 +37,7 @@ from ui.pages.base_page import BasePage, ScrollBlockingTextEdit
 from ui.accessibility import set_control_accessibility, set_state_text
 from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
+from ui.queued_worker_state import QueuedWorkerState
 from app.ui_texts import tr as tr_catalog
 
 from qfluentwidgets import (
@@ -156,8 +157,7 @@ class BlockcheckPage(BasePage):
         self._support_prepare_runtime = OneShotWorkerRuntime()
         self._support_prepare_state = LatestValueWorkerState(self._support_prepare_runtime, empty_value=None)
         self._user_domain_action_runtime = OneShotWorkerRuntime()
-        self._user_domain_action_pending: list[dict[str, str]] = []
-        self._user_domain_action_start_scheduled = False
+        self._user_domain_action_state = QueuedWorkerState(self._user_domain_action_runtime)
         self._build_ui()
         self._request_page_initial_state_load()
         try:
@@ -1128,8 +1128,7 @@ class BlockcheckPage(BasePage):
         if not payload["action"] or not payload["domain"]:
             return
         if (
-            self._user_domain_action_runtime.is_running()
-            or self.__dict__.get("_user_domain_action_start_scheduled", False)
+            self._user_domain_action_state_obj().is_busy()
         ):
             self._queue_user_domain_action(payload)
             return
@@ -1141,7 +1140,7 @@ class BlockcheckPage(BasePage):
             "domain": str((payload or {}).get("domain") or "").strip(),
         }
         domain = queued["domain"]
-        pending = self.__dict__.setdefault("_user_domain_action_pending", [])
+        pending = self._user_domain_action_state_obj().pending
         if domain:
             pending[:] = [
                 item
@@ -1212,7 +1211,7 @@ class BlockcheckPage(BasePage):
         candidate = str(domain or "").strip()
         if not candidate:
             return False
-        pending_actions = self.__dict__.setdefault("_user_domain_action_pending", [])
+        pending_actions = self._user_domain_action_state_obj().pending
         return any(
             str(item.get("domain") or "").strip() == candidate
             for item in pending_actions
@@ -1221,8 +1220,8 @@ class BlockcheckPage(BasePage):
     def _on_user_domain_action_runtime_finished(self, _worker) -> None:
         if not self._is_current_worker_finish(self.__dict__.get("_user_domain_action_runtime"), _worker):
             return
-        if self._user_domain_action_pending and not self._cleanup_in_progress:
-            pending = self._user_domain_action_pending.pop(0)
+        if self._user_domain_action_state_obj().has_pending() and not self._cleanup_in_progress:
+            pending = self._user_domain_action_state_obj().pop_next()
             self._schedule_user_domain_action_worker_start(dict(pending or {}))
 
     def _is_current_worker_finish(self, runtime, worker) -> bool:
@@ -1272,6 +1271,40 @@ class BlockcheckPage(BasePage):
     def _support_prepare_start_scheduled(self, value: bool) -> None:
         self._support_prepare_state_obj().start_scheduled = bool(value)
 
+    def _user_domain_action_state_obj(self) -> QueuedWorkerState:
+        state = self.__dict__.get("_user_domain_action_state")
+        runtime = self.__dict__.get("_user_domain_action_runtime")
+        if state is None:
+            pending = self.__dict__.pop("_user_domain_action_pending", [])
+            start_scheduled = bool(
+                self.__dict__.pop("_user_domain_action_start_scheduled", False)
+            )
+            state = QueuedWorkerState(
+                runtime,
+                pending=list(pending or []),
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_user_domain_action_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _user_domain_action_pending(self) -> list[dict[str, str]]:
+        return self._user_domain_action_state_obj().pending
+
+    @_user_domain_action_pending.setter
+    def _user_domain_action_pending(self, value) -> None:
+        self._user_domain_action_state_obj().pending = list(value or [])
+
+    @property
+    def _user_domain_action_start_scheduled(self) -> bool:
+        return bool(self._user_domain_action_state_obj().start_scheduled)
+
+    @_user_domain_action_start_scheduled.setter
+    def _user_domain_action_start_scheduled(self, value: bool) -> None:
+        self._user_domain_action_state_obj().start_scheduled = bool(value)
+
     def _schedule_user_domain_action_worker_start(self, payload: dict[str, str]) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
@@ -1279,14 +1312,18 @@ class BlockcheckPage(BasePage):
             "action": str((payload or {}).get("action") or "").strip().lower(),
             "domain": str((payload or {}).get("domain") or "").strip(),
         }
-        if self.__dict__.get("_user_domain_action_start_scheduled", False):
-            self._queue_user_domain_action(queued)
-            return
-        self._user_domain_action_start_scheduled = True
-        QTimer.singleShot(0, lambda value=queued: self._run_scheduled_user_domain_action_worker_start(value))
+        self._user_domain_action_state_obj().schedule_start(
+            queued,
+            QTimer.singleShot,
+            self._run_scheduled_user_domain_action_worker_start,
+            queue_item=self._queue_user_domain_action,
+            is_cleanup_in_progress=lambda: bool(
+                self.__dict__.get("_cleanup_in_progress", False)
+            ),
+        )
 
     def _run_scheduled_user_domain_action_worker_start(self, payload: dict[str, str]) -> None:
-        self._user_domain_action_start_scheduled = False
+        self._user_domain_action_state_obj().start_scheduled = False
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         self._start_user_domain_action_worker(payload)
@@ -1327,7 +1364,7 @@ class BlockcheckPage(BasePage):
         )
         self._support_prepare_runtime.cancel()
         self._support_prepare_state_obj().reset()
-        self._user_domain_action_pending.clear()
+        self._user_domain_action_state_obj().reset()
         self._user_domain_action_runtime.stop(
             blocking=False,
             log_fn=log,

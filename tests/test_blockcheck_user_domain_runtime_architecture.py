@@ -16,7 +16,7 @@ class BlockcheckUserDomainRuntimeArchitectureTests(unittest.TestCase):
         cleanup_source = inspect.getsource(BlockcheckPage.cleanup)
 
         self.assertIn("_user_domain_action_runtime = OneShotWorkerRuntime()", page_source)
-        self.assertIn("_user_domain_action_runtime.is_running()", request_source)
+        self.assertIn("_user_domain_action_state_obj().is_busy()", request_source)
         self.assertIn("start_qthread_worker", start_source)
         self.assertIn("bind_worker", start_source)
         self.assertIn("_on_user_domain_action_runtime_finished", start_source)
@@ -27,6 +27,25 @@ class BlockcheckUserDomainRuntimeArchitectureTests(unittest.TestCase):
         self.assertNotIn("_user_domain_action_worker =", page_source)
         self.assertNotIn("_user_domain_action_request_id", page_source)
         self.assertNotIn("worker.start()", start_source)
+
+    def test_user_domain_actions_use_shared_queued_worker_state(self) -> None:
+        from ui.queued_worker_state import QueuedWorkerState
+
+        page = BlockcheckPage.__new__(BlockcheckPage)
+        page._user_domain_action_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+
+        init_source = inspect.getsource(BlockcheckPage.__init__)
+        request_source = inspect.getsource(BlockcheckPage._request_user_domain_action)
+        schedule_source = inspect.getsource(BlockcheckPage._schedule_user_domain_action_worker_start)
+        cleanup_source = inspect.getsource(BlockcheckPage.cleanup)
+
+        self.assertIsInstance(BlockcheckPage._user_domain_action_state_obj(page), QueuedWorkerState)
+        self.assertIn("_user_domain_action_state", init_source)
+        self.assertNotIn("self._user_domain_action_pending: list[dict[str, str]] = []", init_source)
+        self.assertNotIn("self._user_domain_action_start_scheduled = False", init_source)
+        self.assertIn("_user_domain_action_state_obj()", request_source)
+        self.assertIn("_user_domain_action_state_obj()", schedule_source)
+        self.assertIn("_user_domain_action_state_obj().reset()", cleanup_source)
 
     def test_pending_user_domain_action_restarts_after_event_loop_turn(self) -> None:
         import blockcheck.ui.page as blockcheck_page
