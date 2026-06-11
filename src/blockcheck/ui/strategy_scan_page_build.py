@@ -331,6 +331,7 @@ def build_strategy_scan_log_section(*, tr_fn, push_button_cls, parent, on_toggle
         name="Подробный лог подбора стратегии",
         description="Здесь появляется подробный текстовый лог подбора стратегии.",
     )
+    set_state_text(log_edit, "Подробный лог подбора стратегии: пока нет записей")
     log_edit.setReadOnly(True)
     log_edit.setMinimumHeight(180)
     log_edit.setMaximumHeight(300)

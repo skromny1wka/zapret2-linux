@@ -67,7 +67,11 @@ class StrategyScanPageAccessibilityTests(unittest.TestCase):
         self.assertIn("Показывает", page._progress_bar.accessibleDescription())
         self.assertEqual(page._status_label.accessibleName(), "Статус подбора стратегии: Готово к сканированию")
         self.assertEqual(page._table.accessibleName(), "Результаты подбора стратегии")
-        self.assertEqual(page._log_edit.accessibleName(), "Подробный лог подбора стратегии")
+        self.assertEqual(page._log_edit.accessibleName(), "Подробный лог подбора стратегии: пока нет записей")
+        self.assertEqual(
+            page._log_edit.property("screenReaderStateText"),
+            "Подробный лог подбора стратегии: пока нет записей",
+        )
         self.assertEqual(page._expand_log_btn.accessibleName(), "Развернуть лог подбора стратегии")
         self.assertEqual(page._prepare_support_btn.accessibleName(), "Подготовить обращение по подбору стратегии")
 
