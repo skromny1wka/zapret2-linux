@@ -186,6 +186,54 @@ def schedule_stop_button_icon(button, *, delay_ms: int = 250) -> None:
         _apply_icon()
 
 
+def build_deferred_themed_push_setting_card_common(
+    *,
+    push_setting_card_cls,
+    button_text: str,
+    icon_name: str,
+    icon_color: str | None,
+    title_text: str,
+    content_text: str,
+    on_click,
+    button_icon_name=FluentIcon.LINK,
+    button_alignment: str = "left",
+    button_accessible_name: str | None = None,
+    parent=None,
+    delay_ms: int = 250,
+):
+    card = build_push_setting_card_common(
+        push_setting_card_cls=push_setting_card_cls,
+        button_text=button_text,
+        icon=QIcon(),
+        title_text=title_text,
+        content_text=content_text,
+        on_click=on_click,
+        button_icon_name=button_icon_name,
+        button_alignment=button_alignment,
+        button_accessible_name=button_accessible_name,
+        parent=parent,
+    )
+    schedule_push_setting_card_icon(card, icon_name=icon_name, icon_color=icon_color, delay_ms=delay_ms)
+    return card
+
+
+def schedule_push_setting_card_icon(card, *, icon_name: str, icon_color: str | None = None, delay_ms: int = 250) -> None:
+    def _apply_icon() -> None:
+        try:
+            icon = get_themed_qta_icon(icon_name, color=icon_color) if icon_color else get_themed_qta_icon(icon_name)
+            icon_label = getattr(card, "iconLabel", None)
+            set_icon = getattr(icon_label, "setIcon", None)
+            if callable(set_icon):
+                set_icon(icon)
+        except Exception:
+            pass
+
+    try:
+        QTimer.singleShot(delay_ms, _apply_icon)
+    except Exception:
+        _apply_icon()
+
+
 def build_push_setting_card_common(
     *,
     push_setting_card_cls,

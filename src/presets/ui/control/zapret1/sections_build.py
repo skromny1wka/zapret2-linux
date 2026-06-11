@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from presets.ui.control.shared_builders import build_push_setting_card_common
+from presets.ui.control.shared_builders import build_deferred_themed_push_setting_card_common
 from presets.ui.control.windows_features.build import build_windows_feature_toggles
 from ui.fluent_widgets import build_additional_settings_section, enable_setting_card_group_auto_height
-from ui.theme import get_themed_qta_icon
 
 
 @dataclass(slots=True)
@@ -141,20 +140,22 @@ def build_winws1_pages_settings_sections(
         tr_fn("page.winws1_control.section.additional", "Дополнительные действия"),
         content_parent,
     )
-    test_card = build_push_setting_card_common(
+    test_card = build_deferred_themed_push_setting_card_common(
         push_setting_card_cls=push_setting_card_cls,
         button_text=tr_fn("page.winws1_control.button.open", "Открыть"),
-        icon=get_themed_qta_icon("fa5s.wifi", color="#60cdff"),
+        icon_name="fa5s.wifi",
+        icon_color="#60cdff",
         title_text=tr_fn("page.winws1_control.button.connection_test", "Тест соединения"),
         content_text=tr_fn("page.winws1_control.button.connection_test.desc", "Проверить доступность сети и состояние обхода"),
         on_click=on_open_connection_test,
         button_accessible_name=tr_fn("page.winws1_control.button.connection_test.accessible_name", "Открыть тест соединения"),
         parent=content_parent,
     )
-    internet_cleanup_card = build_push_setting_card_common(
+    internet_cleanup_card = build_deferred_themed_push_setting_card_common(
         push_setting_card_cls=push_setting_card_cls,
         button_text=tr_fn("page.control.internet_cleanup.button", "Сбросить"),
-        icon=get_themed_qta_icon("fa5s.network-wired", color="#4cc38a"),
+        icon_name="fa5s.network-wired",
+        icon_color="#4cc38a",
         title_text=tr_fn("page.control.internet_cleanup.title", "Сбросить сеть Windows"),
         content_text=tr_fn(
             "page.control.internet_cleanup.desc",
@@ -164,20 +165,22 @@ def build_winws1_pages_settings_sections(
         button_accessible_name=tr_fn("page.control.internet_cleanup.accessible_name", "Сбросить сеть Windows"),
         parent=content_parent,
     )
-    folder_card = build_push_setting_card_common(
+    folder_card = build_deferred_themed_push_setting_card_common(
         push_setting_card_cls=push_setting_card_cls,
         button_text=tr_fn("page.winws1_control.button.open", "Открыть"),
-        icon=get_themed_qta_icon("fa5s.folder-open", color="#f5c04d"),
+        icon_name="fa5s.folder-open",
+        icon_color="#f5c04d",
         title_text=tr_fn("page.winws1_control.button.open_folder", "Открыть папку"),
         content_text=tr_fn("page.winws1_control.button.open_folder.desc", "Перейти в папку программы и служебных файлов"),
         on_click=on_open_folder,
         button_accessible_name=tr_fn("page.winws1_control.button.open_folder.accessible_name", "Открыть папку программы"),
         parent=content_parent,
     )
-    docs_card = build_push_setting_card_common(
+    docs_card = build_deferred_themed_push_setting_card_common(
         push_setting_card_cls=push_setting_card_cls,
         button_text=tr_fn("page.winws1_control.button.open", "Открыть"),
-        icon=get_themed_qta_icon("fa5s.book", color="#8ab4f8"),
+        icon_name="fa5s.book",
+        icon_color="#8ab4f8",
         title_text=tr_fn("page.winws1_control.button.documentation", "Документация"),
         content_text=tr_fn("page.winws1_control.button.documentation.desc", "Открыть справку и описание возможностей"),
         on_click=on_open_docs,

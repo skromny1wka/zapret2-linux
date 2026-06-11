@@ -140,6 +140,18 @@ class ControlPageImmediateStartupTests(unittest.TestCase):
         self.assertIn("enable_setting_card_group_auto_height(program_settings_card)", builder_source)
         self.assertNotIn("enable_setting_card_group_auto_height(self.program_settings_card)", page_source)
 
+    def test_control_settings_sections_defer_themed_action_icons(self) -> None:
+        import inspect
+
+        import presets.ui.control.zapret1.sections_build as zapret1_sections
+        import presets.ui.control.zapret2.sections_build as zapret2_sections
+
+        for module in (zapret1_sections, zapret2_sections):
+            with self.subTest(module=module.__name__):
+                source = inspect.getsource(module)
+                self.assertIn("build_deferred_themed_push_setting_card_common", source)
+                self.assertNotIn("get_themed_qta_icon", source)
+
 
 if __name__ == "__main__":
     unittest.main()
