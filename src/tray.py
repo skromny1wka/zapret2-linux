@@ -13,6 +13,8 @@ from PyQt6.QtGui import QCursor, QFontMetrics
 from PyQt6.QtWidgets import QApplication, QMenu, QMessageBox, QWidget
 from qfluentwidgets import RoundMenu, Action, FluentIcon
 
+from ui.message_box_accessibility import set_message_box_button_accessibility
+
 try:
     from log.log import log
 
@@ -811,6 +813,17 @@ class SystemTrayManager:
             "После отключения вам придётся вручную перезапускать Discord при смене стратегии."
         )
         box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        set_message_box_button_accessibility(
+            box,
+            yes_button=box.button(QMessageBox.StandardButton.Yes),
+            cancel_button=box.button(QMessageBox.StandardButton.No),
+            yes_name="Отключить автоперезапуск Discord",
+            yes_description=(
+                "Discord больше не будет перезапускаться автоматически при смене стратегии."
+            ),
+            cancel_name="Не отключать автоперезапуск Discord",
+            cancel_description="Автоперезапуск Discord останется включённым.",
+        )
         return box.exec() == QMessageBox.StandardButton.Yes
 
     def _set_window_opacity(self, value: int) -> None:

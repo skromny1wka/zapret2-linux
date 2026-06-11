@@ -10,11 +10,15 @@ def set_message_box_button_accessibility(
     yes_description: str,
     cancel_name: str,
     cancel_description: str,
+    yes_button=None,
+    cancel_button=None,
 ) -> None:
-    yes_button = getattr(box, "yesButton", None)
+    if yes_button is None:
+        yes_button = getattr(box, "yesButton", None)
     if yes_button is not None:
         set_control_accessibility(yes_button, name=yes_name, description=yes_description)
-    cancel_button = getattr(box, "cancelButton", None)
+    if cancel_button is None:
+        cancel_button = getattr(box, "cancelButton", None)
     if cancel_button is not None:
         set_control_accessibility(cancel_button, name=cancel_name, description=cancel_description)
 
