@@ -102,8 +102,45 @@ class OrchestraLogContextActionWorker(QThread):
         self.loaded.emit(self._request_id, self._action, result)
 
 
+class OrchestraLogFilterWorker(QThread):
+    loaded = pyqtSignal(int, str)
+    failed = pyqtSignal(int, str)
+
+    def __init__(
+        self,
+        request_id: int,
+        *,
+        lines,
+        domain_filter: str,
+        protocol_filter: str,
+        filter_lines,
+        parent=None,
+    ):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self._lines = tuple(str(line or "") for line in (lines or ()))
+        self._domain_filter = str(domain_filter or "")
+        self._protocol_filter = str(protocol_filter or "")
+        self._filter_lines = filter_lines
+
+    def run(self) -> None:
+        try:
+            filtered_lines = self._filter_lines(
+                lines=list(self._lines),
+                domain_filter=self._domain_filter,
+                protocol_filter=self._protocol_filter,
+            )
+            text = "\n".join(str(line or "") for line in (filtered_lines or ()))
+        except Exception as exc:
+            log(f"Orchestra log filter worker: ошибка фильтра лога: {exc}", "ERROR")
+            self.failed.emit(self._request_id, str(exc))
+            return
+        self.loaded.emit(self._request_id, text)
+
+
 __all__ = [
     "OrchestraClearLearnedWorker",
+    "OrchestraLogFilterWorker",
     "OrchestraLogContextActionWorker",
     "OrchestraLogHistoryActionWorker",
     "OrchestraLogHistoryLoadWorker",

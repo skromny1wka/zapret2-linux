@@ -3,6 +3,7 @@
 
 from queue import Queue
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, pyqtSlot
+from PyQt6.QtGui import QTextCursor
 from PyQt6.QtWidgets import (
     QVBoxLayout, QLabel,
 )
@@ -19,7 +20,6 @@ from orchestra.ui.page_build import (
 )
 from orchestra.ui.page_runtime_helpers import (
     append_log_line,
-    apply_log_filter_to_view,
     apply_orchestra_language,
     current_protocol_filter_code,
     protocol_filter_items,
@@ -111,6 +111,14 @@ class OrchestraPage(BasePage):
         self._log_context_action_state = QueuedWorkerState[tuple[str, str, int, str]](
             self._log_context_action_runtime,
         )
+        self._log_filter_runtime = OneShotWorkerRuntime()
+        self._log_filter_state = LatestValueWorkerState(
+            self._log_filter_runtime,
+            empty_value=None,
+        )
+        self._log_filter_timer = QTimer(self)
+        self._log_filter_timer.setSingleShot(True)
+        self._log_filter_timer.timeout.connect(self._run_debounced_log_filter)
         self._clear_learned_reset_timer = QTimer(self)
         self._clear_learned_reset_timer.setSingleShot(True)
         self._clear_learned_reset_timer.timeout.connect(self._reset_clear_learned_button)
@@ -569,12 +577,118 @@ class OrchestraPage(BasePage):
         """Применяет фильтр к логу"""
         if self._cleanup_in_progress:
             return
-        apply_log_filter_to_view(
-            lines=self._full_log_lines,
-            domain_filter=self.log_filter_input.text().strip().lower(),
-            protocol_filter=self._current_protocol_filter_code(),
-            log_text=self.log_text,
+        request = (
+            tuple(self._full_log_lines),
+            self.log_filter_input.text().strip().lower(),
+            self._current_protocol_filter_code(),
         )
+        self._log_filter_state_obj().pending = request
+        try:
+            self._log_filter_timer.start(120)
+        except Exception:
+            self._run_debounced_log_filter()
+
+    def create_log_filter_worker(self, request_id: int, *, lines, domain_filter: str, protocol_filter: str):
+        from orchestra.page_workers import OrchestraLogFilterWorker
+
+        return OrchestraLogFilterWorker(
+            request_id,
+            lines=lines,
+            domain_filter=domain_filter,
+            protocol_filter=protocol_filter,
+            filter_lines=orchestra_page_runtime.filter_lines,
+            parent=self,
+        )
+
+    def _run_debounced_log_filter(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        pending = self._log_filter_state_obj().pending
+        if pending is None:
+            return
+        if self._log_filter_state_obj().is_busy():
+            return
+        self._log_filter_state_obj().pending = None
+        lines, domain_filter, protocol_filter = pending
+        self._start_log_filter_worker(lines, domain_filter, protocol_filter)
+
+    def _start_log_filter_worker(self, lines, domain_filter: str, protocol_filter: str) -> None:
+        self._log_filter_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: self.create_log_filter_worker(
+                request_id,
+                lines=lines,
+                domain_filter=str(domain_filter or ""),
+                protocol_filter=str(protocol_filter or ""),
+            ),
+            on_loaded=self._on_log_filter_loaded,
+            on_failed=self._on_log_filter_failed,
+            on_finished=self._on_log_filter_worker_finished,
+        )
+
+    def _on_log_filter_loaded(self, request_id: int, text: str) -> None:
+        if not self._log_filter_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
+            return
+        if self._log_filter_state_obj().has_pending():
+            return
+        self.log_text.clear()
+        if text:
+            self.log_text.setPlainText(str(text or ""))
+        cursor = self.log_text.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        self.log_text.setTextCursor(cursor)
+
+    def _on_log_filter_failed(self, request_id: int, error: str) -> None:
+        if not self._log_filter_runtime.is_current(
+            request_id,
+            cleanup_in_progress=self._cleanup_in_progress,
+        ):
+            return
+        if self._log_filter_state_obj().has_pending():
+            return
+        log(f"Ошибка фильтрации лога Orchestra: {error}", "DEBUG")
+
+    def _on_log_filter_worker_finished(self, worker) -> None:
+        if not self._is_current_worker_finish(self.__dict__.get("_log_filter_runtime"), worker):
+            return
+        if self._log_filter_state_obj().has_pending() and not self._cleanup_in_progress:
+            self._schedule_log_filter_worker_start()
+
+    def _schedule_log_filter_worker_start(self) -> None:
+        self._log_filter_state_obj().schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_log_filter_worker_start,
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+            pending_when_already_scheduled=self._log_filter_state_obj().pending,
+        )
+
+    def _run_scheduled_log_filter_worker_start(self) -> None:
+        pending = self._log_filter_state_obj().take_pending_for_scheduled_start(
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+        )
+        if pending is None:
+            return
+        lines, domain_filter, protocol_filter = pending
+        self._start_log_filter_worker(lines, domain_filter, protocol_filter)
+
+    def _log_filter_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_log_filter_state")
+        runtime = self.__dict__.get("_log_filter_runtime")
+        if state is None:
+            pending = self.__dict__.pop("_log_filter_pending", None)
+            start_scheduled = bool(self.__dict__.pop("_log_filter_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=None,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_log_filter_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
 
     def _clear_log_filter(self):
         """Сбрасывает фильтр"""
@@ -914,6 +1028,13 @@ class OrchestraPage(BasePage):
         self._clear_learned_start_scheduled = False
         self.stop_monitoring()
         self._clear_learned_reset_timer.stop()
+        self._log_filter_timer.stop()
+        self._log_filter_state_obj().reset()
+        self._log_filter_runtime.stop(
+            blocking=False,
+            log_fn=log,
+            warning_prefix="Orchestra log filter worker",
+        )
         self._clear_learned_runtime.stop(
             blocking=False,
             log_fn=log,

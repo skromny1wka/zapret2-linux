@@ -458,6 +458,94 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("_log_history_state_obj().schedule_start", schedule_source)
         self.assertIn("_log_history_state_obj().reset()", cleanup_source)
 
+    def test_orchestra_log_filter_runs_through_worker(self) -> None:
+        from orchestra.page_workers import OrchestraLogFilterWorker
+        from orchestra.ui.page import OrchestraPage
+
+        apply_source = inspect.getsource(OrchestraPage._apply_log_filter)
+        start_source = inspect.getsource(OrchestraPage._start_log_filter_worker)
+        loaded_source = inspect.getsource(OrchestraPage._on_log_filter_loaded)
+        cleanup_source = inspect.getsource(OrchestraPage.cleanup)
+        worker_run_source = inspect.getsource(OrchestraLogFilterWorker.run)
+
+        self.assertIn("_log_filter_state_obj().pending", apply_source)
+        self.assertIn("_log_filter_timer.start", apply_source)
+        self.assertNotIn("apply_log_filter_to_view", apply_source)
+        self.assertNotIn("filter_lines(", apply_source)
+        self.assertNotIn("log_text.append", apply_source)
+        self.assertIn("create_log_filter_worker", start_source)
+        self.assertIn("start_qthread_worker", start_source)
+        self.assertIn("_log_filter_runtime.is_current", loaded_source)
+        self.assertIn("_log_filter_state_obj().has_pending()", loaded_source)
+        self.assertIn("setPlainText", loaded_source)
+        self.assertNotIn("log_text.append", loaded_source)
+        self.assertIn("_log_filter_state_obj().reset()", cleanup_source)
+        self.assertIn("_log_filter_runtime.stop", cleanup_source)
+        self.assertIn("self._filter_lines(", worker_run_source)
+
+    def test_orchestra_log_filter_request_is_debounced_in_ui_thread(self) -> None:
+        from orchestra.ui.page import OrchestraPage
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        page = OrchestraPage.__new__(OrchestraPage)
+        page._cleanup_in_progress = False
+        page._full_log_lines = ["alpha tls", "beta udp"]
+        page._log_filter_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+        page._log_filter_state = LatestValueWorkerState(page._log_filter_runtime, empty_value=None)
+        page._log_filter_timer = SimpleNamespace(start=Mock())
+        page.log_filter_input = SimpleNamespace(text=Mock(return_value="alpha"))
+        page._current_protocol_filter_code = Mock(return_value="tls")
+        page._run_debounced_log_filter = Mock()
+
+        OrchestraPage._apply_log_filter(page)
+
+        page._log_filter_timer.start.assert_called_once_with(120)
+        page._run_debounced_log_filter.assert_not_called()
+        self.assertEqual(page._log_filter_state.pending, (("alpha tls", "beta udp"), "alpha", "tls"))
+
+    def test_orchestra_log_filter_worker_filters_lines(self) -> None:
+        from orchestra.page_workers import OrchestraLogFilterWorker
+
+        loaded = []
+        failed = []
+
+        def _filter_lines(*, lines, domain_filter, protocol_filter):
+            self.assertEqual(domain_filter, "alpha")
+            self.assertEqual(protocol_filter, "tls")
+            return [line for line in lines if domain_filter in line and protocol_filter in line]
+
+        worker = OrchestraLogFilterWorker(
+            7,
+            lines=["alpha tls ok", "alpha udp skip", "beta tls skip"],
+            domain_filter="alpha",
+            protocol_filter="tls",
+            filter_lines=_filter_lines,
+        )
+        worker.loaded.connect(lambda request_id, text: loaded.append((request_id, text)))
+        worker.failed.connect(lambda request_id, error: failed.append((request_id, error)))
+
+        worker.run()
+
+        self.assertEqual(loaded, [(7, "alpha tls ok")])
+        self.assertEqual(failed, [])
+
+    def test_orchestra_log_filter_pending_result_is_not_drawn_over_new_request(self) -> None:
+        from orchestra.ui.page import OrchestraPage
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        page = OrchestraPage.__new__(OrchestraPage)
+        page._cleanup_in_progress = False
+        page._log_filter_runtime = SimpleNamespace(is_current=Mock(return_value=True))
+        page._log_filter_state = LatestValueWorkerState(page._log_filter_runtime, empty_value=None)
+        page._log_filter_state.pending = (("new line",), "new", "all")
+        page.log_text = Mock()
+
+        OrchestraPage._on_log_filter_loaded(page, 3, "old text")
+
+        page._log_filter_runtime.is_current.assert_called_once_with(3, cleanup_in_progress=False)
+        page.log_text.clear.assert_not_called()
+        page.log_text.setPlainText.assert_not_called()
+
     def test_orchestra_log_history_pending_load_restarts_after_event_loop_turn(self) -> None:
         import orchestra.ui.page as orchestra_page
         from orchestra.ui.page import OrchestraPage

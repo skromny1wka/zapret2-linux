@@ -213,20 +213,6 @@ def append_log_line(*, text: str, full_log_lines: list[str], max_log_lines: int,
     return full_log_lines
 
 
-def apply_log_filter_to_view(*, lines: list[str], domain_filter: str, protocol_filter: str, log_text) -> None:
-    filtered_lines = orchestra_page_runtime.filter_lines(
-        lines=lines,
-        domain_filter=domain_filter,
-        protocol_filter=protocol_filter,
-    )
-    log_text.clear()
-    for line in filtered_lines:
-        log_text.append(line)
-    cursor = log_text.textCursor()
-    cursor.movePosition(QTextCursor.MoveOperation.End)
-    log_text.setTextCursor(cursor)
-
-
 def update_log_history_view(*, logs, tr_fn, log_history_list) -> None:
     log_history_list.clear()
 
