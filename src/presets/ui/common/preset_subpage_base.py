@@ -391,6 +391,15 @@ class PresetRawEditorPage(BasePage):
         if not state.has_pending():
             return False
         operation = dict(state.pop_next() or {})
+        return self._run_raw_preset_write_operation(operation)
+
+    def _run_raw_preset_write_operation(self, operation: dict[str, object] | None) -> bool:
+        if self.__dict__.get("_cleanup_in_progress"):
+            return False
+        if self._raw_preset_write_is_running():
+            self._queue_raw_preset_write_operation(dict(operation or {}))
+            return False
+        operation = dict(operation or {})
         kind = str(operation.get("kind") or "")
         if kind == "activate":
             self._raw_preset_activation_state_obj().pending = ""
@@ -412,6 +421,38 @@ class PresetRawEditorPage(BasePage):
             )
             return True
         return bool(self._start_next_raw_preset_write_operation())
+
+    def _queue_raw_preset_write_operation_from_dict(self, operation: dict[str, object]) -> bool:
+        self._queue_raw_preset_write_operation(dict(operation or {}))
+        return True
+
+    def _schedule_next_raw_preset_write_operation_after_finish(
+        self,
+        request_attr: str,
+        worker,
+    ) -> tuple[bool, bool]:
+        accepted = False
+
+        def _is_current_worker_finish(_runtime, finished_worker) -> bool:
+            nonlocal accepted
+            accepted = self._accept_current_raw_write_worker_finished(request_attr, finished_worker)
+            return accepted
+
+        def _single_shot(delay: int, callback) -> None:
+            try:
+                QTimer.singleShot(delay, callback)
+            except Exception:
+                callback()
+
+        operation = self._raw_preset_write_state_obj().schedule_next_after_finish(
+            worker,
+            is_current_worker_finish=_is_current_worker_finish,
+            single_shot=_single_shot,
+            start=lambda pending: self._run_raw_preset_write_operation(dict(pending or {})),
+            queue_item=self._queue_raw_preset_write_operation_from_dict,
+            is_cleanup_in_progress=lambda: bool(self.__dict__.get("_cleanup_in_progress", False)),
+        )
+        return accepted, operation is not None
 
     def _schedule_next_raw_preset_write_operation_start(self) -> bool:
         if self.__dict__.get("_cleanup_in_progress"):
@@ -1211,7 +1252,7 @@ class PresetRawEditorPage(BasePage):
             callback()
             if self._raw_preset_write_is_running():
                 return
-        self._schedule_next_raw_preset_write_operation_start()
+        self._schedule_next_raw_preset_write_operation_after_finish("_raw_save_request_id", worker)
 
     def _schedule_raw_preset_save_worker_start(
         self,
@@ -1564,9 +1605,13 @@ class PresetRawEditorPage(BasePage):
         self._show_error(str(error))
 
     def _on_preset_activation_worker_finished(self, worker) -> None:
-        if not self._accept_current_raw_write_worker_finished("_raw_activate_request_id", worker):
+        accepted, scheduled = self._schedule_next_raw_preset_write_operation_after_finish(
+            "_raw_activate_request_id",
+            worker,
+        )
+        if not accepted:
             return
-        if self._schedule_next_raw_preset_write_operation_start():
+        if scheduled:
             return
         state = self._raw_preset_activation_state_obj()
         pending = str(state.pending or "").strip()
@@ -1714,9 +1759,11 @@ class PresetRawEditorPage(BasePage):
         self._show_error(str(error))
 
     def _on_raw_preset_action_worker_finished(self, worker) -> None:
-        if not self._accept_current_raw_write_worker_finished("_raw_action_request_id", worker):
-            return
-        if self._schedule_next_raw_preset_write_operation_start():
+        _accepted, scheduled = self._schedule_next_raw_preset_write_operation_after_finish(
+            "_raw_action_request_id",
+            worker,
+        )
+        if scheduled:
             return
 
     def _activation_footer_text(self) -> str:

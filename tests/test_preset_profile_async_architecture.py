@@ -3961,6 +3961,18 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_after_raw_preset_save", save_finished_source)
         self.assertIn("_raw_save_succeeded", save_finished_source)
 
+    def test_raw_preset_write_finished_uses_queued_state_finish_guard(self) -> None:
+        save_finished_source = inspect.getsource(PresetRawEditorPage._on_raw_preset_save_worker_finished)
+        activate_finished_source = inspect.getsource(PresetRawEditorPage._on_preset_activation_worker_finished)
+        action_finished_source = inspect.getsource(PresetRawEditorPage._on_raw_preset_action_worker_finished)
+        helper_source = inspect.getsource(PresetRawEditorPage._schedule_next_raw_preset_write_operation_after_finish)
+
+        self.assertIn("schedule_next_after_finish", helper_source)
+        self.assertIn("_accept_current_raw_write_worker_finished", helper_source)
+        for source in (save_finished_source, activate_finished_source, action_finished_source):
+            self.assertIn("_schedule_next_raw_preset_write_operation_after_finish", source)
+            self.assertNotIn("_schedule_next_raw_preset_write_operation_start()", source)
+
     def test_raw_preset_editor_activation_runs_through_worker(self) -> None:
         source = inspect.getsource(PresetRawEditorPage._activate_preset)
         request_source = inspect.getsource(PresetRawEditorPage._request_preset_activation)
