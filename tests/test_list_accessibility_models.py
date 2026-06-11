@@ -63,7 +63,11 @@ class ListAccessibilityModelTests(unittest.TestCase):
 
         text = model.index(0, 0).data(Qt.ItemDataRole.AccessibleTextRole)
 
-        self.assertEqual(text, "Позиция 1, YouTube, включён, стратегия: TLS fake, TCP | TCP 443")
+        self.assertEqual(
+            text,
+            "Позиция 1, YouTube, включён, стратегия: TLS fake, TCP | TCP 443. "
+            "PageUp и PageDown меняют порядок profile.",
+        )
 
     def test_preset_rows_expose_screen_reader_text(self) -> None:
         from ui.presets_menu.model import PresetListModel

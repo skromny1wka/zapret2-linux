@@ -455,7 +455,8 @@ def _profile_order_accessible_text(
         parts.append(f"стратегия: {strategy_name}")
     if description:
         parts.append(description)
-    return ", ".join(parts)
+    text = ", ".join(parts)
+    return f"{text}. PageUp и PageDown меняют порядок profile." if text else ""
 
 
 def _profile_order_data_roles() -> list[int]:
