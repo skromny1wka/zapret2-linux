@@ -12,6 +12,9 @@ from ui.queued_worker_state import QueuedWorkerState
 from app.ui_texts import tr as tr_catalog
 
 
+ORDER_PAYLOAD_PRESET_SWITCH_RELOAD_DELAY_MS = 180
+
+
 class ProfileOrderPageBase(BasePage):
     launch_method = ZAPRET2_MODE
     title_key = "page.winws2_profile_order.title"
@@ -27,6 +30,7 @@ class ProfileOrderPageBase(BasePage):
         create_preset_profile_order_move_worker,
         open_profiles,
         open_root,
+        ui_state_store=None,
     ):
         super().__init__(
             title="Порядок в пресете",
@@ -46,15 +50,84 @@ class ProfileOrderPageBase(BasePage):
         )
         self._order_payload_apply_scheduled = False
         self._pending_order_payload_apply = None
+        self._order_payload_loaded_once = False
+        self._order_payload_dirty = True
+        self._order_reload_after_preset_switch_scheduled = False
         self._order_move_runtime = OneShotWorkerRuntime()
         self._order_move_state = QueuedWorkerState[dict[str, str]](self._order_move_runtime)
         self._order_move_reload_required = False
         self._breadcrumb = None
+        self._ui_state_store = None
+        self._ui_state_unsubscribe = None
         self._cleanup_in_progress = False
         self._build_content()
+        self.bind_ui_state_store(ui_state_store)
 
     def on_page_activated(self) -> None:
-        self._reload_order_profiles()
+        if not self.__dict__.get("_order_payload_loaded_once", False) or self.__dict__.get(
+            "_order_payload_dirty",
+            True,
+        ):
+            self._reload_order_profiles()
+
+    def bind_ui_state_store(self, store) -> None:
+        if self.__dict__.get("_ui_state_store") is store:
+            return
+        unsubscribe = self.__dict__.get("_ui_state_unsubscribe")
+        if callable(unsubscribe):
+            try:
+                unsubscribe()
+            except Exception:
+                pass
+        self._ui_state_store = store
+        self._ui_state_unsubscribe = None
+        if store is None:
+            return
+        self._ui_state_unsubscribe = store.subscribe(
+            self._on_ui_state_changed,
+            fields={"active_preset_revision", "preset_content_revision"},
+            emit_initial=False,
+        )
+
+    def _on_ui_state_changed(self, _state, changed: frozenset[str]) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if not (set(changed or ()) & {"active_preset_revision", "preset_content_revision"}):
+            return
+        self._order_payload_dirty = True
+        if not self.isVisible():
+            return
+        if "preset_content_revision" in changed:
+            self._reload_order_profiles(force=True)
+            return
+        self._schedule_order_reload_after_preset_switch()
+
+    def _schedule_order_reload_after_preset_switch(self) -> None:
+        if self.__dict__.get("_order_reload_after_preset_switch_scheduled", False):
+            return
+        self._order_reload_after_preset_switch_scheduled = True
+        try:
+            QTimer.singleShot(
+                ORDER_PAYLOAD_PRESET_SWITCH_RELOAD_DELAY_MS,
+                self._run_scheduled_order_reload_after_preset_switch,
+            )
+        except Exception:
+            self._run_scheduled_order_reload_after_preset_switch()
+
+    def _run_scheduled_order_reload_after_preset_switch(self) -> None:
+        self._order_reload_after_preset_switch_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if not self.__dict__.get("_order_payload_dirty", False):
+            return
+        if not self.isVisible():
+            return
+        self._reload_order_profiles(force=True)
+
+    def _mark_order_payload_dirty(self, *, reload_if_visible: bool = False) -> None:
+        self._order_payload_dirty = True
+        if reload_if_visible and self.isVisible():
+            self._reload_order_profiles(force=True)
 
     def _build_content(self) -> None:
         if self.title_label is not None:
@@ -82,6 +155,11 @@ class ProfileOrderPageBase(BasePage):
 
     def _reload_order_profiles(self, *, force: bool = False) -> None:
         if bool(self.__dict__.get("_cleanup_in_progress", False)):
+            return
+        if not force and self.__dict__.get("_order_payload_loaded_once", False) and not self.__dict__.get(
+            "_order_payload_dirty",
+            True,
+        ):
             return
         runtime = self._order_load_runtime
         state = self._order_load_state_obj()
@@ -146,6 +224,8 @@ class ProfileOrderPageBase(BasePage):
                 payload_items = getattr(getattr(payload, "payload", payload), "items", ())
                 self._order_list.set_profiles(tuple(payload_items or ()))
         self._rebuild_breadcrumb()
+        self._order_payload_loaded_once = True
+        self._order_payload_dirty = False
 
     def _on_order_profiles_failed(self, request_id: int, error: str) -> None:
         if not self._order_load_runtime.is_current(
@@ -349,6 +429,7 @@ class ProfileOrderPageBase(BasePage):
             self._reload_order_profiles(force=True)
             return
         if applied_locally:
+            self._order_payload_dirty = False
             return
         if result:
             self._reload_order_profiles(force=True)
@@ -461,9 +542,18 @@ class ProfileOrderPageBase(BasePage):
 
     def cleanup(self) -> None:
         self._cleanup_in_progress = True
+        unsubscribe = self.__dict__.get("_ui_state_unsubscribe")
+        if callable(unsubscribe):
+            try:
+                unsubscribe()
+            except Exception:
+                pass
+        self._ui_state_unsubscribe = None
+        self._ui_state_store = None
         self._order_load_state_obj().reset()
         self._pending_order_payload_apply = None
         self._order_payload_apply_scheduled = False
+        self._order_reload_after_preset_switch_scheduled = False
         self._order_move_state_obj().reset()
         self._order_move_reload_required = False
         self._order_load_runtime.stop(
@@ -500,6 +590,14 @@ class ProfileOrderPageBase(BasePage):
             self._open_profiles()
         elif key == "order":
             self._rebuild_breadcrumb()
+
+    def handle_page_command(self, command: str, payload: dict) -> bool:
+        if command == "profile_order_changed":
+            self._mark_order_payload_dirty(
+                reload_if_visible=bool((payload or {}).get("reload_if_visible", False)),
+            )
+            return True
+        return False
 
 
 class Zapret2ProfileOrderPage(ProfileOrderPageBase):

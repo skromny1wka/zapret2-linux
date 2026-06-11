@@ -207,6 +207,35 @@ class ProfileOrderPageTests(unittest.TestCase):
         self.assertNotIn("move_preset_profile_after", after_source)
         self.assertNotIn("move_preset_profile_to_end", end_source)
 
+    def test_order_page_repeat_activation_skips_clean_payload_reload(self) -> None:
+        from profile.ui.profile_order_page import ProfileOrderPageBase
+
+        page = ProfileOrderPageBase.__new__(ProfileOrderPageBase)
+        page._order_payload_loaded_once = True
+        page._order_payload_dirty = False
+        page._reload_order_profiles = Mock()
+
+        ProfileOrderPageBase.on_page_activated(page)
+
+        page._reload_order_profiles.assert_not_called()
+
+    def test_order_page_ui_state_change_marks_payload_dirty(self) -> None:
+        from app.state_store import MainWindowStateStore
+        from profile.ui.profile_order_page import ProfileOrderPageBase
+
+        store = MainWindowStateStore()
+        page = ProfileOrderPageBase.__new__(ProfileOrderPageBase)
+        page._ui_state_store = None
+        page._ui_state_unsubscribe = None
+        page._cleanup_in_progress = False
+        page._order_payload_dirty = False
+        page.isVisible = Mock(return_value=False)
+
+        ProfileOrderPageBase.bind_ui_state_store(page, store)
+        store.bump_preset_content_revision()
+
+        self.assertTrue(page._order_payload_dirty)
+
     def test_order_page_updates_visible_list_locally_after_move_worker(self) -> None:
         from profile.ui.profile_order_list import ProfileOrderList
         from profile.ui.profile_order_page import ProfileOrderPageBase

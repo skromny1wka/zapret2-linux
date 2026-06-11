@@ -4,6 +4,7 @@ from log.log import log
 from ui.navigation_pages import (
     resolve_preset_raw_editor_page_for_method,
     resolve_preset_setup_page_for_method,
+    resolve_profile_order_page_for_method,
     resolve_profile_setup_page_for_method,
 )
 from ui.window_adapter import send_page_command, show_page
@@ -68,13 +69,24 @@ def apply_profile_setup_change_for_method(
     preset_setup_page = resolve_preset_setup_page_for_method(method)
     if preset_setup_page is None:
         return False
-    return send_page_command(
+    preset_updated = send_page_command(
         window,
         preset_setup_page,
         "profile_setup_changed",
         {"profile_key": profile_key, "change_kind": change_kind, "profile_item": profile_item},
         ensure=False,
     )
+    order_page = resolve_profile_order_page_for_method(method)
+    order_invalidated = False
+    if order_page is not None:
+        order_invalidated = send_page_command(
+            window,
+            order_page,
+            "profile_order_changed",
+            {"profile_key": profile_key, "change_kind": change_kind, "reload_if_visible": True},
+            ensure=False,
+        )
+    return bool(preset_updated or order_invalidated)
 
 
 __all__ = [

@@ -2126,6 +2126,33 @@ class StartupRuntimeSetupTests(unittest.TestCase):
 
         routed_show_page.assert_called_once_with(window, PageName.ABOUT, allow_internal=True)
 
+    def test_profile_setup_change_invalidates_loaded_order_page_without_ensuring_it(self) -> None:
+        from app.page_names import PageName
+        from main import window_page_presenters
+
+        calls: list[tuple[PageName, str, dict, bool]] = []
+
+        def send_page_command(_window, page_name, command, payload, *, ensure=True):
+            calls.append((page_name, command, payload, ensure))
+            return True
+
+        with patch.object(window_page_presenters, "send_page_command", side_effect=send_page_command):
+            self.assertTrue(
+                window_page_presenters.apply_profile_setup_change_for_method(
+                    object(),
+                    "zapret2_mode",
+                    "profile:1",
+                    "strategy",
+                )
+            )
+
+        self.assertEqual(calls[0][0], PageName.ZAPRET2_PRESET_SETUP)
+        self.assertEqual(calls[0][1], "profile_setup_changed")
+        self.assertFalse(calls[0][3])
+        self.assertEqual(calls[1][0], PageName.ZAPRET2_PROFILE_ORDER)
+        self.assertEqual(calls[1][1], "profile_order_changed")
+        self.assertFalse(calls[1][3])
+
     def test_window_notifications_route_pages_through_adapter(self) -> None:
         from app.page_names import PageName
         from main import window_notifications_setup

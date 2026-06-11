@@ -151,6 +151,7 @@ def build_profile_order_page_kwargs(
     page_name: PageName,
     profile_feature,
     show_page,
+    ui_state_store=None,
 ) -> dict:
     method = ZAPRET2_MODE if page_name == PageName.ZAPRET2_PROFILE_ORDER else ZAPRET1_MODE
     profiles_page = (
@@ -168,6 +169,7 @@ def build_profile_order_page_kwargs(
         "create_preset_profile_order_move_worker": profile_feature.create_preset_profile_order_move_worker,
         "open_profiles": lambda page=profiles_page: show_page(page, allow_internal=True),
         "open_root": lambda page=control_page: show_page(page, allow_internal=True),
+        "ui_state_store": ui_state_store,
     }
 
 
