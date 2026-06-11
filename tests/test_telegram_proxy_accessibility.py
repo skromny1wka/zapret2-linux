@@ -115,8 +115,12 @@ class TelegramProxyAccessibilityTests(unittest.TestCase):
         self.assertIn("открывает файл", widgets.btn_open_log_file.accessibleDescription().lower())
         self.assertEqual(widgets.btn_clear_logs.accessibleName(), "Очистить лог Telegram Proxy")
         self.assertIn("очищает видимый лог", widgets.btn_clear_logs.accessibleDescription().lower())
-        self.assertEqual(widgets.log_edit.accessibleName(), "Лог Telegram Proxy")
+        self.assertEqual(widgets.log_edit.accessibleName(), "Лог Telegram Proxy: пока нет событий подключений")
         self.assertIn("события подключений", widgets.log_edit.accessibleDescription())
+        self.assertEqual(
+            widgets.log_edit.property("screenReaderStateText"),
+            "Лог Telegram Proxy: пока нет событий подключений",
+        )
 
     def test_diagnostics_panel_controls_are_named_for_screen_reader(self) -> None:
         widgets = build_telegram_proxy_diag_panel(

@@ -162,6 +162,7 @@ def build_telegram_proxy_logs_panel(
         name="Лог Telegram Proxy",
         description="Показывает события подключений и работы Telegram Proxy.",
     )
+    set_state_text(log_edit, "Лог Telegram Proxy: пока нет событий подключений")
     apply_text_line_limit(log_edit, TELEGRAM_PROXY_LOG_VIEW_MAX_LINES)
     layout.addWidget(log_edit)
 
