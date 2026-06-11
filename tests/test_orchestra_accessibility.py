@@ -1,6 +1,7 @@
 import os
 import unittest
 from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -20,6 +21,41 @@ from orchestra.ui.whitelist_page import OrchestraWhitelistPage, WhitelistDomainR
 
 class _OrchestraFeatureStub:
     ASKEY_ALL = ("tcp", "udp")
+
+
+class _DialogButton:
+    def __init__(self) -> None:
+        self._accessible_name = ""
+        self._accessible_description = ""
+
+    def accessibleName(self) -> str:  # noqa: N802
+        return self._accessible_name
+
+    def setAccessibleName(self, text: str) -> None:  # noqa: N802
+        self._accessible_name = str(text)
+
+    def accessibleDescription(self) -> str:  # noqa: N802
+        return self._accessible_description
+
+    def setAccessibleDescription(self, text: str) -> None:  # noqa: N802
+        self._accessible_description = str(text)
+
+
+class _MessageBox:
+    instances: list["_MessageBox"] = []
+
+    def __init__(self, title: str, body: str, parent=None) -> None:
+        self.title = title
+        self.body = body
+        self.parent = parent
+        self.yesButton = _DialogButton()
+        self.cancelButton = _DialogButton()
+        self.exec_called = False
+        _MessageBox.instances.append(self)
+
+    def exec(self) -> bool:
+        self.exec_called = True
+        return False
 
 
 class OrchestraAccessibilityTests(unittest.TestCase):
@@ -107,6 +143,62 @@ class OrchestraAccessibilityTests(unittest.TestCase):
         self.assertEqual(page.add_btn.accessibleName(), "Добавить домен в белый список")
         self.assertEqual(page.search_input.accessibleName(), "Поиск по белому списку")
         self.assertEqual(page.clear_user_btn.accessibleName(), "Очистить пользовательские домены белого списка")
+
+    def test_locked_clear_confirmation_buttons_are_named_for_screen_reader(self) -> None:
+        page = OrchestraLockedPage.__new__(OrchestraLockedPage)
+        page._cleanup_in_progress = False
+        page._orchestra = SimpleNamespace(runner=object(), count_locked_strategies=lambda: 3)
+        page._request_managed_action = Mock()
+        page._tr = lambda _key, default, **kwargs: default.format(**kwargs) if kwargs else default
+        page.window = lambda: None
+        _MessageBox.instances = []
+
+        with patch("orchestra.ui.locked_page.MessageBox", _MessageBox):
+            OrchestraLockedPage._unlock_all(page)
+
+        dialog = _MessageBox.instances[0]
+        self.assertEqual(dialog.yesButton.accessibleName(), "Разлочить все стратегии")
+        self.assertIn("Разлочить все 3 стратегий", dialog.yesButton.accessibleDescription())
+        self.assertEqual(dialog.cancelButton.accessibleName(), "Отменить разлочку всех стратегий")
+        self.assertTrue(dialog.exec_called)
+        page._request_managed_action.assert_not_called()
+
+    def test_blocked_clear_confirmation_buttons_are_named_for_screen_reader(self) -> None:
+        page = OrchestraBlockedPage.__new__(OrchestraBlockedPage)
+        page._cleanup_in_progress = False
+        page._orchestra = SimpleNamespace(runner=object(), count_user_blocked_strategies=lambda: 4)
+        page._request_managed_action = Mock()
+        page._tr = lambda _key, default, **kwargs: default.format(**kwargs) if kwargs else default
+        page.window = lambda: None
+        _MessageBox.instances = []
+
+        with patch("orchestra.ui.blocked_page.MessageBox", _MessageBox):
+            OrchestraBlockedPage._unblock_all(page)
+
+        dialog = _MessageBox.instances[0]
+        self.assertEqual(dialog.yesButton.accessibleName(), "Очистить пользовательские блокировки")
+        self.assertIn("пользовательский чёрный список", dialog.yesButton.accessibleDescription())
+        self.assertEqual(dialog.cancelButton.accessibleName(), "Отменить очистку пользовательских блокировок")
+        self.assertTrue(dialog.exec_called)
+        page._request_managed_action.assert_not_called()
+
+    def test_whitelist_clear_confirmation_buttons_are_named_for_screen_reader(self) -> None:
+        page = OrchestraWhitelistPage.__new__(OrchestraWhitelistPage)
+        page._all_whitelist_data = (("user.example", False), ("system.example", True))
+        page._request_whitelist_action = Mock()
+        page._tr = lambda _key, default, **kwargs: default.format(**kwargs) if kwargs else default
+        page.window = lambda: None
+        _MessageBox.instances = []
+
+        with patch("orchestra.ui.whitelist_page.MessageBox", _MessageBox):
+            OrchestraWhitelistPage._clear_user_domains(page)
+
+        dialog = _MessageBox.instances[0]
+        self.assertEqual(dialog.yesButton.accessibleName(), "Очистить пользовательские домены белого списка")
+        self.assertIn("Удалить все пользовательские домены", dialog.yesButton.accessibleDescription())
+        self.assertEqual(dialog.cancelButton.accessibleName(), "Отменить очистку пользовательских доменов")
+        self.assertTrue(dialog.exec_called)
+        page._request_whitelist_action.assert_not_called()
 
     def test_orchestra_list_counters_read_current_counts(self) -> None:
         whitelist_page = OrchestraWhitelistPage(orchestra_feature=_OrchestraFeatureStub())

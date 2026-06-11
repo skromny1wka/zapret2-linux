@@ -15,6 +15,7 @@ from ui.pages.base_page import BasePage
 from ui.accessibility import set_control_accessibility, set_state_text
 from ui.fluent_widgets import set_tooltip
 from ui.latest_value_worker_state import LatestValueWorkerState
+from ui.message_box_accessibility import set_message_box_button_accessibility
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.queued_worker_state import QueuedWorkerState
 from qfluentwidgets import (
@@ -911,14 +912,22 @@ class OrchestraLockedPage(BasePage):
             return
 
         if MessageBox is not None:
+            body = self._tr(
+                "page.orchestra.locked.dialog.unlock_all.body",
+                "Разлочить все {total} стратегий?\nОркестратор начнёт обучение заново.",
+                total=total,
+            )
             box = MessageBox(
                 self._tr("page.orchestra.locked.dialog.unlock_all.title", "Подтверждение"),
-                self._tr(
-                    "page.orchestra.locked.dialog.unlock_all.body",
-                    "Разлочить все {total} стратегий?\nОркестратор начнёт обучение заново.",
-                    total=total,
-                ),
+                body,
                 self.window()
+            )
+            set_message_box_button_accessibility(
+                box,
+                yes_name="Разлочить все стратегии",
+                yes_description=body,
+                cancel_name="Отменить разлочку всех стратегий",
+                cancel_description="Закрывает диалог без разлочки стратегий.",
             )
             confirmed = box.exec()
         else:

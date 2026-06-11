@@ -29,6 +29,7 @@ from ui.pages.base_page import BasePage
 from ui.accessibility import set_control_accessibility, set_state_text
 from ui.fluent_widgets import set_tooltip
 from ui.latest_value_worker_state import LatestValueWorkerState
+from ui.message_box_accessibility import set_message_box_button_accessibility
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.queued_worker_state import QueuedWorkerState
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens
@@ -1060,14 +1061,22 @@ class OrchestraBlockedPage(BasePage):
 
         confirmed = True
         if MessageBox is not None:
+            body = self._tr(
+                "page.orchestra.blocked.dialog.clear_user.body",
+                "Очистить пользовательский чёрный список ({count} записей)?\n\nСистемные блокировки останутся.",
+                count=user_count,
+            )
             box = MessageBox(
                 self._tr("page.orchestra.blocked.dialog.clear_user.title", "Подтверждение"),
-                self._tr(
-                    "page.orchestra.blocked.dialog.clear_user.body",
-                    "Очистить пользовательский чёрный список ({count} записей)?\n\nСистемные блокировки останутся.",
-                    count=user_count,
-                ),
+                body,
                 self.window(),
+            )
+            set_message_box_button_accessibility(
+                box,
+                yes_name="Очистить пользовательские блокировки",
+                yes_description=body,
+                cancel_name="Отменить очистку пользовательских блокировок",
+                cancel_description="Закрывает диалог без очистки пользовательских блокировок.",
             )
             confirmed = bool(box.exec())
         if confirmed:
