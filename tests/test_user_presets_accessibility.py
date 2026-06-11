@@ -300,11 +300,29 @@ class UserPresetsAccessibilityTests(unittest.TestCase):
                 "Основа нового пресета, выбрано: Текущий пресет",
             )
             self.assertIn("Выберите", dialog._source_seg.accessibleDescription())
+            current_item = dialog._source_seg.items["current"]
+            standard_item = dialog._source_seg.items["standard"]
+            self.assertEqual(
+                current_item.accessibleName(),
+                "Основа нового пресета: Текущего пресета, выбрано",
+            )
+            self.assertEqual(
+                standard_item.accessibleName(),
+                "Основа нового пресета: Встроенного пресета, не выбрано",
+            )
             dialog._source_seg.setCurrentItem("standard")
             self.assertEqual(dialog._source_seg.accessibleName(), "Основа нового пресета, выбрано: Встроенный пресет")
             self.assertEqual(
                 dialog._source_seg.property("screenReaderStateText"),
                 "Основа нового пресета, выбрано: Встроенный пресет",
+            )
+            self.assertEqual(
+                current_item.accessibleName(),
+                "Основа нового пресета: Текущего пресета, не выбрано",
+            )
+            self.assertEqual(
+                standard_item.accessibleName(),
+                "Основа нового пресета: Встроенного пресета, выбрано",
             )
         self.assertEqual(dialog.yesButton.accessibleName(), "Создать пресет")
         self.assertIn("Сохраняет текущие настройки", dialog.yesButton.accessibleDescription())

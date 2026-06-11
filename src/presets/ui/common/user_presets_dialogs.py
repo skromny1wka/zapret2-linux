@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import QHBoxLayout
 
 from ui.accessibility import set_control_accessibility, set_state_text
 from ui.fluent_widgets import style_semantic_caption_label
+from ui.segmented_accessibility import set_segmented_items_accessibility
 from app.ui_texts import tr as tr_catalog
 from qfluentwidgets import BodyLabel, CaptionLabel, LineEdit, MessageBoxBase, SubtitleLabel
 
@@ -159,6 +160,7 @@ class CreatePresetDialog(PresetDialogTextMixin, MessageBoxBase):
             name=state_text,
         )
         set_state_text(self._source_seg, state_text)
+        set_segmented_items_accessibility(self._source_seg, name="Основа нового пресета")
 
     def _show_warning(self, text: str) -> None:
         self.warningLabel.setText(text)
