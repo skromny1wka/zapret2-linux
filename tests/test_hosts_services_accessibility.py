@@ -73,6 +73,7 @@ class HostsServicesAccessibilityTests(unittest.TestCase):
         self.assertEqual(widgets.control.accessibleName(), "YouTube, выбран профиль Zapret DNS")
         self.assertEqual(widgets.control.property("screenReaderStateText"), "YouTube, выбран профиль Zapret DNS")
         self.assertIn("Выберите профиль hosts", widgets.control.accessibleDescription())
+        self.assertIn("стрелками вверх и вниз", widgets.control.accessibleDescription())
 
         widgets.control.setCurrentIndex(0)
 

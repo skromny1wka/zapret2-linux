@@ -251,7 +251,10 @@ def _update_profile_service_accessibility(control, *, service_name: str, off_lab
     set_control_accessibility(
         control,
         name=state_text,
-        description=f"Выберите профиль hosts для сервиса {service_name}.",
+        description=(
+            f"Выберите профиль hosts для сервиса {service_name}. "
+            "Откройте список и выберите профиль стрелками вверх и вниз."
+        ),
     )
     set_combo_items_accessibility(control, name=service_name)
 
