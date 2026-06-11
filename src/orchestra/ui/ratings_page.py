@@ -283,10 +283,15 @@ class OrchestraRatingsPage(BasePage):
         log(f"Ошибка подготовки рейтингов orchestra: {error}", "DEBUG")
 
     def _on_ratings_render_worker_finished(self, worker) -> None:
-        if not self._is_current_ratings_render_worker_finish(worker):
-            return
-        if self._ratings_render_state_obj().has_pending() and not bool(getattr(self, "_cleanup_in_progress", False)):
-            self._schedule_ratings_render_start()
+        self._ratings_render_state_obj().schedule_pending_after_finish(
+            worker,
+            is_current_worker_finish=lambda _runtime, current_worker: self._is_current_ratings_render_worker_finish(
+                current_worker,
+            ),
+            single_shot=QTimer.singleShot,
+            run_scheduled=self._run_scheduled_ratings_render_start,
+            cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
+        )
 
     def _schedule_ratings_render_start(self) -> None:
         self._ratings_render_state_obj().schedule_start(

@@ -812,10 +812,15 @@ class ProfileStrategyListWidget(QWidget):
         log(f"Ошибка подготовки списка готовых стратегий profile: {error}", "DEBUG")
 
     def _on_strategy_filter_worker_finished(self, worker) -> None:
-        if not self._is_current_strategy_filter_worker_finish(worker):
-            return
-        if self._strategy_filter_state_obj().has_pending():
-            self._schedule_strategy_filter_worker_start()
+        self._strategy_filter_state_obj().schedule_pending_after_finish(
+            worker,
+            is_current_worker_finish=lambda _runtime, current_worker: self._is_current_strategy_filter_worker_finish(
+                current_worker,
+            ),
+            single_shot=QTimer.singleShot,
+            run_scheduled=self._run_scheduled_strategy_filter_worker_start,
+            cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
+        )
 
     def _schedule_strategy_filter_worker_start(self) -> None:
         self._strategy_filter_state_obj().schedule_start(
