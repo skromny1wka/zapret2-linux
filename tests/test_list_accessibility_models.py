@@ -86,7 +86,10 @@ class ListAccessibilityModelTests(unittest.TestCase):
 
         text = model.index(0, 0).data(Qt.ItemDataRole.AccessibleTextRole)
 
-        self.assertEqual(text, "Default, активный пресет, встроенный, папка: Общие, закреплённый, оценка 9")
+        self.assertEqual(
+            text,
+            "Default, активный пресет, встроенный, папка: Общие, закреплённый, оценка 9. Нажмите Enter, чтобы открыть preset.",
+        )
 
     def test_preset_folder_rows_expose_screen_reader_text(self) -> None:
         from ui.presets_menu.model import PresetListModel
@@ -105,7 +108,10 @@ class ListAccessibilityModelTests(unittest.TestCase):
 
         text = model.index(0, 0).data(Qt.ItemDataRole.AccessibleTextRole)
 
-        self.assertEqual(text, "Папка Общие, 5 пресетов, развернута")
+        self.assertEqual(
+            text,
+            "Папка Общие, 5 пресетов, развернута. Нажмите Enter, чтобы свернуть или развернуть папку.",
+        )
 
 
 if __name__ == "__main__":
