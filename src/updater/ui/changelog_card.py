@@ -193,6 +193,15 @@ class ChangelogCard(CardWidget):
             description="Запускает установку доступного обновления.",
         )
         set_state_text(self.install_btn, install_name)
+        changelog_text = " ".join(str(self._raw_changelog or "").strip().split())
+        changelog_name = "Список изменений обновления"
+        if changelog_text:
+            changelog_name = f"{changelog_name}: {changelog_text}"
+        set_control_accessibility(
+            self.changelog_text,
+            name=changelog_name,
+            description="Показывает, что изменилось в доступном обновлении.",
+        )
         self._update_progress_accessibility()
 
     def _update_progress_accessibility(self) -> None:
