@@ -124,6 +124,7 @@ class ProfileOrderWorkerArchitectureTests(unittest.TestCase):
         request_source = inspect.getsource(ProfileOrderPageBase._request_profile_order_move)
         queue_source = inspect.getsource(ProfileOrderPageBase._queue_profile_order_move)
         finished_source = inspect.getsource(ProfileOrderPageBase._on_profile_order_move_worker_finished)
+        helper_source = inspect.getsource(ProfileOrderPageBase._schedule_next_profile_order_move_after_finish)
         scheduled_source = inspect.getsource(ProfileOrderPageBase._run_scheduled_profile_order_move_start)
         cleanup_source = inspect.getsource(ProfileOrderPageBase.cleanup)
 
@@ -132,11 +133,23 @@ class ProfileOrderWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("_order_move_state = QueuedWorkerState", init_source)
         self.assertIn("_order_move_state_obj()", request_source)
         self.assertIn("_order_move_state_obj()", queue_source)
-        self.assertIn("_order_move_state_obj()", finished_source)
+        self.assertIn("_order_move_state_obj()", helper_source)
+        self.assertIn("_schedule_next_profile_order_move_after_finish", finished_source)
         self.assertIn("_order_move_state_obj()", scheduled_source)
         self.assertIn("_order_move_state_obj().reset()", cleanup_source)
         self.assertNotIn("self._pending_profile_order_moves", init_source)
         self.assertNotIn("self._order_move_start_scheduled = False", init_source)
+
+    def test_profile_order_move_finished_uses_queued_state_finish_guard(self) -> None:
+        from profile.ui.profile_order_page import ProfileOrderPageBase
+
+        finished_source = inspect.getsource(ProfileOrderPageBase._on_profile_order_move_worker_finished)
+        helper_source = inspect.getsource(ProfileOrderPageBase._schedule_next_profile_order_move_after_finish)
+
+        self.assertIn("schedule_next_after_finish", helper_source)
+        self.assertIn("_is_current_worker_finish", helper_source)
+        self.assertIn("_schedule_next_profile_order_move_after_finish", finished_source)
+        self.assertNotIn("_schedule_next_profile_order_move_start()", finished_source)
 
 
 if __name__ == "__main__":

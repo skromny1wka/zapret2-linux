@@ -401,6 +401,25 @@ class ProfileOrderPageBase(BasePage):
             key=lambda pending: str(pending.get("source_profile_key") or "").strip(),
         )
 
+    def _queue_profile_order_move_from_dict(self, operation: dict[str, str]) -> bool:
+        pending = dict(operation or {})
+        self._queue_profile_order_move(
+            str(pending.get("action") or ""),
+            str(pending.get("source_profile_key") or ""),
+            destination_profile_key=str(pending.get("destination_profile_key") or ""),
+        )
+        return True
+
+    def _run_profile_order_move_operation(self, operation: dict[str, str] | None) -> None:
+        if bool(self.__dict__.get("_cleanup_in_progress", False)):
+            return
+        pending = dict(operation or {})
+        self._start_profile_order_move_worker(
+            str(pending.get("action") or ""),
+            str(pending.get("source_profile_key") or ""),
+            destination_profile_key=str(pending.get("destination_profile_key") or ""),
+        )
+
     def _start_profile_order_move_worker(
         self,
         action: str,
@@ -491,12 +510,24 @@ class ProfileOrderPageBase(BasePage):
             self._reload_order_profiles(force=True)
 
     def _on_profile_order_move_worker_finished(self, _worker) -> None:
-        if not self._is_current_worker_finish(self.__dict__.get("_order_move_runtime"), _worker):
-            return
-        if self._order_move_state_obj().has_pending() and not bool(
-            self.__dict__.get("_cleanup_in_progress", False)
-        ):
-            self._schedule_next_profile_order_move_start()
+        self._schedule_next_profile_order_move_after_finish(_worker)
+
+    def _schedule_next_profile_order_move_after_finish(self, worker) -> bool:
+        def _single_shot(delay: int, callback) -> None:
+            try:
+                QTimer.singleShot(delay, callback)
+            except Exception:
+                callback()
+
+        operation = self._order_move_state_obj().schedule_next_after_finish(
+            worker,
+            is_current_worker_finish=self._is_current_worker_finish,
+            single_shot=_single_shot,
+            start=lambda pending: self._run_profile_order_move_operation(dict(pending or {})),
+            queue_item=self._queue_profile_order_move_from_dict,
+            is_cleanup_in_progress=lambda: bool(self.__dict__.get("_cleanup_in_progress", False)),
+        )
+        return operation is not None
 
     def _schedule_next_profile_order_move_start(self) -> None:
         state = self._order_move_state_obj()
@@ -514,11 +545,7 @@ class ProfileOrderPageBase(BasePage):
         pending = state.pop_next()
         if pending is None or bool(self.__dict__.get("_cleanup_in_progress", False)):
             return
-        self._start_profile_order_move_worker(
-            str(pending.get("action") or ""),
-            str(pending.get("source_profile_key") or ""),
-            destination_profile_key=str(pending.get("destination_profile_key") or ""),
-        )
+        self._run_profile_order_move_operation(pending)
 
     def _order_move_state_obj(self) -> QueuedWorkerState[dict[str, str]]:
         state = self.__dict__.get("_order_move_state")
