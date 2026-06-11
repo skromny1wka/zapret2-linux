@@ -831,6 +831,26 @@ class ProfileFeature:
             parent=parent,
         )
 
+    def create_profile_item_refresh_worker(
+        self,
+        request_id: int,
+        launch_method: str,
+        *,
+        old_profile_key: str,
+        profile_key: str,
+        parent=None,
+    ):
+        from profile.profile_setup_loader import ProfileItemRefreshWorker, load_profile_item_from_payload
+
+        service = self._commands()._profile_preset_service(self, launch_method)
+        return ProfileItemRefreshWorker(
+            request_id,
+            lambda profile_key: load_profile_item_from_payload(service.list_profiles, profile_key),
+            old_profile_key=old_profile_key,
+            profile_key=profile_key,
+            parent=parent,
+        )
+
     def create_profile_move_worker(
         self,
         request_id: int,

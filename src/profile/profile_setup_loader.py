@@ -301,6 +301,35 @@ class ProfilePresetProfileActionWorker(QThread):
         self.finished_action.emit(self._request_id, self._action, self._target_profile_key, result)
 
 
+class ProfileItemRefreshWorker(QThread):
+    refreshed = pyqtSignal(int, str, str, object)
+    failed = pyqtSignal(int, str)
+
+    def __init__(
+        self,
+        request_id: int,
+        load_profile_item,
+        *,
+        old_profile_key: str,
+        profile_key: str,
+        parent=None,
+    ):
+        super().__init__(parent)
+        self._request_id = int(request_id)
+        self._load_profile_item = load_profile_item
+        self._old_profile_key = str(old_profile_key or "").strip()
+        self._profile_key = str(profile_key or "").strip()
+
+    def run(self) -> None:
+        try:
+            item = self._load_profile_item(self._profile_key)
+        except Exception as exc:
+            log(f"ProfileItemRefreshWorker: не удалось загрузить profile item: {exc}", "ERROR")
+            self.failed.emit(self._request_id, str(exc))
+            return
+        self.refreshed.emit(self._request_id, self._old_profile_key, self._profile_key, item)
+
+
 class ProfilePresetProfileMoveWorker(QThread):
     moved = pyqtSignal(int, str, str, str, str, object)
     failed = pyqtSignal(int, str)

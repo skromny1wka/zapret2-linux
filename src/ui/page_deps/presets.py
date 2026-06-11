@@ -97,6 +97,7 @@ def build_preset_setup_page_kwargs(*, page_name: PageName, profile_feature, open
     method = ZAPRET2_MODE if page_name == PageName.ZAPRET2_PRESET_SETUP else ZAPRET1_MODE
     return {
         "create_profile_list_load_worker": profile_feature.create_profile_list_load_worker,
+        "create_profile_item_refresh_worker": profile_feature.create_profile_item_refresh_worker,
         "create_profile_context_action_worker": profile_feature.create_profile_context_action_worker,
         "create_profile_move_worker": profile_feature.create_profile_move_worker,
         "create_user_profile_create_worker": profile_feature.create_user_profile_create_worker,

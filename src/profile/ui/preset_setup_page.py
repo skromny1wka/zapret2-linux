@@ -78,6 +78,7 @@ class PresetSetupPageBase(BasePage):
         parent=None,
         *,
         create_profile_list_load_worker,
+        create_profile_item_refresh_worker,
         create_profile_context_action_worker,
         create_profile_move_worker,
         create_user_profile_create_worker,
@@ -94,6 +95,7 @@ class PresetSetupPageBase(BasePage):
             title_key=self.title_key,
         )
         self._create_profile_list_load_worker_fn = create_profile_list_load_worker
+        self._create_profile_item_refresh_worker_fn = create_profile_item_refresh_worker
         self._create_profile_context_action_worker_fn = create_profile_context_action_worker
         self._create_profile_move_worker_fn = create_profile_move_worker
         self._create_user_profile_create_worker_fn = create_user_profile_create_worker
@@ -117,6 +119,8 @@ class PresetSetupPageBase(BasePage):
         self._profile_load_request_id = 0
         self._profile_load_runtime = OneShotWorkerRuntime()
         self._profile_load_runtime_request_id = 0
+        self._profile_item_refresh_request_id = 0
+        self._profile_item_refresh_runtime = OneShotWorkerRuntime()
         self._profile_context_action_request_id = 0
         self._profile_context_action_runtime = OneShotWorkerRuntime()
         self._profile_move_request_id = 0
@@ -1133,12 +1137,75 @@ class PresetSetupPageBase(BasePage):
             view_state_options=view_state_options,
         )
 
+    def _create_profile_item_refresh_worker(
+        self,
+        request_id: int,
+        launch_method: str,
+        *,
+        old_profile_key: str,
+        profile_key: str,
+        parent=None,
+    ):
+        return self._create_profile_item_refresh_worker_fn(
+            request_id,
+            launch_method,
+            old_profile_key=old_profile_key,
+            profile_key=profile_key,
+            parent=parent,
+        )
+
     def _sync_profile_list_locally(self) -> None:
         self._profile_payload_dirty = True
         self._schedule_profiles_payload_request(force=True)
 
     def _refresh_profile_item_locally(self, old_profile_key: str, profile_key: str) -> None:
+        old_key = str(old_profile_key or "").strip()
+        clean_profile_key = str(profile_key or "").strip()
         self._profile_payload_dirty = True
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if not clean_profile_key:
+            self._schedule_profiles_payload_request(force=True)
+            return
+        runtime = self._worker_runtime("_profile_item_refresh_runtime")
+
+        def _bind_worker(worker) -> None:
+            worker.refreshed.connect(self._on_profile_item_refreshed)
+            worker.failed.connect(self._on_profile_item_refresh_failed)
+
+        request_id, _worker = runtime.start_qthread_worker(
+            worker_factory=lambda runtime_request_id: self._create_profile_item_refresh_worker(
+                runtime_request_id,
+                self.launch_method,
+                old_profile_key=old_key or clean_profile_key,
+                profile_key=clean_profile_key,
+                parent=self,
+            ),
+            bind_worker=_bind_worker,
+        )
+        self._profile_item_refresh_request_id = request_id
+
+    def _on_profile_item_refreshed(
+        self,
+        request_id: int,
+        old_profile_key: str,
+        profile_key: str,
+        item,
+    ) -> None:
+        if request_id != int(self.__dict__.get("_profile_item_refresh_request_id", 0) or 0):
+            return
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if item is not None and self._replace_profile_item_locally(old_profile_key or profile_key, item):
+            return
+        self._schedule_profiles_payload_request(force=True)
+
+    def _on_profile_item_refresh_failed(self, request_id: int, error: str) -> None:
+        if request_id != int(self.__dict__.get("_profile_item_refresh_request_id", 0) or 0):
+            return
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        log(f"{self.__class__.__name__}: не удалось обновить profile item: {error}", "DEBUG")
         self._schedule_profiles_payload_request(force=True)
 
     def _replace_profile_item_locally(self, old_profile_key: str, item) -> bool:
@@ -1967,6 +2034,7 @@ class PresetSetupPageBase(BasePage):
         self.__dict__.setdefault("_profile_context_action_enabled_by_request", {}).clear()
         for attr, label in (
             ("_profile_load_runtime", "profile list load worker"),
+            ("_profile_item_refresh_runtime", "profile item refresh worker"),
             ("_profile_context_action_runtime", "profile context action worker"),
             ("_profile_move_runtime", "profile move worker"),
             ("_profile_folder_action_runtime", "profile folder action worker"),
@@ -1985,6 +2053,7 @@ class PresetSetupPageBase(BasePage):
             runtime.cancel()
         self._profile_load_runtime_request_id = 0
         for attr in (
+            "_profile_item_refresh_request_id",
             "_profile_context_action_request_id",
             "_profile_move_request_id",
             "_profile_folder_action_request_id",

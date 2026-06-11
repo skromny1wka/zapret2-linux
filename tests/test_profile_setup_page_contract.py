@@ -17,6 +17,7 @@ from profile.ui.profile_setup_page import (
 from profile.setup_match_text import build_profile_setup_match_tab_text
 from profile.profile_setup_loader import (
     ProfileEnabledSaveWorker,
+    ProfileItemRefreshWorker,
     ProfileListFileValidationWorker,
     ProfileListFileSaveWorker,
     ProfileSetupLoadResult,
@@ -94,6 +95,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertIn("_request_id", page_source)
         for attr in (
             "_profile_context_action_runtime_worker",
+            "_profile_item_refresh_runtime_worker",
             "_profile_move_runtime_worker",
             "_profile_folder_action_runtime_worker",
             "_user_profile_create_runtime_worker",
@@ -1939,6 +1941,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         for attr in (
             "_profile_load_runtime",
+            "_profile_item_refresh_runtime",
             "_profile_context_action_runtime",
             "_profile_move_runtime",
             "_profile_folder_action_runtime",
@@ -2267,6 +2270,9 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._profile.list_profiles.side_effect = AssertionError("list must load in worker")
         page._profile.get_profile_setup.side_effect = AssertionError("profile setup must load in worker")
         page._profile_payload_dirty = False
+        page._cleanup_in_progress = False
+        page._profile_item_refresh_runtime = Mock()
+        page._profile_item_refresh_runtime.start_qthread_worker.return_value = (1, Mock())
         page._schedule_profiles_payload_request = Mock()
 
         PresetSetupPageBase._sync_profile_list_locally(page)
@@ -2278,8 +2284,49 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertTrue(page._profile_payload_dirty)
         self.assertEqual(
             page._schedule_profiles_payload_request.call_args_list,
-            [call(force=True), call(force=True), call(force=True)],
+            [call(force=True), call(force=True)],
         )
+        page._profile_item_refresh_runtime.start_qthread_worker.assert_called_once()
+
+    def test_profile_item_refresh_loads_one_item_through_worker_without_full_reload(self) -> None:
+        class _Signal:
+            def __init__(self) -> None:
+                self.callbacks = []
+
+            def connect(self, callback) -> None:
+                self.callbacks.append(callback)
+
+        worker = SimpleNamespace(refreshed=_Signal(), failed=_Signal())
+
+        def _start_worker(*, worker_factory, bind_worker, **_kwargs):
+            created = worker_factory(12)
+            bind_worker(created)
+            return 12, created
+
+        item = SimpleNamespace(key="profile-1")
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._cleanup_in_progress = False
+        page._profile_payload_dirty = False
+        page._profile_item_refresh_runtime = SimpleNamespace(
+            start_qthread_worker=Mock(side_effect=_start_worker),
+        )
+        page._create_profile_item_refresh_worker = Mock(return_value=worker)
+        page._replace_profile_item_locally = Mock(return_value=True)
+        page._schedule_profiles_payload_request = Mock()
+
+        PresetSetupPageBase._refresh_profile_item_locally(page, "profile-1", "profile-1")
+        PresetSetupPageBase._on_profile_item_refreshed(page, 12, "profile-1", "profile-1", item)
+
+        page._create_profile_item_refresh_worker.assert_called_once_with(
+            12,
+            page.launch_method,
+            old_profile_key="profile-1",
+            profile_key="profile-1",
+            parent=page,
+        )
+        page._replace_profile_item_locally.assert_called_once_with("profile-1", item)
+        page._schedule_profiles_payload_request.assert_not_called()
+        self.assertTrue(page._profile_payload_dirty)
 
     def test_profile_enabled_finish_updates_existing_row_without_full_reload(self) -> None:
         page = PresetSetupPageBase.__new__(PresetSetupPageBase)

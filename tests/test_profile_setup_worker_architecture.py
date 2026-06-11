@@ -475,12 +475,14 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
         init_source = inspect.getsource(PresetSetupPageBase.__init__)
         page_source = inspect.getsource(PresetSetupPageBase)
         action_source = inspect.getsource(PresetSetupPageBase._create_profile_context_action_worker)
+        item_refresh_source = inspect.getsource(PresetSetupPageBase._create_profile_item_refresh_worker)
         move_source = inspect.getsource(PresetSetupPageBase._create_profile_move_worker)
         create_user_source = inspect.getsource(PresetSetupPageBase._create_user_profile_create_worker)
         update_user_source = inspect.getsource(PresetSetupPageBase._create_user_profile_update_worker)
         delete_user_source = inspect.getsource(PresetSetupPageBase._create_user_profile_delete_worker)
 
         self.assertIn("create_profile_list_load_worker", init_source)
+        self.assertIn("create_profile_item_refresh_worker", init_source)
         self.assertIn("create_profile_context_action_worker", init_source)
         self.assertIn("create_profile_move_worker", init_source)
         self.assertIn("create_user_profile_create_worker", init_source)
@@ -500,6 +502,8 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
         self.assertNotIn("_delete_user_profile_fn", page_source)
         self.assertNotIn("self._profile.create_profile_context_action_worker", action_source)
         self.assertNotIn("ProfilePresetProfileActionWorker(", action_source)
+        self.assertNotIn("self._profile.create_profile_item_refresh_worker", item_refresh_source)
+        self.assertNotIn("ProfileItemRefreshWorker(", item_refresh_source)
         self.assertNotIn("self._profile.create_profile_move_worker", move_source)
         self.assertNotIn("ProfilePresetProfileMoveWorker(", move_source)
         self.assertNotIn("ProfileUserProfileCreateWorker(", create_user_source)
@@ -519,6 +523,10 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
         )
 
         self.assertIs(kwargs["create_profile_list_load_worker"], profile_feature.create_profile_list_load_worker)
+        self.assertIs(
+            kwargs["create_profile_item_refresh_worker"],
+            profile_feature.create_profile_item_refresh_worker,
+        )
         self.assertIs(
             kwargs["create_profile_context_action_worker"],
             profile_feature.create_profile_context_action_worker,
@@ -566,6 +574,7 @@ class ProfileSetupWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("OneShotWorkerRuntime", init_source)
         for attr in (
             "_profile_load_runtime",
+            "_profile_item_refresh_runtime",
             "_profile_context_action_runtime",
             "_profile_move_runtime",
             "_profile_folder_action_runtime",
