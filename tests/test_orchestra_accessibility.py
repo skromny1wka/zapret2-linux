@@ -142,6 +142,30 @@ class OrchestraAccessibilityTests(unittest.TestCase):
             "Счётчик заблокированных стратегий Оркестратора: Всего: 4 (3 пользовательских + 1 системных)",
         )
 
+    def test_whitelist_group_headers_read_section_names(self) -> None:
+        page = OrchestraWhitelistPage(orchestra_feature=_OrchestraFeatureStub())
+        self.addCleanup(page.deleteLater)
+
+        page._apply_whitelist_entries((
+            ("system.example", True),
+            ("user.example", False),
+        ))
+
+        sections = {}
+        for index in range(page.rows_layout.count()):
+            widget = page.rows_layout.itemAt(index).widget()
+            if widget is not None and widget.property("whitelistSection"):
+                sections[str(widget.property("whitelistSection"))] = widget
+
+        self.assertEqual(
+            sections["user"].property("screenReaderStateText"),
+            "Раздел белого списка Оркестратора: Пользовательские, 1",
+        )
+        self.assertEqual(
+            sections["system"].property("screenReaderStateText"),
+            "Раздел белого списка Оркестратора: Системные, 1, нельзя удалить",
+        )
+
     def test_ratings_page_main_controls_are_named_for_screen_reader(self) -> None:
         page = OrchestraRatingsPage(orchestra_feature=_OrchestraFeatureStub())
         self.addCleanup(page.deleteLater)

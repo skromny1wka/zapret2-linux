@@ -584,6 +584,14 @@ class OrchestraWhitelistPage(BasePage):
                 )
             )
             user_header.setProperty("whitelistSection", "user")
+            set_state_text(
+                user_header,
+                self._tr(
+                    "page.orchestra.whitelist.section.user.accessible",
+                    "Раздел белого списка Оркестратора: Пользовательские, {count}",
+                    count=user_count,
+                ),
+            )
             self.rows_layout.addWidget(user_header)
 
             for domain in user_domains:
@@ -614,6 +622,14 @@ class OrchestraWhitelistPage(BasePage):
                 )
             )
             system_header.setProperty("whitelistSection", "system")
+            set_state_text(
+                system_header,
+                self._tr(
+                    "page.orchestra.whitelist.section.system.accessible",
+                    "Раздел белого списка Оркестратора: Системные, {count}, нельзя удалить",
+                    count=system_count,
+                ),
+            )
             self.rows_layout.addWidget(system_header)
 
             for domain in system_domains:
