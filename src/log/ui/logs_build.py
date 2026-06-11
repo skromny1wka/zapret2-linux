@@ -128,6 +128,14 @@ def build_logs_primary_tab_ui(
             default="Здесь показывается результат последнего действия с логами.",
         ),
     )
+    set_state_text(
+        info_label,
+        tr_catalog_fn(
+            "page.logs.accessibility.info.initial_state",
+            language=ui_language,
+            default="Сообщение страницы логов: пока нет сообщений",
+        ),
+    )
     info_row.addWidget(info_label)
     controls_main.addLayout(info_row)
 
