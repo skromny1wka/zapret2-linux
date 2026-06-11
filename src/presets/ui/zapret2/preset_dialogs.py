@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.ui_texts import tr as tr_catalog
 from qfluentwidgets import BodyLabel, CaptionLabel, LineEdit, MessageBoxBase, SubtitleLabel
+from ui.accessibility import set_control_accessibility, set_state_text
 
 
 def _tr_dialog(language: str, key: str, default: str, **kwargs) -> str:
@@ -60,6 +61,23 @@ class PresetNameDialog(MessageBoxBase):
         )
         if mode == "rename" and old_name:
             self.name_edit.setText(old_name)
+        if mode == "rename":
+            description = (
+                f"Текущее имя: {old_name}. Введите новое название preset."
+                if old_name
+                else "Введите новое название preset."
+            )
+            set_control_accessibility(
+                self.name_edit,
+                name="Новое название preset",
+                description=description,
+            )
+        else:
+            set_control_accessibility(
+                self.name_edit,
+                name="Название нового preset",
+                description="Введите название для нового preset.",
+            )
         self.name_edit.returnPressed.connect(self._validate_and_accept)
 
         self._error_label = CaptionLabel("", self.widget)
@@ -84,6 +102,28 @@ class PresetNameDialog(MessageBoxBase):
         self.cancelButton.setText(
             _tr_dialog(self._ui_language, "page.winws2_profile_setup.preset_dialog.button.cancel", "Отмена")
         )
+        if mode == "rename":
+            set_control_accessibility(
+                self.yesButton,
+                name="Переименовать preset",
+                description="Меняет имя preset.",
+            )
+            set_control_accessibility(
+                self.cancelButton,
+                name="Отменить переименование preset",
+                description="Закрывает диалог без переименования preset.",
+            )
+        else:
+            set_control_accessibility(
+                self.yesButton,
+                name="Создать preset",
+                description="Создаёт новый preset.",
+            )
+            set_control_accessibility(
+                self.cancelButton,
+                name="Отменить создание preset",
+                description="Закрывает диалог без создания preset.",
+            )
         self.widget.setMinimumWidth(360)
 
     def _validate_and_accept(self) -> None:
@@ -93,9 +133,13 @@ class PresetNameDialog(MessageBoxBase):
     def validate(self) -> bool:
         name = self.name_edit.text().strip()
         if not name:
-            self._error_label.setText(
-                _tr_dialog(self._ui_language, "page.winws2_profile_setup.preset_dialog.error.empty", "Введите название пресета")
+            error_text = _tr_dialog(
+                self._ui_language,
+                "page.winws2_profile_setup.preset_dialog.error.empty",
+                "Введите название пресета",
             )
+            self._error_label.setText(error_text)
+            set_state_text(self._error_label, f"Ошибка: {error_text}")
             self._error_label.show()
             return False
         self._error_label.hide()
