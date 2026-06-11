@@ -1060,16 +1060,6 @@ class TelegramWSProxy:
     ) -> bool:
         """Try Cloudflare Worker/domain fallback before plain TCP fallback."""
         if not should_try_cloudflare(self._cloudflare):
-            self._log_route_detail(
-                label,
-                route="Cloudflare",
-                dc=dc,
-                is_media=is_media,
-                target=f"{target_host}:{target_port}",
-                result="skip",
-                reason="no Cloudflare Worker or domain configured",
-                next_step="TCP fallback",
-            )
             return False
 
         media_tag = " media" if is_media else ""

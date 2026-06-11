@@ -336,6 +336,29 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
         self.assertIn("TimeoutError", joined)
         self.assertIn("next=try next Cloudflare domain or TCP fallback", joined)
 
+    def test_disabled_cloudflare_is_not_logged_as_cloudflare_route(self) -> None:
+        from telegram_proxy.wss_proxy import TelegramWSProxy
+
+        logs: list[str] = []
+        proxy = TelegramWSProxy(on_log=logs.append)
+
+        ok = asyncio.run(
+            proxy._cloudflare_fallback(
+                None,
+                None,
+                "91.105.192.100",
+                443,
+                b"x" * 64,
+                False,
+                "test",
+                203,
+                False,
+            )
+        )
+
+        self.assertFalse(ok)
+        self.assertNotIn("route=Cloudflare", "\n".join(logs))
+
     def test_http_transport_tries_upstream_fallback_after_direct_tcp_failure(self) -> None:
         from telegram_proxy.proxy.routing import UpstreamProxyConfig
         from telegram_proxy.wss_proxy import TelegramWSProxy
