@@ -463,6 +463,67 @@ class UserPresetsMetadataLoadQueueTests(unittest.TestCase):
         page.refresh_presets_view_if_possible.assert_not_called()
         service.schedule_presets_reload.assert_called_once_with(page)
 
+    def test_active_preset_marker_defers_current_index_until_next_qt_tick(self) -> None:
+        from presets.user_presets_runtime_service import UserPresetsRuntimeService
+
+        class _Index:
+            def __init__(self, row: int) -> None:
+                self.row = row
+
+            def isValid(self) -> bool:  # noqa: N802
+                return self.row >= 0
+
+            def __eq__(self, other) -> bool:
+                return isinstance(other, _Index) and self.row == other.row
+
+        class _Model:
+            def __init__(self) -> None:
+                self.active_names: list[str] = []
+
+            def set_active_preset(self, file_name: str) -> bool:
+                self.active_names.append(file_name)
+                return True
+
+            def find_preset_row(self, file_name: str) -> int:
+                return {"First.txt": 1, "Second.txt": 2}.get(file_name, -1)
+
+            def index(self, row: int, _column: int):
+                return _Index(row)
+
+        class _List:
+            def __init__(self) -> None:
+                self.current = _Index(-1)
+                self.set_indexes: list[int] = []
+
+            def currentIndex(self):  # noqa: N802
+                return self.current
+
+            def setCurrentIndex(self, index):  # noqa: N802
+                self.current = index
+                self.set_indexes.append(index.row)
+
+        model = _Model()
+        presets_list = _List()
+        page = SimpleNamespace(_presets_model=model, presets_list=presets_list)
+        service = UserPresetsRuntimeService()
+        scheduled: list[tuple[int, object]] = []
+
+        with patch(
+            "presets.user_presets_runtime_service.QTimer.singleShot",
+            side_effect=lambda delay, callback: scheduled.append((delay, callback)),
+        ):
+            self.assertTrue(service.apply_active_preset_marker_for_file("First.txt", page=page))
+            self.assertTrue(service.apply_active_preset_marker_for_file("Second.txt", page=page))
+
+        self.assertEqual(model.active_names, ["First.txt", "Second.txt"])
+        self.assertEqual(presets_list.set_indexes, [])
+        self.assertEqual(len(scheduled), 1)
+        self.assertEqual(scheduled[0][0], 0)
+
+        scheduled[0][1]()
+
+        self.assertEqual(presets_list.set_indexes, [2])
+
     def test_metadata_loaded_defers_watcher_sync_after_rows_request(self) -> None:
         from presets.user_presets_runtime_service import UserPresetsRuntimeAdapter, UserPresetsRuntimeService
 

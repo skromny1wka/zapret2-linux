@@ -221,6 +221,8 @@ class UserPresetsRuntimeService:
         self._rows_plan_state = LatestValueWorkerState(self._rows_plan_runtime, empty_value=None, pending=None)
         self._rows_plan_apply_scheduled = False
         self._pending_rows_plan_apply: tuple[object, float | None, object] | None = None
+        self._current_preset_index_scheduled = False
+        self._pending_current_preset_index: tuple[str, object] | None = None
         self._watched_preset_files_sync_state = LatestValueWorkerState(None, empty_value=None, pending=None)
         self._watched_preset_files_sync_batch_state = LatestValueWorkerState(None, empty_value=None, pending=None)
         self._watched_preset_files_sync_batch_size = 64
@@ -548,6 +550,31 @@ class UserPresetsRuntimeService:
                 pass
             page.presets_list.setCurrentIndex(index)
 
+    def schedule_current_preset_index(
+        self,
+        file_name: str,
+        *,
+        page=None,
+    ) -> None:
+        page = self._resolve_page(page)
+        self._pending_current_preset_index = (str(file_name or "").strip(), page)
+        if self.__dict__.get("_current_preset_index_scheduled", False):
+            return
+        self._current_preset_index_scheduled = True
+        try:
+            QTimer.singleShot(0, self._run_scheduled_current_preset_index)
+        except Exception:
+            self._run_scheduled_current_preset_index()
+
+    def _run_scheduled_current_preset_index(self) -> None:
+        pending = self.__dict__.get("_pending_current_preset_index")
+        self._pending_current_preset_index = None
+        self._current_preset_index_scheduled = False
+        if pending is None:
+            return
+        file_name, page = pending
+        self.set_current_preset_index(file_name, page=page)
+
     def apply_active_preset_marker_for_file(
         self,
         file_name: str,
@@ -561,7 +588,7 @@ class UserPresetsRuntimeService:
             str(file_name or "").strip(),
         )
         if changed and hasattr(page, "presets_list"):
-            self.set_current_preset_index(
+            self.schedule_current_preset_index(
                 file_name,
                 page=page,
             )

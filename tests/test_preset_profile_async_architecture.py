@@ -414,7 +414,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         source = inspect.getsource(UserPresetsRuntimeService.apply_active_preset_marker_for_file)
 
         self.assertIn("set_active_preset", source)
-        self.assertIn("set_current_preset_index", source)
+        self.assertIn("schedule_current_preset_index", source)
         self.assertNotIn("viewport().update()", source)
         self.assertNotIn("viewport().repaint()", source)
 
