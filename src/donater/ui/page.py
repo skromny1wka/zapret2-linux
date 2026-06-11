@@ -126,8 +126,10 @@ class PremiumPage(BasePage):
             empty_value=False,
         )
         self._reset_storage_runtime = OneShotWorkerRuntime()
-        self._reset_storage_pending = False
-        self._reset_storage_start_scheduled = False
+        self._reset_storage_state = LatestValueWorkerState(
+            self._reset_storage_runtime,
+            empty_value=False,
+        )
         self._premium_action_runtime = OneShotWorkerRuntime()
         self._premium_action_runtime_worker = None
         self._pending_premium_action = ""
@@ -366,8 +368,7 @@ class PremiumPage(BasePage):
             blocking=False,
             warning_prefix="Premium reset storage worker",
         )
-        self._reset_storage_pending = False
-        self._reset_storage_start_scheduled = False
+        self._reset_storage_state_obj().reset()
         self._premium_action_runtime_worker = None
         self._pending_premium_action = ""
         self._pending_premium_action_start_scheduled = False
@@ -1090,19 +1091,16 @@ class PremiumPage(BasePage):
     def _request_reset_storage(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        runtime = self.__dict__.get("_reset_storage_runtime")
-        if (
-            (runtime is not None and runtime.is_running())
-            or self.__dict__.get("_reset_storage_start_scheduled", False)
-        ):
-            self._reset_storage_pending = True
+        state = self._reset_storage_state_obj()
+        if state.is_busy():
+            state.pending = True
             return
         self._start_reset_storage_worker()
 
     def _start_reset_storage_worker(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        self._reset_storage_pending = False
+        self._reset_storage_state_obj().pending = False
         self._reset_storage_runtime.start_qthread_worker(
             worker_factory=lambda request_id: self.create_reset_storage_worker(request_id),
             on_loaded=self._on_reset_storage_finished,
@@ -1113,7 +1111,7 @@ class PremiumPage(BasePage):
     def _on_reset_storage_finished(self, request_id: int, _result) -> None:
         if not self._reset_storage_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
             return
-        if self.__dict__.get("_reset_storage_pending", False):
+        if self._reset_storage_state_obj().has_pending():
             return
         self._days_state_kind, self._days_state_value = apply_reset_plan_ui(
             key_input=self.key_input,
@@ -1130,7 +1128,7 @@ class PremiumPage(BasePage):
     def _on_reset_storage_failed(self, request_id: int, error: str) -> None:
         if not self._reset_storage_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
             return
-        if self.__dict__.get("_reset_storage_pending", False):
+        if self._reset_storage_state_obj().has_pending():
             return
         if InfoBar:
             InfoBar.warning(
@@ -1146,28 +1144,61 @@ class PremiumPage(BasePage):
     def _on_reset_storage_worker_finished(self, worker) -> None:
         if not self._is_current_worker_finish(self.__dict__.get("_reset_storage_runtime"), worker):
             return
-        if self.__dict__.get("_reset_storage_pending", False) and not self.__dict__.get(
-            "_cleanup_in_progress",
-            False,
-        ):
+        if self._reset_storage_state_obj().has_pending() and not self.__dict__.get("_cleanup_in_progress", False):
             self._schedule_reset_storage_worker_start()
 
     def _schedule_reset_storage_worker_start(self) -> None:
-        if self.__dict__.get("_cleanup_in_progress", False):
-            return
-        if self.__dict__.get("_reset_storage_start_scheduled", False):
-            self._reset_storage_pending = True
-            return
-        self._reset_storage_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_reset_storage_worker_start)
+        self._reset_storage_state_obj().schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_reset_storage_worker_start,
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+            pending_when_already_scheduled=True,
+        )
 
     def _run_scheduled_reset_storage_worker_start(self) -> None:
-        self._reset_storage_start_scheduled = False
-        pending = bool(self.__dict__.get("_reset_storage_pending", False))
-        self._reset_storage_pending = False
+        pending = bool(
+            self._reset_storage_state_obj().take_pending_for_scheduled_start(
+                cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+            )
+        )
         if not pending or self.__dict__.get("_cleanup_in_progress", False):
             return
         self._start_reset_storage_worker()
+
+    def _reset_storage_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_reset_storage_state")
+        runtime = self.__dict__.get("_reset_storage_runtime")
+        if state is None:
+            pending = bool(self.__dict__.pop("_reset_storage_pending", False))
+            start_scheduled = bool(
+                self.__dict__.pop("_reset_storage_start_scheduled", False)
+            )
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=False,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_reset_storage_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _reset_storage_pending(self) -> bool:
+        return bool(self._reset_storage_state_obj().pending)
+
+    @_reset_storage_pending.setter
+    def _reset_storage_pending(self, value: bool) -> None:
+        self._reset_storage_state_obj().pending = bool(value)
+
+    @property
+    def _reset_storage_start_scheduled(self) -> bool:
+        return bool(self._reset_storage_state_obj().start_scheduled)
+
+    @_reset_storage_start_scheduled.setter
+    def _reset_storage_start_scheduled(self, value: bool) -> None:
+        self._reset_storage_state_obj().start_scheduled = bool(value)
 
     def _is_current_worker_finish(self, runtime, worker) -> bool:
         if runtime is None:

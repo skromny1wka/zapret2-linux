@@ -520,6 +520,25 @@ class PremiumWorkerArchitectureTests(unittest.TestCase):
         page._start_reset_storage_worker.assert_called_once_with()
         self.assertFalse(page._reset_storage_pending)
 
+    def test_reset_storage_uses_shared_latest_worker_state(self) -> None:
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        page = PremiumPage.__new__(PremiumPage)
+        page._reset_storage_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+
+        init_source = inspect.getsource(PremiumPage.__init__)
+        request_source = inspect.getsource(PremiumPage._request_reset_storage)
+        schedule_source = inspect.getsource(PremiumPage._schedule_reset_storage_worker_start)
+        cleanup_source = inspect.getsource(PremiumPage.cleanup)
+
+        self.assertIsInstance(PremiumPage._reset_storage_state_obj(page), LatestValueWorkerState)
+        self.assertIn("_reset_storage_state", init_source)
+        self.assertNotIn("self._reset_storage_pending = False", init_source)
+        self.assertNotIn("self._reset_storage_start_scheduled = False", init_source)
+        self.assertIn("_reset_storage_state_obj()", request_source)
+        self.assertIn("_reset_storage_state_obj()", schedule_source)
+        self.assertIn("_reset_storage_state_obj().reset()", cleanup_source)
+
     def test_stale_reset_storage_worker_finished_does_not_restart_pending_reset(self) -> None:
         import donater.ui.page as premium_page
 
