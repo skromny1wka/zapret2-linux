@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from PyQt6.QtCore import QTimer
+
 from ui.navigation.search import route_search_result, update_titlebar_search_width
 from app.page_names import PageName
 from ui.window_ui_session import get_window_ui_session
@@ -97,11 +99,20 @@ def hide_window(window) -> None:
     window.hide()
 
 
-def show_window(window) -> None:
+def _sync_nav_visibility_after_show(window) -> None:
     try:
         from ui.navigation.sidebar_builder import sync_nav_visibility
 
         sync_nav_visibility(window)
+    except Exception:
+        pass
+
+
+def show_window(window) -> None:
+    try:
+        from ui.navigation.sidebar_builder import sync_existing_nav_visibility
+
+        sync_existing_nav_visibility(window)
     except Exception:
         pass
 
@@ -112,6 +123,7 @@ def show_window(window) -> None:
     )
     window.raise_()
     window.activateWindow()
+    QTimer.singleShot(0, lambda current_window=window: _sync_nav_visibility_after_show(current_window))
 
 
 def request_exit(window, *, stop_dpi: bool) -> None:

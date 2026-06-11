@@ -524,6 +524,30 @@ def _refresh_existing_nav_mode_visibility(window, method: str | None) -> None:
     }
 
 
+def _resolve_nav_visibility_method(window, method: str | None) -> str:
+    if method is not None:
+        resolved = str(method or "").strip()
+    else:
+        try:
+            resolved = str(window.get_launch_method() or "").strip()
+        except Exception:
+            resolved = ""
+        if not resolved:
+            try:
+                from ui.workflows.common import get_current_launch_method
+
+                resolved = get_current_launch_method(default="")
+            except Exception:
+                resolved = ""
+
+    if resolved:
+        return resolved
+
+    from settings.mode import DEFAULT_LAUNCH_METHOD
+
+    return DEFAULT_LAUNCH_METHOD
+
+
 def _install_secondary_sidebar_groups(window) -> None:
     import time as _time
 
@@ -696,14 +720,7 @@ def sync_nav_visibility(window, method: str | None = None) -> None:
 
     from ui.navigation.search import update_sidebar_search_suggestions
 
-    if method is None:
-        from ui.workflows.common import get_current_launch_method
-
-        method = get_current_launch_method(default="")
-    if not method:
-        from settings.mode import DEFAULT_LAUNCH_METHOD
-
-        method = DEFAULT_LAUNCH_METHOD
+    method = _resolve_nav_visibility_method(window, method)
 
     visibility_by_page = get_nav_visibility(method)
 
@@ -739,6 +756,16 @@ def sync_nav_visibility(window, method: str | None = None) -> None:
     session.nav_mode_visibility = mode_visibility
     apply_nav_visibility_filter(window, method=method)
     update_sidebar_search_suggestions(window)
+
+
+def sync_existing_nav_visibility(window, method: str | None = None) -> None:
+    session = get_window_ui_session(window)
+    if session is None or not session.nav_items:
+        return
+
+    method = _resolve_nav_visibility_method(window, method)
+    _refresh_existing_nav_mode_visibility(window, method)
+    apply_nav_visibility_filter(window, method=method)
 
 
 def apply_nav_visibility_filter(window, method: str | None = None) -> None:
@@ -783,5 +810,6 @@ __all__ = [
     "add_nav_item",
     "apply_nav_visibility_filter",
     "init_navigation",
+    "sync_existing_nav_visibility",
     "sync_nav_visibility",
 ]

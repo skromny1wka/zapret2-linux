@@ -3111,10 +3111,11 @@ class WindowLifecycleEarlyEventTests(unittest.TestCase):
         window.close_to_tray.assert_not_called()
         self.assertEqual(window.calls, ["base_minimize"])
 
-    def test_tray_show_window_resyncs_sidebar_before_show(self) -> None:
+    def test_tray_show_window_uses_fast_sidebar_sync_before_show(self) -> None:
         from ui.window_adapter import show_window
 
         calls: list[str] = []
+        scheduled: list[tuple[int, object]] = []
         geometry_runtime = SimpleNamespace(
             remembered_zoom_state=Mock(side_effect=lambda: calls.append("remember_zoom") or "normal"),
             request_zoom_state=Mock(side_effect=lambda _state: calls.append("request_zoom")),
@@ -3127,25 +3128,45 @@ class WindowLifecycleEarlyEventTests(unittest.TestCase):
             activateWindow=Mock(side_effect=lambda: calls.append("activate")),
         )
 
-        with patch(
-            "ui.navigation.sidebar_builder.sync_nav_visibility",
-            side_effect=lambda current_window: calls.append("sync_nav"),
-        ) as sync_nav_visibility:
+        with (
+            patch(
+                "ui.navigation.sidebar_builder.sync_existing_nav_visibility",
+                side_effect=lambda current_window: calls.append("sync_existing_nav"),
+                create=True,
+            ) as sync_existing_nav_visibility,
+            patch(
+                "ui.navigation.sidebar_builder.sync_nav_visibility",
+                side_effect=lambda current_window: calls.append("sync_nav"),
+            ) as sync_nav_visibility,
+            patch(
+                "ui.window_adapter.QTimer",
+                SimpleNamespace(
+                    singleShot=lambda delay, callback: scheduled.append((int(delay), callback)),
+                ),
+                create=True,
+            ),
+        ):
             show_window(window)
 
-        sync_nav_visibility.assert_called_once_with(window)
-        self.assertEqual(
-            calls,
-            [
-                "sync_nav",
-                "show",
-                "show_normal",
-                "remember_zoom",
-                "request_zoom",
-                "raise",
-                "activate",
-            ],
-        )
+            sync_existing_nav_visibility.assert_called_once_with(window)
+            sync_nav_visibility.assert_not_called()
+            self.assertEqual(
+                calls,
+                [
+                    "sync_existing_nav",
+                    "show",
+                    "show_normal",
+                    "remember_zoom",
+                    "request_zoom",
+                    "raise",
+                    "activate",
+                ],
+            )
+            self.assertEqual(len(scheduled), 1)
+            self.assertEqual(scheduled[0][0], 0)
+
+            scheduled.pop(0)[1]()
+            sync_nav_visibility.assert_called_once_with(window)
 
 
 class WindowsSessionShutdownTests(unittest.TestCase):
