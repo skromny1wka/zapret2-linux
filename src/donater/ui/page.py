@@ -28,6 +28,7 @@ from donater.pairing_workflow import (
     stop_pairing_status_autopoll,
     sync_pairing_status_autopoll,
 )
+from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from donater.ui.page_lifecycle import (
     activate_premium_page,
@@ -118,8 +119,10 @@ class PremiumPage(BasePage):
         self._open_bot_pending = False
         self._open_bot_start_scheduled = False
         self._device_info_runtime = OneShotWorkerRuntime()
-        self._device_info_pending = False
-        self._device_info_start_scheduled = False
+        self._device_info_state = LatestValueWorkerState(
+            self._device_info_runtime,
+            empty_value=False,
+        )
         self._reset_storage_runtime = OneShotWorkerRuntime()
         self._reset_storage_pending = False
         self._reset_storage_start_scheduled = False
@@ -352,8 +355,7 @@ class PremiumPage(BasePage):
             warning_prefix="Premium open bot worker",
         )
         self._open_bot_runtime.cancel()
-        self._device_info_pending = False
-        self._device_info_start_scheduled = False
+        self._device_info_state_obj().reset()
         self._device_info_runtime.stop(
             blocking=False,
             warning_prefix="Premium device info worker",
@@ -609,10 +611,11 @@ class PremiumPage(BasePage):
     def _request_device_info_load(self) -> None:
         if not self._premium.is_checker_ready():
             return
-        if self._device_info_runtime.is_running() or self.__dict__.get("_device_info_start_scheduled", False):
-            self._device_info_pending = True
+        state = self._device_info_state_obj()
+        if state.is_busy():
+            state.pending = True
             return
-        self._device_info_pending = False
+        state.pending = False
         self._start_device_info_load_worker()
 
     def _start_device_info_load_worker(self) -> None:
@@ -633,7 +636,7 @@ class PremiumPage(BasePage):
             cleanup_in_progress=self._cleanup_in_progress,
         ):
             return
-        if self.__dict__.get("_device_info_pending", False):
+        if self._device_info_state_obj().has_pending():
             return
         if not snapshot:
             return
@@ -659,25 +662,65 @@ class PremiumPage(BasePage):
     def _on_device_info_worker_finished(self, worker) -> None:
         if not self._is_current_worker_finish(self.__dict__.get("_device_info_runtime"), worker):
             return
-        pending = self._device_info_pending
-        self._device_info_pending = False
+        pending = bool(self._device_info_state_obj().pending)
+        self._device_info_state_obj().pending = False
         if pending and not self._cleanup_in_progress:
             self._schedule_device_info_load_worker_start()
 
     def _schedule_device_info_load_worker_start(self) -> None:
-        if self.__dict__.get("_cleanup_in_progress", False):
-            return
-        if self.__dict__.get("_device_info_start_scheduled", False):
-            self._device_info_pending = True
-            return
-        self._device_info_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_device_info_load_worker_start)
+        self._device_info_state_obj().schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_device_info_load_worker_start,
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+            pending_when_already_scheduled=True,
+        )
 
     def _run_scheduled_device_info_load_worker_start(self) -> None:
-        self._device_info_start_scheduled = False
+        pending = bool(
+            self._device_info_state_obj().take_pending_for_scheduled_start(
+                cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+            )
+        )
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         self._start_device_info_load_worker()
+        if pending and not self.__dict__.get("_cleanup_in_progress", False):
+            self._device_info_state_obj().pending = True
+
+    def _device_info_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_device_info_state")
+        runtime = self.__dict__.get("_device_info_runtime")
+        if state is None:
+            pending = bool(self.__dict__.pop("_device_info_pending", False))
+            start_scheduled = bool(
+                self.__dict__.pop("_device_info_start_scheduled", False)
+            )
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=False,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_device_info_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _device_info_pending(self) -> bool:
+        return bool(self._device_info_state_obj().pending)
+
+    @_device_info_pending.setter
+    def _device_info_pending(self, value: bool) -> None:
+        self._device_info_state_obj().pending = bool(value)
+
+    @property
+    def _device_info_start_scheduled(self) -> bool:
+        return bool(self._device_info_state_obj().start_scheduled)
+
+    @_device_info_start_scheduled.setter
+    def _device_info_start_scheduled(self, value: bool) -> None:
+        self._device_info_state_obj().start_scheduled = bool(value)
 
     def _open_extend_bot(self) -> None:
         self._request_open_extend_bot()
