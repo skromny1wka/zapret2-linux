@@ -6,7 +6,7 @@ from PyQt6.QtCore import Q_ARG, QMetaObject, QObject, Qt, QTimer, pyqtSlot
 
 from app_notifications import advisory_notification, normalize_notification_payload, notification_action
 from log.log import global_logger, log
-from ui.accessibility import set_control_accessibility
+from ui.accessibility import set_control_accessibility, set_state_text
 from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.window_notification_actions import WindowNotificationActionHandler, WindowNotificationRuntimeActions
@@ -768,6 +768,7 @@ class WindowNotificationCenter(QObject):
                 duration=duration,
                 parent=self._parent,
             )
+            self._set_infobar_accessibility(bar, level=level, title=title, content=content)
 
             for action in payload.get("buttons") or []:
                 button_text = str(action.get("text") or "").strip()
@@ -794,6 +795,28 @@ class WindowNotificationCenter(QObject):
                 bar.addWidget(btn)
         except Exception as e:
             log(f"Не удалось показать InfoBar уведомление: {e}", "DEBUG")
+
+    def _set_infobar_accessibility(self, bar, *, level: str, title: str, content: str) -> None:
+        level_text = {
+            "success": "Готово",
+            "info": "Информация",
+            "warning": "Предупреждение",
+            "error": "Ошибка",
+        }.get(str(level or "").strip().lower(), "Уведомление")
+        title_text = str(title or "").strip()
+        content_text = str(content or "").strip()
+        if title_text:
+            state_text = f"{level_text}: {title_text}"
+        else:
+            state_text = level_text
+        if content_text:
+            state_text = f"{state_text}. {content_text}"
+        set_state_text(bar, state_text)
+        set_control_accessibility(
+            bar,
+            name=state_text,
+            description="Системное уведомление ZapretGUI.",
+        )
 
     def _set_infobar_action_button_accessibility(self, button, action: dict, button_text: str) -> None:
         description = str(action.get("description") or "").strip()

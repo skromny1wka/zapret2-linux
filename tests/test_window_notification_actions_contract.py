@@ -88,6 +88,61 @@ class WindowNotificationActionsContractTests(unittest.TestCase):
         self.assertEqual(button.accessibleName(), "Действие уведомления: Открыть логи")
         self.assertIn("Открывает страницу логов", button.accessibleDescription())
 
+    def test_infobar_notification_has_screen_reader_text(self) -> None:
+        import qfluentwidgets
+
+        class _FakeBar:
+            def __init__(self) -> None:
+                self._accessible_name = ""
+                self._accessible_description = ""
+                self._properties = {}
+
+            def addWidget(self, _widget) -> None:  # noqa: N802
+                return None
+
+            def accessibleName(self) -> str:  # noqa: N802
+                return self._accessible_name
+
+            def setAccessibleName(self, text: str) -> None:  # noqa: N802
+                self._accessible_name = str(text)
+
+            def accessibleDescription(self) -> str:  # noqa: N802
+                return self._accessible_description
+
+            def setAccessibleDescription(self, text: str) -> None:  # noqa: N802
+                self._accessible_description = str(text)
+
+            def property(self, name: str):  # noqa: A003
+                return self._properties.get(str(name))
+
+            def setProperty(self, name: str, value) -> None:  # noqa: N802
+                self._properties[str(name)] = value
+
+        bar = _FakeBar()
+        center = WindowNotificationCenter.__new__(WindowNotificationCenter)
+        center._parent = None
+        center._action_handler = SimpleNamespace(build_action_callback=lambda _action, _bar: None)
+
+        with (
+            patch.object(qfluentwidgets.InfoBar, "warning", return_value=bar),
+            patch.object(qfluentwidgets.InfoBar, "info", return_value=bar),
+            patch.object(qfluentwidgets.InfoBar, "success", return_value=bar),
+            patch.object(qfluentwidgets.InfoBar, "error", return_value=bar),
+        ):
+            WindowNotificationCenter._show_infobar_notification(
+                center,
+                {
+                    "level": "error",
+                    "title": "Не удалось запустить Zapret",
+                    "content": "Проверьте лог запуска.",
+                },
+            )
+
+        expected = "Ошибка: Не удалось запустить Zapret. Проверьте лог запуска."
+        self.assertEqual(bar.accessibleName(), expected)
+        self.assertEqual(bar.property("screenReaderStateText"), expected)
+        self.assertIn("уведомление", bar.accessibleDescription().lower())
+
     def test_notification_open_url_pending_restarts_after_event_loop_turn(self) -> None:
         import ui.window_notification_center as notification_center
 
