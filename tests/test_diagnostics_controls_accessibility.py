@@ -63,6 +63,7 @@ class DiagnosticsControlsAccessibilityTests(unittest.TestCase):
             "Сценарий диагностики, выбрано: Все тесты (Discord + YouTube)",
         )
         self.assertIn("Discord и YouTube", combo.accessibleDescription())
+        self.assertIn("стрелками вверх и вниз", combo.accessibleDescription())
 
         combo.setCurrentIndex(1)
 

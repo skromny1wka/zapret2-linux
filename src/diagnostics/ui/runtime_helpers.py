@@ -81,7 +81,10 @@ def _update_test_combo_accessibility(combo) -> None:
     set_control_accessibility(
         combo,
         name=name,
-        description="Выберите, какие соединения проверить: Discord и YouTube, только Discord или только YouTube.",
+        description=(
+            "Выберите, какие соединения проверить: Discord и YouTube, только Discord или только YouTube. "
+            "Откройте список и выберите сценарий стрелками вверх и вниз."
+        ),
     )
     set_combo_items_accessibility(combo, name="Сценарий диагностики", clean_label=_clean_combo_text)
 
