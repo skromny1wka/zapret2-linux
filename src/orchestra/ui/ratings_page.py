@@ -1,7 +1,7 @@
 # ui/pages/orchestra/ratings_page.py
 """Страница истории стратегий с рейтингами (оркестратор)"""
 
-from PyQt6.QtCore import QSize
+from PyQt6.QtCore import QSize, QTimer
 from PyQt6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QLabel, QWidget,
 )
@@ -18,6 +18,7 @@ from qfluentwidgets import (
 from ui.pages.base_page import BasePage
 from ui.accessibility import set_control_accessibility, set_state_text
 from ui.fluent_widgets import set_tooltip
+from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.smooth_scroll import apply_editor_smooth_scroll_preference
 from ui.theme import get_theme_tokens
@@ -50,6 +51,14 @@ class OrchestraRatingsPage(BasePage):
         self._runtime_initialized = False
         self._ratings_state = OrchestraRatingsState(no_runner=True)
         self._ratings_state_runtime = OneShotWorkerRuntime()
+        self._ratings_render_runtime = OneShotWorkerRuntime()
+        self._ratings_render_state = LatestValueWorkerState(
+            self._ratings_render_runtime,
+            empty_value=None,
+        )
+        self._ratings_render_timer = QTimer(self)
+        self._ratings_render_timer.setSingleShot(True)
+        self._ratings_render_timer.timeout.connect(self._run_debounced_ratings_render)
 
         self._setup_ui()
         self._apply_page_theme(force=True)
@@ -174,7 +183,7 @@ class OrchestraRatingsPage(BasePage):
             return
         self._ratings_state = state
         self._no_runner = self._ratings_state.no_runner
-        self._render_history()
+        self._request_render_history()
         self._set_refresh_loading(False)
 
     def _on_ratings_state_failed(self, request_id: int, error: str) -> None:
@@ -192,20 +201,153 @@ class OrchestraRatingsPage(BasePage):
 
     def _apply_filter(self):
         """Применяет фильтр"""
-        self._render_history()
+        self._request_render_history()
 
-    def _render_history(self):
-        """Рендерит историю с учётом фильтра"""
-        plan = build_orchestra_ratings_render_plan(
-            state=self._ratings_state,
-            filter_text=self.filter_input.text(),
-            tr_fn=self._tr,
+    def _request_render_history(self) -> None:
+        state = self._ratings_render_state_obj()
+        state.pending = (
+            self._ratings_state,
+            self.filter_input.text(),
         )
+        try:
+            self._ratings_render_timer.start(120)
+        except Exception:
+            self._run_debounced_ratings_render()
+
+    def _run_debounced_ratings_render(self) -> None:
+        if bool(getattr(self, "_cleanup_in_progress", False)):
+            return
+        state = self._ratings_render_state_obj()
+        pending = state.pending
+        if pending is None:
+            return
+        if state.is_busy():
+            return
+        state.pending = None
+        ratings_state, filter_text = pending
+        self._start_ratings_render_worker(ratings_state, filter_text)
+
+    def _start_ratings_render_worker(self, ratings_state, filter_text: str) -> None:
+        self._ratings_render_runtime.start_qthread_worker(
+            worker_factory=lambda request_id: self.create_ratings_render_worker(
+                request_id,
+                state=ratings_state,
+                filter_text=filter_text,
+            ),
+            on_loaded=self._on_ratings_render_loaded,
+            on_failed=self._on_ratings_render_failed,
+            on_finished=self._on_ratings_render_worker_finished,
+        )
+
+    def create_ratings_render_worker(self, request_id: int, *, state, filter_text: str):
+        from orchestra.ratings_worker import OrchestraRatingsRenderWorker
+
+        language = str(self._ui_language or "ru")
+
+        def _tr_worker(key: str, default: str, **kwargs) -> str:
+            text = tr_catalog(key, language=language, default=default)
+            if kwargs:
+                try:
+                    return text.format(**kwargs)
+                except Exception:
+                    return text
+            return text
+
+        return OrchestraRatingsRenderWorker(
+            request_id,
+            state=state,
+            filter_text=filter_text,
+            tr_fn=_tr_worker,
+            build_render_plan=build_orchestra_ratings_render_plan,
+            parent=self,
+        )
+
+    def _on_ratings_render_loaded(self, request_id: int, plan) -> None:
+        if not self._ratings_render_runtime.is_current(
+            request_id,
+            cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
+        ):
+            return
+        if self._ratings_render_state_obj().has_pending():
+            return
+        self._apply_ratings_render_plan(plan)
+
+    def _on_ratings_render_failed(self, request_id: int, error: str) -> None:
+        if not self._ratings_render_runtime.is_current(
+            request_id,
+            cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
+        ):
+            return
+        if self._ratings_render_state_obj().has_pending():
+            return
+        log(f"Ошибка подготовки рейтингов orchestra: {error}", "DEBUG")
+
+    def _on_ratings_render_worker_finished(self, worker) -> None:
+        if not self._is_current_ratings_render_worker_finish(worker):
+            return
+        if self._ratings_render_state_obj().has_pending() and not bool(getattr(self, "_cleanup_in_progress", False)):
+            self._schedule_ratings_render_start()
+
+    def _schedule_ratings_render_start(self) -> None:
+        self._ratings_render_state_obj().schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_ratings_render_start,
+            cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
+            pending_when_already_scheduled=self._ratings_render_state_obj().pending,
+        )
+
+    def _run_scheduled_ratings_render_start(self) -> None:
+        pending = self._ratings_render_state_obj().take_pending_for_scheduled_start(
+            cleanup_in_progress=bool(getattr(self, "_cleanup_in_progress", False)),
+        )
+        if pending is None:
+            return
+        ratings_state, filter_text = pending
+        self._start_ratings_render_worker(ratings_state, filter_text)
+
+    def _is_current_ratings_render_worker_finish(self, worker) -> bool:
+        if getattr(self._ratings_render_runtime, "worker", None) is worker:
+            return True
+        request_id = getattr(worker, "_request_id", None)
+        if request_id is None:
+            return False
+        return int(request_id) == int(getattr(self._ratings_render_runtime, "request_id", 0) or 0)
+
+    def _ratings_render_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_ratings_render_state")
+        runtime = self.__dict__.get("_ratings_render_runtime")
+        if state is None:
+            pending = self.__dict__.pop("_ratings_render_pending", None)
+            start_scheduled = bool(self.__dict__.pop("_ratings_render_start_scheduled", False))
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=None,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_ratings_render_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    def _apply_ratings_render_plan(self, plan) -> None:
         self.history_text.setPlainText(plan.history_text)
         self._set_stats_text(plan.stats_text)
 
     def cleanup(self) -> None:
         self._cleanup_in_progress = True
+        render_timer = self.__dict__.get("_ratings_render_timer")
+        if render_timer is not None:
+            render_timer.stop()
+        render_runtime = self.__dict__.get("_ratings_render_runtime")
+        if render_runtime is not None:
+            self._ratings_render_state_obj().reset()
+            render_runtime.stop(
+                blocking=False,
+                log_fn=log,
+                warning_prefix="Orchestra ratings render worker",
+            )
+            render_runtime.cancel()
         self._ratings_state_runtime.stop(
             blocking=False,
             log_fn=log,
@@ -245,7 +387,7 @@ class OrchestraRatingsPage(BasePage):
             )
             return
 
-        self._render_history()
+        self._request_render_history()
 
     def _install_accessibility(self) -> None:
         set_control_accessibility(

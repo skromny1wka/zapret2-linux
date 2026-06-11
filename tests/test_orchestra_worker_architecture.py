@@ -629,6 +629,36 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
         self.assertIn("self._load_state()", run_source)
         self.assertNotIn("self._controller.load_state", run_source)
 
+    def test_ratings_render_worker_receives_plan_builder(self) -> None:
+        from orchestra.ratings_worker import OrchestraRatingsRenderWorker
+
+        init_source = inspect.getsource(OrchestraRatingsRenderWorker.__init__)
+        run_source = inspect.getsource(OrchestraRatingsRenderWorker.run)
+
+        self.assertIn("build_render_plan", init_source)
+        self.assertIn("self._build_render_plan", init_source)
+        self.assertIn("self._build_render_plan(", run_source)
+        self.assertIn("filter_text=self._filter_text", run_source)
+        self.assertNotIn("history_text.setPlainText", run_source)
+
+        loaded = []
+        failed = []
+        plan = SimpleNamespace(stats_text="Всего: 1", history_text="example.com")
+        worker = OrchestraRatingsRenderWorker(
+            8,
+            state=object(),
+            filter_text="example",
+            tr_fn=lambda key, default, **kwargs: default.format(**kwargs) if kwargs else default,
+            build_render_plan=Mock(return_value=plan),
+        )
+        worker.loaded.connect(lambda request_id, result: loaded.append((request_id, result)))
+        worker.failed.connect(lambda request_id, error: failed.append((request_id, error)))
+
+        worker.run()
+
+        self.assertEqual(failed, [])
+        self.assertEqual(loaded, [(8, plan)])
+
     def test_ratings_page_uses_feature_without_controller_wrapper(self) -> None:
         from app.feature_facades.orchestra import OrchestraFeature
         from orchestra.ui.ratings_page import OrchestraRatingsPage
@@ -652,16 +682,42 @@ class OrchestraWorkerArchitectureTests(unittest.TestCase):
         self.assertNotIn('"ratings"', deps_source)
         self.assertIn("create_ratings_state_load_worker", feature_source)
 
+    def test_ratings_filter_render_runs_through_worker_runtime(self) -> None:
+        from orchestra.ratings_workflow import OrchestraRatingsState
+        from orchestra.ui.ratings_page import OrchestraRatingsPage
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        page = OrchestraRatingsPage.__new__(OrchestraRatingsPage)
+        page._cleanup_in_progress = False
+        page._ratings_state = OrchestraRatingsState(no_runner=False, history={"example.com": {1: {"rate": 100}}})
+        page._ratings_render_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+        page._ratings_render_state = LatestValueWorkerState(page._ratings_render_runtime, empty_value=None)
+        page._ratings_render_timer = SimpleNamespace(start=Mock())
+        page.filter_input = SimpleNamespace(text=Mock(return_value="example"))
+        page._render_history = Mock(side_effect=AssertionError("ratings text must be prepared in worker"))
+
+        OrchestraRatingsPage._apply_filter(page)
+
+        page._ratings_render_timer.start.assert_called_once_with(120)
+        page._render_history.assert_not_called()
+        self.assertEqual(page._ratings_render_state.pending[1], "example")
+
     def test_ratings_cleanup_does_not_block_gui(self) -> None:
         from orchestra.ui.ratings_page import OrchestraRatingsPage
 
         page = OrchestraRatingsPage.__new__(OrchestraRatingsPage)
         page._cleanup_in_progress = False
         page._ratings_state_runtime = Mock()
+        page._ratings_render_runtime = Mock()
+        page._ratings_render_timer = Mock()
 
         OrchestraRatingsPage.cleanup(page)
 
         self.assertTrue(page._cleanup_in_progress)
+        page._ratings_render_timer.stop.assert_called_once()
+        page._ratings_render_runtime.stop.assert_called_once()
+        self.assertFalse(page._ratings_render_runtime.stop.call_args.kwargs["blocking"])
+        page._ratings_render_runtime.cancel.assert_called_once()
         page._ratings_state_runtime.stop.assert_called_once()
         self.assertFalse(page._ratings_state_runtime.stop.call_args.kwargs["blocking"])
         page._ratings_state_runtime.cancel.assert_called_once()
