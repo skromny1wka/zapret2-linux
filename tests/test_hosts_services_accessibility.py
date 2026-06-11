@@ -5,6 +5,7 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
 from qfluentwidgets import BodyLabel, ComboBox, PushButton, StrongBodyLabel, SwitchButton
 
@@ -77,6 +78,40 @@ class HostsServicesAccessibilityTests(unittest.TestCase):
 
         self.assertEqual(widgets.control.accessibleName(), "YouTube, отключено")
         self.assertEqual(widgets.control.property("screenReaderStateText"), "YouTube, отключено")
+
+    def test_profile_combo_menu_items_are_named_for_screen_reader(self) -> None:
+        widgets = build_hosts_service_row(
+            HostsServiceRowPlan(
+                service_name="YouTube",
+                icon_name="",
+                icon_color=None,
+                direct_only=False,
+                available_profiles=["zapret_dns"],
+                profile_items=[("zapret_dns", "Zapret DNS")],
+                selected_profile="zapret_dns",
+                toggle_enabled=True,
+                toggle_checked=False,
+            ),
+            body_label_cls=BodyLabel,
+            combo_cls=ComboBox,
+            toggle_cls=SwitchButton,
+            off_label="Отключено",
+            on_direct_toggle=lambda *_args: None,
+            on_profile_changed=lambda *_args: None,
+        )
+        create_menu = getattr(widgets.control, "_create_accessible_combo_menu", None)
+        self.assertIsNotNone(create_menu)
+
+        menu = create_menu()
+
+        self.assertEqual(
+            menu.view.item(0).data(Qt.ItemDataRole.AccessibleTextRole),
+            "YouTube: Отключено, не выбран",
+        )
+        self.assertEqual(
+            menu.view.item(1).data(Qt.ItemDataRole.AccessibleTextRole),
+            "YouTube: Zapret DNS, выбран",
+        )
 
     def test_group_chips_read_bulk_action(self) -> None:
         widgets = build_hosts_services_group(

@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QFrame
 from qfluentwidgets import ScrollArea
 
 from ui.accessibility import set_control_accessibility, set_state_text
+from ui.combo_accessibility import set_combo_items_accessibility
 from ui.fluent_widgets import SettingsCard
 from ui.theme import get_theme_tokens
 
@@ -252,6 +253,7 @@ def _update_profile_service_accessibility(control, *, service_name: str, off_lab
         name=state_text,
         description=f"Выберите профиль hosts для сервиса {service_name}.",
     )
+    set_combo_items_accessibility(control, name=service_name)
 
 
 def _set_group_chip_accessibility(button, *, group_title: str, service_names: list[str], profile_label: str) -> None:
