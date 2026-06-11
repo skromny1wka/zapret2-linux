@@ -14,6 +14,7 @@ from hosts.ui.page_runtime import create_page_hosts_runtime, create_runtime_cach
 from ui.pages.base_page import BasePage
 from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
+from ui.accessibility import set_state_text
 from hosts.ui.sections_build import (
     build_hosts_adobe_section,
     build_hosts_browser_warning,
@@ -134,6 +135,7 @@ class HostsPage(BasePage):
         self._service_group_title_labels = []
         self._service_group_chips_scrolls = []
         self._service_group_chip_buttons = []
+        self.status_card = None
         self._open_hosts_button = None
         self._info_text_label = None
         self._browser_warning_label = None
@@ -864,6 +866,7 @@ class HostsPage(BasePage):
             on_clear_clicked=self._on_clear_clicked,
             on_open_hosts_file=self._open_hosts_file,
         )
+        self.status_card = widgets.card
         self.status_dot = widgets.status_dot
         self.status_label = widgets.status_label
         self.clear_btn = widgets.clear_button
@@ -1518,6 +1521,25 @@ class HostsPage(BasePage):
         else:
             self.status_dot.setStyleSheet(f"color: {tokens.fg_faint}; font-size: 12px;")
         self.status_label.setText(status_display.label_text)
+        status_accessible_text = self._tr(
+            "page.hosts.status.accessible_name",
+            "Статус hosts: {status}",
+            status=status_display.label_text,
+        )
+        set_state_text(self.status_label, status_accessible_text)
+        set_state_text(getattr(self, "status_card", None), status_accessible_text)
+        set_state_text(
+            self.status_dot,
+            self._tr(
+                "page.hosts.status.dot.active.accessible_name",
+                "Индикатор hosts: есть активные домены",
+            )
+            if status_display.dot_active
+            else self._tr(
+                "page.hosts.status.dot.inactive.accessible_name",
+                "Индикатор hosts: нет активных доменов",
+            ),
+        )
 
         # Обновляем иконки под текущие выборы
         for name in list(self.service_combos.keys()):

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import os
+from types import SimpleNamespace
 import unittest
+from unittest.mock import Mock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QLabel, QWidget
 
+from hosts.ui.page import HostsPage
 from hosts.ui.sections_build import build_hosts_status_section
 from hosts.ui.sections_build import build_hosts_adobe_section
 from qfluentwidgets import SwitchButton
@@ -53,6 +56,33 @@ class HostsStatusAccessibilityTests(unittest.TestCase):
         self.assertEqual(inactive_widgets.status_dot.accessibleName(), "Индикатор hosts: нет активных доменов")
         self.assertEqual(inactive_widgets.card.accessibleName(), "Статус hosts: Нет активных")
         self.assertEqual(inactive_widgets.card.property("screenReaderStateText"), "Статус hosts: Нет активных")
+
+    def test_runtime_status_update_refreshes_screen_reader_state(self) -> None:
+        page = HostsPage.__new__(HostsPage)
+        page.status_dot = QLabel("●")
+        page.status_label = QLabel("Нет активных")
+        page.status_card = QWidget()
+        page.service_combos = {}
+        page.adobe_switch = SwitchButton()
+        page._adobe_active = False
+        page._update_profile_row_visual = Mock()
+        page._log_ui_timing = Mock()
+        page._tr = lambda _key, default, **kwargs: default.format(**kwargs) if kwargs else default
+
+        HostsPage._apply_hosts_runtime_state_to_ui(
+            page,
+            SimpleNamespace(active_domains={"one.example", "two.example"}, adobe_active=True),
+        )
+
+        self.assertEqual(page.status_label.text(), "Активно 2 доменов")
+        self.assertEqual(page.status_label.accessibleName(), "Статус hosts: Активно 2 доменов")
+        self.assertEqual(
+            page.status_label.property("screenReaderStateText"),
+            "Статус hosts: Активно 2 доменов",
+        )
+        self.assertEqual(page.status_dot.accessibleName(), "Индикатор hosts: есть активные домены")
+        self.assertEqual(page.status_card.accessibleName(), "Статус hosts: Активно 2 доменов")
+        self.assertEqual(page.status_card.property("screenReaderStateText"), "Статус hosts: Активно 2 доменов")
 
     def test_adobe_switch_reads_current_state(self) -> None:
         widgets = build_hosts_adobe_section(
