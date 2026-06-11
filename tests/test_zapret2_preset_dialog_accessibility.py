@@ -26,6 +26,8 @@ class Zapret2PresetDialogAccessibilityTests(unittest.TestCase):
         dialog = PresetNameDialog("create", parent=self._parent())
         self.addCleanup(dialog.deleteLater)
 
+        self.assertEqual(dialog.titleLabel.accessibleName(), "Диалог: Создать пресет")
+        self.assertIn("создания preset", dialog.titleLabel.accessibleDescription())
         self.assertEqual(dialog.name_edit.accessibleName(), "Название нового preset")
         self.assertIn("Введите название", dialog.name_edit.accessibleDescription())
         self.assertEqual(dialog.yesButton.accessibleName(), "Создать preset")
@@ -44,6 +46,10 @@ class Zapret2PresetDialogAccessibilityTests(unittest.TestCase):
         dialog = PresetNameDialog("rename", old_name="Дом", parent=self._parent())
         self.addCleanup(dialog.deleteLater)
 
+        self.assertEqual(dialog.titleLabel.accessibleName(), "Диалог: Переименовать пресет")
+        self.assertIn("переименования preset", dialog.titleLabel.accessibleDescription())
+        self.assertEqual(dialog.current_name_label.accessibleName(), "Текущее имя preset: Дом")
+        self.assertIn("старое имя", dialog.current_name_label.accessibleDescription())
         self.assertEqual(dialog.name_edit.accessibleName(), "Новое название preset")
         self.assertIn("Текущее имя: Дом", dialog.name_edit.accessibleDescription())
         self.assertEqual(dialog.yesButton.accessibleName(), "Переименовать preset")

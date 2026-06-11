@@ -31,6 +31,13 @@ class PresetNameDialog(MessageBoxBase):
             else _tr_dialog(self._ui_language, "page.winws2_profile_setup.preset_dialog.rename.title", "Переименовать пресет")
         )
         self.titleLabel = SubtitleLabel(title_text, self.widget)
+        title_description = "Диалог создания preset." if mode == "create" else "Диалог переименования preset."
+        set_control_accessibility(
+            self.titleLabel,
+            name=f"Диалог: {title_text}",
+            description=title_description,
+        )
+        self.current_name_label = None
 
         if mode == "rename" and old_name:
             from_label = CaptionLabel(
@@ -41,6 +48,12 @@ class PresetNameDialog(MessageBoxBase):
                     name=old_name,
                 ),
                 self.widget,
+            )
+            self.current_name_label = from_label
+            set_control_accessibility(
+                from_label,
+                name=f"Текущее имя preset: {old_name}",
+                description="Это старое имя preset перед переименованием.",
             )
             self.viewLayout.addWidget(self.titleLabel)
             self.viewLayout.addWidget(from_label)
