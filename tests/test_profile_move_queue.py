@@ -17,6 +17,7 @@ class _Worker:
     finished = _Signal()
 
     def __init__(self, *, running: bool = False) -> None:
+        self._request_id = 0
         self._running = running
         self.start = Mock()
         self.deleteLater = Mock()

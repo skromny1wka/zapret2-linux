@@ -68,6 +68,7 @@ class ProfilesList(QWidget):
     profile_move_to_end_requested = pyqtSignal(str)
     folder_context_requested = pyqtSignal(str, QPoint)
     folder_toggled = pyqtSignal(str, bool)
+    folders_toggled = pyqtSignal(object, bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -347,8 +348,10 @@ class ProfilesList(QWidget):
         for group_key in changed_keys:
             group_expanded[group_key] = expanded_value
         self._request_view_state_rebuild(group_expanded=group_expanded)
-        for group_key in changed_keys:
-            self.folder_toggled.emit(group_key, expanded_value)
+        self.folders_toggled.emit(
+            {group_key: expanded_value for group_key in changed_keys},
+            expanded_value,
+        )
 
     def _current_group_expanded(self) -> dict[str, bool]:
         pending = self.__dict__.get("_view_state_group_expanded")

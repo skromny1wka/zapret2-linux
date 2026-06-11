@@ -718,6 +718,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         )
         profiles_list._request_view_state_rebuild = Mock()
         profiles_list.folder_toggled = SimpleNamespace(emit=Mock())
+        profiles_list.folders_toggled = SimpleNamespace(emit=Mock())
 
         ProfilesList.expand_all(profiles_list)
 
@@ -725,7 +726,26 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         profiles_list._request_view_state_rebuild.assert_called_once_with(
             group_expanded={"video": True, "voice": True}
         )
-        profiles_list.folder_toggled.emit.assert_called_once_with("video", True)
+        profiles_list.folder_toggled.emit.assert_not_called()
+        profiles_list.folders_toggled.emit.assert_called_once_with({"video": True}, True)
+
+    def test_profile_list_expand_all_saves_groups_as_one_worker_action(self) -> None:
+        from profile.ui.preset_setup_page import PresetSetupPageBase
+
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._request_profile_folder_action = Mock()
+
+        PresetSetupPageBase._on_folders_toggled(
+            page,
+            {"video": True, "voice": False},
+            True,
+        )
+
+        page._request_profile_folder_action.assert_called_once_with(
+            "set_collapsed_many",
+            collapsed_by_key={"video": False, "voice": True},
+            refresh=False,
+        )
 
     def test_profile_list_folder_state_requests_worker_view_state_rebuild(self) -> None:
         profiles_list = ProfilesList.__new__(ProfilesList)

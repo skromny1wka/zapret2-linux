@@ -495,6 +495,7 @@ class PresetSetupPageBase(BasePage):
         profiles_list.profile_move_to_end_requested.connect(self._on_profile_move_to_end_requested)
         profiles_list.folder_context_requested.connect(self._on_folder_context_requested)
         profiles_list.folder_toggled.connect(self._on_folder_toggled)
+        profiles_list.folders_toggled.connect(self._on_folders_toggled)
         self._log_ui_timing("profile_ui.profile_list.create", create_started_at)
 
         started_at = time.perf_counter()
@@ -1797,6 +1798,20 @@ class PresetSetupPageBase(BasePage):
             refresh=False,
         )
 
+    def _on_folders_toggled(self, expanded_by_key: object, _expanded: bool) -> None:
+        collapsed_by_key = {
+            str(folder_key or "").strip(): not bool(is_expanded)
+            for folder_key, is_expanded in dict(expanded_by_key or {}).items()
+            if str(folder_key or "").strip()
+        }
+        if not collapsed_by_key:
+            return
+        self._request_profile_folder_action(
+            "set_collapsed_many",
+            collapsed_by_key=collapsed_by_key,
+            refresh=False,
+        )
+
     def _create_profile_folder_action_worker(
         self,
         request_id: int,
@@ -1806,6 +1821,7 @@ class PresetSetupPageBase(BasePage):
         name: str = "",
         direction: int = 0,
         collapsed: bool = False,
+        collapsed_by_key: dict[str, bool] | None = None,
         context_extra: dict | None = None,
     ):
         return self._create_profile_folder_action_worker_fn(
@@ -1815,6 +1831,7 @@ class PresetSetupPageBase(BasePage):
             name=name,
             direction=direction,
             collapsed=collapsed,
+            collapsed_by_key=collapsed_by_key,
             context_extra=context_extra,
             parent=self,
         )
@@ -1827,6 +1844,7 @@ class PresetSetupPageBase(BasePage):
         name: str = "",
         direction: int = 0,
         collapsed: bool = False,
+        collapsed_by_key: dict[str, bool] | None = None,
         refresh: bool = True,
         context_extra: dict | None = None,
     ) -> None:
@@ -1840,6 +1858,13 @@ class PresetSetupPageBase(BasePage):
             "refresh": bool(refresh),
             "context_extra": dict(context_extra or {}),
         }
+        collapsed_map = {
+            str(key or "").strip(): bool(value)
+            for key, value in dict(collapsed_by_key or {}).items()
+            if str(key or "").strip()
+        }
+        if collapsed_map:
+            payload["collapsed_by_key"] = collapsed_map
         if self._profile_folder_action_state_obj().is_busy():
             self._queue_profile_folder_action(payload)
             return
@@ -1861,6 +1886,11 @@ class PresetSetupPageBase(BasePage):
                 name=str(name or ""),
                 direction=int(direction or 0),
                 collapsed=bool(collapsed),
+                collapsed_by_key={
+                    str(key or "").strip(): bool(value)
+                    for key, value in dict(collapsed_by_key or {}).items()
+                    if str(key or "").strip()
+                },
                 context_extra=dict(context_extra or {}),
             ),
             bind_worker=_bind_worker,
@@ -1881,6 +1911,24 @@ class PresetSetupPageBase(BasePage):
                 if not (
                     str(item.get("action") or "") == "set_collapsed"
                     and str(item.get("folder_key") or "") == folder_key
+                )
+            ]
+        if action == "set_collapsed_many":
+            collapsed_by_key = dict(queued.get("collapsed_by_key") or {})
+            changed_keys = {
+                str(key or "").strip()
+                for key in collapsed_by_key.keys()
+                if str(key or "").strip()
+            }
+            pending[:] = [
+                item
+                for item in pending
+                if not (
+                    str(item.get("action") or "") == "set_collapsed_many"
+                    or (
+                        str(item.get("action") or "") == "set_collapsed"
+                        and str(item.get("folder_key") or "") in changed_keys
+                    )
                 )
             ]
         pending.append(queued)
@@ -1967,6 +2015,11 @@ class PresetSetupPageBase(BasePage):
             name=str(pending.get("name") or ""),
             direction=int(pending.get("direction") or 0),
             collapsed=bool(pending.get("collapsed")),
+            collapsed_by_key=(
+                dict(pending.get("collapsed_by_key") or {})
+                if "collapsed_by_key" in pending
+                else None
+            ),
             refresh=bool(pending.get("refresh", True)),
             context_extra=dict(pending.get("context_extra") or {}),
         )

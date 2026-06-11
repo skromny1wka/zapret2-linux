@@ -540,6 +540,7 @@ class ProfileFolderActionWorker(QThread):
         delete_profile_folder,
         move_profile_folder_by_step,
         set_profile_folder_collapsed,
+        set_profile_folders_collapsed,
         reset_profile_folders,
         *,
         action: str,
@@ -547,6 +548,7 @@ class ProfileFolderActionWorker(QThread):
         name: str = "",
         direction: int = 0,
         collapsed: bool = False,
+        collapsed_by_key: dict[str, bool] | None = None,
         context_extra: dict | None = None,
         parent=None,
     ):
@@ -558,12 +560,18 @@ class ProfileFolderActionWorker(QThread):
         self._delete_profile_folder = delete_profile_folder
         self._move_profile_folder_by_step = move_profile_folder_by_step
         self._set_profile_folder_collapsed = set_profile_folder_collapsed
+        self._set_profile_folders_collapsed = set_profile_folders_collapsed
         self._reset_profile_folders = reset_profile_folders
         self._action = str(action or "").strip()
         self._folder_key = str(folder_key or "").strip()
         self._name = str(name or "").strip()
         self._direction = int(direction or 0)
         self._collapsed = bool(collapsed)
+        self._collapsed_by_key = {
+            str(key or "").strip(): bool(value)
+            for key, value in dict(collapsed_by_key or {}).items()
+            if str(key or "").strip()
+        }
         self._context_extra = dict(context_extra or {})
 
     def run(self) -> None:
@@ -572,6 +580,7 @@ class ProfileFolderActionWorker(QThread):
             "name": self._name,
             "direction": self._direction,
             "collapsed": self._collapsed,
+            "collapsed_by_key": dict(self._collapsed_by_key),
         }
         context.update(self._context_extra)
         try:
@@ -587,6 +596,8 @@ class ProfileFolderActionWorker(QThread):
                 result = self._move_profile_folder_by_step(self._folder_key, self._direction)
             elif self._action == "set_collapsed":
                 result = self._set_profile_folder_collapsed(self._folder_key, self._collapsed)
+            elif self._action == "set_collapsed_many":
+                result = self._set_profile_folders_collapsed(self._collapsed_by_key)
             elif self._action == "reset":
                 result = self._reset_profile_folders()
             else:

@@ -19,6 +19,7 @@ from profile.folders import (
     reset_profile_folders,
     set_profile_folder,
     set_profile_folder_collapsed,
+    set_profile_folders_collapsed,
     set_profile_folder_order,
     save_profile_folder_state,
 )
@@ -117,6 +118,25 @@ class ProfileFolderActionTests(unittest.TestCase):
                     side_effect=AssertionError("unchanged folder collapsed state must not be saved"),
                 ):
                     self.assertFalse(set_profile_folder_collapsed("youtube", True))
+
+    def test_profile_folders_collapsed_batch_saves_settings_once(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            with patch("settings.store.MAIN_DIRECTORY", str(Path(temp_dir))):
+                calls = []
+                original_save = save_profile_folder_state
+
+                def wrapped_save(state):
+                    calls.append(state)
+                    return original_save(state)
+
+                with patch("profile.folders.save_profile_folder_state", side_effect=wrapped_save):
+                    self.assertTrue(set_profile_folders_collapsed({"youtube": True, "discord": True}))
+
+                state = load_profile_folder_state()
+
+        self.assertEqual(len(calls), 1)
+        self.assertTrue(state["folders"]["youtube"]["collapsed"])
+        self.assertTrue(state["folders"]["discord"]["collapsed"])
 
     def test_duplicate_profile_folder_item_metadata_skips_save(self) -> None:
         with TemporaryDirectory() as temp_dir:

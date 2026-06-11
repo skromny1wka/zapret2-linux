@@ -946,6 +946,7 @@ class ProfileFeature:
         name: str = "",
         direction: int = 0,
         collapsed: bool = False,
+        collapsed_by_key: dict[str, bool] | None = None,
         context_extra: dict | None = None,
         parent=None,
     ):
@@ -957,6 +958,7 @@ class ProfileFeature:
             rename_profile_folder,
             reset_profile_folders,
             set_profile_folder_collapsed,
+            set_profile_folders_collapsed,
         )
         from profile.profile_setup_loader import ProfileFolderActionWorker
 
@@ -968,12 +970,14 @@ class ProfileFeature:
             delete_profile_folder,
             move_profile_folder_by_step,
             set_profile_folder_collapsed,
+            set_profile_folders_collapsed,
             reset_profile_folders,
             action=action,
             folder_key=folder_key,
             name=name,
             direction=direction,
             collapsed=collapsed,
+            collapsed_by_key=collapsed_by_key,
             context_extra=context_extra,
             parent=parent,
         )

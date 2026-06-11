@@ -71,6 +71,25 @@ def set_profile_folder_collapsed(folder_key: str, collapsed: bool) -> bool:
     return True
 
 
+def set_profile_folders_collapsed(collapsed_by_key: dict[str, bool]) -> bool:
+    changes = {
+        str(folder_key or "").strip(): bool(collapsed)
+        for folder_key, collapsed in dict(collapsed_by_key or {}).items()
+        if str(folder_key or "").strip()
+    }
+    if not changes:
+        return False
+    state = load_profile_folder_state()
+    store = FolderLibraryStore(state, default_state=build_default_profile_folders())
+    changed = False
+    for folder_key, collapsed in changes.items():
+        changed = bool(store.set_folder_collapsed(folder_key, collapsed)) or changed
+    if not changed:
+        return False
+    save_profile_folder_state(store.to_dict())
+    return True
+
+
 def reset_profile_folders() -> dict[str, Any] | bool:
     default_state = build_default_profile_folders()
     current_state = load_profile_folder_state()
@@ -300,6 +319,7 @@ __all__ = [
     "reset_profile_folders",
     "save_profile_folder_state",
     "set_profile_folder_collapsed",
+    "set_profile_folders_collapsed",
     "set_profile_folder",
     "set_profile_folder_order",
 ]
