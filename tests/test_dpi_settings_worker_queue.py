@@ -33,6 +33,25 @@ class DpiSettingsWorkerQueueTests(unittest.TestCase):
         self.assertIn("_dpi_settings_state_obj()", schedule_source)
         self.assertIn("_dpi_settings_state_obj().reset()", cleanup_source)
 
+    def test_orchestra_settings_save_queue_uses_shared_queued_worker_state(self) -> None:
+        from settings.dpi.page import DpiSettingsPage
+        from ui.queued_worker_state import QueuedWorkerState
+
+        page = DpiSettingsPage.__new__(DpiSettingsPage)
+        page._orchestra_settings_save_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+
+        init_source = inspect.getsource(DpiSettingsPage.__init__)
+        request_source = inspect.getsource(DpiSettingsPage._request_orchestra_setting_save)
+        schedule_source = inspect.getsource(DpiSettingsPage._schedule_orchestra_setting_save_worker_start)
+        cleanup_source = inspect.getsource(DpiSettingsPage.cleanup)
+
+        self.assertIsInstance(DpiSettingsPage._orchestra_settings_save_state_obj(page), QueuedWorkerState)
+        self.assertNotIn("_orchestra_settings_save_pending: list", init_source)
+        self.assertNotIn("_orchestra_settings_save_start_scheduled = False", init_source)
+        self.assertIn("_orchestra_settings_save_state_obj()", request_source)
+        self.assertIn("_orchestra_settings_save_state_obj()", schedule_source)
+        self.assertIn("_orchestra_settings_save_state_obj().reset()", cleanup_source)
+
     def test_dpi_settings_pending_restarts_after_event_loop_turn(self) -> None:
         import settings.dpi.page as dpi_page
         from settings.dpi.page import DpiSettingsPage

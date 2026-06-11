@@ -107,8 +107,9 @@ class DpiSettingsPage(BasePage):
             self._dpi_settings_runtime,
         )
         self._orchestra_settings_save_runtime = OneShotWorkerRuntime()
-        self._orchestra_settings_save_pending: list[tuple[str, object]] = []
-        self._orchestra_settings_save_start_scheduled = False
+        self._orchestra_settings_save_state = QueuedWorkerState[tuple[str, object]](
+            self._orchestra_settings_save_runtime,
+        )
         self._build_ui()
 
     def _tr(self, key: str, default: str, **kwargs) -> str:
@@ -550,11 +551,9 @@ class DpiSettingsPage(BasePage):
 
     def _request_orchestra_setting_save(self, key: str, value) -> None:
         payload = (str(key or "").strip(), value)
-        if (
-            self._orchestra_settings_save_runtime.is_running()
-            or self.__dict__.get("_orchestra_settings_save_start_scheduled", False)
-        ):
-            self._orchestra_settings_save_pending.append(payload)
+        state = self._orchestra_settings_save_state_obj()
+        if state.is_busy():
+            state.append(payload)
             self._coalesce_orchestra_settings_save_pending()
             return
         self._start_orchestra_setting_save_worker(payload)
@@ -562,12 +561,50 @@ class DpiSettingsPage(BasePage):
     def _coalesce_orchestra_settings_save_pending(self) -> None:
         latest_by_key: dict[str, tuple[str, object]] = {}
         order: list[str] = []
-        for payload in self._orchestra_settings_save_pending:
+        for payload in self._orchestra_settings_save_state_obj().pending:
             key = str(payload[0] or "").strip()
             if key not in latest_by_key:
                 order.append(key)
             latest_by_key[key] = payload
-        self._orchestra_settings_save_pending = [latest_by_key[key] for key in order]
+        self._orchestra_settings_save_state_obj().pending = [latest_by_key[key] for key in order]
+
+    def _orchestra_settings_save_state_obj(self) -> QueuedWorkerState[tuple[str, object]]:
+        state = self.__dict__.get("_orchestra_settings_save_state")
+        runtime = self.__dict__.get("_orchestra_settings_save_runtime")
+        if state is None:
+            pending = [
+                (str(item[0] if item else ""), item[1] if item else None)
+                for item in list(self.__dict__.pop("_orchestra_settings_save_pending", []) or [])
+            ]
+            start_scheduled = bool(self.__dict__.pop("_orchestra_settings_save_start_scheduled", False))
+            state = QueuedWorkerState[tuple[str, object]](
+                runtime,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_orchestra_settings_save_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _orchestra_settings_save_pending(self) -> list[tuple[str, object]]:
+        return self._orchestra_settings_save_state_obj().pending
+
+    @_orchestra_settings_save_pending.setter
+    def _orchestra_settings_save_pending(self, value: list[tuple[str, object]]) -> None:
+        self._orchestra_settings_save_state_obj().pending = [
+            (str(item[0] if item else ""), item[1] if item else None)
+            for item in list(value or [])
+        ]
+
+    @property
+    def _orchestra_settings_save_start_scheduled(self) -> bool:
+        return bool(self._orchestra_settings_save_state_obj().start_scheduled)
+
+    @_orchestra_settings_save_start_scheduled.setter
+    def _orchestra_settings_save_start_scheduled(self, value: bool) -> None:
+        self._orchestra_settings_save_state_obj().start_scheduled = bool(value)
 
     def _start_orchestra_setting_save_worker(self, payload: tuple[str, object]) -> None:
         self._orchestra_settings_save_runtime.start_qthread_worker(
@@ -600,8 +637,10 @@ class DpiSettingsPage(BasePage):
     def _on_orchestra_setting_save_worker_finished(self, worker) -> None:
         if not self._is_current_worker_finish(self.__dict__.get("_orchestra_settings_save_runtime"), worker):
             return
-        if self._orchestra_settings_save_pending and not self._cleanup_in_progress:
-            pending = self._orchestra_settings_save_pending.pop(0)
+        if self._cleanup_in_progress:
+            return
+        pending = self._orchestra_settings_save_state_obj().pop_next()
+        if pending is not None:
             self._schedule_orchestra_setting_save_worker_start(pending)
 
     def _is_current_worker_finish(self, runtime, worker) -> bool:
@@ -622,15 +661,16 @@ class DpiSettingsPage(BasePage):
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         queued = (str(payload[0] if payload else ""), payload[1] if payload else None)
-        if self.__dict__.get("_orchestra_settings_save_start_scheduled", False):
-            self._orchestra_settings_save_pending.append(queued)
+        state = self._orchestra_settings_save_state_obj()
+        if state.start_scheduled:
+            state.append(queued)
             self._coalesce_orchestra_settings_save_pending()
             return
-        self._orchestra_settings_save_start_scheduled = True
+        state.start_scheduled = True
         QTimer.singleShot(0, lambda value=queued: self._run_scheduled_orchestra_setting_save_worker_start(value))
 
     def _run_scheduled_orchestra_setting_save_worker_start(self, payload: tuple[str, object]) -> None:
-        self._orchestra_settings_save_start_scheduled = False
+        self._orchestra_settings_save_state_obj().start_scheduled = False
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         self._start_orchestra_setting_save_worker(payload)
@@ -750,7 +790,7 @@ class DpiSettingsPage(BasePage):
             warning_prefix="DPI-настройки",
         )
         self._dpi_settings_runtime.cancel()
-        self._orchestra_settings_save_pending.clear()
+        self._orchestra_settings_save_state_obj().reset()
         self._orchestra_settings_save_runtime.stop(
             blocking=False,
             log_fn=log,

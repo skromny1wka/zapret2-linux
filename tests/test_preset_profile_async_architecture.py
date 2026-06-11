@@ -4588,8 +4588,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
         self.assertIn("create_orchestra_setting_save_worker", page_source)
         self.assertIn("_orchestra_settings_save_runtime", page_source)
-        self.assertIn("_orchestra_settings_save_pending", request_source)
-        self.assertIn("_orchestra_settings_save_pending.pop(0)", finished_source)
+        self.assertIn("_orchestra_settings_save_state_obj()", request_source)
+        self.assertIn("_orchestra_settings_save_state_obj().pop_next()", finished_source)
         self.assertNotIn("worker.start()", start_source)
         self.assertIn("set_setting=self.set_setting", feature_source)
         self.assertIn("_set_setting", worker_source)
