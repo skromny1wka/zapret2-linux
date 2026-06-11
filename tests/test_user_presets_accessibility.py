@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -12,6 +14,7 @@ from qfluentwidgets import FluentIcon, LineEdit, PrimaryToolButton, StrongBodyLa
 
 from presets.ui.common.user_presets_build import build_user_presets_page_shell
 from presets.ui.common.user_presets_dialogs import CreatePresetDialog, RenamePresetDialog, ResetAllPresetsDialog
+from presets.ui.common.user_presets_page import UserPresetsPageBase
 from presets.ui.common.user_presets_page_lifecycle import apply_user_presets_language
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens
 
@@ -24,6 +27,45 @@ class _PageHost(QWidget):
 
     def viewport(self):  # noqa: ANN201
         return self
+
+
+class _DialogButton:
+    def __init__(self) -> None:
+        self._accessible_name = ""
+        self._accessible_description = ""
+        self.hidden = False
+
+    def hide(self) -> None:
+        self.hidden = True
+
+    def accessibleName(self) -> str:  # noqa: N802
+        return self._accessible_name
+
+    def setAccessibleName(self, text: str) -> None:  # noqa: N802
+        self._accessible_name = str(text)
+
+    def accessibleDescription(self) -> str:  # noqa: N802
+        return self._accessible_description
+
+    def setAccessibleDescription(self, text: str) -> None:  # noqa: N802
+        self._accessible_description = str(text)
+
+
+class _MessageBox:
+    instances: list["_MessageBox"] = []
+
+    def __init__(self, title: str, body: str, parent=None) -> None:
+        self.title = title
+        self.body = body
+        self.parent = parent
+        self.yesButton = _DialogButton()
+        self.cancelButton = _DialogButton()
+        self.exec_called = False
+        _MessageBox.instances.append(self)
+
+    def exec(self) -> bool:
+        self.exec_called = True
+        return True
 
 
 class UserPresetsAccessibilityTests(unittest.TestCase):
@@ -181,6 +223,22 @@ class UserPresetsAccessibilityTests(unittest.TestCase):
 
         self.assertTrue(event.isAccepted())
         self.assertEqual(requested, [("toggle_folder", "games")])
+
+    def test_info_dialog_close_button_has_screen_reader_text(self) -> None:
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._config = SimpleNamespace(tr_prefix="page.user_presets")
+        page._tr = lambda _key, default, **kwargs: default.format(**kwargs) if kwargs else default
+        page.window = lambda: None
+        _MessageBox.instances = []
+
+        with patch("presets.ui.common.user_presets_page.MessageBox", _MessageBox):
+            UserPresetsPageBase._on_info_clicked(page)
+
+        dialog = _MessageBox.instances[0]
+        self.assertEqual(dialog.yesButton.accessibleName(), "Закрыть справку о пресетах")
+        self.assertIn("Закрывает окно справки", dialog.yesButton.accessibleDescription())
+        self.assertTrue(dialog.cancelButton.hidden)
+        self.assertTrue(dialog.exec_called)
 
     def test_create_preset_dialog_has_screen_reader_text(self) -> None:
         dialog = CreatePresetDialog([], self._dialog_parent())

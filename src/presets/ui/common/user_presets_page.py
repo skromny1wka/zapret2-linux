@@ -572,6 +572,25 @@ class UserPresetsPageBase(BasePage):
                 self.window(),
             )
             box.cancelButton.hide()
+            set_message_box_button_accessibility(
+                box,
+                yes_name=self._tr(
+                    f"{self._config.tr_prefix}.info.close.accessible_name",
+                    "Закрыть справку о пресетах",
+                ),
+                yes_description=self._tr(
+                    f"{self._config.tr_prefix}.info.close.accessible_description",
+                    "Закрывает окно справки о пользовательских пресетах.",
+                ),
+                cancel_name=self._tr(
+                    f"{self._config.tr_prefix}.info.cancel.accessible_name",
+                    "Отменить закрытие справки о пресетах",
+                ),
+                cancel_description=self._tr(
+                    f"{self._config.tr_prefix}.info.cancel.accessible_description",
+                    "Скрытая кнопка отмены в справочном окне.",
+                ),
+            )
             box.exec()
 
     def _open_presets_folder(self) -> None:
