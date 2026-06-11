@@ -411,6 +411,62 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
         self.assertIn("next=upstream SOCKS5 fallback", joined)
         self.assertIn("HTTP TCP failed -> trying upstream", joined)
 
+    def test_http_transport_uses_upstream_immediately_after_learned_direct_block(self) -> None:
+        from telegram_proxy.proxy.routing import UpstreamProxyConfig
+        from telegram_proxy.wss_proxy import TelegramWSProxy
+
+        class _Reader:
+            async def readexactly(self, size):
+                init = b"GET /api HTTP/1.1\r\nHost: telegram\r\n\r\n"
+                return init[:size].ljust(size, b"x")
+
+        class _Writer:
+            def get_extra_info(self, name, default=None):
+                if name == "peername":
+                    return ("127.0.0.1", 34567)
+                return default
+
+            def close(self):
+                return None
+
+            async def wait_closed(self):
+                return None
+
+        async def fail_direct_tcp(*_args, **_kwargs):
+            raise TimeoutError()
+
+        logs: list[str] = []
+        proxy = TelegramWSProxy(
+            on_log=logs.append,
+            upstream_config=UpstreamProxyConfig(
+                enabled=True,
+                host="127.0.0.1",
+                port=1080,
+                mode="fallback",
+            ),
+        )
+        upstream = AsyncMock(return_value=True)
+        proxy._upstream_proxy_connect = upstream
+
+        with (
+            patch("telegram_proxy.wss_proxy.socks5.handshake", return_value=("149.154.167.41", 80)),
+            patch("telegram_proxy.wss_proxy.asyncio.open_connection", side_effect=fail_direct_tcp),
+        ):
+            asyncio.run(proxy._handle_socks5_client(_Reader(), _Writer()))
+
+        upstream.assert_awaited_once()
+        upstream.reset_mock()
+
+        with (
+            patch("telegram_proxy.wss_proxy.socks5.handshake", return_value=("149.154.167.51", 80)),
+            patch("telegram_proxy.wss_proxy.asyncio.open_connection", new_callable=AsyncMock) as direct_tcp,
+        ):
+            asyncio.run(proxy._handle_socks5_client(_Reader(), _Writer()))
+
+        direct_tcp.assert_not_called()
+        upstream.assert_awaited_once()
+        self.assertIn("HTTP transport learned-blocked -> upstream", "\n".join(logs))
+
     def test_http_transport_records_failure_for_status_without_upstream(self) -> None:
         from telegram_proxy.wss_proxy import TelegramWSProxy
 

@@ -137,6 +137,9 @@ class TelegramWSProxy:
         self._dc_cooldown: dict[tuple[int, bool], float] = {}
         # DCs that should use upstream (learned from consecutive recv=0 failures)
         self._dc_upstream_required: set[tuple[int, bool]] = set()
+        # HTTP transport cannot use WSS. If direct HTTP/80 is blocked once,
+        # skip the repeated 10s direct timeout while this proxy session runs.
+        self._http_upstream_required = False
         self._mtproxy_invalid_init_log_marks = {1, 5, 20, 50}
         self._mtproxy_bad_handshake_log_marks = {1, 5, 20, 50}
 
@@ -255,6 +258,7 @@ class TelegramWSProxy:
         )
         # Reset learned routing state from previous session
         self._dc_upstream_required = set()
+        self._http_upstream_required = False
         self._ws_blacklist = set()
         self._dc_cooldown = {}
         self._cloudflare_domain_balancer.reset()
@@ -401,6 +405,20 @@ class TelegramWSProxy:
                         init, label, dc=0, is_media=False,
                     )
                     return
+                if self._http_upstream_required and should_route_upstream(self._upstream, mode="fallback"):
+                    self._log(f"[{label}] HTTP transport learned-blocked -> upstream")
+                    self._record_route(
+                        dc=0,
+                        is_media=False,
+                        route="HTTP direct TCP",
+                        status="пропуск",
+                        reason="раньше был TimeoutError",
+                    )
+                    await self._upstream_proxy_connect(
+                        reader, writer, target_host, target_port,
+                        init, label, dc=0, is_media=False,
+                    )
+                    return
                 self.stats.passthrough_connections += 1
                 self._log(f"[{label}] HTTP transport -> direct TCP")
                 t_connect = time.monotonic()
@@ -436,6 +454,7 @@ class TelegramWSProxy:
                         reason=self._route_error(exc),
                     )
                     if should_route_upstream(self._upstream, mode="fallback"):
+                        self._http_upstream_required = True
                         self._log(f"[{label}] HTTP TCP failed -> trying upstream SOCKS5 fallback")
                         await self._upstream_proxy_connect(
                             reader, writer, target_host, target_port,
