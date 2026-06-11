@@ -41,6 +41,7 @@ class PresetSubpageAccessibilityTests(unittest.TestCase):
         self.assertEqual(page.runtimeToggleButton.accessibleName(), "Запустить пресет")
         self.assertIn("Запускает Zapret", page.runtimeToggleButton.accessibleDescription())
         self.assertEqual(page.searchInput.accessibleName(), "Поиск по тексту пресета")
+        self.assertIn("После ввода перейдите к тексту пресета клавишей Tab", page.searchInput.accessibleDescription())
         self.assertEqual(page.editor.accessibleName(), "Текст открытого пресета")
 
     def test_rename_dialog_is_named_for_screen_reader(self) -> None:

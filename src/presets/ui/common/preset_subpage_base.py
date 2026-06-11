@@ -725,7 +725,10 @@ class PresetRawEditorPage(BasePage):
         set_control_accessibility(
             self.searchInput,
             name="Поиск по тексту пресета",
-            description="Введите текст, чтобы найти строку внутри открытого пресета.",
+            description=(
+                "Введите текст, чтобы найти строку внутри открытого пресета. "
+                "После ввода перейдите к тексту пресета клавишей Tab."
+            ),
         )
         self.searchInput.setClearButtonEnabled(True)
         self.searchInput.setFixedHeight(34)
