@@ -137,6 +137,36 @@ class AccessibilityHelpersTests(unittest.TestCase):
         self.assertEqual(widget.items["first"].accessibleName(), "Раздел: Первый, не выбрано")
         self.assertEqual(widget.items["second"].accessibleName(), "Раздел: Второй, выбрано")
 
+    def test_set_segmented_items_accessibility_accepts_accessible_labels(self) -> None:
+        import os
+
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+        from PyQt6.QtWidgets import QApplication
+        from qfluentwidgets import SegmentedWidget
+
+        from ui.segmented_accessibility import set_segmented_items_accessibility
+
+        app = QApplication.instance() or QApplication([])
+        self.assertIsNotNone(app)
+
+        widget = SegmentedWidget()
+        widget.addItem("about", "О ПРОГРАММЕ")
+        widget.addItem("support", "ПОДДЕРЖКА")
+        widget.setCurrentItem("about")
+
+        set_segmented_items_accessibility(
+            widget,
+            name="Вкладки",
+            labels={
+                "about": "О программе",
+                "support": "Поддержка",
+            },
+        )
+
+        self.assertEqual(widget.items["about"].accessibleName(), "Вкладки: О программе, выбрано")
+        self.assertEqual(widget.items["support"].accessibleName(), "Вкладки: Поддержка, не выбрано")
+
     def test_set_tooltip_also_sets_accessible_description(self) -> None:
         from unittest.mock import patch
 

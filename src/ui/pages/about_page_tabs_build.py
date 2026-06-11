@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QStackedWidget
 from qfluentwidgets import SegmentedWidget
 from ui.accessibility import set_control_accessibility, set_state_text
+from ui.segmented_accessibility import set_segmented_items_accessibility
 
 
 _TAB_ACCESSIBLE_LABELS = {
@@ -41,6 +42,11 @@ def update_about_tabs_accessibility(tabs_pivot: SegmentedWidget, *, current: obj
         tabs_pivot,
         name=state,
         description=description,
+    )
+    set_segmented_items_accessibility(
+        tabs_pivot,
+        name="Вкладки страницы о программе",
+        labels=_TAB_ACCESSIBLE_LABELS,
     )
 
 

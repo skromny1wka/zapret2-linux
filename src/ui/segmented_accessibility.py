@@ -21,6 +21,7 @@ def set_segmented_items_accessibility(
     widget,
     *,
     name: str,
+    labels: dict[str, object] | None = None,
     selected_word: str = "выбрано",
     unselected_word: str = "не выбрано",
 ) -> None:
@@ -34,9 +35,10 @@ def set_segmented_items_accessibility(
         items = dict(getattr(widget, "items", {}) or {})
     except Exception:
         items = {}
+    accessible_labels = {str(key): value for key, value in dict(labels or {}).items()}
     for key, item in items.items():
         try:
-            label = _clean_text(item.text())
+            label = _clean_text(accessible_labels.get(str(key), item.text()))
         except Exception:
             label = ""
         if not label:

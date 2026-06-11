@@ -76,6 +76,14 @@ class AboutPageAccessibilityTests(unittest.TestCase):
 
         self.assertEqual(widgets.tabs_pivot.accessibleName(), "Вкладки страницы о программе, выбрано: О программе")
         self.assertIn("О программе, Поддержка, Справка или Zapret KVN", widgets.tabs_pivot.accessibleDescription())
+        self.assertEqual(
+            widgets.tabs_pivot.items["about"].accessibleName(),
+            "Вкладки страницы о программе: О программе, выбрано",
+        )
+        self.assertEqual(
+            widgets.tabs_pivot.items["support"].accessibleName(),
+            "Вкладки страницы о программе: Поддержка, не выбрано",
+        )
 
         widgets.tabs_pivot.setCurrentItem("support")
 
@@ -83,6 +91,14 @@ class AboutPageAccessibilityTests(unittest.TestCase):
         self.assertEqual(
             widgets.tabs_pivot.property("screenReaderStateText"),
             "Вкладки страницы о программе, выбрано: Поддержка",
+        )
+        self.assertEqual(
+            widgets.tabs_pivot.items["about"].accessibleName(),
+            "Вкладки страницы о программе: О программе, не выбрано",
+        )
+        self.assertEqual(
+            widgets.tabs_pivot.items["support"].accessibleName(),
+            "Вкладки страницы о программе: Поддержка, выбрано",
         )
 
     def test_about_language_refresh_keeps_screen_reader_names(self) -> None:
