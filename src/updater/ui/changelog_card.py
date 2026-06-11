@@ -193,6 +193,8 @@ class ChangelogCard(CardWidget):
             description="Запускает установку доступного обновления.",
         )
         set_state_text(self.install_btn, install_name)
+        self._set_label_state(self.title_label, "Заголовок обновления")
+        self._set_label_state(self.version_label, "Информация об обновлении")
         changelog_text = " ".join(str(self._raw_changelog or "").strip().split())
         changelog_name = "Список изменений обновления"
         if changelog_text:
