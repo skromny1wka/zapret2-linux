@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from qfluentwidgets import FluentIcon
 
-from ui.accessibility import set_control_accessibility
+from ui.accessibility import set_control_accessibility, set_state_text
 from ui.fluent_widgets import set_tooltip
 from ui.theme import get_cached_qta_pixmap
 
@@ -164,6 +164,14 @@ def build_logs_send_tab(
             "page.logs.send.accessibility.status.description",
             language=ui_language,
             default="Здесь показывается результат подготовки обращения в поддержку.",
+        ),
+    )
+    set_state_text(
+        send_status_label,
+        tr_catalog_fn(
+            "page.logs.send.accessibility.status.initial_state",
+            language=ui_language,
+            default="Статус подготовки обращения: пока обращение не подготовлено",
         ),
     )
     send_layout.addWidget(send_status_label)

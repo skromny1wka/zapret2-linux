@@ -9,12 +9,13 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QApplication, QHBoxLayout, QTextEdit, QVBoxLayout, QWidget
-from qfluentwidgets import CaptionLabel, ComboBox, PushButton, StrongBodyLabel, TransparentToolButton
+from PyQt6.QtWidgets import QApplication, QHBoxLayout, QLabel, QTextEdit, QVBoxLayout, QWidget
+from qfluentwidgets import BodyLabel, CaptionLabel, ComboBox, PushButton, StrongBodyLabel, TransparentToolButton
 
 import log.ui.logs_build as logs_build
 import log.ui.page as logs_page
 import log.ui.runtime_helpers as runtime_helpers
+import log.ui.send_build as send_build
 from ui.fluent_widgets import QuickActionsBar, SettingsCard
 
 
@@ -186,6 +187,36 @@ class LogsAccessibilityTests(unittest.TestCase):
 
         self.assertEqual(widgets.log_combo.accessibleName(), "Выбор файла лога")
         self.assertIn("выберите файл стрелками вверх и вниз", widgets.log_combo.accessibleDescription())
+
+    def test_send_status_initial_state_is_text_for_screen_reader(self) -> None:
+        parent = QWidget()
+        self.addCleanup(parent.deleteLater)
+        layout = QVBoxLayout(parent)
+
+        widgets = send_build.build_logs_send_tab(
+            parent_layout=layout,
+            ui_language="ru",
+            tr_catalog_fn=lambda _key, language, default, **_kwargs: default,
+            settings_card_cls=SettingsCard,
+            qwidget_cls=QWidget,
+            qvbox_layout_cls=QVBoxLayout,
+            qhbox_layout_cls=QHBoxLayout,
+            qlabel_cls=QLabel,
+            body_label_cls=BodyLabel,
+            caption_label_cls=CaptionLabel,
+            strong_body_label_cls=StrongBodyLabel,
+            push_button_cls=PushButton,
+            quick_actions_bar_cls=QuickActionsBar,
+            qta_module=None,
+            get_theme_tokens_fn=lambda: {},
+            on_prepare_support=lambda: None,
+            on_open_folder=lambda: None,
+        )
+
+        self.assertEqual(
+            widgets.send_status_label.property("screenReaderStateText"),
+            "Статус подготовки обращения: пока обращение не подготовлено",
+        )
 
     def test_log_page_routes_info_text_through_screen_reader_state(self) -> None:
         source = inspect.getsource(logs_page.LogsPage)
