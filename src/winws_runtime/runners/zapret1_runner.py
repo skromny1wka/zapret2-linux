@@ -486,7 +486,7 @@ class Winws1StrategyRunner(StrategyRunnerBase):
             self._clear_process_state_locked()
             return False
 
-    def switch_preset_file_fast(self, preset_path: str, strategy_name: str = "Preset") -> bool:
+    def switch_preset_file_fast(self, preset_path: str, strategy_name: str = "Preset", *, is_current=None) -> bool:
         """Fast path for switching running preset mode without full start pipeline."""
         if not os.path.exists(preset_path):
             log(f"Fast switch preset file not found: {preset_path}", "ERROR")
@@ -509,6 +509,10 @@ class Winws1StrategyRunner(StrategyRunnerBase):
                 self._set_last_error(artifact.validation_report, notify=False)
                 return False
 
+            if callable(is_current) and not bool(is_current()):
+                log("Fast preset switch skipped before stop: request is stale", "DEBUG")
+                return True
+
             if self.running_process and self.is_running():
                 self._stop_process_only_locked()
 
@@ -524,6 +528,10 @@ class Winws1StrategyRunner(StrategyRunnerBase):
                 )
                 self._set_last_error(artifact.validation_report, notify=False)
                 return False
+
+            if callable(is_current) and not bool(is_current()):
+                log("Fast preset switch skipped before spawn: request is stale", "DEBUG")
+                return True
 
             self._preset_file_path = preset_path
             success = self._spawn_process_locked(artifact, strategy_name, notify_failure=False)

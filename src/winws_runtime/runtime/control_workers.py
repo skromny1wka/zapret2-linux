@@ -150,8 +150,13 @@ class PresetSwitchWorker(QObject):
                 runner.switch_preset_file_fast(
                     str(preset.preset_path),
                     preset.display_name,
+                    is_current=lambda: bool(self._is_generation_current(self.generation)),
                 )
             )
+
+            if not bool(self._is_generation_current(self.generation)):
+                self.finished.emit(True, "", self.generation, self.launch_method, True)
+                return
 
             if not success:
                 short_error = str(getattr(runner, "last_error", "") or "").strip()

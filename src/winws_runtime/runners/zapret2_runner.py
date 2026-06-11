@@ -922,7 +922,7 @@ class Winws2StrategyRunner(StrategyRunnerBase):
                 self._preset_file_path = None
             return False
 
-    def switch_preset_file_fast(self, preset_path: str, strategy_name: str = "Preset") -> bool:
+    def switch_preset_file_fast(self, preset_path: str, strategy_name: str = "Preset", *, is_current=None) -> bool:
         """Fast path for switching running preset mode without full start pipeline."""
         if not os.path.exists(preset_path):
             log(f"Fast switch preset file not found: {preset_path}", "ERROR")
@@ -969,6 +969,10 @@ class Winws2StrategyRunner(StrategyRunnerBase):
                 except Exception:
                     self._set_last_error("Preset содержит ссылки на отсутствующие файлы", notify=False)
                 return False
+
+            if callable(is_current) and not bool(is_current()):
+                log("Fast preset switch skipped before spawn: request is stale", "DEBUG")
+                return True
 
             old_process = self.running_process if self.running_process and self.is_running() else None
             old_preset_path = str(self._preset_file_path or "")

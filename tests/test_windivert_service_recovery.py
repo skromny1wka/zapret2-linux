@@ -11,7 +11,7 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
             def start_from_preset_file(self, preset_path: str, strategy_name: str = "Preset") -> bool:
                 return True
 
-            def switch_preset_file_fast(self, preset_path: str, strategy_name: str = "Preset") -> bool:
+            def switch_preset_file_fast(self, preset_path: str, strategy_name: str = "Preset", *, is_current=None) -> bool:
                 return True
 
         with (
@@ -177,7 +177,7 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
             def start_from_preset_file(self, preset_path: str, strategy_name: str = "Preset") -> bool:
                 return True
 
-            def switch_preset_file_fast(self, preset_path: str, strategy_name: str = "Preset") -> bool:
+            def switch_preset_file_fast(self, preset_path: str, strategy_name: str = "Preset", *, is_current=None) -> bool:
                 return True
 
         blocked_probe = WinDivertRuntimeProbeResult(
