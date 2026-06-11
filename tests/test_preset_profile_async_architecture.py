@@ -138,6 +138,18 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertNotIn("_profile_load_runtime_worker", finished_source)
         self.assertNotIn("_profile_load_runtime_worker", cleanup_source)
 
+    def test_preset_setup_clean_activation_skips_payload_request_timer(self) -> None:
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._profile_payload_loaded_once = True
+        page._profile_payload_dirty = False
+        page._schedule_profiles_payload_request = Mock(
+            side_effect=AssertionError("clean activation must not schedule profile payload request")
+        )
+
+        PresetSetupPageBase.on_page_activated(page)
+
+        page._schedule_profiles_payload_request.assert_not_called()
+
     def test_preset_setup_page_refreshes_after_active_preset_content_change_signal(self) -> None:
         init_source = inspect.getsource(PresetSetupPageBase.__init__)
         bind_source = inspect.getsource(PresetSetupPageBase.bind_ui_state_store)

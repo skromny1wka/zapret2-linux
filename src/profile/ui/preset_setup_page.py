@@ -157,6 +157,11 @@ class PresetSetupPageBase(BasePage):
         self.bind_ui_state_store(ui_state_store)
 
     def on_page_activated(self) -> None:
+        if self.__dict__.get("_profile_payload_loaded_once", False) and not self.__dict__.get(
+            "_profile_payload_dirty",
+            True,
+        ):
+            return
         self._schedule_profiles_payload_request()
 
     def _worker_runtime(self, attr: str) -> OneShotWorkerRuntime:
