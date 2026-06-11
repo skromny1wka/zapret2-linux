@@ -7,7 +7,9 @@ from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
+from qfluentwidgets import ComboBox
 
 import log.ui.logs_build as logs_build
 import log.ui.page as logs_page
@@ -150,6 +152,35 @@ class LogsAccessibilityTests(unittest.TestCase):
         self.assertEqual(
             page.log_combo.property("screenReaderStateText"),
             "Выбор файла лога, выбрано: current.log",
+        )
+
+    def test_log_combo_menu_items_are_named_for_screen_reader(self) -> None:
+        page = logs_page.LogsPage.__new__(logs_page.LogsPage)
+        page._ui_language = "ru"
+        page.log_combo = ComboBox()
+
+        logs_page.LogsPage._apply_logs_list_state(
+            page,
+            SimpleNamespace(
+                entries=[
+                    {"display": "old.log", "path": "C:/Zapret/Dev/logs/old.log", "is_current": False, "index": 0},
+                    {"display": "current.log", "path": "C:/Zapret/Dev/logs/current.log", "is_current": True, "index": 1},
+                ],
+            ),
+            run_cleanup=False,
+        )
+        create_menu = getattr(page.log_combo, "_create_accessible_combo_menu", None)
+        self.assertIsNotNone(create_menu)
+
+        menu = create_menu()
+
+        self.assertEqual(
+            menu.view.item(0).data(Qt.ItemDataRole.AccessibleTextRole),
+            "Выбор файла лога: old.log, не выбран",
+        )
+        self.assertEqual(
+            menu.view.item(1).data(Qt.ItemDataRole.AccessibleTextRole),
+            "Выбор файла лога: current.log, выбран",
         )
 
     def test_log_combo_accessible_name_updates_after_keyboard_selection(self) -> None:

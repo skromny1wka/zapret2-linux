@@ -25,6 +25,7 @@ import re
 import time
 
 from ui.accessibility import set_control_accessibility, set_state_text
+from ui.combo_accessibility import set_combo_items_accessibility
 from ui.pages.base_page import BasePage, ScrollBlockingTextEdit
 from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
@@ -949,8 +950,8 @@ class LogsPage(BasePage):
                     current_index = entry["index"]
                     current_display = str(entry.get("display") or "")
                 self.log_combo.addItem(entry["display"], userData=entry["path"])
-            self._update_log_combo_accessibility(current_display, count=len(state.entries))
             self.log_combo.setCurrentIndex(current_index)
+            self._update_log_combo_accessibility(current_display, count=len(state.entries))
         finally:
             self.log_combo.blockSignals(False)
 
@@ -973,6 +974,7 @@ class LogsPage(BasePage):
                 default="Доступных файлов логов: {count}.",
             ).format(count=max(0, int(count))),
         )
+        set_combo_items_accessibility(self.log_combo, name="Выбор файла лога")
 
     def _apply_logs_stats_state(self, stats) -> None:
         plan = self._logs.build_stats_text_plan(stats, language=self._ui_language)
