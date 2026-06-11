@@ -274,6 +274,7 @@ class PresetRawEditorPage(BasePage):
         self._raw_preset_content_dirty = True
         self._ignore_next_raw_preset_content_revision = False
         self._raw_editor_text_cache_update_suspended = False
+        self._raw_editor_show_scheduled = False
         self._is_loading = False
         self._raw_load_runtime = OneShotWorkerRuntime()
         self._raw_load_request_id = 0
@@ -463,8 +464,48 @@ class PresetRawEditorPage(BasePage):
     def _default_title(self) -> str:
         return self._title
 
+    def on_page_activated(self) -> None:
+        if self.__dict__.get("_raw_preset_content_loaded_once", False):
+            self._schedule_raw_editor_show_after_page_switch()
+
     def on_page_hidden(self) -> None:
         self._commit_pending_content_change()
+        self._hide_raw_editor_for_next_switch()
+
+    def _hide_raw_editor_for_next_switch(self) -> None:
+        editor = self.__dict__.get("editor")
+        if editor is None:
+            return
+        try:
+            editor.setVisible(False)
+        except Exception:
+            pass
+        self._raw_editor_show_scheduled = False
+
+    def _schedule_raw_editor_show_after_page_switch(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("editor") is None:
+            return
+        if self.__dict__.get("_raw_editor_show_scheduled", False):
+            return
+        self._raw_editor_show_scheduled = True
+        try:
+            QTimer.singleShot(0, self._show_raw_editor_after_page_switch)
+        except Exception:
+            self._show_raw_editor_after_page_switch()
+
+    def _show_raw_editor_after_page_switch(self) -> None:
+        self._raw_editor_show_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        editor = self.__dict__.get("editor")
+        if editor is None:
+            return
+        try:
+            editor.setVisible(True)
+        except Exception:
+            pass
 
     def _preset_launch_method(self) -> str | None:
         return self._launch_method
@@ -863,6 +904,7 @@ class PresetRawEditorPage(BasePage):
         self._set_footer(result.footer_text)
         self._is_loading = False
         self._refresh_header()
+        self._schedule_raw_editor_show_after_page_switch()
 
     def _apply_raw_editor_text(self, text: str) -> None:
         value = str(text or "")
@@ -1887,6 +1929,7 @@ class PresetRawEditorPage(BasePage):
         self._raw_load_state_obj().reset()
         self._pending_raw_text_apply = None
         self._raw_text_apply_scheduled = False
+        self._raw_editor_show_scheduled = False
         self._raw_preset_write_state_obj().reset()
         self._raw_preset_save_state_obj().reset()
         self._raw_preset_activation_state_obj().reset()

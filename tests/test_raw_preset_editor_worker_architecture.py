@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 
 class RawPresetEditorWorkerArchitectureTests(unittest.TestCase):
@@ -142,6 +142,41 @@ class RawPresetEditorWorkerArchitectureTests(unittest.TestCase):
         page._load_file.assert_not_called()
         page._refresh_header.assert_called_once_with()
         self.assertEqual(page._raw_editor_text_snapshot, "--new\nloaded\n")
+
+    def test_clean_raw_editor_activation_restores_editor_after_show(self) -> None:
+        from presets.ui.common.preset_subpage_base import PresetRawEditorPage
+
+        class _Editor:
+            def __init__(self) -> None:
+                self.visible_calls: list[bool] = []
+
+            def setVisible(self, value: bool) -> None:  # noqa: N802
+                self.visible_calls.append(bool(value))
+
+        page = PresetRawEditorPage.__new__(PresetRawEditorPage)
+        editor = _Editor()
+        page.editor = editor
+        page._cleanup_in_progress = False
+        page._raw_preset_content_loaded_once = True
+        page._raw_preset_content_dirty = False
+        page._raw_editor_show_scheduled = False
+        page._commit_pending_content_change = Mock()
+        scheduled: list[object] = []
+
+        with patch(
+            "presets.ui.common.preset_subpage_base.QTimer.singleShot",
+            side_effect=lambda _delay, callback: scheduled.append(callback),
+        ):
+            PresetRawEditorPage.on_page_hidden(page)
+            PresetRawEditorPage.on_page_activated(page)
+
+        page._commit_pending_content_change.assert_called_once_with()
+        self.assertEqual(editor.visible_calls, [False])
+        self.assertEqual(len(scheduled), 1)
+
+        scheduled[0]()
+
+        self.assertEqual(editor.visible_calls, [False, True])
 
     def test_raw_preset_content_revision_marks_loaded_text_dirty(self) -> None:
         from presets.ui.common.preset_subpage_base import PresetRawEditorPage
