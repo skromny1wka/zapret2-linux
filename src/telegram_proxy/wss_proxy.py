@@ -65,7 +65,12 @@ from telegram_proxy.proxy.pool import (
     reset_wss_semaphore,
 )
 from telegram_proxy.proxy.relay import RELAY_BUFFER, relay_tcp, relay_wss
-from telegram_proxy.proxy.routing import UpstreamProxyConfig, check_relay_reachable, should_route_upstream
+from telegram_proxy.proxy.routing import (
+    UpstreamProxyConfig,
+    UpstreamProxyEndpoint,
+    check_relay_reachable,
+    should_route_upstream,
+)
 from telegram_proxy.proxy.stats import ProxyStats
 from telegram_proxy.proxy.transport import RawWebSocket, WsHandshakeError, apply_socket_options
 
@@ -121,6 +126,7 @@ class TelegramWSProxy:
         self._buffer_size = max(4, min(4096, int(buffer_kb or 256))) * 1024
         self._fake_tls_domain = normalize_fake_tls_domain(fake_tls_domain)
         self._proxy_protocol = bool(proxy_protocol)
+        self._upstream_connect_semaphore = asyncio.Semaphore(max(1, self._pool_size or 1))
         self._servers: list[asyncio.Server] = []
         self._tasks: set[asyncio.Task] = set()
         self._running = False
@@ -239,6 +245,130 @@ class TelegramWSProxy:
         if elapsed is not None:
             parts.append(f"elapsed={elapsed:.1f}s")
         self._log(" ".join(parts))
+
+    def _upstream_proxy_candidates(self) -> tuple[UpstreamProxyEndpoint, ...]:
+        primary = UpstreamProxyEndpoint(
+            host=self._upstream.host,
+            port=self._upstream.port,
+            username=self._upstream.username,
+            password=self._upstream.password,
+            tls=self._upstream.tls,
+            tls_server_name=self._upstream.tls_server_name,
+            tls_verify=self._upstream.tls_verify,
+        )
+        candidates = (primary, *tuple(self._upstream.fallback_proxies or ()))
+        result: list[UpstreamProxyEndpoint] = []
+        seen: set[tuple[str, int, str, str, bool, str, bool]] = set()
+        for endpoint in candidates:
+            host = str(endpoint.host or "").strip()
+            try:
+                port = int(endpoint.port)
+            except (TypeError, ValueError):
+                port = 0
+            if not host or port <= 0:
+                continue
+            key = (
+                host.lower(),
+                port,
+                str(endpoint.username or ""),
+                str(endpoint.password or ""),
+                bool(endpoint.tls),
+                str(endpoint.tls_server_name or "").strip().lower(),
+                bool(endpoint.tls_verify),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            result.append(
+                UpstreamProxyEndpoint(
+                    host=host,
+                    port=port,
+                    username=str(endpoint.username or ""),
+                    password=str(endpoint.password or ""),
+                    tls=bool(endpoint.tls),
+                    tls_server_name=str(endpoint.tls_server_name or "").strip(),
+                    tls_verify=bool(endpoint.tls_verify),
+                )
+            )
+        return tuple(result)
+
+    async def _open_upstream_proxy(
+        self,
+        *,
+        upstream_host: str,
+        upstream_port: int,
+        label: str,
+        dc: int,
+        is_media: bool,
+        mtproxy: bool = False,
+    ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter] | None:
+        media_tag = " media" if is_media else ""
+        prefix = "MTProxy " if mtproxy else ""
+        candidates = self._upstream_proxy_candidates()
+        for index, endpoint in enumerate(candidates):
+            next_step = "try next bundled SOCKS5" if index + 1 < len(candidates) else "none"
+            fallback_tag = "backup " if index > 0 else ""
+            self._log(
+                f"[{label}] {prefix}DC{dc}{media_tag} {fallback_tag}upstream proxy "
+                f"-> {endpoint.host}:{endpoint.port}"
+            )
+            t_connect = time.monotonic()
+            try:
+                rr, rw = await socks5.connect_via_socks5(
+                    endpoint.host,
+                    endpoint.port,
+                    upstream_host,
+                    upstream_port,
+                    username=endpoint.username,
+                    password=endpoint.password,
+                    timeout=CONNECT_TIMEOUT,
+                    tls=endpoint.tls,
+                    tls_server_name=endpoint.tls_server_name,
+                    tls_verify=endpoint.tls_verify,
+                )
+                apply_socket_options(rw.transport, self._buffer_size)
+            except Exception as exc:
+                elapsed = time.monotonic() - t_connect
+                self.stats.failed_connections += 1
+                self._log(
+                    f"[{label}] {prefix}DC{dc}{media_tag} upstream connect failed "
+                    f"({elapsed:.1f}s): {type(exc).__name__}: {exc}"
+                )
+                self._log_route_detail(
+                    label,
+                    route="upstream SOCKS5",
+                    dc=dc,
+                    is_media=is_media,
+                    target=f"{upstream_host}:{upstream_port} via {endpoint.host}:{endpoint.port}",
+                    result="error",
+                    reason=self._route_error(exc),
+                    next_step=next_step,
+                    elapsed=elapsed,
+                )
+                self._record_route(
+                    dc=dc,
+                    is_media=is_media,
+                    route="внешний SOCKS5",
+                    status="ошибка",
+                    reason=self._route_error(exc),
+                )
+                continue
+
+            elapsed = time.monotonic() - t_connect
+            self._log(f"[{label}] {prefix}DC{dc}{media_tag} upstream connected ({elapsed:.1f}s)")
+            self._log_route_detail(
+                label,
+                route="upstream SOCKS5",
+                dc=dc,
+                is_media=is_media,
+                target=f"{upstream_host}:{upstream_port} via {endpoint.host}:{endpoint.port}",
+                result="connected",
+                elapsed=elapsed,
+            )
+            self.stats.upstream_connections += 1
+            self._record_route(dc=dc, is_media=is_media, route="внешний SOCKS5", status="OK")
+            return rr, rw
+        return None
 
     @property
     def is_running(self) -> bool:
@@ -1373,77 +1503,30 @@ class TelegramWSProxy:
                 f"[{label}] MTProxy DC{dc}{media_tag} upstream target "
                 f"{target_host}:{target_port} -> {upstream_host}:{upstream_port}"
             )
-        self._log(
-            f"[{label}] MTProxy DC{dc}{media_tag} upstream proxy "
-            f"-> {self._upstream.host}:{self._upstream.port}"
-        )
-        t_connect = time.monotonic()
-        try:
-            rr, rw = await socks5.connect_via_socks5(
-                self._upstream.host,
-                self._upstream.port,
-                upstream_host,
-                upstream_port,
-                username=self._upstream.username,
-                password=self._upstream.password,
-                timeout=CONNECT_TIMEOUT,
-                tls=self._upstream.tls,
-                tls_server_name=self._upstream.tls_server_name,
-                tls_verify=self._upstream.tls_verify,
-            )
-            apply_socket_options(rw.transport, self._buffer_size)
-        except Exception as exc:
-            elapsed = time.monotonic() - t_connect
-            self.stats.failed_connections += 1
-            self._log(
-                f"[{label}] MTProxy DC{dc}{media_tag} upstream connect failed "
-                f"({elapsed:.1f}s): {type(exc).__name__}: {exc}"
-            )
-            self._log_route_detail(
-                label,
-                route="upstream SOCKS5",
+        async with self._upstream_connect_semaphore:
+            opened = await self._open_upstream_proxy(
+                upstream_host=upstream_host,
+                upstream_port=upstream_port,
+                label=label,
                 dc=dc,
                 is_media=is_media,
-                target=f"{upstream_host}:{upstream_port} via {self._upstream.host}:{self._upstream.port}",
-                result="error",
-                reason=self._route_error(exc),
-                next_step="none",
-                elapsed=elapsed,
+                mtproxy=True,
             )
-            self._record_route(
-                dc=dc,
-                is_media=is_media,
-                route="внешний SOCKS5",
-                status="ошибка",
-                reason=self._route_error(exc),
+            if opened is None:
+                return False
+            rr, rw = opened
+            rw.write(relay_init)
+            await rw.drain()
+            await relay_mtproxy_tcp(
+                client_reader=client_reader,
+                client_writer=client_writer,
+                remote_reader=rr,
+                remote_writer=rw,
+                crypto=crypto,
+                stats=self.stats,
+                log_fn=self._log,
+                label=label,
             )
-            return False
-
-        elapsed = time.monotonic() - t_connect
-        self._log(f"[{label}] MTProxy DC{dc}{media_tag} upstream connected ({elapsed:.1f}s)")
-        self._log_route_detail(
-            label,
-            route="upstream SOCKS5",
-            dc=dc,
-            is_media=is_media,
-            target=f"{upstream_host}:{upstream_port} via {self._upstream.host}:{self._upstream.port}",
-            result="connected",
-            elapsed=elapsed,
-        )
-        self.stats.upstream_connections += 1
-        self._record_route(dc=dc, is_media=is_media, route="внешний SOCKS5", status="OK")
-        rw.write(relay_init)
-        await rw.drain()
-        await relay_mtproxy_tcp(
-            client_reader=client_reader,
-            client_writer=client_writer,
-            remote_reader=rr,
-            remote_writer=rw,
-            crypto=crypto,
-            stats=self.stats,
-            log_fn=self._log,
-            label=label,
-        )
         return True
 
     async def _tcp_fallback(
@@ -1592,69 +1675,21 @@ class TelegramWSProxy:
                 f"[{label}] DC{dc}{media_tag} upstream target "
                 f"{target_host}:{target_port} -> {upstream_host}:{upstream_port}"
             )
-        self._log(
-            f"[{label}] DC{dc}{media_tag} upstream proxy "
-            f"-> {self._upstream.host}:{self._upstream.port}"
-        )
-        t_connect = time.monotonic()
-        try:
-            rr, rw = await socks5.connect_via_socks5(
-                self._upstream.host,
-                self._upstream.port,
-                upstream_host,
-                upstream_port,
-                username=self._upstream.username,
-                password=self._upstream.password,
-                timeout=CONNECT_TIMEOUT,
-                tls=self._upstream.tls,
-                tls_server_name=self._upstream.tls_server_name,
-                tls_verify=self._upstream.tls_verify,
-            )
-            apply_socket_options(rw.transport, self._buffer_size)
-        except Exception as exc:
-            elapsed = time.monotonic() - t_connect
-            self.stats.failed_connections += 1
-            self._log(
-                f"[{label}] DC{dc}{media_tag} upstream connect failed "
-                f"({elapsed:.1f}s): {type(exc).__name__}: {exc}"
-            )
-            self._log_route_detail(
-                label,
-                route="upstream SOCKS5",
+        async with self._upstream_connect_semaphore:
+            opened = await self._open_upstream_proxy(
+                upstream_host=upstream_host,
+                upstream_port=upstream_port,
+                label=label,
                 dc=dc,
                 is_media=is_media,
-                target=f"{upstream_host}:{upstream_port} via {self._upstream.host}:{self._upstream.port}",
-                result="error",
-                reason=self._route_error(exc),
-                next_step="none",
-                elapsed=elapsed,
             )
-            self._record_route(
-                dc=dc,
-                is_media=is_media,
-                route="внешний SOCKS5",
-                status="ошибка",
-                reason=self._route_error(exc),
-            )
-            return False
-
-        elapsed = time.monotonic() - t_connect
-        self._log(f"[{label}] DC{dc}{media_tag} upstream connected ({elapsed:.1f}s)")
-        self._log_route_detail(
-            label,
-            route="upstream SOCKS5",
-            dc=dc,
-            is_media=is_media,
-            target=f"{upstream_host}:{upstream_port} via {self._upstream.host}:{self._upstream.port}",
-            result="connected",
-            elapsed=elapsed,
-        )
-        self.stats.upstream_connections += 1
-        self._record_route(dc=dc, is_media=is_media, route="внешний SOCKS5", status="OK")
-        # Forward the buffered init packet
-        rw.write(init)
-        await rw.drain()
-        await self._relay_tcp(client_reader, client_writer, rr, rw, label, dc=dc)
+            if opened is None:
+                return False
+            rr, rw = opened
+            # Forward the buffered init packet
+            rw.write(init)
+            await rw.drain()
+            await self._relay_tcp(client_reader, client_writer, rr, rw, label, dc=dc)
         return True
 
     def _upstream_target(

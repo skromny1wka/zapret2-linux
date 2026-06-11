@@ -6,8 +6,19 @@ import time
 from dataclasses import dataclass
 
 
-@dataclass
-class UpstreamProxyConfig:
+@dataclass(frozen=True)
+class UpstreamProxyEndpoint:
+    host: str = ""
+    port: int = 0
+    username: str = ""
+    password: str = ""
+    tls: bool = False
+    tls_server_name: str = ""
+    tls_verify: bool = False
+
+
+@dataclass(frozen=True)
+class UpstreamProxyConfig(UpstreamProxyEndpoint):
     """Configuration for an external SOCKS5 proxy used as last-resort fallback.
 
     Modes:
@@ -16,14 +27,8 @@ class UpstreamProxyConfig:
     """
 
     enabled: bool = False
-    host: str = ""
-    port: int = 0
     mode: str = "always"
-    username: str = ""
-    password: str = ""
-    tls: bool = False
-    tls_server_name: str = ""
-    tls_verify: bool = False
+    fallback_proxies: tuple[UpstreamProxyEndpoint, ...] = ()
 
 
 def check_relay_reachable(
@@ -64,4 +69,9 @@ def should_route_upstream(upstream: UpstreamProxyConfig, *, mode: str) -> bool:
     return bool(upstream.enabled and upstream.mode == mode)
 
 
-__all__ = ["UpstreamProxyConfig", "check_relay_reachable", "should_route_upstream"]
+__all__ = [
+    "UpstreamProxyConfig",
+    "UpstreamProxyEndpoint",
+    "check_relay_reachable",
+    "should_route_upstream",
+]

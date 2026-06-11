@@ -509,7 +509,7 @@ def load_upstream_test_target() -> tuple | None:
 
 def build_upstream_config():
     try:
-        from telegram_proxy.wss_proxy import UpstreamProxyConfig
+        from telegram_proxy.proxy.routing import UpstreamProxyConfig, UpstreamProxyEndpoint
         from settings.store import (
             get_tg_proxy_upstream_enabled,
             get_tg_proxy_upstream_host,
@@ -526,6 +526,8 @@ def build_upstream_config():
         preset_id = str(get_tg_proxy_upstream_preset_id() or "").strip()
         resolver = UpstreamPresetResolver.load_from_runtime()
         preset = resolver.socks5_by_id(preset_id) if preset_id else None
+        selected_preset_id = preset_id
+        fallback_presets: list[dict] = []
         if preset is not None:
             host = str(preset["host"])
             port = normalize_upstream_port(preset["port"])
@@ -534,6 +536,7 @@ def build_upstream_config():
             tls = bool(preset.get("tls", False))
             tls_server_name = str(preset.get("tls_server_name") or "")
             tls_verify = bool(preset.get("tls_verify", False))
+            fallback_presets = resolver.socks5_fallbacks(selected_preset_id)
         else:
             host = str(get_tg_proxy_upstream_host() or "").strip()
             port = normalize_upstream_port(get_tg_proxy_upstream_port())
@@ -546,6 +549,7 @@ def build_upstream_config():
                 preset = resolver.first_socks5()
                 if preset is None:
                     return None
+                selected_preset_id = str(preset.get("id") or "").strip()
                 host = str(preset["host"])
                 port = normalize_upstream_port(preset["port"])
                 username = str(preset["username"])
@@ -553,9 +557,25 @@ def build_upstream_config():
                 tls = bool(preset.get("tls", False))
                 tls_server_name = str(preset.get("tls_server_name") or "")
                 tls_verify = bool(preset.get("tls_verify", False))
+                fallback_presets = resolver.socks5_fallbacks(selected_preset_id)
 
         if not host or port <= 0:
             return None
+
+        fallback_proxies = tuple(
+            UpstreamProxyEndpoint(
+                host=str(item["host"]),
+                port=normalize_upstream_port(item["port"]),
+                username=str(item["username"]),
+                password=str(item["password"]),
+                tls=bool(item.get("tls", False)),
+                tls_server_name=str(item.get("tls_server_name") or ""),
+                tls_verify=bool(item.get("tls_verify", False)),
+            )
+            for item in fallback_presets
+            if str(item.get("host") or "").strip()
+            and normalize_upstream_port(item.get("port")) > 0
+        )
 
         return UpstreamProxyConfig(
             enabled=True,
@@ -567,6 +587,7 @@ def build_upstream_config():
             tls=tls,
             tls_server_name=tls_server_name,
             tls_verify=tls_verify,
+            fallback_proxies=fallback_proxies,
         )
     except Exception:
         return None

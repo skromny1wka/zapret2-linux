@@ -246,6 +246,19 @@ class UpstreamPresetResolver:
             return None
         return self._socks5_from_preset(preset)
 
+    def socks5_fallbacks(self, primary_preset_id: object) -> list[dict]:
+        primary_id = str(primary_preset_id or "").strip()
+        fallbacks: list[dict] = []
+        for preset in self._presets:
+            if preset.get("type") != "socks5":
+                continue
+            if primary_id and str(preset.get("id") or "").strip() == primary_id:
+                continue
+            resolved = self._socks5_from_preset(preset)
+            if resolved is not None:
+                fallbacks.append(resolved)
+        return fallbacks
+
     def first_socks5(self) -> dict | None:
         for preset in self._presets:
             if preset.get("type") == "socks5":
@@ -258,6 +271,7 @@ class UpstreamPresetResolver:
         if not host or port <= 0:
             return None
         return {
+            "id": str(preset.get("id") or "").strip(),
             "host": host,
             "port": port,
             "username": str(preset.get("username") or "").strip(),

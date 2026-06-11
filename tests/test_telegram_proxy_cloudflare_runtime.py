@@ -602,6 +602,120 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
         self.assertTrue(ok)
         self.assertEqual(seen[0][2:4], ("149.154.175.52", 443))
 
+    def test_upstream_tries_next_bundled_proxy_after_connect_failure(self) -> None:
+        from telegram_proxy.proxy.routing import UpstreamProxyConfig, UpstreamProxyEndpoint
+        from telegram_proxy.wss_proxy import TelegramWSProxy
+
+        class _RemoteWriter:
+            def __init__(self):
+                self.transport = None
+
+            def write(self, _data):
+                return None
+
+            async def drain(self):
+                return None
+
+        async def fake_connect(proxy_host, *_args, **_kwargs):
+            seen_hosts.append(proxy_host)
+            if proxy_host == "bad.proxy":
+                raise ConnectionResetError()
+            return object(), _RemoteWriter()
+
+        async def fake_relay(*_args, **_kwargs):
+            return (1, False)
+
+        seen_hosts: list[str] = []
+        proxy = TelegramWSProxy(
+            upstream_config=UpstreamProxyConfig(
+                enabled=True,
+                host="bad.proxy",
+                port=443,
+                mode="always",
+                fallback_proxies=(
+                    UpstreamProxyEndpoint(host="good.proxy", port=443),
+                ),
+            ),
+        )
+        proxy._relay_tcp = fake_relay
+
+        with patch("telegram_proxy.wss_proxy.socks5.connect_via_socks5", side_effect=fake_connect):
+            ok = asyncio.run(
+                proxy._upstream_proxy_connect(
+                    object(),
+                    object(),
+                    "149.154.175.50",
+                    443,
+                    b"x" * 64,
+                    "test",
+                    1,
+                    False,
+                )
+            )
+
+        self.assertTrue(ok)
+        self.assertEqual(seen_hosts, ["bad.proxy", "good.proxy"])
+
+    def test_upstream_active_relays_are_limited_by_pool_size(self) -> None:
+        from telegram_proxy.proxy.routing import UpstreamProxyConfig
+        from telegram_proxy.wss_proxy import TelegramWSProxy
+
+        class _RemoteWriter:
+            def __init__(self):
+                self.transport = None
+
+            def write(self, _data):
+                return None
+
+            async def drain(self):
+                return None
+
+        async def fake_connect(*_args, **_kwargs):
+            return object(), _RemoteWriter()
+
+        async def fake_relay(*_args, **_kwargs):
+            nonlocal active_relays, max_active_relays
+            active_relays += 1
+            max_active_relays = max(max_active_relays, active_relays)
+            await asyncio.sleep(0.02)
+            active_relays -= 1
+            return (1, False)
+
+        async def run_many(proxy: TelegramWSProxy):
+            await asyncio.gather(
+                *(
+                    proxy._upstream_proxy_connect(
+                        object(),
+                        object(),
+                        "149.154.175.50",
+                        443,
+                        b"x" * 64,
+                        f"test-{index}",
+                        1,
+                        False,
+                    )
+                    for index in range(5)
+                )
+            )
+
+        active_relays = 0
+        max_active_relays = 0
+        proxy = TelegramWSProxy(
+            upstream_config=UpstreamProxyConfig(
+                enabled=True,
+                host="proxy.local",
+                port=443,
+                mode="always",
+            ),
+            pool_size=2,
+        )
+        proxy._relay_tcp = fake_relay
+
+        with patch("telegram_proxy.wss_proxy.socks5.connect_via_socks5", side_effect=fake_connect):
+            asyncio.run(run_many(proxy))
+
+        self.assertLessEqual(max_active_relays, 2)
+
     def test_upstream_socks5_client_sends_ipv6_address_type(self) -> None:
         from telegram_proxy.proxy import socks5
 

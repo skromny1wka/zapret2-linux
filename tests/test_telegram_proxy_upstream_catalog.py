@@ -244,6 +244,62 @@ class TelegramProxyUpstreamCatalogTest(unittest.TestCase):
             ("203.0.113.10", 443, "preset_user", "preset_password", True, "", False),
         )
 
+    def test_selected_bundled_socks_gets_other_bundled_socks_as_fallback(self) -> None:
+        from telegram_proxy.config.settings import DEFAULT_UPSTREAM_PORT, build_upstream_config
+        from telegram_proxy.config.upstream_catalog import UpstreamPresetResolver
+
+        catalog_fixture = [
+            {
+                "id": "uk",
+                "name": "Великобритания",
+                "type": "socks5",
+                "host": "203.0.113.10",
+                "port": 443,
+                "username": "uk_user",
+                "password": "uk_password",
+                "tls": True,
+            },
+            {
+                "id": "no",
+                "name": "Норвегия",
+                "type": "socks5",
+                "host": "203.0.113.20",
+                "port": 443,
+                "username": "no_user",
+                "password": "no_password",
+                "tls": True,
+            },
+        ]
+        data = {
+            "telegram_proxy": {
+                "upstream_enabled": True,
+                "upstream_preset_id": "uk",
+                "upstream_host": "",
+                "upstream_port": DEFAULT_UPSTREAM_PORT,
+                "upstream_user": "",
+                "upstream_pass": "",
+                "upstream_mode": "always",
+            }
+        }
+
+        from unittest.mock import patch
+
+        with (
+            patch(
+                "telegram_proxy.config.settings.UpstreamPresetResolver.load_from_runtime",
+                return_value=UpstreamPresetResolver(catalog_fixture),
+            ),
+            patch("settings.store.read_settings", return_value=data),
+        ):
+            upstream = build_upstream_config()
+
+        self.assertIsNotNone(upstream)
+        self.assertEqual(upstream.host, "203.0.113.10")
+        self.assertEqual(len(upstream.fallback_proxies), 1)
+        self.assertEqual(upstream.fallback_proxies[0].host, "203.0.113.20")
+        self.assertEqual(upstream.fallback_proxies[0].username, "no_user")
+        self.assertEqual(upstream.fallback_proxies[0].password, "no_password")
+
 
 if __name__ == "__main__":
     unittest.main()
