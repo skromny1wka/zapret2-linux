@@ -2245,10 +2245,16 @@ class ProfileSetupPageBase(BasePage):
             )
 
     def _on_list_file_worker_finished(self, _worker) -> None:
-        if not self._accept_current_profile_setup_worker_finished("_list_file_load_request_id", _worker):
-            return
-        if self._list_file_load_state_obj().has_pending():
-            self._schedule_pending_list_file_load_start()
+        self._list_file_load_state_obj().schedule_pending_after_finish(
+            _worker,
+            is_current_worker_finish=lambda _runtime, worker: self._accept_current_profile_setup_worker_finished(
+                "_list_file_load_request_id",
+                worker,
+            ),
+            single_shot=QTimer.singleShot,
+            run_scheduled=self._run_scheduled_list_file_load_start,
+            cleanup_in_progress=bool(self.__dict__.get("_cleanup_in_progress", False)),
+        )
 
     def _schedule_pending_list_file_load_start(self) -> None:
         state = self._list_file_load_state_obj()
@@ -3153,10 +3159,15 @@ class ProfileSetupPageBase(BasePage):
         set_widget_enabled_if_changed(self._enabled_checkbox, False)
 
     def _on_profile_setup_worker_finished(self, _worker) -> None:
-        if not self._accept_current_profile_setup_load_worker_finished(_worker):
-            return
-        if self._setup_load_state_obj().has_pending() and not self.__dict__.get("_cleanup_in_progress", False):
-            self._schedule_profile_setup_load_start()
+        self._setup_load_state_obj().schedule_pending_after_finish(
+            _worker,
+            is_current_worker_finish=lambda _runtime, worker: self._accept_current_profile_setup_load_worker_finished(
+                worker,
+            ),
+            single_shot=QTimer.singleShot,
+            run_scheduled=self._run_scheduled_profile_setup_load_start,
+            cleanup_in_progress=bool(self.__dict__.get("_cleanup_in_progress", False)),
+        )
 
     def _accept_current_profile_setup_load_worker_finished(self, worker) -> bool:
         request_id = getattr(worker, "_request_id", None)
@@ -3590,10 +3601,16 @@ class ProfileSetupPageBase(BasePage):
             set_profile_list_status_text(self._list_file_status_label, "Ошибка проверки списка.")
 
     def _on_list_file_validation_worker_finished(self, _worker) -> None:
-        if not self._accept_current_profile_setup_worker_finished("_list_file_validation_request_id", _worker):
-            return
-        if self._list_file_validation_state_obj().has_pending():
-            self._schedule_pending_list_file_validation_start()
+        self._list_file_validation_state_obj().schedule_pending_after_finish(
+            _worker,
+            is_current_worker_finish=lambda _runtime, worker: self._accept_current_profile_setup_worker_finished(
+                "_list_file_validation_request_id",
+                worker,
+            ),
+            single_shot=QTimer.singleShot,
+            run_scheduled=self._run_scheduled_list_file_validation_start,
+            cleanup_in_progress=bool(self.__dict__.get("_cleanup_in_progress", False)),
+        )
 
     def _schedule_pending_list_file_validation_start(self) -> None:
         state = self._list_file_validation_state_obj()

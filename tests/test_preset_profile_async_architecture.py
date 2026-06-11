@@ -214,6 +214,18 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("_schedule_profile_load_refresh_start", finished_source)
         self.assertIn("_schedule_profiles_payload_request(force=True)", scheduled_source)
 
+    def test_profile_setup_pending_load_restarts_use_shared_finish_guard(self) -> None:
+        finish_sources = (
+            inspect.getsource(ProfileSetupPageBase._on_profile_setup_worker_finished),
+            inspect.getsource(ProfileSetupPageBase._on_list_file_worker_finished),
+            inspect.getsource(ProfileSetupPageBase._on_list_file_validation_worker_finished),
+        )
+
+        for source in finish_sources:
+            self.assertIn("schedule_pending_after_finish", source)
+            self.assertIn("is_current_worker_finish", source)
+            self.assertNotIn("if self._", source)
+
     def test_profile_folder_worker_returns_folder_state_after_write_action(self) -> None:
         worker_source = inspect.getsource(profile_setup_loader.ProfileFolderActionWorker.run)
 
