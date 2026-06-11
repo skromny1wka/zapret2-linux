@@ -8,8 +8,10 @@ import unittest
 SRC_ROOT = Path(__file__).resolve().parents[1] / "src"
 
 ALLOWED_UI_IMPORTS = {
+    "ui.latest_value_worker_state",
     "app.ui_texts",
     "ui.one_shot_worker_runtime",
+    "ui.queued_worker_state",
 }
 
 
