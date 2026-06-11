@@ -64,6 +64,34 @@ class StrategyListAccessibilityTests(unittest.TestCase):
             "Показано готовых стратегий: 1 из 2",
         )
 
+    def test_strategy_list_updates_screen_reader_text_when_current_row_changes(self) -> None:
+        widget = ProfileStrategyListWidget()
+        self.addCleanup(widget.deleteLater)
+
+        visual = SimpleNamespace(label="Fake", description="Подмена TLS", icon_name="", color="")
+        widget.set_rows(
+            entries={
+                "alpha": SimpleNamespace(name="Alpha", args="--alpha", visual=visual),
+                "beta": SimpleNamespace(name="Beta", args="--beta", visual=visual),
+            },
+            states={},
+            current_strategy_id="beta",
+        )
+
+        self.assertEqual(
+            widget._list.property("screenReaderStateText"),
+            "Готовая стратегия: Beta, выбрана, Fake, Подмена TLS. "
+            "Нажмите Enter, чтобы выбрать стратегию.",
+        )
+
+        widget._list.setCurrentRow(0)
+
+        self.assertEqual(
+            widget._list.property("screenReaderStateText"),
+            "Готовая стратегия: Alpha, не выбрана, Fake, Подмена TLS. "
+            "Нажмите Enter, чтобы выбрать стратегию.",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

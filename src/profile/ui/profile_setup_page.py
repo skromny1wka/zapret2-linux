@@ -427,6 +427,7 @@ class ProfileStrategyListWidget(QWidget):
         self._list.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self._list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._list.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self._list.currentItemChanged.connect(self._update_current_strategy_accessibility)
         self._list.itemActivated.connect(self._on_item_activated)
         self._list.itemClicked.connect(self._on_item_clicked)
         self._list.setStyleSheet(
@@ -600,6 +601,7 @@ class ProfileStrategyListWidget(QWidget):
         if current_item is not None:
             self._list.setCurrentItem(current_item)
             current_item.setSelected(True)
+        self._update_current_strategy_accessibility(self._list.currentItem())
 
     def _refresh_strategy_item(self, item, strategy_id: str, *, is_current: bool) -> None:
         if item is None:
@@ -651,6 +653,17 @@ class ProfileStrategyListWidget(QWidget):
                 changed = True
         if changed:
             self._list.viewport().update(self._list.visualItemRect(item))
+            if self._list.currentItem() is item:
+                self._update_current_strategy_accessibility(item)
+
+    def _update_current_strategy_accessibility(self, item=None, _previous=None) -> None:
+        accessible_text = ""
+        if item is not None:
+            accessible_text = str(item.data(Qt.ItemDataRole.AccessibleTextRole) or "").strip()
+        if accessible_text:
+            set_state_text(self._list, f"Готовая стратегия: {accessible_text}")
+        else:
+            set_state_text(self._list, "Список готовых стратегий")
 
     def _apply_filter(self) -> None:
         self._rebuild_tree()
