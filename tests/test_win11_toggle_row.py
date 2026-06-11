@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import unittest
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -23,6 +24,21 @@ class _TextLabel:
         value = str(text)
         self.set_calls.append(value)
         self._text = value
+
+
+class _StyledTextLabel(_TextLabel):
+    def __init__(self, text: str) -> None:
+        super().__init__(text)
+        self._style = ""
+        self.style_calls: list[str] = []
+
+    def styleSheet(self) -> str:  # noqa: N802
+        return self._style
+
+    def setStyleSheet(self, style: str) -> None:  # noqa: N802
+        value = str(style)
+        self.style_calls.append(value)
+        self._style = value
 
 
 class _SwitchButton:
@@ -217,6 +233,26 @@ class Win11ToggleRowTests(unittest.TestCase):
         self.assertEqual(title_calls, ["Title"])
         self.assertEqual(content_calls, ["Description"])
 
+    def test_toggle_row_theme_refresh_styles_title_and_description(self) -> None:
+        from ui.widgets.win11_controls import Win11ToggleRow
+
+        row = Win11ToggleRow.__new__(Win11ToggleRow)
+        row._title_label = _StyledTextLabel("Автозапуск ZapretGUI")
+        row._desc_label = _StyledTextLabel("Запускать программу в трее")
+        row._icon_label = None
+        tokens = SimpleNamespace(
+            fg="rgba(255, 255, 255, 0.92)",
+            fg_muted="rgba(255, 255, 255, 0.65)",
+            font_family_qss="'Segoe UI Variable', 'Segoe UI'",
+        )
+
+        Win11ToggleRow._apply_theme_refresh(row, tokens=tokens)
+
+        self.assertIn("rgba(255, 255, 255, 0.92)", row._title_label.styleSheet())
+        self.assertIn("font-weight: 600", row._title_label.styleSheet())
+        self.assertIn("rgba(255, 255, 255, 0.65)", row._desc_label.styleSheet())
+        self.assertIn("'Segoe UI Variable', 'Segoe UI'", row._desc_label.styleSheet())
+
     def test_radio_option_set_texts_skips_duplicate_text(self) -> None:
         from ui.widgets.win11_controls import Win11RadioOption
 
@@ -394,6 +430,25 @@ class Win11ToggleRowTests(unittest.TestCase):
         self.assertEqual(title_calls, ["Attempts"])
         self.assertEqual(content_calls, ["Retry count"])
 
+    def test_number_row_theme_refresh_styles_title_and_description(self) -> None:
+        from ui.widgets.win11_controls import Win11NumberRow
+
+        row = Win11NumberRow.__new__(Win11NumberRow)
+        row._title_label = _StyledTextLabel("Количество попыток")
+        row._desc_label = _StyledTextLabel("Сколько раз повторять проверку")
+        row._icon_label = None
+        tokens = SimpleNamespace(
+            fg="rgba(255, 255, 255, 0.92)",
+            fg_muted="rgba(255, 255, 255, 0.65)",
+            font_family_qss="'Segoe UI Variable', 'Segoe UI'",
+        )
+
+        Win11NumberRow._apply_theme_refresh(row, tokens=tokens)
+
+        self.assertIn("rgba(255, 255, 255, 0.92)", row._title_label.styleSheet())
+        self.assertIn("font-weight: 600", row._title_label.styleSheet())
+        self.assertIn("rgba(255, 255, 255, 0.65)", row._desc_label.styleSheet())
+
     def test_combo_row_set_current_index_skips_duplicate_index(self) -> None:
         from ui.widgets.win11_controls import Win11ComboRow
 
@@ -520,6 +575,25 @@ class Win11ToggleRowTests(unittest.TestCase):
 
         self.assertEqual(title_calls, ["Preset"])
         self.assertEqual(content_calls, ["Select mode"])
+
+    def test_combo_row_theme_refresh_styles_title_and_description(self) -> None:
+        from ui.widgets.win11_controls import Win11ComboRow
+
+        row = Win11ComboRow.__new__(Win11ComboRow)
+        row._title_label = _StyledTextLabel("Режим")
+        row._desc_label = _StyledTextLabel("Выберите вариант")
+        row._icon_label = None
+        tokens = SimpleNamespace(
+            fg="rgba(255, 255, 255, 0.92)",
+            fg_muted="rgba(255, 255, 255, 0.65)",
+            font_family_qss="'Segoe UI Variable', 'Segoe UI'",
+        )
+
+        Win11ComboRow._apply_theme_refresh(row, tokens=tokens)
+
+        self.assertIn("rgba(255, 255, 255, 0.92)", row._title_label.styleSheet())
+        self.assertIn("font-weight: 600", row._title_label.styleSheet())
+        self.assertIn("rgba(255, 255, 255, 0.65)", row._desc_label.styleSheet())
 
 
 if __name__ == "__main__":

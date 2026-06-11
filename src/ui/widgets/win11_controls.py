@@ -41,6 +41,47 @@ def _build_theme_refresh_key(tokens) -> tuple[str, str, str]:
     return (str(tokens.theme_name), str(tokens.accent_hex), str(tokens.font_family_qss))
 
 
+def _set_stylesheet_if_changed(widget, qss: str) -> None:
+    if widget is None:
+        return
+    value = str(qss or "")
+    try:
+        if str(widget.styleSheet()) == value:
+            return
+    except Exception:
+        pass
+    try:
+        widget.setStyleSheet(value)
+    except Exception:
+        pass
+
+
+def _apply_setting_card_text_styles(title_label, desc_label, tokens=None) -> None:
+    theme_tokens = tokens or get_theme_tokens()
+    font_family = str(getattr(theme_tokens, "font_family_qss", "") or "'Segoe UI Variable', 'Segoe UI', Arial, sans-serif")
+    title_color = str(getattr(theme_tokens, "fg", "") or "rgba(255, 255, 255, 0.92)")
+    desc_color = str(getattr(theme_tokens, "fg_muted", "") or "rgba(255, 255, 255, 0.65)")
+    _set_stylesheet_if_changed(
+        title_label,
+        (
+            f"color: {title_color}; "
+            f"font-family: {font_family}; "
+            "font-size: 13px; "
+            "font-weight: 600; "
+            "background: transparent;"
+        ),
+    )
+    _set_stylesheet_if_changed(
+        desc_label,
+        (
+            f"color: {desc_color}; "
+            f"font-family: {font_family}; "
+            "font-size: 12px; "
+            "background: transparent;"
+        ),
+    )
+
+
 class Win11ToggleRow(FluentSettingCard):
     """Строка с toggle switch в стиле Windows 11."""
 
@@ -74,6 +115,7 @@ class Win11ToggleRow(FluentSettingCard):
         self._desc_label = getattr(self, "contentLabel", None)
 
         self._switch_button = SwitchButton(self)
+        self._apply_text_styles(initial_tokens)
 
         if self._switch_button is not None:
             try:
@@ -131,6 +173,10 @@ class Win11ToggleRow(FluentSettingCard):
     def _apply_theme_refresh(self, tokens=None, force: bool = False) -> None:
         _ = force
         self._refresh_icon(tokens)
+        self._apply_text_styles(tokens)
+
+    def _apply_text_styles(self, tokens=None) -> None:
+        _apply_setting_card_text_styles(self._title_label, self._desc_label, tokens)
 
     def setChecked(self, checked: bool, block_signals: bool = False):
         toggle = getattr(self, "_switch_button", None)
@@ -529,6 +575,7 @@ class Win11NumberRow(FluentSettingCard):
         self.spinbox.valueChanged.connect(self._on_spinbox_value_changed)
         layout.addWidget(self.spinbox)
         layout.addSpacing(16)
+        self._apply_text_styles(initial_tokens)
         self._update_number_accessibility()
         self._theme_refresh = ThemeRefreshBinding(
             self,
@@ -570,13 +617,17 @@ class Win11NumberRow(FluentSettingCard):
             return QIcon()
 
     def _apply_theme_styles(self, tokens=None) -> None:
-        return None
+        self._apply_text_styles(tokens)
+
+    def _apply_text_styles(self, tokens=None) -> None:
+        _apply_setting_card_text_styles(self._title_label, self._desc_label, tokens)
 
     def _apply_theme_refresh(self, tokens=None, force: bool = False) -> None:
         _ = force
         self._applying_theme_styles = True
         try:
             self._refresh_icon(tokens)
+            self._apply_theme_styles(tokens)
         finally:
             self._applying_theme_styles = False
 
@@ -690,6 +741,7 @@ class Win11ComboRow(FluentSettingCard):
         self.combo.currentTextChanged.connect(self._on_combo_text_changed)
         layout.addWidget(self.combo)
         layout.addSpacing(16)
+        self._apply_text_styles(initial_tokens)
         self._update_combo_accessibility()
         self._theme_refresh = ThemeRefreshBinding(
             self,
@@ -731,13 +783,17 @@ class Win11ComboRow(FluentSettingCard):
             return QIcon()
 
     def _apply_theme_styles(self, tokens=None) -> None:
-        return None
+        self._apply_text_styles(tokens)
+
+    def _apply_text_styles(self, tokens=None) -> None:
+        _apply_setting_card_text_styles(self._title_label, self._desc_label, tokens)
 
     def _apply_theme_refresh(self, tokens=None, force: bool = False) -> None:
         _ = force
         self._applying_theme_styles = True
         try:
             self._refresh_icon(tokens)
+            self._apply_theme_styles(tokens)
         finally:
             self._applying_theme_styles = False
 

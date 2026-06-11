@@ -60,11 +60,15 @@ class ThemeRefreshBinding(QObject):
         if self._cleanup_in_progress:
             return False
         try:
-            if watched is self._target and event.type() in (
-                QEvent.Type.StyleChange,
-                QEvent.Type.PaletteChange,
-            ):
-                self.request_refresh()
+            if watched is self._target:
+                event_type = event.type()
+                if event_type in (
+                    QEvent.Type.StyleChange,
+                    QEvent.Type.PaletteChange,
+                ):
+                    self.request_refresh()
+                elif event_type == QEvent.Type.Show:
+                    QTimer.singleShot(0, self.flush_pending)
         except Exception:
             pass
         return super().eventFilter(watched, event)
