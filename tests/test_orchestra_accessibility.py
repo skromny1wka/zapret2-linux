@@ -321,8 +321,15 @@ class OrchestraAccessibilityTests(unittest.TestCase):
         self.assertIn("После ввода перейдите к истории клавишей Tab", page.filter_input.accessibleDescription())
         self.assertEqual(page.refresh_btn.accessibleName(), "Обновить рейтинги стратегий")
         self.assertEqual(page.stats_label.accessibleName(), "Статистика рейтингов: Загрузка...")
-        self.assertEqual(page.history_text.accessibleName(), "История рейтингов стратегий")
+        self.assertEqual(
+            page.history_text.accessibleName(),
+            "История рейтингов стратегий: история появится после обучения",
+        )
         self.assertIn("результаты обучения", page.history_text.accessibleDescription())
+        self.assertEqual(
+            page.history_text.property("screenReaderStateText"),
+            "История рейтингов стратегий: история появится после обучения",
+        )
 
     def test_status_card_exposes_status_as_screen_reader_state(self) -> None:
         def create_card(title: str):

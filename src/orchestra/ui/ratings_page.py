@@ -413,6 +413,7 @@ class OrchestraRatingsPage(BasePage):
             name="История рейтингов стратегий",
             description="Здесь показаны результаты обучения оркестратора по доменам и стратегиям.",
         )
+        set_state_text(self.history_text, "История рейтингов стратегий: история появится после обучения")
         self._set_stats_text(self.stats_label.text())
 
     def _set_stats_text(self, text: str) -> None:
