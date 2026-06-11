@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ui.accessibility import set_accessible_description, set_state_text
+from ui.accessibility import set_accessible_description, set_control_accessibility, set_state_text
 
 
 def _current_widget_text(widget) -> str | None:
@@ -22,6 +22,12 @@ def set_text_if_changed(widget, text: str) -> bool:
         return False
     widget.setText(next_text)
     return True
+
+
+def set_button_text_accessibility(button, text: str, *, description: str) -> bool:
+    changed = set_text_if_changed(button, text)
+    set_control_accessibility(button, name=str(text or ""), description=description)
+    return changed
 
 
 def _current_widget_visible(widget) -> bool | None:

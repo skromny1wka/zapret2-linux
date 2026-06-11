@@ -11,6 +11,77 @@ from PyQt6.QtWidgets import QApplication, QWidget
 from qfluentwidgets import CaptionLabel, IndeterminateProgressBar, PrimaryPushButton, PushButton
 
 
+class _ButtonTarget:
+    def __init__(self) -> None:
+        self._text = ""
+        self._accessible_name = ""
+        self._accessible_description = ""
+
+    def text(self) -> str:
+        return self._text
+
+    def setText(self, text: str) -> None:  # noqa: N802
+        self._text = str(text)
+
+    def accessibleName(self) -> str:  # noqa: N802
+        return self._accessible_name
+
+    def setAccessibleName(self, text: str) -> None:  # noqa: N802
+        self._accessible_name = str(text)
+
+    def accessibleDescription(self) -> str:  # noqa: N802
+        return self._accessible_description
+
+    def setAccessibleDescription(self, text: str) -> None:  # noqa: N802
+        self._accessible_description = str(text)
+
+
+class _TitleLabel:
+    def __init__(self) -> None:
+        self.text = ""
+
+    def setText(self, text: str) -> None:  # noqa: N802
+        self.text = str(text)
+
+
+class _CardTarget:
+    def __init__(self) -> None:
+        self.titleLabel = _TitleLabel()
+        self.button = _ButtonTarget()
+
+    def setTitle(self, text: str) -> None:  # noqa: N802
+        self.title = str(text)
+
+    def setContent(self, text: str) -> None:  # noqa: N802
+        self.content = str(text)
+
+
+class _ToggleTarget:
+    def set_texts(self, _title: str, _description: str) -> None:
+        pass
+
+
+def _language_refresh_kwargs() -> dict[str, object]:
+    return {
+        "language": "ru",
+        "program_settings_card": _CardTarget(),
+        "auto_dpi_toggle": _ToggleTarget(),
+        "gui_autostart_toggle": _ToggleTarget(),
+        "hide_to_tray_toggle": _ToggleTarget(),
+        "defender_toggle": _ToggleTarget(),
+        "max_block_toggle": _ToggleTarget(),
+        "test_card": _CardTarget(),
+        "internet_cleanup_card": _CardTarget(),
+        "folder_card": _CardTarget(),
+        "docs_card": _CardTarget(),
+        "additional_settings_card": _CardTarget(),
+        "additional_settings_notice": _TitleLabel(),
+        "discord_restart_toggle": _ToggleTarget(),
+        "wssize_toggle": _ToggleTarget(),
+        "debug_log_toggle": _ToggleTarget(),
+    }
+
+
 class ControlAccessibilityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -75,6 +146,43 @@ class ControlAccessibilityTests(unittest.TestCase):
             )
 
         get_icon.assert_called_once_with("fa5s.stop")
+
+    def test_winws1_language_refresh_updates_control_button_screen_reader_names(self) -> None:
+        from presets.ui.control.zapret1.runtime_helpers import apply_winws1_pages_language
+
+        start_btn = _ButtonTarget()
+        stop_btn = _ButtonTarget()
+        stop_exit_btn = _ButtonTarget()
+
+        apply_winws1_pages_language(
+            **_language_refresh_kwargs(),
+            start_btn=start_btn,
+            stop_winws_btn=stop_btn,
+            stop_and_exit_btn=stop_exit_btn,
+            refresh_preset_name=lambda: None,
+            get_current_dpi_runtime_state=lambda: ("stopped", ""),
+            update_status=lambda _phase, _last_error: None,
+        )
+
+        self.assertEqual(start_btn.accessibleName(), "Запустить Zapret")
+        self.assertEqual(stop_btn.accessibleName(), "Остановить winws.exe")
+        self.assertEqual(stop_exit_btn.accessibleName(), "Остановить и закрыть")
+
+    def test_winws2_language_refresh_updates_control_button_screen_reader_names(self) -> None:
+        from presets.ui.control.zapret2.runtime_helpers import apply_profile_language
+
+        start_btn = _ButtonTarget()
+        stop_exit_btn = _ButtonTarget()
+
+        apply_profile_language(
+            **_language_refresh_kwargs(),
+            start_btn=start_btn,
+            stop_and_exit_btn=stop_exit_btn,
+            update_stop_button_text=lambda: None,
+        )
+
+        self.assertEqual(start_btn.accessibleName(), "Запустить Zapret")
+        self.assertEqual(stop_exit_btn.accessibleName(), "Остановить и закрыть программу")
 
 
 if __name__ == "__main__":

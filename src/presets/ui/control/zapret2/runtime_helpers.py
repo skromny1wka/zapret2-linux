@@ -6,6 +6,7 @@ from app.ui_texts import tr as tr_catalog
 from presets.ui.control.control_page_runtime_shared import (
     apply_program_settings_toggles,
     apply_status_plan as apply_status_plan_shared,
+    set_button_text_accessibility,
     set_toggle_checked,
 )
 
@@ -73,8 +74,16 @@ def apply_profile_language(
     debug_log_toggle,
     update_stop_button_text,
 ) -> None:
-    start_btn.setText(tr_catalog("page.winws2_control.button.start", language=language, default="Запустить Zapret"))
-    stop_and_exit_btn.setText(tr_catalog("page.winws2_control.button.stop_and_exit", language=language, default="Остановить и закрыть программу"))
+    set_button_text_accessibility(
+        start_btn,
+        tr_catalog("page.winws2_control.button.start", language=language, default="Запустить Zapret"),
+        description="Запускает обход блокировок в выбранном режиме.",
+    )
+    set_button_text_accessibility(
+        stop_and_exit_btn,
+        tr_catalog("page.winws2_control.button.stop_and_exit", language=language, default="Остановить и закрыть программу"),
+        description="Останавливает обход блокировок и закрывает программу.",
+    )
     if additional_settings_notice is not None:
         additional_settings_notice.setText(
             tr_catalog("page.winws2_control.advanced.warning", language=language, default="Изменяйте только если знаете что делаете")

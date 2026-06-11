@@ -29,6 +29,7 @@ from presets.ui.control.control_page_shared import (
 )
 from presets.ui.control.control_page_runtime_shared import (
     apply_last_status_message,
+    set_button_text_accessibility,
     set_enabled_if_changed,
     set_loading_status_accessibility,
     set_progress_active_if_changed,
@@ -789,7 +790,11 @@ class Zapret2ModeControlPage(ControlPageWindowsFeatureMixin, ControlPageActionMi
 
     def _update_stop_winws_button_text(self):
         plan = _zapret2_page_runtime().build_stop_button_plan(language=self._ui_language)
-        set_text_if_changed(self.stop_winws_btn, plan.text)
+        set_button_text_accessibility(
+            self.stop_winws_btn,
+            plan.text,
+            description="Останавливает запущенный процесс обхода блокировок.",
+        )
 
     def set_loading(self, loading: bool, text: str = ""):
         set_progress_active_if_changed(self.progress_bar, loading)
