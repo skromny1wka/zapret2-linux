@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from PyQt6.QtCore import QModelIndex, QRect, QSize, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QFontMetrics, QPainter, QTextCursor
+from PyQt6.QtCore import QModelIndex, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QAction, QFontMetrics, QPainter, QTextCursor
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QAbstractScrollArea,
@@ -40,6 +40,7 @@ from qfluentwidgets import (
     ComboBox,
     InfoBar,
     LineEdit,
+    MenuAnimationType,
     MessageBox,
     PlainTextEdit,
     FluentIcon,
@@ -339,6 +340,54 @@ class CompactDisplayComboBox(ComboBox):
     def setCurrentIndex(self, index: int):  # noqa: N802
         super().setCurrentIndex(index)
         self._sync_compact_text()
+
+    def setItemAccessibleText(self, index: int, text: str) -> None:  # noqa: N802
+        if 0 <= int(index) < len(self.items):
+            setattr(self.items[int(index)], "accessibleText", str(text or "").strip())
+
+    def _create_accessible_combo_menu(self):
+        menu = self._createComboMenu()
+        for index, item in enumerate(self.items):
+            action = QAction(item.icon, item.text, triggered=lambda _checked=False, row=index: self._onItemClicked(row))
+            action.setEnabled(item.isEnabled)
+            menu.addAction(action)
+            accessible_text = str(getattr(item, "accessibleText", "") or "").strip()
+            menu_item = action.property("item")
+            if accessible_text and menu_item is not None:
+                menu_item.setData(Qt.ItemDataRole.AccessibleTextRole, accessible_text)
+                menu_item.setData(Qt.ItemDataRole.AccessibleDescriptionRole, accessible_text)
+        return menu
+
+    def _showComboMenu(self) -> None:
+        if not self.items:
+            return
+
+        menu = self._create_accessible_combo_menu()
+        if menu.view.width() < self.width():
+            menu.view.setMinimumWidth(self.width())
+            menu.adjustSize()
+
+        menu.setMaxVisibleItems(self.maxVisibleItems())
+        menu.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        menu.closedSignal.connect(self._onDropMenuClosed)
+        self.dropMenu = menu
+
+        if self.currentIndex() >= 0 and self.items:
+            menu.setDefaultAction(menu.actions()[self.currentIndex()])
+
+        x = -menu.width() // 2 + menu.layout().contentsMargins().left() + self.width() // 2
+        down_pos = self.mapToGlobal(QPoint(x, self.height()))
+        down_height = menu.view.heightForAnimation(down_pos, MenuAnimationType.DROP_DOWN)
+
+        up_pos = self.mapToGlobal(QPoint(x, 0))
+        up_height = menu.view.heightForAnimation(up_pos, MenuAnimationType.PULL_UP)
+
+        if down_height >= up_height:
+            menu.view.adjustSize(down_pos, MenuAnimationType.DROP_DOWN)
+            menu.exec(down_pos, aniType=MenuAnimationType.DROP_DOWN)
+        else:
+            menu.view.adjustSize(up_pos, MenuAnimationType.PULL_UP)
+            menu.exec(up_pos, aniType=MenuAnimationType.PULL_UP)
 
     def _sync_compact_text(self) -> None:
         index = self.currentIndex()
@@ -893,6 +942,32 @@ def _strategy_branch_label(branch) -> str:
     if out_range != "a":
         parts.append(f"out: {out_range}")
     return f"{' · '.join(parts)} — {strategy_name}"
+
+
+def _strategy_branch_accessible_text(label: str, *, selected: bool) -> str:
+    state = "выбрана" if selected else "не выбрана"
+    return f"Ветка готовой стратегии: {str(label or '').strip()}, {state}"
+
+
+def _sync_strategy_branch_combo_items_accessibility(combo) -> None:
+    if combo is None:
+        return
+    try:
+        current_index = int(combo.currentIndex())
+        count = int(combo.count())
+    except Exception:
+        return
+    set_item_accessible_text = getattr(combo, "setItemAccessibleText", None)
+    if not callable(set_item_accessible_text):
+        return
+    for index in range(count):
+        try:
+            label = str(combo.itemText(index) or "").strip()
+        except Exception:
+            label = ""
+        if not label:
+            continue
+        set_item_accessible_text(index, _strategy_branch_accessible_text(label, selected=index == current_index))
 
 
 def _join_accessible_options(labels: list[str]) -> str:
@@ -1479,7 +1554,7 @@ class ProfileSetupPageBase(BasePage):
         branch_layout.setContentsMargins(0, 0, 0, 0)
         branch_layout.setSpacing(8)
         branch_layout.addWidget(BodyLabel("Ветка"))
-        self._strategy_branch_combo = ComboBox()
+        self._strategy_branch_combo = CompactDisplayComboBox()
         self._strategy_branch_combo.setMinimumWidth(260)
         self._strategy_branch_combo.currentIndexChanged.connect(self._on_strategy_branch_changed)
         self._strategy_branch_combo.currentIndexChanged.connect(self._update_profile_setup_accessibility)
@@ -1549,6 +1624,7 @@ class ProfileSetupPageBase(BasePage):
             name="Ветка готовой стратегии",
             description="Выберите ветку готовой стратегии для этого profile.",
         )
+        _sync_strategy_branch_combo_items_accessibility(self.__dict__.get("_strategy_branch_combo"))
         self._update_strategy_tabs_accessibility()
 
     def _strategy_tab_accessible_labels(self) -> dict[str, str]:
@@ -2956,12 +3032,12 @@ class ProfileSetupPageBase(BasePage):
                 selected_index = index
         combo.blockSignals(True)
         try:
-            if _update_strategy_branch_combo_in_place(combo, branch_rows, selected_index):
-                return
-            combo.clear()
-            for branch_id, label in branch_rows:
-                combo.addItem(label, userData=branch_id)
-            combo.setCurrentIndex(selected_index)
+            if not _update_strategy_branch_combo_in_place(combo, branch_rows, selected_index):
+                combo.clear()
+                for branch_id, label in branch_rows:
+                    combo.addItem(label, userData=branch_id)
+                combo.setCurrentIndex(selected_index)
+            _sync_strategy_branch_combo_items_accessibility(combo)
         finally:
             combo.blockSignals(False)
         self._update_profile_setup_accessibility()

@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
 
 from profile.ui.preset_setup_page import PresetSetupPageBase
@@ -134,6 +135,43 @@ class ProfileSetupAccessibilityTests(unittest.TestCase):
         self.assertEqual(
             page._strategy_tabs.property("screenReaderStateText"),
             "Разделы profile, выбрано: Когда применяется",
+        )
+
+    def test_strategy_branch_combo_options_are_named_for_screen_reader(self) -> None:
+        page = self._make_page()
+        self.addCleanup(page.deleteLater)
+        payload = SimpleNamespace(
+            current_strategy_branch_id="branch:2",
+            strategy_branches=(
+                SimpleNamespace(
+                    branch_id="branch:1",
+                    payload="tls",
+                    in_range="",
+                    out_range="",
+                    strategy_name="TLS fake",
+                ),
+                SimpleNamespace(
+                    branch_id="branch:2",
+                    payload="http",
+                    in_range="",
+                    out_range="",
+                    strategy_name="HTTP fake",
+                ),
+            ),
+        )
+
+        page._apply_strategy_branch_selector(payload)
+        create_menu = getattr(page._strategy_branch_combo, "_create_accessible_combo_menu", None)
+        self.assertIsNotNone(create_menu)
+        menu = create_menu()
+
+        self.assertEqual(
+            menu.view.item(0).data(Qt.ItemDataRole.AccessibleTextRole),
+            "Ветка готовой стратегии: payload: tls — TLS fake, не выбрана",
+        )
+        self.assertEqual(
+            menu.view.item(1).data(Qt.ItemDataRole.AccessibleTextRole),
+            "Ветка готовой стратегии: payload: http — HTTP fake, выбрана",
         )
 
     def test_delete_user_profile_dialog_buttons_are_named_for_screen_reader(self) -> None:
