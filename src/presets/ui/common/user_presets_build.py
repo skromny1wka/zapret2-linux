@@ -202,6 +202,7 @@ def build_user_presets_page_shell(
     presets_list.item_dropped.connect(on_item_dropped)
     presets_list.preset_context_requested.connect(on_preset_context_requested)
     presets_list.folder_context_requested.connect(on_folder_context_requested)
+    presets_list.folder_toggle_requested.connect(lambda folder_key: on_preset_list_action("toggle_folder", folder_key))
     presets_list.background_context_requested.connect(on_background_context_requested)
     presets_list.setDragEnabled(True)
     presets_list.setAcceptDrops(True)

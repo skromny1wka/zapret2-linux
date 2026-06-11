@@ -73,7 +73,8 @@ def apply_user_presets_accessibility(
         description=tr_fn(
             f"{tr_prefix}.list.accessible_description",
             (
-                "Стрелки выбирают пресет, Enter делает выбранный пресет активным, "
+                "Стрелки выбирают пресет или папку, "
+                "Enter активирует пресет или сворачивает и разворачивает папку, "
                 "PageUp и PageDown перемещают пресет, клавиша меню открывает действия"
             ),
         ),

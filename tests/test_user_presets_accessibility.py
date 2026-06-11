@@ -31,7 +31,7 @@ class UserPresetsAccessibilityTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls._app = QApplication.instance() or QApplication([])
 
-    def _build_widgets(self):
+    def _build_widgets(self, *, on_preset_list_action=None):
         parent = _PageHost()
         widgets = build_user_presets_page_shell(
             parent=parent,
@@ -59,7 +59,7 @@ class UserPresetsAccessibilityTests(unittest.TestCase):
             on_preset_context_requested=lambda *_args: None,
             on_folder_context_requested=lambda *_args: None,
             on_background_context_requested=lambda *_args: None,
-            on_preset_list_action=lambda *_args: None,
+            on_preset_list_action=on_preset_list_action or (lambda *_args: None),
             ui_language="ru",
         )
         return parent, widgets
@@ -131,6 +131,57 @@ class UserPresetsAccessibilityTests(unittest.TestCase):
         self.assertTrue(event.isAccepted())
         self.assertEqual(requested, ["Default.txt"])
 
+    def test_preset_list_toggles_selected_folder_from_keyboard(self) -> None:
+        from ui.presets_menu.model import PresetListModel
+        from ui.presets_menu.view import LinkedWheelListView
+
+        model = PresetListModel()
+        model.set_rows(
+            [
+                {
+                    "kind": "folder",
+                    "name": "Игры",
+                    "folder_key": "games",
+                    "count": 2,
+                    "is_collapsed": True,
+                }
+            ]
+        )
+        view = LinkedWheelListView()
+        self.addCleanup(view.deleteLater)
+        view.setModel(model)
+        view.setCurrentIndex(model.index(0, 0))
+        requested: list[str] = []
+        view.folder_toggle_requested.connect(requested.append)
+
+        event = QKeyEvent(QKeyEvent.Type.KeyPress, int(Qt.Key.Key_Return), Qt.KeyboardModifier.NoModifier)
+        view.keyPressEvent(event)
+
+        self.assertTrue(event.isAccepted())
+        self.assertEqual(requested, ["games"])
+
+    def test_preset_page_wires_keyboard_folder_toggle_to_action_handler(self) -> None:
+        requested: list[tuple[str, str]] = []
+        _parent, widgets = self._build_widgets(on_preset_list_action=lambda action, name: requested.append((action, name)))
+        widgets.presets_model.set_rows(
+            [
+                {
+                    "kind": "folder",
+                    "name": "Игры",
+                    "folder_key": "games",
+                    "count": 2,
+                    "is_collapsed": True,
+                }
+            ]
+        )
+        widgets.presets_list.setCurrentIndex(widgets.presets_model.index(0, 0))
+
+        event = QKeyEvent(QKeyEvent.Type.KeyPress, int(Qt.Key.Key_Return), Qt.KeyboardModifier.NoModifier)
+        widgets.presets_list.keyPressEvent(event)
+
+        self.assertTrue(event.isAccepted())
+        self.assertEqual(requested, [("toggle_folder", "games")])
+
     def test_create_preset_dialog_has_screen_reader_text(self) -> None:
         dialog = CreatePresetDialog([], self._dialog_parent())
         self.addCleanup(dialog.deleteLater)
@@ -189,7 +240,7 @@ class UserPresetsAccessibilityTests(unittest.TestCase):
             widgets.preset_search_input: ("Поиск пресетов", "Поиск пресетов по имени"),
             widgets.presets_list: (
                 "Список пользовательских пресетов",
-                "Стрелки выбирают пресет, Enter делает выбранный пресет активным, PageUp и PageDown перемещают пресет, клавиша меню открывает действия",
+                "Стрелки выбирают пресет или папку, Enter активирует пресет или сворачивает и разворачивает папку, PageUp и PageDown перемещают пресет, клавиша меню открывает действия",
             ),
         }
         for widget, (name, description) in expected.items():

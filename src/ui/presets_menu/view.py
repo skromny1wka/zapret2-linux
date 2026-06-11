@@ -23,6 +23,7 @@ class LinkedWheelListView(ListView):
     item_dropped = pyqtSignal(str, str, str, str, str)
     preset_context_requested = pyqtSignal(str, QPoint)
     folder_context_requested = pyqtSignal(str, QPoint)
+    folder_toggle_requested = pyqtSignal(str)
     background_context_requested = pyqtSignal(QPoint)
 
     def __init__(self, parent=None, *, draggable_kinds: set[str] | None = None):
@@ -208,6 +209,12 @@ class LinkedWheelListView(ListView):
                 name = str(index.data(PresetListModel.FileNameRole) or "")
                 if name:
                     self.preset_activated.emit(name)
+                    event.accept()
+                    return
+            if index.isValid() and str(index.data(PresetListModel.KindRole) or "") == "folder":
+                folder_key = str(index.data(PresetListModel.FolderKeyRole) or "")
+                if folder_key:
+                    self.folder_toggle_requested.emit(folder_key)
                     event.accept()
                     return
         if event.key() == Qt.Key.Key_Menu or (
