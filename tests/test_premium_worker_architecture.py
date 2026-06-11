@@ -305,6 +305,25 @@ class PremiumWorkerArchitectureTests(unittest.TestCase):
 
         page._request_open_extend_bot.assert_called_once_with()
 
+    def test_open_bot_uses_shared_latest_worker_state(self) -> None:
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        page = PremiumPage.__new__(PremiumPage)
+        page._open_bot_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+
+        init_source = inspect.getsource(PremiumPage.__init__)
+        request_source = inspect.getsource(PremiumPage._request_open_extend_bot)
+        schedule_source = inspect.getsource(PremiumPage._schedule_open_extend_bot_worker_start)
+        cleanup_source = inspect.getsource(PremiumPage.cleanup)
+
+        self.assertIsInstance(PremiumPage._open_bot_state_obj(page), LatestValueWorkerState)
+        self.assertIn("_open_bot_state", init_source)
+        self.assertNotIn("self._open_bot_pending = False", init_source)
+        self.assertNotIn("self._open_bot_start_scheduled = False", init_source)
+        self.assertIn("_open_bot_state_obj()", request_source)
+        self.assertIn("_open_bot_state_obj()", schedule_source)
+        self.assertIn("_open_bot_state_obj().reset()", cleanup_source)
+
     def test_stale_open_bot_worker_finished_does_not_restart_pending_open(self) -> None:
         import donater.ui.page as premium_page
 

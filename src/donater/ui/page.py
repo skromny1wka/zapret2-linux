@@ -116,8 +116,10 @@ class PremiumPage(BasePage):
             "has_pending_pair_code": False,
         }
         self._open_bot_runtime = OneShotWorkerRuntime()
-        self._open_bot_pending = False
-        self._open_bot_start_scheduled = False
+        self._open_bot_state = LatestValueWorkerState(
+            self._open_bot_runtime,
+            empty_value=False,
+        )
         self._device_info_runtime = OneShotWorkerRuntime()
         self._device_info_state = LatestValueWorkerState(
             self._device_info_runtime,
@@ -348,8 +350,7 @@ class PremiumPage(BasePage):
             stop_pairing_status_autopoll_fn=self._stop_pairing_status_autopoll,
             premium_action_runtime=self._premium_action_runtime,
         )
-        self._open_bot_pending = False
-        self._open_bot_start_scheduled = False
+        self._open_bot_state_obj().reset()
         self._open_bot_runtime.stop(
             blocking=False,
             warning_prefix="Premium open bot worker",
@@ -729,10 +730,11 @@ class PremiumPage(BasePage):
         return self._premium.create_open_extend_bot_worker(request_id, parent=self)
 
     def _request_open_extend_bot(self) -> None:
-        if self._open_bot_runtime.is_running() or self.__dict__.get("_open_bot_start_scheduled", False):
-            self._open_bot_pending = True
+        state = self._open_bot_state_obj()
+        if state.is_busy():
+            state.pending = True
             return
-        self._open_bot_pending = False
+        state.pending = False
         self._open_bot_runtime.start_qthread_worker(
             worker_factory=lambda request_id: self.create_open_extend_bot_worker(request_id),
             on_loaded=self._on_open_extend_bot_finished,
@@ -743,7 +745,7 @@ class PremiumPage(BasePage):
     def _on_open_extend_bot_finished(self, request_id: int, result) -> None:
         if not self._open_bot_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
             return
-        if self.__dict__.get("_open_bot_pending", False):
+        if self._open_bot_state_obj().has_pending():
             return
         if result.ok:
             return
@@ -752,34 +754,71 @@ class PremiumPage(BasePage):
     def _on_open_extend_bot_failed(self, request_id: int, error: str) -> None:
         if not self._open_bot_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
             return
-        if self.__dict__.get("_open_bot_pending", False):
+        if self._open_bot_state_obj().has_pending():
             return
         self._show_open_extend_bot_error(str(error))
 
     def _on_open_extend_bot_worker_finished(self, worker) -> None:
         if not self._is_current_worker_finish(self.__dict__.get("_open_bot_runtime"), worker):
             return
-        if self._open_bot_pending and not self._cleanup_in_progress:
-            self._open_bot_pending = False
+        if self._open_bot_state_obj().has_pending() and not self._cleanup_in_progress:
+            self._open_bot_state_obj().pending = False
             self._schedule_open_extend_bot_worker_start()
 
     def _schedule_open_extend_bot_worker_start(self) -> None:
-        if self.__dict__.get("_cleanup_in_progress", False):
-            return
-        if self.__dict__.get("_open_bot_start_scheduled", False):
-            self._open_bot_pending = True
-            return
-        self._open_bot_start_scheduled = True
-        QTimer.singleShot(0, self._run_scheduled_open_extend_bot_worker_start)
+        self._open_bot_state_obj().schedule_start(
+            QTimer.singleShot,
+            self._run_scheduled_open_extend_bot_worker_start,
+            cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+            pending_when_already_scheduled=True,
+        )
 
     def _run_scheduled_open_extend_bot_worker_start(self) -> None:
-        self._open_bot_start_scheduled = False
+        pending = bool(
+            self._open_bot_state_obj().take_pending_for_scheduled_start(
+                cleanup_in_progress=self.__dict__.get("_cleanup_in_progress", False),
+            )
+        )
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        pending = bool(self._open_bot_pending)
         self._request_open_extend_bot()
         if pending and not self.__dict__.get("_cleanup_in_progress", False):
-            self._open_bot_pending = True
+            self._open_bot_state_obj().pending = True
+
+    def _open_bot_state_obj(self) -> LatestValueWorkerState:
+        state = self.__dict__.get("_open_bot_state")
+        runtime = self.__dict__.get("_open_bot_runtime")
+        if state is None:
+            pending = bool(self.__dict__.pop("_open_bot_pending", False))
+            start_scheduled = bool(
+                self.__dict__.pop("_open_bot_start_scheduled", False)
+            )
+            state = LatestValueWorkerState(
+                runtime,
+                empty_value=False,
+                pending=pending,
+                start_scheduled=start_scheduled,
+            )
+            self.__dict__["_open_bot_state"] = state
+        elif getattr(state, "runtime", None) is None and runtime is not None:
+            state.runtime = runtime
+        return state
+
+    @property
+    def _open_bot_pending(self) -> bool:
+        return bool(self._open_bot_state_obj().pending)
+
+    @_open_bot_pending.setter
+    def _open_bot_pending(self, value: bool) -> None:
+        self._open_bot_state_obj().pending = bool(value)
+
+    @property
+    def _open_bot_start_scheduled(self) -> bool:
+        return bool(self._open_bot_state_obj().start_scheduled)
+
+    @_open_bot_start_scheduled.setter
+    def _open_bot_start_scheduled(self, value: bool) -> None:
+        self._open_bot_state_obj().start_scheduled = bool(value)
 
     def _show_open_extend_bot_error(self, error: str) -> None:
         if InfoBar:
