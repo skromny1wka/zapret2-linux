@@ -20,6 +20,15 @@ class BasePageLayoutContractTests(unittest.TestCase):
         self.assertIn("_sync_content_width_to_viewport", resize)
         self.assertIn("_sync_content_width_to_viewport", show)
 
+    def test_base_page_show_event_logs_internal_timing_steps(self) -> None:
+        show = inspect.getsource(BasePage.showEvent)
+
+        self.assertIn("_log_show_step_timing", show)
+        self.assertIn("show.event.sync_width", show)
+        self.assertIn("show.event.ready_callbacks", show)
+        self.assertIn("show.event.schedule_activation", show)
+        self.assertIn("show.event.theme_flush", show)
+
 
 if __name__ == "__main__":
     unittest.main()

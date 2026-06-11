@@ -275,16 +275,32 @@ class BasePage(_FluentScrollArea):
         except Exception:
             pass
 
+    def _log_show_step_timing(self, stage: str, started_at: float, *, threshold_ms: int = 15) -> None:
+        elapsed_ms = (_time.perf_counter() - started_at) * 1000
+        if elapsed_ms < int(threshold_ms):
+            return
+        log_page_metric(self._page_label(), stage, elapsed_ms)
+
     def showEvent(self, event):  # noqa: N802 (Qt override)
         super().showEvent(event)
+        step_started_at = _time.perf_counter()
         self._sync_content_width_to_viewport()
+        self._log_show_step_timing("show.event.sync_width", step_started_at)
         is_spontaneous = bool(event is not None and event.spontaneous())
         if is_spontaneous:
+            step_started_at = _time.perf_counter()
             self._flush_page_theme_refresh()
+            self._log_show_step_timing("show.event.theme_flush", step_started_at)
             return
+        step_started_at = _time.perf_counter()
         self._flush_ready_callbacks()
+        self._log_show_step_timing("show.event.ready_callbacks", step_started_at)
+        step_started_at = _time.perf_counter()
         self._schedule_activation()
+        self._log_show_step_timing("show.event.schedule_activation", step_started_at)
+        step_started_at = _time.perf_counter()
         self._flush_page_theme_refresh()
+        self._log_show_step_timing("show.event.theme_flush", step_started_at)
 
     def resizeEvent(self, event):  # noqa: N802 (Qt override)
         super().resizeEvent(event)
