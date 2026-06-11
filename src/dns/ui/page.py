@@ -991,7 +991,13 @@ class NetworkPage(BasePage):
 
     def _on_force_dns_action_clicked(self) -> None:
         enabled = not bool(self._force_dns_active)
-        self._update_force_dns_status(enabled, self._force_dns_action_description_key(enabled))
+        if not self._confirm_action(
+            self._force_dns_action_button_key(enabled),
+            self._force_dns_action_button_default(enabled),
+            self._force_dns_action_confirm_key(enabled),
+            self._force_dns_action_description_for_request(enabled),
+        ):
+            return
         self._on_force_dns_toggled(enabled)
 
     def create_force_dns_action_worker(self, request_id: int, *, action: str, enabled=None, adapters=None):
@@ -1074,11 +1080,19 @@ class NetworkPage(BasePage):
             )
         self._force_dns_active = bool(plan.force_dns_active)
         self._set_force_dns_toggle(bool(plan.final_checked))
+        details_key = plan.details_key
+        details_fallback = str(plan.details_fallback or "")
+        if details_key in {
+            "page.network.force_dns.action.enable.description",
+            "page.network.force_dns.action.disable.description",
+        }:
+            details_key = None
+            details_fallback = ""
         self._update_force_dns_status(
             bool(plan.force_dns_active),
-            plan.details_key,
+            details_key,
             details_kwargs=dict(plan.details_kwargs or {}),
-            details_fallback=str(plan.details_fallback or ""),
+            details_fallback=details_fallback,
         )
         self._update_dns_selection_state()
         dns_info = data.get("dns_info")
@@ -1111,10 +1125,10 @@ class NetworkPage(BasePage):
             )
             self._selected_provider = None
 
-        self._update_force_dns_status(
-            bool(result_plan.force_dns_active),
-            result_plan.status_details_key,
-        )
+        status_details_key = result_plan.status_details_key
+        if status_details_key == "page.network.force_dns.action.reset.description":
+            status_details_key = None
+        self._update_force_dns_status(bool(result_plan.force_dns_active), status_details_key)
         self._update_dns_selection_state()
         dns_info = data.get("dns_info")
         if isinstance(dns_info, dict):
@@ -1480,10 +1494,35 @@ class NetworkPage(BasePage):
             return self._tr("page.network.force_dns.action.disable.button", "Выключить принудительный DNS")
         return self._tr("page.network.force_dns.action.enable.button", "Включить принудительный DNS")
 
+    def _force_dns_action_button_key(self, enabled: bool) -> str:
+        if enabled:
+            return "page.network.force_dns.action.enable.button"
+        return "page.network.force_dns.action.disable.button"
+
+    def _force_dns_action_button_default(self, enabled: bool) -> str:
+        if enabled:
+            return "Включить принудительный DNS"
+        return "Выключить принудительный DNS"
+
+    def _force_dns_action_confirm_key(self, enabled: bool) -> str:
+        if enabled:
+            return "page.network.force_dns.action.enable.confirm"
+        return "page.network.force_dns.action.disable.confirm"
+
     def _force_dns_action_description_key(self, enabled: bool) -> str:
         if enabled:
             return "page.network.force_dns.action.enable.description"
         return "page.network.force_dns.action.disable.description"
+
+    def _force_dns_action_description_for_request(self, enabled: bool) -> str:
+        return self._tr(
+            self._force_dns_action_description_key(enabled),
+            (
+                "Программа пропишет DNS-серверы для обхода блокировок. Это поможет, если провайдер подменяет DNS."
+                if enabled
+                else "Программа уберёт принудительные DNS и вернёт обычный режим."
+            ),
+        )
 
     def _force_dns_action_description(self, active: bool) -> str:
         if active:
@@ -1576,10 +1615,9 @@ class NetworkPage(BasePage):
             "page.network.force_dns.reset.button",
             "Вернуть DNS автоматически",
             "page.network.force_dns.reset.confirm",
-            "Отключить Force DNS и сбросить DNS на DHCP для всех адаптеров?",
+            "DNS будет снова получаться автоматически от роутера или провайдера через DHCP. Это полезно, если интернет работает нестабильно после ручной настройки DNS.",
         ):
             return
-        self._update_force_dns_status(False, "page.network.force_dns.action.reset.description")
         self._reset_dns_to_dhcp()
 
     def _test_connection(self):

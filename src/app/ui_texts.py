@@ -1613,9 +1613,17 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Программа пропишет DNS-серверы для обхода блокировок. Это поможет, если провайдер подменяет DNS.",
         "en": "The app will set DNS servers for bypassing blocks. This helps when the provider tampers with DNS.",
     },
+    "page.network.force_dns.action.enable.confirm": {
+        "ru": "Программа пропишет DNS-серверы ZapretGUI на выбранных сетевых адаптерах. Это может помочь, если провайдер подменяет ответы DNS и сайты открываются неправильно. Продолжить?",
+        "en": "The app will set ZapretGUI DNS servers on the selected network adapters. This may help when the provider tampers with DNS answers and sites open incorrectly. Continue?",
+    },
     "page.network.force_dns.action.disable.description": {
         "ru": "Программа уберёт принудительные DNS и вернёт обычный режим.",
         "en": "The app will remove forced DNS and return to the normal mode.",
+    },
+    "page.network.force_dns.action.disable.confirm": {
+        "ru": "Программа перестанет принудительно держать свои DNS-серверы на сетевых адаптерах. Выбор DNS снова станет обычным, но уже прописанные адреса могут остаться до следующей настройки. Продолжить?",
+        "en": "The app will stop forcing its DNS servers on the network adapters. DNS selection will return to normal, but already applied addresses may remain until the next DNS setup. Continue?",
     },
     "page.network.force_dns.action.reset.description": {
         "ru": "DNS будет снова получаться автоматически от роутера или провайдера через DHCP. Это полезно, если интернет работает нестабильно после ручной настройки DNS.",
@@ -1626,8 +1634,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Restore automatic DNS",
     },
     "page.network.force_dns.reset.confirm": {
-        "ru": "Отключить Force DNS и сбросить DNS на DHCP для всех адаптеров?",
-        "en": "Disable Force DNS and reset DNS to DHCP for all adapters?",
+        "ru": "Программа отключит принудительный DNS и вернёт автоматическое получение DNS через DHCP для всех адаптеров. DHCP — это обычный режим, когда DNS выдаёт роутер или провайдер. Продолжить?",
+        "en": "The app will disable forced DNS and restore automatic DNS through DHCP for all adapters. DHCP is the normal mode where DNS is provided by the router or provider. Continue?",
     },
     "page.network.force_dns.status.details.enable_failed": {
         "ru": "Не удалось включить",

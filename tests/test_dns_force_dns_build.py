@@ -81,6 +81,7 @@ class ForceDnsBuildTests(unittest.TestCase):
 
         self.assertEqual(widgets.force_button.text(), "Включить принудительный DNS")
         self.assertEqual(widgets.reset_button.text(), "Вернуть DNS автоматически")
+        self.assertEqual(widgets.card.actions_layout.count(), 2)
         self.assertFalse(hasattr(widgets, "toggle"))
 
     def test_force_dns_action_button_text_reflects_active_state(self) -> None:

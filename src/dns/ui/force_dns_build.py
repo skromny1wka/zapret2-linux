@@ -99,7 +99,6 @@ def build_force_dns_card_ui(
     force_dns_status_label.setVisible(False)
 
     force_dns_card.add_buttons((force_dns_btn, force_dns_reset_dhcp_btn))
-    force_dns_card.actions_layout.addWidget(force_dns_status_label)
 
     add_widget_fn(force_dns_card)
 

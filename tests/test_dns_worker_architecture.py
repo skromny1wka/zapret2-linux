@@ -330,6 +330,61 @@ class DnsWorkerArchitectureTests(unittest.TestCase):
         page._start_force_dns_action_worker.assert_not_called()
         self.assertEqual(page._force_dns_action_pending, [{"action": "toggle", "enabled": True}])
 
+    def test_force_dns_action_click_requires_confirmation_before_worker_request(self) -> None:
+        page = NetworkPage.__new__(NetworkPage)
+        page._force_dns_active = False
+        page._confirm_action = Mock(return_value=True)
+        page._on_force_dns_toggled = Mock()
+        page._update_force_dns_status = Mock()
+        page._tr = Mock(side_effect=lambda _key, default: default)
+
+        NetworkPage._on_force_dns_action_clicked(page)
+
+        page._confirm_action.assert_called_once_with(
+            "page.network.force_dns.action.enable.button",
+            "Включить принудительный DNS",
+            "page.network.force_dns.action.enable.confirm",
+            "Программа пропишет DNS-серверы для обхода блокировок. Это поможет, если провайдер подменяет DNS.",
+        )
+        page._on_force_dns_toggled.assert_called_once_with(True)
+        page._update_force_dns_status.assert_not_called()
+
+    def test_force_dns_action_click_stops_when_confirmation_is_cancelled(self) -> None:
+        page = NetworkPage.__new__(NetworkPage)
+        page._force_dns_active = True
+        page._confirm_action = Mock(return_value=False)
+        page._on_force_dns_toggled = Mock()
+        page._update_force_dns_status = Mock()
+        page._tr = Mock(side_effect=lambda _key, default: default)
+
+        NetworkPage._on_force_dns_action_clicked(page)
+
+        page._confirm_action.assert_called_once_with(
+            "page.network.force_dns.action.disable.button",
+            "Выключить принудительный DNS",
+            "page.network.force_dns.action.disable.confirm",
+            "Программа уберёт принудительные DNS и вернёт обычный режим.",
+        )
+        page._on_force_dns_toggled.assert_not_called()
+        page._update_force_dns_status.assert_not_called()
+
+    def test_reset_dns_confirmation_uses_detailed_dialog_without_inline_status(self) -> None:
+        page = NetworkPage.__new__(NetworkPage)
+        page._confirm_action = Mock(return_value=True)
+        page._reset_dns_to_dhcp = Mock()
+        page._update_force_dns_status = Mock()
+
+        NetworkPage._confirm_reset_dns_to_dhcp(page)
+
+        page._confirm_action.assert_called_once_with(
+            "page.network.force_dns.reset.button",
+            "Вернуть DNS автоматически",
+            "page.network.force_dns.reset.confirm",
+            "DNS будет снова получаться автоматически от роутера или провайдера через DHCP. Это полезно, если интернет работает нестабильно после ручной настройки DNS.",
+        )
+        page._reset_dns_to_dhcp.assert_called_once_with()
+        page._update_force_dns_status.assert_not_called()
+
     def test_force_dns_restarts_after_dns_apply_worker_finished(self) -> None:
         class _Runtime:
             request_id = 1
