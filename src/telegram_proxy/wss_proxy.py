@@ -1704,25 +1704,6 @@ class TelegramWSProxy:
         """
         media_tag = " media" if is_media else ""
 
-        if (
-            int(dc or 0) > 0
-            and int(dc or 0) not in WSS_DOMAINS
-            and should_route_upstream(self._upstream, mode="fallback")
-        ):
-            self._log(f"[{label}] DC{dc}{media_tag} no WSS relay -> upstream proxy")
-            self._record_route(
-                dc=dc,
-                is_media=is_media,
-                route="TCP",
-                status="пропуск",
-                reason="для этого DC нет WSS relay",
-            )
-            await self._upstream_proxy_connect(
-                client_reader, client_writer,
-                target_host, target_port, init, label, dc, is_media,
-            )
-            return
-
         # If this DC is known-blocked and upstream is available, use upstream
         if ((dc, is_media) in self._dc_upstream_required
                 and should_route_upstream(self._upstream, mode="fallback")):
