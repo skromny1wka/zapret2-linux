@@ -16,6 +16,42 @@ from PyQt6.QtWidgets import QApplication
 from profile.state import ProfileListItem
 
 
+class _Breadcrumb:
+    def __init__(self) -> None:
+        self.items: list[tuple[str, str]] = []
+        self.block_calls: list[bool] = []
+        self._accessible_name = ""
+        self._accessible_description = ""
+        self._properties = {}
+
+    def blockSignals(self, blocked: bool) -> None:  # noqa: N802
+        self.block_calls.append(bool(blocked))
+
+    def clear(self) -> None:
+        self.items.clear()
+
+    def addItem(self, key: str, text: str) -> None:  # noqa: N802
+        self.items.append((str(key), str(text)))
+
+    def accessibleName(self) -> str:  # noqa: N802
+        return self._accessible_name
+
+    def setAccessibleName(self, text: str) -> None:  # noqa: N802
+        self._accessible_name = str(text)
+
+    def accessibleDescription(self) -> str:  # noqa: N802
+        return self._accessible_description
+
+    def setAccessibleDescription(self, text: str) -> None:  # noqa: N802
+        self._accessible_description = str(text)
+
+    def property(self, name: str):  # noqa: A003
+        return self._properties.get(str(name))
+
+    def setProperty(self, name: str, value) -> None:  # noqa: N802
+        self._properties[str(name)] = value
+
+
 def _item(name: str, *, key: str, in_preset: bool = True, profile_index: int = 0) -> ProfileListItem:
     return ProfileListItem(
         key=key,
@@ -1084,6 +1120,29 @@ class ProfileOrderPageTests(unittest.TestCase):
         self.assertIn('"order"', breadcrumb_source)
         self.assertIn("_open_profiles()", handler_source)
         self.assertIn("_open_root()", handler_source)
+
+    def test_order_page_breadcrumb_exposes_screen_reader_path(self) -> None:
+        from profile.ui.profile_order_page import ProfileOrderPageBase
+
+        breadcrumb = _Breadcrumb()
+        page = SimpleNamespace(
+            _breadcrumb=breadcrumb,
+            control_key="missing.control.key",
+            profiles_key="missing.profiles.key",
+            profiles_default="Настройка пресета",
+            _ui_language="ru",
+        )
+
+        ProfileOrderPageBase._rebuild_breadcrumb(page)
+
+        self.assertEqual(
+            breadcrumb.property("screenReaderStateText"),
+            "Навигация: Управление > Настройка пресета > Порядок в пресете",
+        )
+        self.assertEqual(
+            breadcrumb.accessibleDescription(),
+            "Показывает путь до текущей страницы. Выберите пункт, чтобы вернуться назад.",
+        )
 
     def test_order_list_does_not_expose_context_or_folder_actions(self) -> None:
         from profile.ui.profile_order_list import ProfileOrderList

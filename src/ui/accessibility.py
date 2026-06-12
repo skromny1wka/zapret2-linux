@@ -107,6 +107,24 @@ def set_item_accessible_text(item, text: object, *, description: object | None =
                 pass
 
 
+def set_breadcrumb_accessibility(widget, parts: object) -> None:
+    """Записывает путь навигации как обычный текст для диктора."""
+
+    if widget is None:
+        return
+    cleaned_parts = [_clean_text(part) for part in tuple(parts or ())]
+    visible_parts = [part for part in cleaned_parts if part]
+    if not visible_parts:
+        return
+    text = f"Навигация: {' > '.join(visible_parts)}"
+    set_control_accessibility(
+        widget,
+        name=text,
+        description="Показывает путь до текущей страницы. Выберите пункт, чтобы вернуться назад.",
+    )
+    set_state_text(widget, text)
+
+
 def enable_keyboard_click(widget) -> None:
     """Делает кликабельную карточку доступной через Tab, Enter и Пробел."""
 
@@ -153,6 +171,7 @@ def enable_keyboard_click(widget) -> None:
 
 __all__ = [
     "enable_keyboard_click",
+    "set_breadcrumb_accessibility",
     "set_accessible_description",
     "set_accessible_name",
     "set_control_accessibility",

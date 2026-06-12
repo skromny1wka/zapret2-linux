@@ -51,7 +51,7 @@ from qfluentwidgets import (
 )
 from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE, is_preset_launch_method, is_zapret2_launch_method
 from ui.pages.base_page import BasePage
-from ui.accessibility import set_control_accessibility, set_state_text
+from ui.accessibility import set_breadcrumb_accessibility, set_control_accessibility, set_state_text
 from ui.fluent_widgets import set_tooltip
 from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.message_box_accessibility import set_message_box_button_accessibility
@@ -2495,11 +2495,16 @@ class ProfileSetupPageBase(BasePage):
     def _rebuild_breadcrumb(self) -> None:
         self._breadcrumb.blockSignals(True)
         try:
+            breadcrumb_key = (
+                tr_catalog(self.control_key, language=self._ui_language, default="Управление"),
+                tr_catalog(self.profiles_key, language=self._ui_language, default=self.profiles_default),
+                str(getattr(getattr(self._payload, "item", None), "display_name", "") or "Профиль"),
+            )
             self._breadcrumb.clear()
-            self._breadcrumb.addItem("control", tr_catalog(self.control_key, language=self._ui_language, default="Управление"))
-            self._breadcrumb.addItem("profiles", tr_catalog(self.profiles_key, language=self._ui_language, default=self.profiles_default))
-            title = str(getattr(getattr(self._payload, "item", None), "display_name", "") or "Профиль")
-            self._breadcrumb.addItem("profile", title)
+            self._breadcrumb.addItem("control", breadcrumb_key[0])
+            self._breadcrumb.addItem("profiles", breadcrumb_key[1])
+            self._breadcrumb.addItem("profile", breadcrumb_key[2])
+            set_breadcrumb_accessibility(self._breadcrumb, breadcrumb_key)
         finally:
             self._breadcrumb.blockSignals(False)
 

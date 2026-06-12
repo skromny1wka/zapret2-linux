@@ -17,6 +17,42 @@ class _TextWidget:
         self._text = value
 
 
+class _Breadcrumb:
+    def __init__(self) -> None:
+        self.items: list[tuple[str, str]] = []
+        self.block_calls: list[bool] = []
+        self._accessible_name = ""
+        self._accessible_description = ""
+        self._properties = {}
+
+    def blockSignals(self, blocked: bool) -> None:  # noqa: N802
+        self.block_calls.append(bool(blocked))
+
+    def clear(self) -> None:
+        self.items.clear()
+
+    def addItem(self, key: str, text: str) -> None:  # noqa: N802
+        self.items.append((str(key), str(text)))
+
+    def accessibleName(self) -> str:  # noqa: N802
+        return self._accessible_name
+
+    def setAccessibleName(self, text: str) -> None:  # noqa: N802
+        self._accessible_name = str(text)
+
+    def accessibleDescription(self) -> str:  # noqa: N802
+        return self._accessible_description
+
+    def setAccessibleDescription(self, text: str) -> None:  # noqa: N802
+        self._accessible_description = str(text)
+
+    def property(self, name: str):  # noqa: A003
+        return self._properties.get(str(name))
+
+    def setProperty(self, name: str, value) -> None:  # noqa: N802
+        self._properties[str(name)] = value
+
+
 class _BoolWidget:
     def __init__(self, *, checked: bool = False, enabled: bool = True, visible: bool = True) -> None:
         self._checked = bool(checked)
@@ -809,6 +845,32 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         self.assertTrue(handled)
         self.assertTrue(event.accepted)
         self.assertEqual(activated, ["tls_fake"])
+
+    def test_profile_setup_breadcrumb_exposes_screen_reader_path(self) -> None:
+        from types import SimpleNamespace
+
+        from profile.ui.profile_setup_page import ProfileSetupPageBase
+
+        breadcrumb = _Breadcrumb()
+        page = SimpleNamespace(
+            _breadcrumb=breadcrumb,
+            control_key="missing.control.key",
+            profiles_key="missing.profiles.key",
+            profiles_default="Настройка пресета",
+            _ui_language="ru",
+            _payload=SimpleNamespace(item=SimpleNamespace(display_name="Discord")),
+        )
+
+        ProfileSetupPageBase._rebuild_breadcrumb(page)
+
+        self.assertEqual(
+            breadcrumb.property("screenReaderStateText"),
+            "Навигация: Управление > Настройка пресета > Discord",
+        )
+        self.assertEqual(
+            breadcrumb.accessibleDescription(),
+            "Показывает путь до текущей страницы. Выберите пункт, чтобы вернуться назад.",
+        )
 
     def test_strategy_list_focus_in_selects_first_row_for_keyboard(self) -> None:
         from PyQt6.QtCore import QEvent, Qt

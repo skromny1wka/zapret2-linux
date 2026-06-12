@@ -128,6 +128,9 @@ class _BreadcrumbWidget:
         self.block_calls: list[bool] = []
         self.clear_calls = 0
         self.items: list[tuple[str, str]] = []
+        self._accessible_name = ""
+        self._accessible_description = ""
+        self._properties = {}
 
     def blockSignals(self, blocked: bool) -> None:  # noqa: N802
         self.block_calls.append(bool(blocked))
@@ -138,6 +141,24 @@ class _BreadcrumbWidget:
 
     def addItem(self, key: str, text: str) -> None:  # noqa: N802
         self.items.append((str(key), str(text)))
+
+    def accessibleName(self) -> str:  # noqa: N802
+        return self._accessible_name
+
+    def setAccessibleName(self, text: str) -> None:  # noqa: N802
+        self._accessible_name = str(text)
+
+    def accessibleDescription(self) -> str:  # noqa: N802
+        return self._accessible_description
+
+    def setAccessibleDescription(self, text: str) -> None:  # noqa: N802
+        self._accessible_description = str(text)
+
+    def property(self, name: str):  # noqa: A003
+        return self._properties.get(str(name))
+
+    def setProperty(self, name: str, value) -> None:  # noqa: N802
+        self._properties[str(name)] = value
 
 
 class PresetStatusBarPlanTests(unittest.TestCase):
@@ -199,6 +220,14 @@ class PresetStatusBarPlanTests(unittest.TestCase):
                 ("list", "Мои пресеты"),
                 ("raw_preset", "Default"),
             ],
+        )
+        self.assertEqual(
+            breadcrumb.property("screenReaderStateText"),
+            "Навигация: Управление > Мои пресеты > Default",
+        )
+        self.assertEqual(
+            breadcrumb.accessibleDescription(),
+            "Показывает путь до текущей страницы. Выберите пункт, чтобы вернуться назад.",
         )
 
     def test_loaded_status_uses_success_check_and_clear_text(self) -> None:

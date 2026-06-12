@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QFi
 
 from ui.pages.base_page import BasePage
 from ui.fluent_widgets import set_tooltip, style_semantic_caption_label
-from ui.accessibility import set_control_accessibility, set_state_text
+from ui.accessibility import set_breadcrumb_accessibility, set_control_accessibility, set_state_text
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.message_box_accessibility import set_message_box_button_accessibility
@@ -595,6 +595,7 @@ class PresetRawEditorPage(BasePage):
             breadcrumb.addItem("root", breadcrumb_key[0])
             breadcrumb.addItem("list", breadcrumb_key[1])
             breadcrumb.addItem("raw_preset", breadcrumb_key[2])
+            set_breadcrumb_accessibility(breadcrumb, breadcrumb_key)
             self.__dict__["_last_breadcrumb_key"] = breadcrumb_key
         finally:
             try:

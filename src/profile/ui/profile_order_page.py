@@ -15,6 +15,7 @@ from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.pages.base_page import BasePage
 from ui.queued_worker_state import QueuedWorkerState
 from app.ui_texts import tr as tr_catalog
+from ui.accessibility import set_breadcrumb_accessibility
 
 
 ORDER_PAYLOAD_PRESET_SWITCH_RELOAD_DELAY_MS = 180
@@ -670,10 +671,16 @@ class ProfileOrderPageBase(BasePage):
             return
         self._breadcrumb.blockSignals(True)
         try:
+            breadcrumb_key = (
+                tr_catalog(self.control_key, language=self._ui_language, default="Управление"),
+                tr_catalog(self.profiles_key, language=self._ui_language, default=self.profiles_default),
+                "Порядок в пресете",
+            )
             self._breadcrumb.clear()
-            self._breadcrumb.addItem("control", tr_catalog(self.control_key, language=self._ui_language, default="Управление"))
-            self._breadcrumb.addItem("profiles", tr_catalog(self.profiles_key, language=self._ui_language, default=self.profiles_default))
-            self._breadcrumb.addItem("order", "Порядок в пресете")
+            self._breadcrumb.addItem("control", breadcrumb_key[0])
+            self._breadcrumb.addItem("profiles", breadcrumb_key[1])
+            self._breadcrumb.addItem("order", breadcrumb_key[2])
+            set_breadcrumb_accessibility(self._breadcrumb, breadcrumb_key)
         finally:
             self._breadcrumb.blockSignals(False)
 
