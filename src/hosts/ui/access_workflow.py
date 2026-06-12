@@ -5,6 +5,7 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt
 
 import hosts.page_plans as hosts_page_plans
+from ui.accessibility import set_control_accessibility, set_state_text
 
 
 def dismiss_hosts_error_bar(current_bar) -> None:
@@ -59,6 +60,19 @@ def show_hosts_access_error(
 
         restore_btn = push_button_cls(error_plan.action_text)
         restore_btn.setFixedWidth(220)
+        restore_accessible_name = tr_fn(
+            "page.hosts.restore_access.accessible_name",
+            "Восстановить права доступа к hosts",
+        )
+        set_control_accessibility(
+            restore_btn,
+            name=restore_accessible_name,
+            description=tr_fn(
+                "page.hosts.restore_access.accessible_description",
+                "Пытается вернуть программе право изменять файл hosts.",
+            ),
+        )
+        set_state_text(restore_btn, restore_accessible_name)
 
         def _on_restore():
             restore_btn.setEnabled(False)

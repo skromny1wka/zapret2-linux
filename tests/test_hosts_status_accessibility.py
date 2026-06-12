@@ -66,6 +66,65 @@ class _MessageBox:
         return False
 
 
+class _FakeSignal:
+    def connect(self, callback) -> None:
+        self.callback = callback
+
+
+class _RestoreAccessButton:
+    def __init__(self, text: str) -> None:
+        self._text = str(text)
+        self._accessible_name = ""
+        self._accessible_description = ""
+        self._properties = {}
+        self.clicked = _FakeSignal()
+
+    def text(self) -> str:
+        return self._text
+
+    def setText(self, text: str) -> None:  # noqa: N802
+        self._text = str(text)
+
+    def setFixedWidth(self, width: int) -> None:  # noqa: N802
+        self.fixed_width = int(width)
+
+    def setEnabled(self, enabled: bool) -> None:  # noqa: N802
+        self.enabled = bool(enabled)
+
+    def accessibleName(self) -> str:  # noqa: N802
+        return self._accessible_name
+
+    def setAccessibleName(self, text: str) -> None:  # noqa: N802
+        self._accessible_name = str(text)
+
+    def accessibleDescription(self) -> str:  # noqa: N802
+        return self._accessible_description
+
+    def setAccessibleDescription(self, text: str) -> None:  # noqa: N802
+        self._accessible_description = str(text)
+
+    def property(self, name: str) -> object:  # noqa: A003
+        return self._properties.get(name)
+
+    def setProperty(self, name: str, value: object) -> None:  # noqa: N802
+        self._properties[name] = value
+
+
+class _HostsInfoBar:
+    instances: list["_HostsInfoBar"] = []
+
+    def __init__(self) -> None:
+        self.widgets = []
+        _HostsInfoBar.instances.append(self)
+
+    @classmethod
+    def error(cls, **_kwargs):
+        return cls()
+
+    def addWidget(self, widget) -> None:  # noqa: N802
+        self.widgets.append(widget)
+
+
 class HostsStatusAccessibilityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -205,6 +264,33 @@ class HostsStatusAccessibilityTests(unittest.TestCase):
         self.assertTrue(event.isAccepted())
         self.assertEqual(events, [True])
         self.assertEqual(widgets.switch.accessibleName(), "Блокировка Adobe, включено")
+
+    def test_hosts_access_restore_button_is_named_for_screen_reader(self) -> None:
+        from hosts.ui.access_workflow import show_hosts_access_error
+
+        _HostsInfoBar.instances = []
+
+        bar, _last_error = show_hosts_access_error(
+            current_bar=None,
+            last_error=None,
+            message="Нет доступа",
+            tr_fn=lambda _key, default, **kwargs: default.format(**kwargs) if kwargs else default,
+            info_bar_cls=_HostsInfoBar,
+            push_button_cls=_RestoreAccessButton,
+            window=None,
+            on_restore=lambda _bar, _button: None,
+            log_warning=lambda _message: None,
+            log_debug=lambda _message: None,
+        )
+
+        self.assertIs(bar, _HostsInfoBar.instances[0])
+        restore_btn = bar.widgets[0]
+        self.assertEqual(restore_btn.accessibleName(), "Восстановить права доступа к hosts")
+        self.assertEqual(
+            restore_btn.property("screenReaderStateText"),
+            "Восстановить права доступа к hosts",
+        )
+        self.assertIn("вернуть программе право изменять файл hosts", restore_btn.accessibleDescription())
 
     def test_clear_hosts_confirmation_buttons_are_named_for_screen_reader(self) -> None:
         page = HostsPage.__new__(HostsPage)
