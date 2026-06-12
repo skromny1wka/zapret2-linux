@@ -1,7 +1,7 @@
 # ui/pages/orchestra/ratings_page.py
 """Страница истории стратегий с рейтингами (оркестратор)"""
 
-from PyQt6.QtCore import QSize, QTimer
+from PyQt6.QtCore import QEvent, QSize, Qt, QTimer
 from PyQt6.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QLabel, QWidget,
 )
@@ -120,6 +120,7 @@ class OrchestraRatingsPage(BasePage):
         self.filter_input.setClearButtonEnabled(True)
         remove_line_edit_buttons_from_tab_order(self.filter_input)
         self.filter_input.textChanged.connect(self._apply_filter)
+        self.filter_input.installEventFilter(self)
         # Styled in _apply_theme()
         filter_row.addWidget(self.filter_input, 1)
 
@@ -401,7 +402,7 @@ class OrchestraRatingsPage(BasePage):
             name="Фильтр рейтингов по домену",
             description=(
                 "Введите часть домена, чтобы оставить в истории только подходящие записи. "
-                "После ввода перейдите к истории клавишей Tab."
+                "После ввода перейдите к истории клавишей Tab или нажмите Стрелка вниз."
             ),
         )
         set_control_accessibility(
@@ -417,6 +418,20 @@ class OrchestraRatingsPage(BasePage):
         )
         set_state_text(self.history_text, "История рейтингов стратегий: история появится после обучения")
         self._set_stats_text(self.stats_label.text())
+
+    def eventFilter(self, watched, event):  # noqa: N802
+        if watched is getattr(self, "filter_input", None) and event.type() == QEvent.Type.KeyPress:
+            if event.key() == Qt.Key.Key_Down and self._focus_history_text():
+                event.accept()
+                return True
+        return super().eventFilter(watched, event)
+
+    def _focus_history_text(self) -> bool:
+        history_text = getattr(self, "history_text", None)
+        if history_text is None:
+            return False
+        history_text.setFocus(Qt.FocusReason.OtherFocusReason)
+        return True
 
     def _set_stats_text(self, text: str) -> None:
         value = str(text or "").strip()

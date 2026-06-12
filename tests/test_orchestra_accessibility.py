@@ -400,6 +400,7 @@ class OrchestraAccessibilityTests(unittest.TestCase):
 
         self.assertEqual(page.filter_input.accessibleName(), "Фильтр рейтингов по домену")
         self.assertIn("После ввода перейдите к истории клавишей Tab", page.filter_input.accessibleDescription())
+        self.assertIn("или нажмите Стрелка вниз", page.filter_input.accessibleDescription())
         self.assertEqual(page.refresh_btn.accessibleName(), "Обновить рейтинги стратегий")
         self.assertEqual(page.refresh_btn.property("screenReaderStateText"), "Обновить рейтинги стратегий")
         self.assertEqual(page.stats_label.accessibleName(), "Статистика рейтингов: Загрузка...")
@@ -412,6 +413,19 @@ class OrchestraAccessibilityTests(unittest.TestCase):
             page.history_text.property("screenReaderStateText"),
             "История рейтингов стратегий: история появится после обучения",
         )
+
+    def test_ratings_filter_arrow_down_moves_focus_to_history(self) -> None:
+        page = OrchestraRatingsPage(orchestra_feature=_OrchestraFeatureStub())
+        self.addCleanup(page.deleteLater)
+        page.show()
+        self.app.processEvents()
+        page.filter_input.setFocus()
+        self.app.processEvents()
+
+        QTest.keyClick(page.filter_input, Qt.Key.Key_Down)
+        self.app.processEvents()
+
+        self.assertIs(self.app.focusWidget(), page.history_text)
 
     def test_orchestra_search_clear_buttons_do_not_take_tab_focus(self) -> None:
         pages_and_inputs = []
