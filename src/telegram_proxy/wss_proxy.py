@@ -439,11 +439,20 @@ class TelegramWSProxy:
         prefix = "MTProxy " if mtproxy else ""
         attempted: set[tuple[str, int, str, str, bool, str, bool]] = set()
         attempt_index = 0
+        start_candidates = self._upstream_proxy_candidates()
+        skip_penalized_backups = any(
+            not self._upstream_penalty_active(endpoint)
+            for endpoint in start_candidates
+        )
         while True:
             candidates = tuple(
                 endpoint
                 for endpoint in self._upstream_proxy_candidates()
                 if self._upstream_endpoint_key(endpoint) not in attempted
+                and (
+                    not skip_penalized_backups
+                    or not self._upstream_penalty_active(endpoint)
+                )
             )
             if not candidates:
                 return None

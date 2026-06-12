@@ -1026,6 +1026,45 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(seen_hosts, ["primary.tls", "fresh.tls"])
 
+    def test_upstream_connect_does_not_retry_previously_penalized_backup_after_fresh_failure(self) -> None:
+        from telegram_proxy.proxy.routing import UpstreamProxyConfig, UpstreamProxyEndpoint
+        from telegram_proxy.wss_proxy import TelegramWSProxy
+
+        stale_endpoint = UpstreamProxyEndpoint(host="stale.tls", port=443, tls=True)
+        proxy = TelegramWSProxy(
+            upstream_config=UpstreamProxyConfig(
+                enabled=True,
+                host="fresh.tls",
+                port=443,
+                tls=True,
+                mode="always",
+                fallback_proxies=(
+                    stale_endpoint,
+                ),
+            ),
+        )
+        proxy._mark_upstream_connect_failure(stale_endpoint, "earlier", TimeoutError())
+
+        seen_hosts: list[str] = []
+
+        async def fake_connect(proxy_host, *_args, **_kwargs):
+            seen_hosts.append(proxy_host)
+            raise TimeoutError()
+
+        with patch("telegram_proxy.wss_proxy.socks5.connect_via_socks5", side_effect=fake_connect):
+            result = asyncio.run(
+                proxy._open_upstream_proxy(
+                    upstream_host="149.154.175.50",
+                    upstream_port=443,
+                    label="test",
+                    dc=3,
+                    is_media=False,
+                )
+            )
+
+        self.assertIsNone(result)
+        self.assertEqual(seen_hosts, ["fresh.tls"])
+
     def test_upstream_connect_uses_bounded_failover_timeout(self) -> None:
         from telegram_proxy.proxy.routing import UpstreamProxyConfig, UpstreamProxyEndpoint
         from telegram_proxy.wss_proxy import TelegramWSProxy
