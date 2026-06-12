@@ -34,6 +34,7 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
             patch.object(service_manager, "stop_service", return_value=True),
             patch.object(service_manager, "delete_service", return_value=True),
             patch.object(service_manager, "service_exists", return_value=True) as service_exists,
+            patch.object(service_manager, "stop_and_delete_service_sc_fallback", return_value=False),
             patch.object(service_manager.time, "sleep"),
         ):
             removed = service_manager.stop_and_delete_service("Monkey", retry_count=1)
@@ -55,6 +56,37 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
 
         self.assertTrue(removed)
         fallback.assert_called_once_with("Monkey")
+
+    def test_sc_fallback_deletes_stopped_service_registry_tree_when_scm_keeps_entry(self) -> None:
+        from utils import service_manager
+
+        completed = Mock(returncode=0, stdout="", stderr="")
+
+        with (
+            patch.object(service_manager.subprocess, "run", return_value=completed) as run,
+            patch.object(service_manager, "service_exists", return_value=True),
+            patch.object(service_manager, "stop_and_delete_service_pywin32_fallback", return_value=False),
+            patch.object(service_manager, "delete_stopped_service_registry_tree", return_value=True) as delete_registry,
+            patch.object(service_manager.time, "time", side_effect=[0, 3, 0, 3, 0, 3]),
+            patch.object(service_manager.time, "sleep"),
+        ):
+            removed = service_manager.stop_and_delete_service_sc_fallback("Monkey")
+
+        self.assertFalse(removed)
+        self.assertEqual(run.call_count, 2)
+        delete_registry.assert_called_once_with("Monkey")
+
+    def test_registry_tree_delete_skips_running_service(self) -> None:
+        from utils import service_manager
+
+        with (
+            patch.object(service_manager, "get_service_state", return_value=service_manager.SERVICE_RUNNING),
+            patch.object(service_manager, "_delete_registry_tree") as delete_tree,
+        ):
+            deleted = service_manager.delete_stopped_service_registry_tree("Monkey")
+
+        self.assertFalse(deleted)
+        delete_tree.assert_not_called()
 
     def test_service_state_query_uses_minimal_sc_manager_access(self) -> None:
         from utils import service_manager

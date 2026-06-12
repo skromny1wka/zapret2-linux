@@ -38,6 +38,22 @@ ERROR_SERVICE_DOES_NOT_EXIST = 1060
 ERROR_SERVICE_NOT_ACTIVE = 1062
 ERROR_SERVICE_MARKED_FOR_DELETE = 1072
 
+
+def _get_winapi_last_error() -> int:
+    try:
+        error_code = int(ctypes.get_last_error() or 0)
+    except Exception:
+        error_code = 0
+    if error_code:
+        return error_code
+    try:
+        if hasattr(ctypes, "windll"):
+            return int(ctypes.windll.kernel32.GetLastError() or 0)
+    except Exception:
+        return 0
+    return 0
+
+
 if hasattr(ctypes, "windll"):
     advapi32 = ctypes.windll.advapi32
 
@@ -131,7 +147,7 @@ def stop_service(service_name: str) -> bool:
                     if service_status.dwCurrentState != SERVICE_STOP_PENDING:
                         result = ControlService(service, 1, ctypes.byref(service_status))  # 1 = SERVICE_CONTROL_STOP
                         if not result:
-                            error_code = ctypes.get_last_error()
+                            error_code = _get_winapi_last_error()
                             if error_code == ERROR_SERVICE_NOT_ACTIVE:
                                 log(f"Служба {service_name} уже остановлена", "DEBUG")
                                 return True
@@ -142,7 +158,7 @@ def stop_service(service_name: str) -> bool:
                 deadline = time.time() + 5.0
                 while time.time() < deadline:
                     if not QueryServiceStatus(service, ctypes.byref(service_status)):
-                        error_code = ctypes.get_last_error()
+                        error_code = _get_winapi_last_error()
                         log(f"QueryServiceStatus не удался для {service_name}, код: {error_code}", "DEBUG")
                         return False
                     if service_status.dwCurrentState == SERVICE_STOPPED:
@@ -198,7 +214,7 @@ def delete_service(service_name: str) -> bool:
                 deadline = time.time() + 5.0
                 while time.time() < deadline:
                     if not QueryServiceStatus(service, ctypes.byref(service_status)):
-                        error_code = ctypes.get_last_error()
+                        error_code = _get_winapi_last_error()
                         if error_code == ERROR_SERVICE_DOES_NOT_EXIST:
                             return True
                         break
@@ -213,7 +229,7 @@ def delete_service(service_name: str) -> bool:
                     log(f"✅ Служба {service_name} удалена через Win API", "DEBUG")
                     return True
                 else:
-                    error_code = ctypes.get_last_error()
+                    error_code = _get_winapi_last_error()
                     if error_code == ERROR_SERVICE_DOES_NOT_EXIST:
                         log(f"Служба {service_name} не существует", "DEBUG")
                         return True
@@ -263,7 +279,7 @@ def stop_and_delete_service(service_name: str, retry_count: int = 3) -> bool:
                 time.sleep(0.35)
 
         if service_exists(service_name):
-            log(f"Служба {service_name} всё ещё видна после удаления через Win API", "DEBUG")
+            log(f"Служба {service_name} всё ещё видна после удаления через Win API", "WARNING")
             if stop_and_delete_service_sc_fallback(service_name):
                 return True
         return False
@@ -290,11 +306,24 @@ def stop_and_delete_service_sc_fallback(service_name: str) -> bool:
                 log(
                     f"sc.exe {action} {service_name}: code={result.returncode}"
                     + (f", output={output[:200]}" if output else ""),
-                    "DEBUG",
+                    "WARNING",
                 )
             except Exception as e:
-                log(f"Ошибка sc.exe {action} {service_name}: {e}", "DEBUG")
+                log(f"Ошибка sc.exe {action} {service_name}: {e}", "WARNING")
 
+            deadline = time.time() + 2.0
+            while time.time() < deadline:
+                if not service_exists(service_name):
+                    return True
+                time.sleep(0.2)
+
+        if not service_exists(service_name):
+            return True
+
+        if stop_and_delete_service_pywin32_fallback(service_name):
+            return True
+
+        if delete_stopped_service_registry_tree(service_name):
             deadline = time.time() + 2.0
             while time.time() < deadline:
                 if not service_exists(service_name):
@@ -303,8 +332,73 @@ def stop_and_delete_service_sc_fallback(service_name: str) -> bool:
 
         return not service_exists(service_name)
     except Exception as e:
-        log(f"Ошибка fallback-удаления службы {service_name}: {e}", "DEBUG")
+        log(f"Ошибка fallback-удаления службы {service_name}: {e}", "WARNING")
         return False
+
+
+def stop_and_delete_service_pywin32_fallback(service_name: str) -> bool:
+    """Резерв через pywin32 RemoveService, если он доступен в сборке."""
+    try:
+        import win32service
+        import win32serviceutil
+
+        try:
+            win32serviceutil.StopService(service_name)
+        except win32service.error as exc:
+            if getattr(exc, "winerror", None) not in (ERROR_SERVICE_DOES_NOT_EXIST, ERROR_SERVICE_NOT_ACTIVE):
+                log(f"pywin32 stop {service_name}: {exc}", "WARNING")
+
+        try:
+            win32serviceutil.RemoveService(service_name)
+        except win32service.error as exc:
+            if getattr(exc, "winerror", None) == ERROR_SERVICE_DOES_NOT_EXIST:
+                return True
+            log(f"pywin32 delete {service_name}: {exc}", "WARNING")
+            return False
+
+        deadline = time.time() + 2.0
+        while time.time() < deadline:
+            if not service_exists(service_name):
+                return True
+            time.sleep(0.2)
+        return not service_exists(service_name)
+    except Exception as e:
+        log(f"pywin32 fallback недоступен для {service_name}: {e}", "WARNING")
+        return False
+
+
+def delete_stopped_service_registry_tree(service_name: str) -> bool:
+    """Последний fallback: удалить registry-ключ уже остановленной driver-службы."""
+    try:
+        state = get_service_state(service_name)
+        if state not in (SERVICE_STOPPED, None):
+            log(f"Registry fallback пропущен для {service_name}: служба не остановлена (state={state})", "WARNING")
+            return False
+
+        import winreg
+
+        path = f"SYSTEM\\CurrentControlSet\\Services\\{service_name}"
+        _delete_registry_tree(winreg.HKEY_LOCAL_MACHINE, path)
+        log(f"Registry-ключ службы {service_name} удалён напрямую", "WARNING")
+        return True
+    except FileNotFoundError:
+        return True
+    except Exception as e:
+        log(f"Ошибка прямого удаления registry-ключа службы {service_name}: {e}", "WARNING")
+        return False
+
+
+def _delete_registry_tree(root, sub_key: str) -> None:
+    import winreg
+
+    with winreg.OpenKey(root, sub_key, 0, winreg.KEY_READ | winreg.KEY_WRITE) as key:
+        while True:
+            try:
+                child = winreg.EnumKey(key, 0)
+            except OSError:
+                break
+            _delete_registry_tree(root, f"{sub_key}\\{child}")
+    winreg.DeleteKey(root, sub_key)
 
 
 def set_service_start_type(service_name: str, start_type: int) -> bool:
@@ -350,7 +444,7 @@ def set_service_start_type(service_name: str, start_type: int) -> bool:
                     log(f"Служба {service_name} переведена в ручной запуск", "DEBUG")
                     return True
 
-                error_code = ctypes.get_last_error()
+                error_code = _get_winapi_last_error()
                 log(f"Не удалось изменить тип запуска {service_name}, код: {error_code}", "DEBUG")
                 return set_service_registry_start_type(service_name, start_type)
             finally:
