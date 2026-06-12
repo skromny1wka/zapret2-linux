@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from PyQt6.QtCore import Qt
 from qfluentwidgets import BodyLabel, CaptionLabel, LineEdit, MessageBox, MessageBoxBase, RoundMenu, SubtitleLabel
 
 from ui.accessibility import set_control_accessibility, set_state_text
@@ -116,14 +117,26 @@ def show_folder_context_menu(
     is_existing_folder = isinstance(folder, dict) or is_service
     is_system = bool(folder.get("system", False)) if isinstance(folder, dict) else is_service
     is_collapsed = bool(folder.get("collapsed", False)) if isinstance(folder, dict) else False
+    folder_name = str(folder.get("name") or key) if isinstance(folder, dict) else key
 
     menu = RoundMenu(parent=parent)
     action_map: dict[object, tuple[str, dict]] = {}
 
     def _add_action(text: str, *, icon_name: str, command: str, payload: dict | None = None):
+        payload = dict(payload or {})
         action = make_menu_action(text, icon=fluent_icon(icon_name), parent=menu)
         menu.addAction(action)
-        action_map[action] = (str(command or ""), dict(payload or {}))
+        accessible_text = _folder_menu_accessible_text(
+            text=text,
+            command=command,
+            folder_name=folder_name,
+            payload=payload,
+        )
+        menu_item = menu.view.item(menu.view.count() - 1)
+        if menu_item is not None and accessible_text:
+            menu_item.setData(Qt.ItemDataRole.AccessibleTextRole, accessible_text)
+            menu_item.setData(Qt.ItemDataRole.AccessibleDescriptionRole, accessible_text)
+        action_map[action] = (str(command or ""), payload)
         return action
 
     if is_existing_folder:
@@ -178,6 +191,24 @@ def show_folder_context_menu(
         refresh_fn,
         log_fn,
     )
+
+
+def _folder_menu_accessible_text(*, text: str, command: str, folder_name: str, payload: dict) -> str:
+    label = " ".join(str(text or "").strip().split())
+    name = " ".join(str(folder_name or "").strip().split())
+    command_name = str(command or "").strip()
+    if not label:
+        return ""
+    if command_name == "set_collapsed" and name:
+        return f"Папка {name}: {label}"
+    if command_name == "rename" and name:
+        return f"Переименовать папку {name}"
+    if command_name == "delete" and name:
+        return f"Удалить папку {name}"
+    if command_name == "move_step" and name:
+        direction = "выше" if int(payload.get("direction", 0) or 0) < 0 else "ниже"
+        return f"Переместить папку {name} {direction}"
+    return label
 
 
 def _dispatch_folder_menu_action(

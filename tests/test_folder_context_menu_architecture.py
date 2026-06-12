@@ -7,6 +7,7 @@ from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QWidget
 
 from ui.widgets import folder_context_menu
@@ -81,6 +82,57 @@ class FolderContextMenuArchitectureTests(unittest.TestCase):
         self.assertIn("action_map", source)
         self.assertNotIn("menu.exec(", source)
         self.assertNotIn("triggered.connect(lambda: _run_folder_action", source)
+
+    def test_folder_context_menu_items_are_named_for_screen_reader(self) -> None:
+        labels = folder_context_menu.FolderMenuLabels(
+            reset_title="Сбросить папки",
+            reset_body="Папки будут возвращены к стандартному виду.",
+            create_subtitle="",
+            rename_subtitle="",
+            delete_body="Папка будет удалена, элементы останутся в общем списке.",
+            action_error_suffix="preset-ов",
+        )
+        actions = folder_context_menu.FolderMenuActions(run_action=Mock())
+        captured = []
+
+        with patch(
+            "ui.widgets.folder_context_menu.exec_popup_menu",
+            side_effect=lambda menu, *_args, **_kwargs: captured.append(menu),
+        ):
+            folder_context_menu.show_folder_context_menu(
+                parent=self._dialog_parent(),
+                folder_key="video",
+                global_pos=None,
+                folder_state={
+                    "folders": {
+                        "video": {
+                            "name": "Видео",
+                            "collapsed": False,
+                            "system": False,
+                        }
+                    }
+                },
+                actions=actions,
+                labels=labels,
+                refresh_fn=Mock(),
+            )
+
+        self.assertEqual(len(captured), 1)
+        menu = captured[0]
+        accessible_items = [
+            menu.view.item(row).data(Qt.ItemDataRole.AccessibleTextRole)
+            for row in range(menu.view.count())
+            if menu.view.item(row) is not None
+            and menu.view.item(row).data(Qt.ItemDataRole.AccessibleTextRole)
+        ]
+
+        self.assertIn("Папка Видео: Свернуть", accessible_items)
+        self.assertIn("Создать папку", accessible_items)
+        self.assertIn("Переименовать папку Видео", accessible_items)
+        self.assertIn("Удалить папку Видео", accessible_items)
+        self.assertIn("Переместить папку Видео выше", accessible_items)
+        self.assertIn("Переместить папку Видео ниже", accessible_items)
+        self.assertIn("Сбросить папки", accessible_items)
 
     def test_folder_name_dialog_has_screen_reader_text_for_create(self) -> None:
         dialog = folder_context_menu.FolderNameDialog(
