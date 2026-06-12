@@ -679,6 +679,8 @@ class SettingsRow(FluentSettingCard):
 
     def __init__(self, icon_name: str, title: str, description: str = "", parent=None):
         self._icon_name = icon_name
+        self._accessible_title = str(title or "")
+        self._accessible_description = str(description or "")
         self._icon_label = None
         self._title_label = None
         self._desc_label = None
@@ -702,6 +704,7 @@ class SettingsRow(FluentSettingCard):
             self.hBoxLayout.insertLayout(stretch_index, self.control_container)
         except Exception:
             self.hBoxLayout.addLayout(self.control_container)
+        self._sync_text_accessibility()
 
     def _refresh_icon(self) -> None:
         if self._icon_label is None:
@@ -719,14 +722,34 @@ class SettingsRow(FluentSettingCard):
     def set_title(self, text: str) -> None:
         try:
             self.setTitle(text)
+            self._accessible_title = str(text or "")
+            self._sync_text_accessibility()
         except Exception:
             pass
 
     def set_description(self, text: str) -> None:
         try:
             self.setContent(text)
+            self._accessible_description = str(text or "")
+            self._sync_text_accessibility()
         except Exception:
             pass
+
+    def _sync_text_accessibility(self) -> None:
+        title = str(self._accessible_title or "").strip()
+        description = str(self._accessible_description or "").strip()
+        if not title and not description:
+            return
+        state_text = f"Настройка: {title}" if title else "Настройка"
+        if description:
+            state_text = f"{state_text}. {description}"
+        set_state_text(self, state_text)
+        if description:
+            set_accessible_description(self, description)
+        if self._title_label is not None and title:
+            set_state_text(self._title_label, f"Настройка: {title}")
+        if self._desc_label is not None and description:
+            set_state_text(self._desc_label, f"Описание настройки: {description}")
 
 
 # ---------------------------------------------------------------------------

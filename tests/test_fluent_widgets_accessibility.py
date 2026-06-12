@@ -40,6 +40,35 @@ class FluentWidgetsAccessibilityTests(unittest.TestCase):
         self.assertEqual(card.property("screenReaderStateText"), "Раздел настроек: Инструменты")
         self.assertEqual(card._title_label.property("screenReaderStateText"), "Раздел настроек: Инструменты")
 
+    def test_settings_row_title_and_description_have_screen_reader_state(self) -> None:
+        from ui.fluent_widgets import SettingsRow
+
+        row = SettingsRow("fa5s.palette", "Цвет акцента", "Открывает выбор цвета")
+        self.addCleanup(row.deleteLater)
+
+        expected = "Настройка: Цвет акцента. Открывает выбор цвета"
+        self.assertEqual(row.property("screenReaderStateText"), expected)
+        self.assertEqual(row.accessibleName(), expected)
+        self.assertEqual(row.accessibleDescription(), "Открывает выбор цвета")
+        self.assertEqual(row._title_label.property("screenReaderStateText"), "Настройка: Цвет акцента")
+        self.assertEqual(row._desc_label.property("screenReaderStateText"), "Описание настройки: Открывает выбор цвета")
+
+    def test_settings_row_updates_screen_reader_state_after_text_changes(self) -> None:
+        from ui.fluent_widgets import SettingsRow
+
+        row = SettingsRow("fa5s.palette", "Цвет акцента", "Открывает выбор цвета")
+        self.addCleanup(row.deleteLater)
+
+        row.set_title("Интенсивность")
+        row.set_description("Меняет силу эффекта")
+
+        expected = "Настройка: Интенсивность. Меняет силу эффекта"
+        self.assertEqual(row.property("screenReaderStateText"), expected)
+        self.assertEqual(row.accessibleName(), expected)
+        self.assertEqual(row.accessibleDescription(), "Меняет силу эффекта")
+        self.assertEqual(row._title_label.property("screenReaderStateText"), "Настройка: Интенсивность")
+        self.assertEqual(row._desc_label.property("screenReaderStateText"), "Описание настройки: Меняет силу эффекта")
+
 
 if __name__ == "__main__":
     unittest.main()
