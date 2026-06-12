@@ -72,6 +72,7 @@ def create_top_summary_worker(
     read_selected_preset_source=None,
     *,
     launch_method: str,
+    get_enabled_profile_count_fallback=None,
     parent=None,
 ):
     clean_launch_method = str(launch_method or "").strip()
@@ -97,6 +98,12 @@ def create_top_summary_worker(
             profile_count = int(count) if count is not None else None
         except Exception as exc:
             log(f"ControlTopSummaryWorker: не удалось прочитать количество profile: {exc}", "DEBUG")
+        if profile_count is None and callable(get_enabled_profile_count_fallback):
+            try:
+                count = get_enabled_profile_count_fallback(clean_launch_method)
+                profile_count = int(count) if count is not None else None
+            except Exception as exc:
+                log(f"ControlTopSummaryWorker: не удалось пересчитать количество profile: {exc}", "DEBUG")
 
         profile_tab_visible = True
         if callable(read_selected_preset_source):

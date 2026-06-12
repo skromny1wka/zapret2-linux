@@ -176,6 +176,24 @@ class ControlTopSummaryPlanTests(unittest.TestCase):
 
         self.assertFalse(state.profile_tab_visible)
 
+    def test_top_summary_worker_uses_full_profile_count_when_snapshot_is_not_ready(self) -> None:
+        from presets.ui.control.additional_settings_runtime import create_top_summary_worker
+        from settings.mode import ZAPRET2_MODE
+
+        fallback_count = Mock(return_value=3)
+        worker = create_top_summary_worker(
+            8,
+            lambda _method: ("Default", "Default.txt"),
+            lambda _method: None,
+            launch_method=ZAPRET2_MODE,
+            get_enabled_profile_count_fallback=fallback_count,
+        )
+
+        state = worker._summary_loader()
+
+        self.assertEqual(state.profile_count, 3)
+        fallback_count.assert_called_once_with(ZAPRET2_MODE)
+
     def test_top_summary_item_skips_same_text_render(self) -> None:
         with patch.dict("os.environ", {"QT_QPA_PLATFORM": "offscreen"}):
             from PyQt6.QtWidgets import QApplication
