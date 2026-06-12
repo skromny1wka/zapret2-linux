@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ui.theme import get_cached_qta_pixmap
+from ui.accessibility import set_control_accessibility, set_state_text
 
 
 @dataclass(slots=True)
@@ -66,6 +67,17 @@ def build_isp_warning_ui(
 
     btn_row.addStretch()
     warning_layout.addLayout(btn_row)
+    _apply_isp_warning_accessibility(
+        warning=warning,
+        title_label=title_text,
+        content_label=content_label,
+        accept_button=accept_btn,
+        dismiss_button=dismiss_btn,
+        title=plan.title,
+        content=plan.content,
+        action_text=plan.action_text,
+        dismiss_text=plan.dismiss_text,
+    )
 
     return IspWarningWidgets(
         frame=warning,
@@ -75,6 +87,64 @@ def build_isp_warning_ui(
         accept_button=accept_btn,
         dismiss_button=dismiss_btn,
     )
+
+
+def _apply_isp_warning_accessibility(
+    *,
+    warning,
+    title_label,
+    content_label,
+    accept_button,
+    dismiss_button,
+    title: str,
+    content: str,
+    action_text: str,
+    dismiss_text: str,
+) -> None:
+    title_text = _clean_accessible_text(title)
+    content_text = _clean_accessible_text(content)
+    action_name = _clean_accessible_text(action_text)
+    dismiss_name = _clean_accessible_text(dismiss_text)
+
+    warning_text = _join_warning_text(title_text, content_text)
+    if warning_text:
+        set_state_text(warning, f"Предупреждение DNS: {warning_text}")
+        set_control_accessibility(
+            warning,
+            name=f"Предупреждение DNS: {title_text}" if title_text else "Предупреждение DNS",
+            description=content_text,
+        )
+    if title_text:
+        set_state_text(title_label, f"Заголовок предупреждения DNS: {title_text}")
+    if content_text:
+        set_state_text(content_label, f"Описание предупреждения DNS: {content_text}")
+    if action_name:
+        set_state_text(accept_button, action_name)
+        set_control_accessibility(
+            accept_button,
+            name=action_name,
+            description="Применяет рекомендованное действие из предупреждения DNS.",
+        )
+    if dismiss_name:
+        set_state_text(dismiss_button, dismiss_name)
+        set_control_accessibility(
+            dismiss_button,
+            name=dismiss_name,
+            description="Скрывает предупреждение DNS без изменения текущей настройки.",
+        )
+
+
+def _clean_accessible_text(text: object) -> str:
+    return " ".join(str(text or "").strip().split())
+
+
+def _join_warning_text(title: str, content: str) -> str:
+    if not title:
+        return content
+    if not content:
+        return title
+    separator = " " if title.endswith((".", "!", "?")) else ". "
+    return f"{title}{separator}{content}"
 
 
 def insert_isp_warning_widget(*, layout, before_widget, add_widget_fn, warning_widget) -> None:
