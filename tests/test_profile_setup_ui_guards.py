@@ -257,6 +257,22 @@ class _StrategyItem:
         self._selected = value
 
 
+class _KeyEvent:
+    def __init__(self, key: int, event_type) -> None:
+        self._key = int(key)
+        self._event_type = event_type
+        self.accepted = False
+
+    def type(self):  # noqa: A003
+        return self._event_type
+
+    def key(self) -> int:
+        return self._key
+
+    def accept(self) -> None:
+        self.accepted = True
+
+
 class _Signal:
     def connect(self, _callback) -> None:
         pass
@@ -694,6 +710,29 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
             "TLS fake, выбрана, в избранном, работает, Fake, Подмена TLS. "
             "Нажмите Enter, чтобы выбрать стратегию.",
         )
+
+    def test_strategy_list_keyboard_activation_uses_current_row(self) -> None:
+        from types import SimpleNamespace
+
+        from PyQt6.QtCore import QEvent, Qt
+
+        from profile.ui.profile_setup_page import ProfileStrategyListWidget
+
+        widget = ProfileStrategyListWidget.__new__(ProfileStrategyListWidget)
+        item = _StrategyItem(data={ProfileStrategyListWidget._ROLE_STRATEGY_ID: "tls_fake"})
+        widget._current_strategy_id = "none"
+        widget._list = _ListWidget()
+        widget._list.current_item = item
+        activated: list[str] = []
+        widget.strategy_activated = SimpleNamespace(emit=lambda strategy_id: activated.append(strategy_id))
+
+        event = _KeyEvent(int(Qt.Key.Key_Return), QEvent.Type.KeyPress)
+
+        handled = ProfileStrategyListWidget.eventFilter(widget, widget._list, event)
+
+        self.assertTrue(handled)
+        self.assertTrue(event.accepted)
+        self.assertEqual(activated, ["tls_fake"])
 
     def test_strategy_item_refresh_updates_screen_reader_text(self) -> None:
         from types import SimpleNamespace

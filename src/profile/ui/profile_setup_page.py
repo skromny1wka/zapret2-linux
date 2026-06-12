@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from PyQt6.QtCore import QModelIndex, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QEvent, QModelIndex, QPoint, QRect, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction, QFontMetrics, QPainter, QTextCursor
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -491,6 +491,7 @@ class ProfileStrategyListWidget(QWidget):
         self._list.currentItemChanged.connect(self._update_current_strategy_accessibility)
         self._list.itemActivated.connect(self._on_item_activated)
         self._list.itemClicked.connect(self._on_item_clicked)
+        self._list.installEventFilter(self)
         self._list.setStyleSheet(
             "QListWidget { background: rgba(255, 255, 255, 0.035); border: none; border-radius: 6px; outline: none; padding: 4px 0; }"
             "QListWidget::viewport { background: transparent; }"
@@ -500,6 +501,16 @@ class ProfileStrategyListWidget(QWidget):
         )
         self._scrollbars = install_fluent_scrollbars(self._list, vertical=True, horizontal=False)
         layout.addWidget(self._list, 1)
+
+    def eventFilter(self, watched, event):  # noqa: N802
+        if watched is self._list and event.type() == QEvent.Type.KeyPress:
+            if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
+                item = self._list.currentItem()
+                if item is not None:
+                    self._on_item_activated(item)
+                    event.accept()
+                    return True
+        return super().eventFilter(watched, event)
 
     def set_rows(self, *, entries, states, current_strategy_id: str) -> None:
         next_entries = dict(entries or {})
