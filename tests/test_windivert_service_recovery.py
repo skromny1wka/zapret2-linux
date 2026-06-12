@@ -319,6 +319,43 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
             any("administrator rights" in call.args[0] for call in log.call_args_list)
         )
 
+    def test_spawn_readiness_allows_winws_when_1058_probe_has_clean_registry(self) -> None:
+        from winws_runtime.runtime import system_ops
+
+        disabled_probe = system_ops.WinDivertRuntimeProbeResult(
+            installed=False,
+            ready=False,
+            error_code=1058,
+            stage="network_open",
+        )
+
+        with (
+            patch.object(system_ops, "probe_windivert_state_runtime", return_value=disabled_probe),
+            patch.object(
+                system_ops,
+                "restore_known_windivert_services_demand_start_runtime",
+                return_value=True,
+            ) as restore_start,
+            patch.object(
+                system_ops,
+                "find_blocking_windivert_registry_services_runtime",
+                return_value=[],
+            ),
+            patch.object(system_ops.time, "sleep"),
+            patch.object(system_ops, "log") as log,
+        ):
+            result = system_ops.wait_for_windivert_spawn_ready_runtime(
+                max_wait_seconds=1.0,
+                poll_interval=0.001,
+            )
+
+        self.assertTrue(result.ready)
+        self.assertEqual(result.stage, "network_open_probe_bypassed:registry_clean")
+        restore_start.assert_called_once_with()
+        self.assertTrue(
+            any("allowing winws2" in call.args[0] for call in log.call_args_list)
+        )
+
     def test_running_disabled_delete_pending_monkey_is_detected_as_stale(self) -> None:
         from winws_runtime.runtime import system_ops
 

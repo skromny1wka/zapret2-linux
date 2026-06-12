@@ -146,6 +146,27 @@ def find_stale_windivert_delete_pending_services_runtime() -> list[str]:
     return stale
 
 
+def find_blocking_windivert_registry_services_runtime() -> list[str]:
+    """Ищет WinDivert-службы, которые точно блокируют новый старт.
+
+    WinDivertOpen иногда возвращает 1058 даже после того, как `Start` уже
+    восстановлен в ручной запуск. Поэтому перед тем как блокировать запуск
+    настоящего winws2, проверяем сам реестр: если нет Disabled/DeleteFlag,
+    пробник не должен быть единственным источником отказа.
+    """
+    registry_flags = get_known_windivert_service_registry_flags_runtime()
+    blocking: list[str] = []
+
+    for service_name in _KNOWN_WINDIVERT_SERVICES:
+        flags = registry_flags.get(service_name) or {}
+        start_type = flags.get("start")
+        delete_flag = flags.get("delete_flag")
+        if start_type == _SERVICE_DISABLED or int(delete_flag or 0) == 1:
+            blocking.append(service_name)
+
+    return blocking
+
+
 def _iter_windivert_dll_candidates_runtime() -> list[str]:
     candidates: list[str] = []
     try:
@@ -508,10 +529,23 @@ def wait_for_windivert_spawn_ready_runtime(
         if int(last_probe.error_code or 0) == 1058 and not restored_service_start_type:
             restored_service_start_type = True
             log("WinDivert service disabled during readiness probe; restoring manual start", "WARNING")
-            if not restore_known_windivert_services_demand_start_runtime():
+            restored_ok = restore_known_windivert_services_demand_start_runtime()
+            if not restored_ok:
                 log(
                     "WinDivert service start type restore failed; administrator rights may be required",
                     "WARNING",
+                )
+            if restored_ok and not find_blocking_windivert_registry_services_runtime():
+                log(
+                    "WinDivert readiness probe still reports 1058, but service registry is clean; "
+                    "allowing winws2 to perform the real driver open",
+                    "WARNING",
+                )
+                return WinDivertRuntimeProbeResult(
+                    installed=last_probe.installed,
+                    ready=True,
+                    error_code=last_probe.error_code,
+                    stage="network_open_probe_bypassed:registry_clean",
                 )
         time.sleep(interval)
 
