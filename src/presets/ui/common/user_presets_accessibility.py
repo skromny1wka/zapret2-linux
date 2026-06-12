@@ -86,7 +86,7 @@ def apply_user_presets_accessibility(
         description_key=f"{tr_prefix}.search.accessible_description",
         description_default=(
             "Поиск пресетов по имени. "
-            "После ввода перейдите в список клавишей Tab, "
+            "После ввода перейдите в список клавишей Tab или нажмите Стрелка вниз, "
             "выберите пресет стрелками вверх и вниз, затем нажмите Enter или Пробел."
         ),
     )

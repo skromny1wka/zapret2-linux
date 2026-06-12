@@ -517,6 +517,7 @@ class UserPresetsAccessibilityTests(unittest.TestCase):
 
         search_description = widgets.preset_search_input.accessibleDescription()
         self.assertIn("После ввода перейдите в список клавишей Tab", search_description)
+        self.assertIn("или нажмите Стрелка вниз", search_description)
         self.assertIn("выберите пресет стрелками вверх и вниз", search_description)
         self.assertIn("нажмите Enter или Пробел", search_description)
         search_buttons = [
