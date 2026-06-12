@@ -715,7 +715,7 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         self.assertEqual(
             accessible_text,
             "TLS fake, выбрана, в избранном, работает, Fake, Подмена TLS. "
-            "Нажмите Enter, чтобы выбрать стратегию.",
+            "Нажмите Enter или Пробел, чтобы выбрать стратегию.",
         )
 
     def test_strategy_list_focuses_first_visible_row_when_current_strategy_is_hidden(self) -> None:
@@ -762,7 +762,7 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
                     strategy_id="tls_fake",
                     name="TLS fake",
                     status_text="",
-                    accessible_text="TLS fake, не выбрана. Нажмите Enter, чтобы выбрать стратегию.",
+                    accessible_text="TLS fake, не выбрана. Нажмите Enter или Пробел, чтобы выбрать стратегию.",
                     is_current=False,
                     visual_icon_name="",
                     visual_color="",
@@ -823,7 +823,7 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
                 ProfileStrategyListWidget._ROLE_VISUAL_DESCRIPTION: "Подмена TLS",
                 Qt.ItemDataRole.AccessibleTextRole: (
                     "TLS fake, не выбрана, Fake, Подмена TLS. "
-                    "Нажмите Enter, чтобы выбрать стратегию."
+                    "Нажмите Enter или Пробел, чтобы выбрать стратегию."
                 ),
             },
             selected=False,
@@ -834,7 +834,7 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         self.assertIn(
             (
                 Qt.ItemDataRole.AccessibleTextRole,
-                "TLS fake, выбрана, Fake, Подмена TLS. Нажмите Enter, чтобы выбрать стратегию.",
+                "TLS fake, выбрана, Fake, Подмена TLS. Нажмите Enter или Пробел, чтобы выбрать стратегию.",
             ),
             item.data_calls,
         )

@@ -105,7 +105,7 @@ class StrategyListAccessibilityTests(unittest.TestCase):
         self.assertEqual(
             widget._list.property("screenReaderStateText"),
             "Готовая стратегия: Beta, выбрана, Fake, Подмена TLS. "
-            "Нажмите Enter, чтобы выбрать стратегию.",
+            "Нажмите Enter или Пробел, чтобы выбрать стратегию.",
         )
 
         widget._list.setCurrentRow(0)
@@ -113,7 +113,7 @@ class StrategyListAccessibilityTests(unittest.TestCase):
         self.assertEqual(
             widget._list.property("screenReaderStateText"),
             "Готовая стратегия: Alpha, не выбрана, Fake, Подмена TLS. "
-            "Нажмите Enter, чтобы выбрать стратегию.",
+            "Нажмите Enter или Пробел, чтобы выбрать стратегию.",
         )
 
 
