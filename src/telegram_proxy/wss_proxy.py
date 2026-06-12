@@ -315,9 +315,10 @@ class TelegramWSProxy:
         for index, endpoint in enumerate(candidates):
             next_step = "try next bundled SOCKS5" if index + 1 < len(candidates) else "none"
             fallback_tag = "backup " if index > 0 else ""
+            tls_tag = "yes" if endpoint.tls else "no"
             self._log(
                 f"[{label}] {prefix}DC{dc}{media_tag} {fallback_tag}upstream proxy "
-                f"-> {endpoint.host}:{endpoint.port}"
+                f"-> {endpoint.host}:{endpoint.port} tls={tls_tag}"
             )
             t_connect = time.monotonic()
             try:

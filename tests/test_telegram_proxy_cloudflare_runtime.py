@@ -517,6 +517,9 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
                 enabled=True,
                 host="127.0.0.1",
                 port=1080,
+                username="secret-user",
+                password="secret-pass",
+                tls=True,
                 mode="fallback",
             ),
         )
@@ -540,12 +543,15 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
 
         self.assertFalse(ok)
         joined = "\n".join(logs)
+        self.assertIn("upstream proxy -> 127.0.0.1:1080 tls=yes", joined)
         self.assertIn("route=upstream SOCKS5", joined)
         self.assertIn("dc=1", joined)
         self.assertIn("target=149.154.175.50:443 via 127.0.0.1:1080", joined)
         self.assertIn("result=error", joined)
         self.assertIn("TimeoutError", joined)
         self.assertIn("next=none", joined)
+        self.assertNotIn("secret-user", joined)
+        self.assertNotIn("secret-pass", joined)
 
     def test_upstream_replaces_telegram_ipv6_media_target_with_same_dc_ipv4(self) -> None:
         from telegram_proxy.proxy.routing import UpstreamProxyConfig
