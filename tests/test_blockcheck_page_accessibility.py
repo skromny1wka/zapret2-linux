@@ -74,7 +74,15 @@ class BlockcheckPageAccessibilityTests(unittest.TestCase):
         self.assertIn("Остановить текущую проверку", page._stop_btn.accessibleDescription())
         self.assertEqual(page._stop_btn.property("screenReaderStateText"), "Остановить BlockCheck")
         self.assertEqual(page._domain_input.accessibleName(), "Пользовательский домен для BlockCheck")
+        self.assertEqual(
+            page._domain_input.property("screenReaderStateText"),
+            "Пользовательский домен для BlockCheck",
+        )
         self.assertEqual(page._add_domain_btn.accessibleName(), "Добавить домен в BlockCheck")
+        self.assertEqual(
+            page._add_domain_btn.property("screenReaderStateText"),
+            "Добавить домен в BlockCheck",
+        )
         self.assertEqual(page._progress_bar.accessibleName(), "Ход BlockCheck: не выполняется")
         self.assertEqual(
             page._progress_bar.property("screenReaderStateText"),
