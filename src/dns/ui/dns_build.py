@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from qfluentwidgets import FluentIcon
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QLabel
 
@@ -14,7 +13,6 @@ from dns.ui.selection import (
     sync_selectable_dns_card_accessibility,
 )
 from dns.ui.cards import DNSChoiceCard
-from ui.accessibility import set_control_accessibility, set_state_text
 from ui.theme import get_cached_qta_pixmap
 
 
@@ -34,6 +32,17 @@ class CustomDnsWidgets:
     primary_input: object
     secondary_input: object
     apply_button: object
+
+
+class _TextValue:
+    def __init__(self, value: str = ""):
+        self._value = str(value or "")
+
+    def text(self) -> str:
+        return self._value
+
+    def setText(self, value: str) -> None:  # noqa: N802
+        self._value = str(value or "")
 
 
 def _trigger_auto_dns_selection(on_select) -> None:
@@ -74,7 +83,7 @@ def build_custom_dns_ui(
     on_apply,
     indicator_off_qss: str,
 ) -> CustomDnsWidgets:
-    _ = settings_card_cls, qframe_cls, indicator_off_qss
+    _ = settings_card_cls, qframe_cls, line_edit_cls, action_button_cls, on_apply, indicator_off_qss
     custom_card = DNSChoiceCard()
     custom_layout = qhbox_layout_cls(custom_card)
     custom_layout.setContentsMargins(18, 3, 12, 3)
@@ -87,53 +96,9 @@ def build_custom_dns_ui(
     custom_label = body_label_cls(tr_fn("page.network.custom.label", "Свой DNS"))
     custom_layout.addWidget(custom_label)
 
-    custom_primary = line_edit_cls()
-    custom_primary.setPlaceholderText("8.8.8.8")
-    custom_primary.setFixedWidth(110)
-    custom_primary.returnPressed.connect(on_apply)
-    set_control_accessibility(
-        custom_primary,
-        name=tr_fn("page.network.custom.primary.accessible_name", "Основной DNS сервер"),
-        description=tr_fn(
-            "page.network.custom.primary.accessible_description",
-            "Введите первый DNS сервер, например 8.8.8.8.",
-        ),
-    )
-    custom_layout.addWidget(custom_primary)
-
-    custom_secondary = line_edit_cls()
-    custom_secondary.setPlaceholderText("208.67.222.222")
-    custom_secondary.setFixedWidth(110)
-    custom_secondary.returnPressed.connect(on_apply)
-    set_control_accessibility(
-        custom_secondary,
-        name=tr_fn("page.network.custom.secondary.accessible_name", "Дополнительный DNS сервер"),
-        description=tr_fn(
-            "page.network.custom.secondary.accessible_description",
-            "Введите второй DNS сервер, если он нужен.",
-        ),
-    )
-    custom_layout.addWidget(custom_secondary)
-
-    custom_apply_btn = action_button_cls(
-        tr_fn("page.network.custom.apply", "OK"),
-        icon=FluentIcon.ACCEPT,
-    )
-    custom_apply_btn.setFixedSize(68, 24)
-    custom_apply_btn.clicked.connect(on_apply)
-    apply_accessible_name = tr_fn("page.network.custom.apply.accessible_name", "Применить свой DNS")
-    set_control_accessibility(
-        custom_apply_btn,
-        name=apply_accessible_name,
-        description=tr_fn(
-            "page.network.custom.apply.accessible_description",
-            "Применяет указанные DNS серверы к выбранным сетевым адаптерам.",
-        ),
-    )
-    set_state_text(custom_apply_btn, apply_accessible_name)
-    custom_layout.addWidget(custom_apply_btn)
-
     custom_layout.addStretch()
+    custom_primary = _TextValue()
+    custom_secondary = _TextValue()
 
     custom_accessible_name = tr_fn("page.network.custom.accessible_name", "Свой DNS")
     custom_card.setProperty(ACCESSIBLE_BASE_PROPERTY, custom_accessible_name)
@@ -141,7 +106,7 @@ def build_custom_dns_ui(
         ACCESSIBLE_DESCRIPTION_PROPERTY,
         tr_fn(
             "page.network.custom.accessible_description",
-            "Введите DNS серверы и нажмите OK, чтобы применить их к выбранным сетевым адаптерам.",
+            "Для ручного DNS нажмите кнопку Свой DNS в верхней панели страницы.",
         ),
     )
     sync_selectable_dns_card_accessibility(custom_card)
@@ -153,7 +118,7 @@ def build_custom_dns_ui(
         title_label=custom_label,
         primary_input=custom_primary,
         secondary_input=custom_secondary,
-        apply_button=custom_apply_btn,
+        apply_button=None,
     )
 
 

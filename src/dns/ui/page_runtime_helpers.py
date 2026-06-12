@@ -139,10 +139,9 @@ def build_dns_choices_ui(
             title_label=None,
         )
         try:
-            dns_cards_layout.set_custom_choice(custom_card)
+            custom_card.hide()
         except Exception:
             pass
-        custom_card.show()
     else:
         auto_widgets = build_auto_dns_ui_fn(
             tr_fn=tr_fn,
@@ -157,8 +156,10 @@ def build_dns_choices_ui(
             on_select=lambda _event: on_auto_selected(),
         )
         dns_cards_layout.addWidget(auto_widgets.card)
-        dns_cards_layout.addWidget(custom_card)
-        custom_card.show()
+        try:
+            custom_card.hide()
+        except Exception:
+            pass
 
     provider_cards = build_provider_cards_fn(
         providers_by_category=providers,

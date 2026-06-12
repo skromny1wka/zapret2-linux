@@ -15,6 +15,7 @@ from qfluentwidgets import (
     LineEdit, MessageBox, PushButton, SettingCardGroup, StrongBodyLabel,
 )
 
+from settings.store import get_custom_dns_servers, set_custom_dns_servers
 from ui.pages.base_page import BasePage
 from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
@@ -33,10 +34,12 @@ from ui.theme import get_cached_qta_pixmap, get_theme_tokens
 from app.ui_texts import tr as tr_catalog
 from log.log import log
 
+from dns.custom_providers import build_dns_providers_with_custom
 from dns.dns_providers import DNS_PROVIDERS
 from dns import page_plans as dns_page_plans
 from dns.ui.adapters import build_adapter_cards, refresh_adapter_cards
 from dns.ui.cards import DNSProviderCard, AdapterCard
+from dns.ui.custom_dns_dialog import CustomDnsDialog
 from dns.ui.dns_build import build_auto_dns_ui, build_custom_dns_ui
 from dns.ui.page_build import build_network_page_shell
 from dns.ui.providers_build import build_provider_cards
@@ -148,6 +151,8 @@ class NetworkPage(BasePage):
         )
         self._scheduled_dns_apply_request = None
         self._dns_mutation_pending_order: list[str] = []
+        self._custom_dns_servers = get_custom_dns_servers()
+        self._dns_providers = build_dns_providers_with_custom(DNS_PROVIDERS, self._custom_dns_servers)
         self._isp_warning_runtime = OneShotWorkerRuntime()
         self._isp_warning_state = LatestValueWorkerState(
             self._isp_warning_runtime,
@@ -175,7 +180,7 @@ class NetworkPage(BasePage):
             schedule_fn=QTimer.singleShot,
             get_adapter_cards_fn=lambda: self.adapter_cards,
             get_dns_info_fn=lambda: self._dns_info,
-            providers=DNS_PROVIDERS,
+            providers=self._dns_providers,
             build_dns_selection_plan_fn=lambda **kwargs: dns_page_plans.build_dns_selection_plan(
                 **kwargs,
                 normalize_alias_fn=self._dns.normalize_adapter_alias,
@@ -339,6 +344,24 @@ class NetworkPage(BasePage):
                 name=self._tr("page.network.force_dns.reset.accessible_name", "Вернуть DNS автоматически"),
                 description=reset_description,
             )
+        if hasattr(self, "force_dns_custom_btn"):
+            self.force_dns_custom_btn.setText(
+                self._tr("page.network.custom.button", "Свой DNS")
+            )
+            custom_description = self._tr(
+                "page.network.custom.button.description",
+                "Открывает окно, где можно добавить, изменить или удалить свои DNS серверы.",
+            )
+            set_tooltip(self.force_dns_custom_btn, custom_description)
+            set_state_text(
+                self.force_dns_custom_btn,
+                self._tr("page.network.custom.button.accessible_name", "Настроить свой DNS"),
+            )
+            set_control_accessibility(
+                self.force_dns_custom_btn,
+                name=self._tr("page.network.custom.button.accessible_name", "Настроить свой DNS"),
+                description=custom_description,
+            )
 
         if hasattr(self, "force_dns_status_label"):
             self._update_force_dns_status(
@@ -445,7 +468,7 @@ class NetworkPage(BasePage):
             get_theme_tokens_fn=get_theme_tokens,
             build_auto_dns_ui_fn=build_auto_dns_ui,
             build_provider_cards_fn=build_provider_cards,
-            providers=DNS_PROVIDERS,
+            providers=self._dns_providers,
             dns_cards_layout=self.dns_cards_layout,
             on_auto_selected=self._select_auto_dns,
             on_provider_selected=self._on_dns_selected,
@@ -708,6 +731,48 @@ class NetworkPage(BasePage):
             secondary=secondary,
         )
 
+    def _open_custom_dns_dialog(self):
+        """Открывает окно управления своими DNS."""
+        dialog = CustomDnsDialog(
+            self,
+            servers=self._custom_dns_servers,
+        )
+        if not dialog.exec():
+            return
+        self._custom_dns_servers = set_custom_dns_servers(dialog.servers())
+        self._refresh_custom_dns_providers()
+
+    def _refresh_custom_dns_providers(self) -> None:
+        """Обновляет пользовательские DNS в списке провайдеров."""
+        self._dns_providers.clear()
+        self._dns_providers.update(
+            build_dns_providers_with_custom(DNS_PROVIDERS, self._custom_dns_servers)
+        )
+        self._rebuild_dns_choices_ui()
+        self._request_dns_selection_sync()
+
+    def _rebuild_dns_choices_ui(self) -> None:
+        try:
+            self.dns_cards_layout.auto_selected.disconnect()
+        except Exception:
+            pass
+        try:
+            self.dns_cards_layout.provider_selected.disconnect()
+        except Exception:
+            pass
+        try:
+            self.dns_cards_layout.custom_selected.disconnect()
+        except Exception:
+            pass
+        try:
+            self.dns_cards_layout.clear()
+        except Exception:
+            pass
+        self.dns_cards.clear()
+        self._dns_category_labels.clear()
+        self._dns_choices_built = False
+        self._build_dns_choices_ui()
+
     def create_dns_apply_worker(
         self,
         request_id: int,
@@ -924,11 +989,13 @@ class NetworkPage(BasePage):
             enable_setting_card_group_auto_height_fn=enable_setting_card_group_auto_height,
             on_toggle=self._on_force_dns_action_clicked,
             on_confirm_reset=self._confirm_reset_dns_to_dhcp,
+            on_custom_dns=self._open_custom_dns_dialog,
         )
         self.force_dns_card = force_dns_widgets.card
         self.force_dns_action_btn = force_dns_widgets.force_button
         self.force_dns_status_label = force_dns_widgets.status_label
         self.force_dns_reset_dhcp_btn = force_dns_widgets.reset_button
+        self.force_dns_custom_btn = force_dns_widgets.custom_button
 
         self._update_force_dns_status(self._force_dns_active)
         self._update_dns_selection_state()

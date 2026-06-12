@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -63,7 +64,7 @@ class DnsPageBuildContractTests(unittest.TestCase):
         self.assertIs(shell.dns_cards_container.parent(), content_parent)
         self.assertIs(shell.adapters_container.parent(), content_parent)
 
-    def test_network_page_places_custom_dns_inside_dns_choices_list(self) -> None:
+    def test_network_page_does_not_place_inline_custom_dns_row_in_choices_list(self) -> None:
         from dns.ui.cards import DNSProviderCard
         from dns.ui.choice_list import DnsChoiceListWidget
         from dns.ui.page import NetworkPage
@@ -74,20 +75,20 @@ class DnsPageBuildContractTests(unittest.TestCase):
             create_page_load_worker=lambda request_id, parent=None: None,
         )
 
-        page = NetworkPage(deps=SimpleNamespace(dns_feature=dns_feature))
+        with patch("dns.ui.page.get_custom_dns_servers", return_value=[]):
+            page = NetworkPage(deps=SimpleNamespace(dns_feature=dns_feature))
 
         self.assertIsInstance(page.dns_cards_container, DnsChoiceListWidget)
-        self.assertIs(
-            page.dns_cards_container.itemWidget(page.dns_cards_container.custom_item()),
-            page.custom_card,
-        )
+        self.assertIsNone(page.dns_cards_container.custom_item())
+        self.assertFalse(page.custom_card.isVisible())
         self.assertEqual(len(page.dns_cards_container.findChildren(DNSProviderCard)), 0)
         self.assertGreater(page.dns_cards_container.count(), len(page.dns_cards))
 
-    def test_custom_dns_row_is_not_shown_before_it_is_inserted_into_choice_list(self) -> None:
+    def test_custom_dns_row_is_not_inserted_or_shown_by_choices_builder(self) -> None:
         class _ChoiceList:
             def __init__(self):
                 self.auto_selected = _Signal()
+                self.custom_was_inserted = False
 
             def show(self):
                 pass
@@ -96,6 +97,7 @@ class DnsPageBuildContractTests(unittest.TestCase):
                 return object()
 
             def set_custom_choice(self, custom_card):
+                self.custom_was_inserted = True
                 custom_card.set_parented()
 
         class _CustomCard:
@@ -112,6 +114,8 @@ class DnsPageBuildContractTests(unittest.TestCase):
 
         custom_card = _CustomCard()
 
+        choice_list = _ChoiceList()
+
         build_dns_choices_ui(
             cleanup_in_progress=False,
             dns_choices_built=False,
@@ -127,7 +131,7 @@ class DnsPageBuildContractTests(unittest.TestCase):
             build_auto_dns_ui_fn=lambda **_kwargs: None,
             build_provider_cards_fn=lambda **_kwargs: SimpleNamespace(dns_cards={}, category_labels=[]),
             providers={},
-            dns_cards_layout=_ChoiceList(),
+            dns_cards_layout=choice_list,
             on_auto_selected=lambda: None,
             on_provider_selected=lambda _name, _data: None,
             ipv6_available=True,
@@ -137,6 +141,7 @@ class DnsPageBuildContractTests(unittest.TestCase):
             apply_inline_theme_styles_fn=lambda _tokens: None,
         )
 
+        self.assertFalse(choice_list.custom_was_inserted)
         self.assertFalse(custom_card.was_shown_without_parent)
 
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ipaddress import IPv4Address
+from ipaddress import IPv4Address, ip_address
 from typing import Any
 
 from settings import schema
@@ -198,6 +198,62 @@ def unique_int_list(value: object) -> list[int]:
     return result
 
 
+def unique_ip_list(value: object) -> list[str]:
+    if isinstance(value, str):
+        raw_items = value.replace(",", " ").replace(";", " ").split()
+    elif isinstance(value, (list, tuple, set)):
+        raw_items = []
+        for item in value:
+            if isinstance(item, str):
+                raw_items.extend(item.replace(",", " ").replace(";", " ").split())
+            else:
+                raw_items.append(str(item))
+    else:
+        raw_items = []
+
+    result: list[str] = []
+    seen: set[str] = set()
+    for item in raw_items:
+        try:
+            normalized = str(ip_address(str(item).strip()))
+        except Exception:
+            continue
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        result.append(normalized)
+    return result
+
+
+def normalize_custom_dns_servers(value: object) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    result: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    seen_names: set[str] = set()
+    for index, item in enumerate(value):
+        raw = as_dict(item)
+        server_id = as_clean_str(raw.get("id")) or f"custom-{index + 1}"
+        name = as_clean_str(raw.get("name")) or "Свой DNS"
+        ipv4 = [ip for ip in unique_ip_list(raw.get("ipv4")) if "." in ip]
+        ipv6 = [ip for ip in unique_ip_list(raw.get("ipv6")) if ":" in ip]
+        if not ipv4 and not ipv6:
+            continue
+        server_id_key = server_id.lower()
+        name_key = name.lower()
+        if server_id_key in seen_ids or name_key in seen_names:
+            continue
+        seen_ids.add(server_id_key)
+        seen_names.add(name_key)
+        result.append({
+            "id": server_id,
+            "name": name,
+            "ipv4": ipv4,
+            "ipv6": ipv6,
+        })
+    return result
+
+
 def normalize_lookup_key(value: object) -> str:
     return as_clean_str(value).lower()
 
@@ -337,6 +393,7 @@ def normalize_dns(data: object) -> dict[str, Any]:
     return {
         "force_dns_enabled": as_bool(raw.get("force_dns_enabled"), defaults["force_dns_enabled"]),
         "dns_crash_count": as_int(raw.get("dns_crash_count"), defaults["dns_crash_count"], minimum=0),
+        "custom_servers": normalize_custom_dns_servers(raw.get("custom_servers")),
     }
 
 

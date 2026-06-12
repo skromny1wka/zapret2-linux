@@ -16,6 +16,7 @@ class ForceDnsCardWidgets:
     force_button: object
     status_label: object
     reset_button: object
+    custom_button: object
 
 
 def build_force_dns_card_ui(
@@ -39,6 +40,7 @@ def build_force_dns_card_ui(
     enable_setting_card_group_auto_height_fn,
     on_toggle,
     on_confirm_reset,
+    on_custom_dns=None,
 ) -> tuple[bool, ForceDnsCardWidgets]:
     tokens = get_theme_tokens_fn()
     force_dns_active = get_force_dns_status_fn()
@@ -94,11 +96,30 @@ def build_force_dns_card_ui(
         description=reset_description,
     )
 
+    custom_dns_btn = action_button_cls(
+        tr_fn("page.network.custom.button", "Свой DNS"),
+        icon=FluentIcon.EDIT,
+    )
+    if callable(on_custom_dns):
+        custom_dns_btn.clicked.connect(on_custom_dns)
+    custom_description = tr_fn(
+        "page.network.custom.button.description",
+        "Открывает окно, где можно добавить, изменить или удалить свои DNS серверы.",
+    )
+    set_tooltip(custom_dns_btn, custom_description)
+    custom_name = tr_fn("page.network.custom.button.accessible_name", "Настроить свой DNS")
+    set_state_text(custom_dns_btn, custom_name)
+    set_control_accessibility(
+        custom_dns_btn,
+        name=custom_name,
+        description=custom_description,
+    )
+
     force_dns_status_label = caption_label_cls("")
     force_dns_status_label.setWordWrap(True)
     force_dns_status_label.setVisible(False)
 
-    force_dns_card.add_buttons((force_dns_btn, force_dns_reset_dhcp_btn))
+    force_dns_card.add_buttons((force_dns_btn, force_dns_reset_dhcp_btn, custom_dns_btn))
 
     add_widget_fn(force_dns_card)
 
@@ -107,4 +128,5 @@ def build_force_dns_card_ui(
         force_button=force_dns_btn,
         status_label=force_dns_status_label,
         reset_button=force_dns_reset_dhcp_btn,
+        custom_button=custom_dns_btn,
     )

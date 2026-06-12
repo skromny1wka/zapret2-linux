@@ -694,6 +694,16 @@ def set_dns_crash_count(value: int) -> bool:
     return _set_int(("dns", "dns_crash_count"), value)
 
 
+def get_custom_dns_servers() -> list[dict[str, Any]]:
+    value = _get_path_value(read_settings(), ("dns", "custom_servers"), [])
+    return copy.deepcopy(value if isinstance(value, list) else [])
+
+
+def set_custom_dns_servers(value: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    updated = _update_settings(lambda data: _set_path_value(data, ("dns", "custom_servers"), value))
+    return copy.deepcopy(updated["dns"]["custom_servers"])
+
+
 def increment_dns_crash_count() -> int:
     updated = _update_settings(
         lambda data: _set_path_value(
@@ -1286,6 +1296,7 @@ __all__ = [
     "get_discord_restart_enabled",
     "get_display_mode",
     "get_dns_crash_count",
+    "get_custom_dns_servers",
     "get_dpi_autostart",
     "get_editor_smooth_scroll_enabled",
     "get_defender_disabled_memory",
@@ -1383,6 +1394,7 @@ __all__ = [
     "set_discord_restart_enabled",
     "set_display_mode",
     "set_dns_crash_count",
+    "set_custom_dns_servers",
     "set_dpi_autostart",
     "set_editor_smooth_scroll_enabled",
     "set_follow_windows_accent",

@@ -19,7 +19,7 @@ class CustomDnsAccessibilityTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls._app = QApplication.instance() or QApplication([])
 
-    def test_custom_dns_controls_have_screen_reader_text(self) -> None:
+    def test_custom_dns_row_has_no_inline_inputs_or_apply_button(self) -> None:
         widgets = build_custom_dns_ui(
             tr_fn=lambda _key, default: default,
             settings_card_cls=_Card,
@@ -32,18 +32,14 @@ class CustomDnsAccessibilityTests(unittest.TestCase):
             indicator_off_qss="",
         )
 
-        self.assertEqual(widgets.primary_input.accessibleName(), "Основной DNS сервер")
-        self.assertIn("первый DNS сервер", widgets.primary_input.accessibleDescription())
-        self.assertEqual(widgets.secondary_input.accessibleName(), "Дополнительный DNS сервер")
-        self.assertIn("второй DNS сервер", widgets.secondary_input.accessibleDescription())
-        self.assertEqual(widgets.apply_button.accessibleName(), "Применить свой DNS")
-        self.assertEqual(
-            widgets.apply_button.property("screenReaderStateText"),
-            "Применить свой DNS",
-        )
-        self.assertIn("указанные DNS серверы", widgets.apply_button.accessibleDescription())
+        self.assertEqual(widgets.primary_input.text(), "")
+        self.assertEqual(widgets.secondary_input.text(), "")
+        self.assertIsNone(widgets.apply_button)
         self.assertIsNone(widgets.indicator)
         self.assertTrue(hasattr(widgets.card, "set_selected"))
+        self.assertEqual(len(widgets.card.findChildren(LineEdit)), 0)
+        self.assertEqual(len(widgets.card.findChildren(PushButton)), 0)
+        self.assertIn("кнопку", widgets.card.accessibleDescription())
 
         set_dns_card_selected(widgets.card, True)
 

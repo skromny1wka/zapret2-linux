@@ -127,6 +127,7 @@ def default_dns() -> dict[str, Any]:
     return {
         "force_dns_enabled": True,
         "dns_crash_count": 0,
+        "custom_servers": [],
     }
 
 

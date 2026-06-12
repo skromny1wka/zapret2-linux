@@ -6,7 +6,7 @@ import unittest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QWidget
 
 
 class DnsChoiceListTests(unittest.TestCase):
@@ -51,14 +51,17 @@ class DnsChoiceListTests(unittest.TestCase):
             {"desc": "Быстрый", "ipv4": ["1.1.1.1"], "ipv6": []},
             show_ipv6=False,
         ).item
+        custom_item = view.set_custom_choice(QWidget())
         selected: list[str] = []
         view.auto_selected.connect(lambda: selected.append("auto"))
         view.provider_selected.connect(lambda name, _data: selected.append(name))
+        view.custom_selected.connect(lambda: selected.append("custom"))
 
         view.activate_item(auto_item)
         view.activate_item(provider_item)
+        view.activate_item(custom_item)
 
-        self.assertEqual(selected, ["auto", "Cloudflare"])
+        self.assertEqual(selected, ["auto", "Cloudflare", "custom"])
         self.assertEqual(auto_item.flags() & Qt.ItemFlag.ItemIsEnabled, Qt.ItemFlag.ItemIsEnabled)
 
 

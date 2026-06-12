@@ -55,8 +55,9 @@ class ForceDnsBuildTests(unittest.TestCase):
         self.assertEqual([], section_titles)
         self.assertFalse(widgets.reset_button.icon().isNull())
 
-    def test_force_dns_actions_are_two_buttons_without_toggle_row(self) -> None:
+    def test_force_dns_actions_include_custom_dns_button_without_toggle_row(self) -> None:
         parent = QWidget()
+        custom_clicks: list[bool] = []
 
         _active, widgets = build_force_dns_card_ui(
             parent=parent,
@@ -78,12 +79,16 @@ class ForceDnsBuildTests(unittest.TestCase):
             enable_setting_card_group_auto_height_fn=enable_setting_card_group_auto_height,
             on_toggle=lambda: None,
             on_confirm_reset=lambda: None,
+            on_custom_dns=lambda: custom_clicks.append(True),
         )
 
         self.assertEqual(widgets.force_button.text(), "Включить принудительный DNS")
         self.assertEqual(widgets.reset_button.text(), "Вернуть DNS автоматически")
-        self.assertEqual(widgets.card.actions_layout.count(), 2)
+        self.assertEqual(widgets.custom_button.text(), "Свой DNS")
+        self.assertEqual(widgets.card.actions_layout.count(), 3)
         self.assertFalse(hasattr(widgets, "toggle"))
+        widgets.custom_button.click()
+        self.assertEqual(custom_clicks, [True])
 
     def test_force_dns_action_button_text_reflects_active_state(self) -> None:
         parent = QWidget()
@@ -108,6 +113,7 @@ class ForceDnsBuildTests(unittest.TestCase):
             enable_setting_card_group_auto_height_fn=enable_setting_card_group_auto_height,
             on_toggle=lambda: None,
             on_confirm_reset=lambda: None,
+            on_custom_dns=lambda: None,
         )
 
         self.assertEqual(widgets.force_button.text(), "Выключить принудительный DNS")
@@ -135,6 +141,7 @@ class ForceDnsBuildTests(unittest.TestCase):
             enable_setting_card_group_auto_height_fn=enable_setting_card_group_auto_height,
             on_toggle=lambda: None,
             on_confirm_reset=lambda: None,
+            on_custom_dns=lambda: None,
         )
 
         self.assertEqual(widgets.force_button.accessibleName(), "Включить принудительный DNS")
@@ -143,6 +150,9 @@ class ForceDnsBuildTests(unittest.TestCase):
         self.assertEqual(widgets.reset_button.accessibleName(), "Вернуть DNS автоматически")
         self.assertEqual(widgets.reset_button.property("screenReaderStateText"), "Вернуть DNS автоматически")
         self.assertIn("DNS будет снова получаться автоматически", widgets.reset_button.accessibleDescription())
+        self.assertEqual(widgets.custom_button.accessibleName(), "Настроить свой DNS")
+        self.assertEqual(widgets.custom_button.property("screenReaderStateText"), "Настроить свой DNS")
+        self.assertIn("Открывает окно", widgets.custom_button.accessibleDescription())
 
     def test_force_dns_active_action_button_has_screen_reader_state_text(self) -> None:
         parent = QWidget()
@@ -167,6 +177,7 @@ class ForceDnsBuildTests(unittest.TestCase):
             enable_setting_card_group_auto_height_fn=enable_setting_card_group_auto_height,
             on_toggle=lambda: None,
             on_confirm_reset=lambda: None,
+            on_custom_dns=lambda: None,
         )
 
         self.assertEqual(widgets.force_button.accessibleName(), "Выключить принудительный DNS")
