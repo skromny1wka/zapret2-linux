@@ -139,11 +139,13 @@ class CreatePresetDialog(PresetDialogTextMixin, MessageBoxBase):
             name="Создать пресет",
             description="Сохраняет текущие настройки как отдельный пресет.",
         )
+        set_state_text(self.yesButton, "Создать пресет")
         set_control_accessibility(
             self.cancelButton,
             name="Отменить создание пресета",
             description="Закрывает окно без создания пресета.",
         )
+        set_state_text(self.cancelButton, "Отменить создание пресета")
 
     def _on_source_changed(self, key: str) -> None:
         self._source = key
@@ -257,11 +259,13 @@ class RenamePresetDialog(PresetDialogTextMixin, MessageBoxBase):
             name="Переименовать пресет",
             description="Меняет имя пресета в списке.",
         )
+        set_state_text(self.yesButton, "Переименовать пресет")
         set_control_accessibility(
             self.cancelButton,
             name="Отменить переименование пресета",
             description="Закрывает окно без изменения имени.",
         )
+        set_state_text(self.cancelButton, "Отменить переименование пресета")
 
     def _show_warning(self, text: str) -> None:
         self.warningLabel.setText(text)
@@ -314,8 +318,10 @@ class ResetAllPresetsDialog(PresetDialogTextMixin, MessageBoxBase):
             name="Вернуть встроенные пресеты",
             description="Изменения во встроенных пресетах будут потеряны. Пользовательские пресеты останутся.",
         )
+        set_state_text(self.yesButton, "Вернуть встроенные пресеты")
         set_control_accessibility(
             self.cancelButton,
             name="Отменить возврат встроенных пресетов",
             description="Закрывает окно без возврата встроенных пресетов.",
         )
+        set_state_text(self.cancelButton, "Отменить возврат встроенных пресетов")

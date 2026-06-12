@@ -325,8 +325,10 @@ class UserPresetsAccessibilityTests(unittest.TestCase):
                 "Основа нового пресета: Встроенного пресета, выбрано",
             )
         self.assertEqual(dialog.yesButton.accessibleName(), "Создать пресет")
+        self.assertEqual(dialog.yesButton.property("screenReaderStateText"), "Создать пресет")
         self.assertIn("Сохраняет текущие настройки", dialog.yesButton.accessibleDescription())
         self.assertEqual(dialog.cancelButton.accessibleName(), "Отменить создание пресета")
+        self.assertEqual(dialog.cancelButton.property("screenReaderStateText"), "Отменить создание пресета")
 
         self.assertFalse(dialog.validate())
 
@@ -340,16 +342,23 @@ class UserPresetsAccessibilityTests(unittest.TestCase):
         self.assertEqual(dialog.nameEdit.accessibleName(), "Новое название пресета")
         self.assertIn("Текущее имя: Дом", dialog.nameEdit.accessibleDescription())
         self.assertEqual(dialog.yesButton.accessibleName(), "Переименовать пресет")
+        self.assertEqual(dialog.yesButton.property("screenReaderStateText"), "Переименовать пресет")
         self.assertIn("Меняет имя пресета", dialog.yesButton.accessibleDescription())
         self.assertEqual(dialog.cancelButton.accessibleName(), "Отменить переименование пресета")
+        self.assertEqual(dialog.cancelButton.property("screenReaderStateText"), "Отменить переименование пресета")
 
     def test_reset_presets_dialog_has_screen_reader_text(self) -> None:
         dialog = ResetAllPresetsDialog(self._dialog_parent())
         self.addCleanup(dialog.deleteLater)
 
         self.assertEqual(dialog.yesButton.accessibleName(), "Вернуть встроенные пресеты")
+        self.assertEqual(dialog.yesButton.property("screenReaderStateText"), "Вернуть встроенные пресеты")
         self.assertIn("Изменения во встроенных пресетах будут потеряны", dialog.yesButton.accessibleDescription())
         self.assertEqual(dialog.cancelButton.accessibleName(), "Отменить возврат встроенных пресетов")
+        self.assertEqual(
+            dialog.cancelButton.property("screenReaderStateText"),
+            "Отменить возврат встроенных пресетов",
+        )
 
     def _assert_accessibility(self, widgets) -> None:
         expected = {
