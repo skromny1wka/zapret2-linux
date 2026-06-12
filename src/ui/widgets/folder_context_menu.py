@@ -81,7 +81,9 @@ class FolderNameDialog(MessageBoxBase):
             yes_description = "Создаёт папку."
             cancel_name = "Отменить создание папки"
         set_control_accessibility(self.nameEdit, name=name, description=description)
+        set_state_text(self.yesButton, yes_name)
         set_control_accessibility(self.yesButton, name=yes_name, description=yes_description)
+        set_state_text(self.cancelButton, cancel_name)
         set_control_accessibility(
             self.cancelButton,
             name=cancel_name,

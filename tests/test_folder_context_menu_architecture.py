@@ -17,6 +17,7 @@ class _DialogButton:
         self._text = ""
         self._accessible_name = ""
         self._accessible_description = ""
+        self._properties: dict[str, object] = {}
 
     def setText(self, text: str) -> None:  # noqa: N802
         self._text = str(text)
@@ -35,6 +36,12 @@ class _DialogButton:
 
     def setAccessibleDescription(self, text: str) -> None:  # noqa: N802
         self._accessible_description = str(text)
+
+    def property(self, name: str):  # noqa: A003
+        return self._properties.get(str(name))
+
+    def setProperty(self, name: str, value) -> None:  # noqa: N802
+        self._properties[str(name)] = value
 
 
 class _MessageBox:
@@ -87,8 +94,10 @@ class FolderContextMenuArchitectureTests(unittest.TestCase):
         self.assertEqual(dialog.nameEdit.accessibleName(), "Название папки")
         self.assertIn("Введите имя папки", dialog.nameEdit.accessibleDescription())
         self.assertEqual(dialog.yesButton.accessibleName(), "Создать папку")
+        self.assertEqual(dialog.yesButton.property("screenReaderStateText"), "Создать папку")
         self.assertIn("Создаёт папку", dialog.yesButton.accessibleDescription())
         self.assertEqual(dialog.cancelButton.accessibleName(), "Отменить создание папки")
+        self.assertEqual(dialog.cancelButton.property("screenReaderStateText"), "Отменить создание папки")
 
         self.assertFalse(dialog.validate())
 
@@ -108,8 +117,10 @@ class FolderContextMenuArchitectureTests(unittest.TestCase):
         self.assertEqual(dialog.nameEdit.accessibleName(), "Новое название папки")
         self.assertIn("Текущее имя: Видео", dialog.nameEdit.accessibleDescription())
         self.assertEqual(dialog.yesButton.accessibleName(), "Переименовать папку")
+        self.assertEqual(dialog.yesButton.property("screenReaderStateText"), "Переименовать папку")
         self.assertIn("Меняет имя папки", dialog.yesButton.accessibleDescription())
         self.assertEqual(dialog.cancelButton.accessibleName(), "Отменить переименование папки")
+        self.assertEqual(dialog.cancelButton.property("screenReaderStateText"), "Отменить переименование папки")
 
     def test_delete_folder_dialog_buttons_are_named_for_screen_reader(self) -> None:
         labels = folder_context_menu.FolderMenuLabels(
@@ -135,8 +146,10 @@ class FolderContextMenuArchitectureTests(unittest.TestCase):
 
         dialog = _MessageBox.instances[0]
         self.assertEqual(dialog.yesButton.accessibleName(), "Удалить папку")
+        self.assertEqual(dialog.yesButton.property("screenReaderStateText"), "Удалить папку")
         self.assertIn("Папка будет удалена", dialog.yesButton.accessibleDescription())
         self.assertEqual(dialog.cancelButton.accessibleName(), "Отменить удаление папки")
+        self.assertEqual(dialog.cancelButton.property("screenReaderStateText"), "Отменить удаление папки")
         self.assertTrue(dialog.exec_called)
         actions.run_action.assert_not_called()
 
@@ -163,8 +176,10 @@ class FolderContextMenuArchitectureTests(unittest.TestCase):
 
         dialog = _MessageBox.instances[0]
         self.assertEqual(dialog.yesButton.accessibleName(), "Сбросить папки")
+        self.assertEqual(dialog.yesButton.property("screenReaderStateText"), "Сбросить папки")
         self.assertIn("Папки будут возвращены", dialog.yesButton.accessibleDescription())
         self.assertEqual(dialog.cancelButton.accessibleName(), "Отменить сброс папок")
+        self.assertEqual(dialog.cancelButton.property("screenReaderStateText"), "Отменить сброс папок")
         self.assertTrue(dialog.exec_called)
         actions.run_action.assert_not_called()
 
