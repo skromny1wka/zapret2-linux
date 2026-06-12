@@ -7,6 +7,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtWidgets import QApplication, QVBoxLayout, QWidget
 
+from app.state_store import MainWindowStateStore
 from ui.pages.about_page_about_build import build_about_page_about_content
 from ui.pages.about_page import AboutPage
 from ui.pages.about_page_tabs_build import build_about_page_tabs
@@ -80,30 +81,27 @@ class AboutPageAccessibilityTests(unittest.TestCase):
         self.addCleanup(widgets.stacked_widget.deleteLater)
 
         self.assertEqual(widgets.tabs_pivot.accessibleName(), "Вкладки страницы о программе, выбрано: О программе")
-        self.assertIn("О программе, Поддержка, Справка или Zapret KVN", widgets.tabs_pivot.accessibleDescription())
+        self.assertIn("О программе, Справка или Zapret KVN", widgets.tabs_pivot.accessibleDescription())
         self.assertEqual(
             widgets.tabs_pivot.items["about"].accessibleName(),
             "Вкладки страницы о программе: О программе, выбрано",
         )
-        self.assertEqual(
-            widgets.tabs_pivot.items["support"].accessibleName(),
-            "Вкладки страницы о программе: Поддержка, не выбрано",
-        )
+        self.assertNotIn("support", widgets.tabs_pivot.items)
 
-        widgets.tabs_pivot.setCurrentItem("support")
+        widgets.tabs_pivot.setCurrentItem("help")
 
-        self.assertEqual(widgets.tabs_pivot.accessibleName(), "Вкладки страницы о программе, выбрано: Поддержка")
+        self.assertEqual(widgets.tabs_pivot.accessibleName(), "Вкладки страницы о программе, выбрано: Справка")
         self.assertEqual(
             widgets.tabs_pivot.property("screenReaderStateText"),
-            "Вкладки страницы о программе, выбрано: Поддержка",
+            "Вкладки страницы о программе, выбрано: Справка",
         )
         self.assertEqual(
             widgets.tabs_pivot.items["about"].accessibleName(),
             "Вкладки страницы о программе: О программе, не выбрано",
         )
         self.assertEqual(
-            widgets.tabs_pivot.items["support"].accessibleName(),
-            "Вкладки страницы о программе: Поддержка, выбрано",
+            widgets.tabs_pivot.items["help"].accessibleName(),
+            "Вкладки страницы о программе: Справка, выбрано",
         )
 
     def test_about_language_refresh_keeps_screen_reader_names(self) -> None:
@@ -137,6 +135,27 @@ class AboutPageAccessibilityTests(unittest.TestCase):
         self.assertEqual(page.premium_btn.accessible_name, "Открыть Premium и VPN")
         self.assertEqual(page.premium_btn.property("screenReaderStateText"), "Открыть Premium и VPN")
         self.assertIn("Premium", page.premium_btn.accessible_description)
+
+    def test_about_page_shows_support_blocks_on_about_tab(self) -> None:
+        page = AboutPage(
+            open_premium=lambda: None,
+            open_updates=lambda: None,
+            create_open_action_worker=lambda *_args, **_kwargs: None,
+            ui_state_store=MainWindowStateStore(),
+        )
+        self.addCleanup(page.cleanup)
+        self.addCleanup(page.deleteLater)
+
+        self.assertNotIn("support", page.tabs_pivot.items)
+        self.assertEqual(page.stacked_widget.count(), 3)
+        self.assertIsNotNone(page._support_discussions_card)
+        self.assertIsNotNone(page._support_telegram_card)
+        self.assertIsNotNone(page._support_discord_card)
+
+        page.switch_to_tab("support")
+
+        self.assertEqual(page.stacked_widget.currentIndex(), 0)
+        self.assertEqual(page.tabs_pivot.currentRouteKey(), "about")
 
 
 class _TextWidget:

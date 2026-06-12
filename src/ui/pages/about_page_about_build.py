@@ -143,7 +143,6 @@ def build_about_page_about_content(
 
     sub_card.add_layout(sub_layout)
     layout.addWidget(sub_card)
-    layout.addStretch()
 
     return AboutPageAboutWidgets(
         about_section_version_label=about_section_version_label,

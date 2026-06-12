@@ -46,7 +46,7 @@ def _make_section_label(text: str, parent: QWidget | None = None) -> QLabel:
 
 
 class AboutPage(BasePage):
-    """Страница О программе с вкладками: О программе / Поддержка / Справка"""
+    """Страница О программе с вкладками: О программе / Справка / Zapret KVN."""
 
     def __init__(
         self,
@@ -65,7 +65,7 @@ class AboutPage(BasePage):
             subtitle_key="page.about.subtitle",
         )
 
-        # UI refs (support tab)
+        # UI refs (support blocks)
         self._open_premium_callback = open_premium
         self._open_updates_callback = open_updates
         self._create_about_open_action_worker = create_open_action_worker
@@ -77,7 +77,6 @@ class AboutPage(BasePage):
         self._support_discord_card = None
 
         # Tab lazy init flags
-        self._support_tab_initialized = False
         self._help_tab_initialized = False
         self._kvn_tab_initialized = False
 
@@ -130,13 +129,12 @@ class AboutPage(BasePage):
 
         self.stacked_widget = tabs_widgets.stacked_widget
         self._about_tab = tabs_widgets.about_tab
-        self._support_tab = tabs_widgets.support_tab
         self._help_tab = tabs_widgets.help_tab
         self._kvn_tab = tabs_widgets.kvn_tab
-        self._support_layout = tabs_widgets.support_layout
+        self._about_layout = tabs_widgets.about_layout
         self._help_layout = tabs_widgets.help_layout
         self._kvn_layout = tabs_widgets.kvn_layout
-        self._build_about_content(tabs_widgets.about_layout)
+        self._build_about_content(self._about_layout)
 
         self.add_widget(self.stacked_widget)
 
@@ -154,17 +152,9 @@ class AboutPage(BasePage):
     def _switch_tab(self, index: int):
         plan = about_page_plans.build_tab_switch_plan(
             index=index,
-            support_initialized=self._support_tab_initialized,
             help_initialized=self._help_tab_initialized,
             kvn_initialized=self._kvn_tab_initialized,
         )
-        if plan.init_support:
-            self._support_tab_initialized = True
-            try:
-                self._build_support_content(self._support_layout)
-            except Exception as e:
-                log(f"Ошибка построения вкладки поддержки: {e}", "ERROR")
-
         if plan.init_help:
             self._help_tab_initialized = True
             try:
@@ -205,15 +195,12 @@ class AboutPage(BasePage):
 
         try:
             self.tabs_pivot.setItemText("about", " " + tr_catalog("page.about.tab.about", language=language, default="О ПРОГРАММЕ"))
-            self.tabs_pivot.setItemText("support", " " + tr_catalog("page.about.tab.support", language=language, default="ПОДДЕРЖКА"))
             self.tabs_pivot.setItemText("help", " " + tr_catalog("page.about.tab.help", language=language, default="СПРАВКА"))
             self.tabs_pivot.setItemText("kvn", " ZAPRET KVN")
         except Exception:
             pass
 
-        self._retranslate_about_tab()
-        if self._support_tab_initialized:
-            self._rebuild_support_tab()
+        self._rebuild_about_tab()
         if self._help_tab_initialized:
             self._rebuild_help_tab()
         if self._kvn_tab_initialized:
@@ -295,9 +282,13 @@ class AboutPage(BasePage):
         except Exception:
             pass
 
-    def _rebuild_support_tab(self) -> None:
-        self._clear_layout(self._support_layout)
-        self._build_support_content(self._support_layout)
+    def _rebuild_about_tab(self) -> None:
+        self._clear_layout(self._about_layout)
+        self._build_about_content(self._about_layout)
+        try:
+            self.update_subscription_status(*self._current_subscription_state())
+        except Exception:
+            pass
 
     def _rebuild_help_tab(self) -> None:
         self._clear_layout(self._help_layout)
@@ -329,6 +320,8 @@ class AboutPage(BasePage):
         self.sub_status_label = widgets.sub_status_label
         self.sub_desc_label = widgets.sub_desc_label
         self.premium_btn = widgets.premium_btn
+        layout.addSpacing(16)
+        self._build_support_content(layout)
 
     def update_subscription_status(self, is_premium: bool, days: int | None = None):
         """Обновляет отображение статуса подписки"""
@@ -365,7 +358,7 @@ class AboutPage(BasePage):
         return False, None
 
     # ─────────────────────────────────────────────────────────────────────────
-    # Tab 1: Поддержка
+    # Блоки поддержки внутри вкладки «О программе»
     # ─────────────────────────────────────────────────────────────────────────
 
     def _build_support_content(self, layout: QVBoxLayout):

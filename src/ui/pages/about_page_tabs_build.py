@@ -12,7 +12,6 @@ from ui.segmented_accessibility import set_segmented_items_accessibility
 
 _TAB_ACCESSIBLE_LABELS = {
     "about": "О программе",
-    "support": "Поддержка",
     "help": "Справка",
     "kvn": "Zapret KVN",
 }
@@ -56,8 +55,6 @@ class AboutPageTabsWidgets:
     stacked_widget: QStackedWidget
     about_tab: QWidget
     about_layout: QVBoxLayout
-    support_tab: QWidget
-    support_layout: QVBoxLayout
     help_tab: QWidget
     help_layout: QVBoxLayout
     kvn_tab: QWidget
@@ -80,19 +77,14 @@ def build_about_page_tabs(*, tr_fn, on_switch_tab) -> AboutPageTabsWidgets:
         onClick=lambda: on_switch_tab(0),
     )
     tabs_pivot.addItem(
-        routeKey="support",
-        text=" " + tr_fn("page.about.tab.support", "ПОДДЕРЖКА"),
-        onClick=lambda: on_switch_tab(1),
-    )
-    tabs_pivot.addItem(
         routeKey="help",
         text=" " + tr_fn("page.about.tab.help", "СПРАВКА"),
-        onClick=lambda: on_switch_tab(2),
+        onClick=lambda: on_switch_tab(1),
     )
     tabs_pivot.addItem(
         routeKey="kvn",
         text=" ZAPRET KVN",
-        onClick=lambda: on_switch_tab(3),
+        onClick=lambda: on_switch_tab(2),
     )
     tabs_pivot.setCurrentItem("about")
     tabs_pivot.setItemFontSize(13)
@@ -102,12 +94,10 @@ def build_about_page_tabs(*, tr_fn, on_switch_tab) -> AboutPageTabsWidgets:
     stacked_widget = QStackedWidget()
 
     about_tab, about_layout = _make_tab_widget()
-    support_tab, support_layout = _make_tab_widget()
     help_tab, help_layout = _make_tab_widget()
     kvn_tab, kvn_layout = _make_tab_widget()
 
     stacked_widget.addWidget(about_tab)
-    stacked_widget.addWidget(support_tab)
     stacked_widget.addWidget(help_tab)
     stacked_widget.addWidget(kvn_tab)
 
@@ -116,8 +106,6 @@ def build_about_page_tabs(*, tr_fn, on_switch_tab) -> AboutPageTabsWidgets:
         stacked_widget=stacked_widget,
         about_tab=about_tab,
         about_layout=about_layout,
-        support_tab=support_tab,
-        support_layout=support_layout,
         help_tab=help_tab,
         help_layout=help_layout,
         kvn_tab=kvn_tab,
