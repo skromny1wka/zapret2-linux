@@ -61,6 +61,39 @@ class ProfileListAccessibilityTests(unittest.TestCase):
         self.assertEqual(widget.focusPolicy(), Qt.FocusPolicy.StrongFocus)
         self.assertIs(widget.focusProxy(), widget._view)
 
+    def test_profile_list_wrapper_forwards_arrow_and_enter_keys_to_view(self) -> None:
+        from profile.ui.profiles_list import ProfilesList
+
+        widget = ProfilesList()
+        self.addCleanup(widget.deleteLater)
+        widget._model._rows = [
+            {
+                "kind": "profile",
+                "key": "profile-a",
+                "display_name": "A",
+            },
+            {
+                "kind": "profile",
+                "key": "profile-b",
+                "display_name": "B",
+            },
+        ]
+        widget._view.setCurrentIndex(widget._model.index(0, 0))
+        opened: list[str] = []
+        widget.profile_selected.connect(opened.append)
+
+        down_event = QKeyEvent(QKeyEvent.Type.KeyPress, int(Qt.Key.Key_Down), Qt.KeyboardModifier.NoModifier)
+        widget.keyPressEvent(down_event)
+
+        self.assertTrue(down_event.isAccepted())
+        self.assertEqual(widget._view.currentIndex().row(), 1)
+
+        enter_event = QKeyEvent(QKeyEvent.Type.KeyPress, int(Qt.Key.Key_Return), Qt.KeyboardModifier.NoModifier)
+        widget.keyPressEvent(enter_event)
+
+        self.assertTrue(enter_event.isAccepted())
+        self.assertEqual(opened, ["profile-b"])
+
     def test_profile_list_focuses_first_loaded_row_for_screen_reader(self) -> None:
         from profile.list_view_state import build_profile_list_view_state
         from profile.ui.profiles_list import ProfilesList

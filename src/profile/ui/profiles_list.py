@@ -164,6 +164,56 @@ class ProfilesList(QWidget):
         apply_page_smooth_scroll_preference(self._view)
         layout.addWidget(self._view, 1)
 
+    def keyPressEvent(self, event):  # noqa: N802
+        if self._handle_profile_list_keyboard_event(event):
+            return
+        super().keyPressEvent(event)
+
+    def _handle_profile_list_keyboard_event(self, event) -> bool:
+        key = event.key()
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space, Qt.Key.Key_Menu) or (
+            key == Qt.Key.Key_F10 and event.modifiers() & Qt.KeyboardModifier.ShiftModifier
+        ):
+            self._view.setFocus(Qt.FocusReason.OtherFocusReason)
+            self._view.keyPressEvent(event)
+            return bool(event.isAccepted())
+
+        if key not in (
+            Qt.Key.Key_Down,
+            Qt.Key.Key_Up,
+            Qt.Key.Key_Home,
+            Qt.Key.Key_End,
+            Qt.Key.Key_PageDown,
+            Qt.Key.Key_PageUp,
+        ):
+            return False
+
+        count = self._model.rowCount()
+        if count <= 0:
+            return False
+
+        current = self._view.currentIndex()
+        row = current.row() if current.isValid() else -1
+        if row < 0:
+            row = 0
+        elif key == Qt.Key.Key_Down:
+            row = min(count - 1, row + 1)
+        elif key == Qt.Key.Key_Up:
+            row = max(0, row - 1)
+        elif key == Qt.Key.Key_Home:
+            row = 0
+        elif key == Qt.Key.Key_End:
+            row = count - 1
+        elif key == Qt.Key.Key_PageDown:
+            row = min(count - 1, row + 10)
+        elif key == Qt.Key.Key_PageUp:
+            row = max(0, row - 10)
+
+        self._view.setFocus(Qt.FocusReason.OtherFocusReason)
+        self._view.setCurrentIndex(self._model.index(row, 0))
+        event.accept()
+        return True
+
     def set_smooth_scroll_enabled(self, enabled: bool) -> None:
         apply_smooth_scroll_mode(self._view, enabled)
 
