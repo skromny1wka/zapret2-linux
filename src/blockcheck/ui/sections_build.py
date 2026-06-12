@@ -61,6 +61,7 @@ def build_actions_section(
         name="Запустить BlockCheck",
         description=start_description,
     )
+    set_state_text(start_btn, "Запустить BlockCheck")
     start_btn.clicked.connect(on_start)
     actions_bar.add_button(start_btn)
 
@@ -78,6 +79,7 @@ def build_actions_section(
         name="Остановить BlockCheck",
         description=stop_description,
     )
+    set_state_text(stop_btn, "Остановить BlockCheck")
     stop_btn.clicked.connect(on_stop)
     stop_btn.setEnabled(False)
     actions_bar.add_button(stop_btn)
