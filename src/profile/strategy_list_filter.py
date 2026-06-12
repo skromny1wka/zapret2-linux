@@ -160,7 +160,7 @@ def _strategy_screen_reader_text(
         if str(part or "").strip()
     )
     text = ", ".join(part for part in parts if part)
-    return f"{text}. Нажмите Enter, чтобы выбрать стратегию." if text else ""
+    return f"{text}. Нажмите Enter или Пробел, чтобы выбрать стратегию." if text else ""
 
 
 def _lower_first(text: str) -> str:

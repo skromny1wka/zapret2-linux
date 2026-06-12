@@ -2931,7 +2931,11 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertEqual(plan.total_count, 2)
         self.assertEqual(plan.rows[0].strategy_id, "fake")
         self.assertEqual(plan.rows[0].status_text, "Выбрана • В избранном • Работает")
-        self.assertIn("Fake TLS", plan.rows[0].accessible_text)
+        self.assertEqual(
+            plan.rows[0].accessible_text,
+            "Fake TLS, выбрана, в избранном, работает, Fake, Fake TLS. "
+            "Нажмите Enter или Пробел, чтобы выбрать стратегию.",
+        )
 
     def test_strategy_list_filter_worker_emits_latest_plan(self) -> None:
         loaded = []
