@@ -60,6 +60,38 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
         self.assertEqual(state, service_manager.SERVICE_RUNNING)
         open_sc_manager.assert_called_once_with(None, None, 0x0001)
 
+    def test_service_start_type_falls_back_to_registry_when_change_config_fails(self) -> None:
+        import sys
+        from utils import service_manager
+
+        fake_winreg = Mock()
+        fake_winreg.HKEY_LOCAL_MACHINE = object()
+        fake_winreg.KEY_SET_VALUE = 0
+        fake_winreg.REG_DWORD = 4
+        fake_key = Mock()
+        fake_key.__enter__ = Mock(return_value=fake_key)
+        fake_key.__exit__ = Mock(return_value=False)
+        fake_winreg.OpenKey.return_value = fake_key
+
+        with (
+            patch.object(service_manager, "advapi32", object()),
+            patch.object(service_manager, "OpenSCManager", return_value=111),
+            patch.object(service_manager, "OpenService", return_value=222),
+            patch.object(service_manager, "ChangeServiceConfig", return_value=False),
+            patch.object(service_manager, "CloseServiceHandle"),
+            patch.dict(sys.modules, {"winreg": fake_winreg}),
+        ):
+            changed = service_manager.set_service_demand_start("Monkey")
+
+        self.assertTrue(changed)
+        fake_winreg.SetValueEx.assert_called_once_with(
+            fake_key,
+            "Start",
+            0,
+            fake_winreg.REG_DWORD,
+            service_manager.SERVICE_DEMAND_START,
+        )
+
     def test_monkey_disabled_service_is_reported_as_windivert_driver_problem(self) -> None:
         from winws_runtime.health import process_health_check
 

@@ -276,12 +276,12 @@ def set_service_start_type(service_name: str, start_type: int) -> bool:
     получает 1058 и не может сам поднять драйвер.
     """
     if advapi32 is None or OpenSCManager is None or OpenService is None or ChangeServiceConfig is None:
-        return False
+        return set_service_registry_start_type(service_name, start_type)
     try:
         sc_manager = OpenSCManager(None, None, SC_MANAGER_CONNECT)
         if not sc_manager:
             log(f"Не удалось открыть SCManager для настройки {service_name}", "DEBUG")
-            return False
+            return set_service_registry_start_type(service_name, start_type)
 
         try:
             service = OpenService(
@@ -313,19 +313,41 @@ def set_service_start_type(service_name: str, start_type: int) -> bool:
 
                 error_code = ctypes.get_last_error()
                 log(f"Не удалось изменить тип запуска {service_name}, код: {error_code}", "DEBUG")
-                return False
+                return set_service_registry_start_type(service_name, start_type)
             finally:
                 CloseServiceHandle(service)
         finally:
             CloseServiceHandle(sc_manager)
     except Exception as e:
         log(f"Ошибка настройки типа запуска {service_name}: {e}", "DEBUG")
-        return False
+        return set_service_registry_start_type(service_name, start_type)
 
 
 def set_service_demand_start(service_name: str) -> bool:
     """Переводит службу в ручной запуск, если она существует."""
     return set_service_start_type(service_name, SERVICE_DEMAND_START)
+
+
+def set_service_registry_start_type(service_name: str, start_type: int) -> bool:
+    """Резервно меняет Start в реестре, если SCM не даёт ChangeServiceConfig."""
+    try:
+        import winreg
+
+        path = f"SYSTEM\\CurrentControlSet\\Services\\{service_name}"
+        with winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE,
+            path,
+            0,
+            winreg.KEY_SET_VALUE,
+        ) as key:
+            winreg.SetValueEx(key, "Start", 0, winreg.REG_DWORD, int(start_type))
+        log(f"Start={int(start_type)} записан в реестр службы {service_name}", "DEBUG")
+        return True
+    except FileNotFoundError:
+        return True
+    except Exception as e:
+        log(f"Ошибка записи Start службы {service_name}: {e}", "DEBUG")
+        return False
 
 
 def cleanup_windivert_services() -> bool:
