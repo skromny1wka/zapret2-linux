@@ -1,19 +1,16 @@
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, pyqtProperty, QRectF, pyqtSignal, QTimer
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QStyle, QStyleOption
-from PyQt6.QtGui import QPainter, QColor, QPainterPath, QIcon
+from PyQt6.QtCore import Qt, QPropertyAnimation, QEasingCurve, pyqtProperty, pyqtSignal, QTimer
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
+from PyQt6.QtGui import QIcon
 import qtawesome as qta
 
 from ui.accessibility import set_control_accessibility, set_state_text
 from ui.combo_accessibility import set_combo_items_accessibility
 from ui.theme import (
     get_cached_qta_pixmap,
-    get_card_gradient_qss,
     get_theme_tokens,
     get_themed_qta_icon,
-    get_tinted_surface_gradient_qss,
-    to_qcolor,
 )
 from ui.animation_policy import register_managed_animation, start_managed_animation
 from ui.theme_refresh import ThemeRefreshBinding
@@ -25,10 +22,8 @@ from qfluentwidgets import (
     SettingCard as FluentSettingCard,
     SwitchSettingCard,
     SwitchButton,
+    RadioButton,
     IndicatorPosition,
-    StrongBodyLabel,
-    BodyLabel as _BodyLabel,
-    CaptionLabel as _CaptionLabel,
 )
 
 _HAS_INFO_BADGE = InfoBadge is not None and _InfoLevel is not None
@@ -262,7 +257,7 @@ class Win11ToggleRow(FluentSettingCard):
             set_state_text(toggle, name)
 
 
-class Win11RadioOption(QWidget):
+class Win11RadioOption(FluentSettingCard):
     """Радио-опция в стиле Windows 11."""
 
     clicked = pyqtSignal()
@@ -277,10 +272,16 @@ class Win11RadioOption(QWidget):
         recommended_badge: str = "рекомендуется",
         parent=None,
     ):
-        super().__init__(parent)
+        initial_tokens = get_theme_tokens()
+        FluentSettingCard.__init__(
+            self,
+            self._build_icon(icon_name, icon_color, initial_tokens),
+            title,
+            description or None,
+            parent=parent,
+        )
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
         self._selected = False
         self._hover = False
@@ -291,38 +292,27 @@ class Win11RadioOption(QWidget):
 
         self._icon_name = icon_name
         self._icon_color = icon_color
-        self._icon_label: QLabel | None = None
+        self._icon_label = getattr(self, "iconLabel", None)
+        self._radio_button = RadioButton(self)
         self._badge_label = None
-        self._title_label = None
-        self._desc_label = None
+        self._title_label = getattr(self, "titleLabel", None)
+        self._desc_label = getattr(self, "contentLabel", None)
         self._applying_theme_styles = False
-        initial_tokens = get_theme_tokens()
 
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(12)
+        try:
+            self.setIconSize(24 if icon_name else 0, 24 if icon_name else 0)
+            if not icon_name and self._icon_label is not None:
+                self._icon_label.hide()
+        except Exception:
+            pass
+        _apply_setting_card_text_styles(self._title_label, self._desc_label, initial_tokens)
 
-        self.radio_circle = QWidget()
-        self.radio_circle.setFixedSize(20, 20)
-        layout.addWidget(self.radio_circle)
-
-        if icon_name:
-            self._icon_label = QLabel()
-            self._icon_label.setFixedSize(28, 28)
-            layout.addWidget(self._icon_label)
-            self._refresh_icon(initial_tokens)
-
-        text_layout = QVBoxLayout()
-        text_layout.setSpacing(2)
-        text_layout.setContentsMargins(0, 0, 0, 0)
-
-        title_layout = QHBoxLayout()
-        title_layout.setSpacing(8)
-        title_layout.setContentsMargins(0, 0, 0, 0)
-
-        title_label = StrongBodyLabel(title)
-        self._title_label = title_label
-        title_layout.addWidget(title_label)
+        try:
+            self.hBoxLayout.insertWidget(0, self._radio_button, 0, Qt.AlignmentFlag.AlignLeft)
+            self.hBoxLayout.insertSpacing(1, 12)
+            self._radio_button.clicked.connect(self.clicked.emit)
+        except Exception:
+            pass
 
         if recommended:
             if _should_use_info_badge():
@@ -332,17 +322,7 @@ class Win11RadioOption(QWidget):
                 self._badge_label.setStyleSheet(
                     "QLabel { background: #0078d4; color: #fff; font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 3px; }"
                 )
-            title_layout.addWidget(self._badge_label)
-
-        title_layout.addStretch()
-        text_layout.addLayout(title_layout)
-
-        desc_label = _CaptionLabel(description)
-        desc_label.setWordWrap(True)
-        self._desc_label = desc_label
-        text_layout.addWidget(desc_label)
-
-        layout.addLayout(text_layout, 1)
+            self.hBoxLayout.insertWidget(max(0, self.hBoxLayout.count() - 1), self._badge_label, 0, Qt.AlignmentFlag.AlignRight)
 
         self._update_style(initial_tokens)
         self._update_accessibility()
@@ -359,11 +339,28 @@ class Win11RadioOption(QWidget):
             return theme_tokens.accent_hex
         return c
 
+    def _build_icon(self, icon_name: str | None = None, icon_color: str = "", tokens=None) -> QIcon:
+        if icon_name is None:
+            icon_name = self.__dict__.get("_icon_name")
+        if not icon_name:
+            return QIcon()
+        theme_tokens = tokens or get_theme_tokens()
+        color = str(icon_color or self.__dict__.get("_icon_color", "") or "").strip()
+        if not color:
+            color = theme_tokens.accent_hex
+        try:
+            return get_themed_qta_icon(str(icon_name), color=color)
+        except Exception:
+            return QIcon()
+
     def _refresh_icon(self, tokens=None) -> None:
         if self._icon_label is None or not self._icon_name:
             return
         theme_tokens = tokens or get_theme_tokens()
         try:
+            self._icon_label.setIcon(self._build_icon(tokens=theme_tokens))
+        except Exception:
+            try:
                 self._icon_label.setPixmap(
                     get_cached_qta_pixmap(
                         self._icon_name,
@@ -371,8 +368,8 @@ class Win11RadioOption(QWidget):
                         size=24,
                     )
                 )
-        except Exception:
-            return
+            except Exception:
+                return
 
     def _apply_theme_refresh(self, tokens=None, force: bool = False) -> None:
         _ = force
@@ -385,6 +382,10 @@ class Win11RadioOption(QWidget):
             self._update_accessibility()
             return
         self._selected = selected
+        try:
+            self._radio_button.setChecked(selected)
+        except Exception:
+            pass
         self._update_style()
         self._update_accessibility()
 
@@ -444,32 +445,7 @@ class Win11RadioOption(QWidget):
         self._applying_theme_styles = True
         try:
             theme_tokens = tokens or get_theme_tokens()
-
-            if self._selected:
-                selected_bg = theme_tokens.accent_soft_bg_hover if self._hover else theme_tokens.accent_soft_bg
-                bg = get_tinted_surface_gradient_qss(
-                    selected_bg,
-                    theme_name=theme_tokens.theme_name,
-                    hover=self._hover,
-                )
-                border_alpha = "0.68" if self._hover else "0.60"
-                border = f"rgba({theme_tokens.accent_rgb_str}, {border_alpha})"
-            elif self._hover:
-                bg = get_card_gradient_qss(theme_tokens.theme_name, hover=True)
-                border = theme_tokens.surface_border_hover
-            else:
-                bg = get_card_gradient_qss(theme_tokens.theme_name)
-                border = theme_tokens.surface_border
-
-            self.setStyleSheet(
-                f"""
-                Win11RadioOption {{
-                    background: {bg};
-                    border: 1px solid {border};
-                    border-radius: 8px;
-                }}
-                """
-            )
+            _apply_setting_card_text_styles(self._title_label, self._desc_label, theme_tokens)
         finally:
             self._applying_theme_styles = False
 
@@ -488,6 +464,8 @@ class Win11RadioOption(QWidget):
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.clicked.emit()
+            event.accept()
+            return
         super().mousePressEvent(event)
 
     def keyPressEvent(self, event):  # noqa: N802
@@ -527,49 +505,6 @@ class Win11RadioOption(QWidget):
             if isinstance(widget, Win11RadioOption) and widget.isEnabled():
                 options.append(widget)
         return options
-
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        option = QStyleOption()
-        option.initFrom(self)
-        self.style().drawPrimitive(QStyle.PrimitiveElement.PE_Widget, option, painter, self)
-
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        circle_x = 12 + 10
-        circle_y = self.height() // 2
-
-        tokens = get_theme_tokens()
-        accent_r, accent_g, accent_b = tokens.accent_rgb
-        selected_ring = QColor(accent_r, accent_g, accent_b, 245)
-        selected_dot = QColor(accent_r, accent_g, accent_b, 255)
-        unselected_ring = QColor(accent_r, accent_g, accent_b, 140 if tokens.is_light else 165)
-
-        if not selected_ring.isValid():
-            selected_ring = QColor(tokens.accent_hex)
-            selected_ring.setAlpha(245)
-        if not selected_dot.isValid():
-            selected_dot = QColor(tokens.accent_hex)
-            selected_dot.setAlpha(255)
-        if not unselected_ring.isValid():
-            unselected_ring = QColor(tokens.accent_hex)
-            unselected_ring.setAlpha(140 if tokens.is_light else 165)
-
-        ring_color = selected_ring if self._selected else unselected_ring
-        pen = painter.pen()
-        pen.setColor(ring_color)
-        pen.setWidth(2 if self._selected else 1)
-        painter.setPen(pen)
-        painter.setBrush(Qt.BrushStyle.NoBrush)
-        painter.drawEllipse(circle_x - 8, circle_y - 8, 16, 16)
-
-        if self._selected:
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(selected_dot)
-            painter.drawEllipse(circle_x - 4, circle_y - 4, 8, 8)
-
-        painter.end()
-
 
 class Win11NumberRow(FluentSettingCard):
     """Строка с числовым вводом в стиле Windows 11."""

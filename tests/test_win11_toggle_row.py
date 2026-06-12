@@ -389,7 +389,8 @@ class Win11ToggleRowTests(unittest.TestCase):
         self.assertTrue(event.isAccepted())
         self.assertEqual(events, ["second", "first"])
 
-    def test_radio_option_uses_styled_background_for_clean_repaint(self) -> None:
+    def test_radio_option_uses_stock_qfluent_card_and_radio(self) -> None:
+        from qfluentwidgets import RadioButton, SettingCard
         from ui.widgets.win11_controls import Win11RadioOption
 
         option = Win11RadioOption(
@@ -397,8 +398,23 @@ class Win11ToggleRowTests(unittest.TestCase):
             "Запуск через готовые профили",
         )
 
-        self.assertTrue(option.testAttribute(Qt.WidgetAttribute.WA_StyledBackground))
-        self.assertIn("background:", option.styleSheet())
+        self.assertIsInstance(option, SettingCard)
+        self.assertFalse(option.testAttribute(Qt.WidgetAttribute.WA_StyledBackground))
+        self.assertIsInstance(option._radio_button, RadioButton)
+
+    def test_radio_option_child_radio_button_emits_card_click(self) -> None:
+        from ui.widgets.win11_controls import Win11RadioOption
+
+        option = Win11RadioOption(
+            "Профили Zapret 2",
+            "Запуск через готовые профили",
+        )
+        clicked = Mock()
+        option.clicked.connect(clicked)
+
+        option._radio_button.click()
+
+        clicked.assert_called_once()
 
     def test_radio_option_updates_screen_reader_state_after_selection_change(self) -> None:
         from ui.widgets.win11_controls import Win11RadioOption
