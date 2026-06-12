@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from ui.accessibility import set_control_accessibility
+from ui.accessibility import set_control_accessibility, set_state_text
 
 
 def _set_card_and_button_accessibility(card, *, name: str, description: str) -> None:
+    set_state_text(card, name)
     set_control_accessibility(card, name=name, description=description)
     button = getattr(card, "button", None)
     if button is not None:
+        set_state_text(button, name)
         set_control_accessibility(button, name=name, description=description)
 
 

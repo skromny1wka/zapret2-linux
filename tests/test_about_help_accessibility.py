@@ -50,10 +50,12 @@ class AboutHelpAccessibilityTests(unittest.TestCase):
         for card, (name, description) in expected.items():
             with self.subTest(name=name):
                 self.assertEqual(card.accessibleName(), name)
+                self.assertEqual(card.property("screenReaderStateText"), name)
                 self.assertIn(description, card.accessibleDescription())
                 button = getattr(card, "button", None)
                 if button is not None:
                     self.assertEqual(button.accessibleName(), name)
+                    self.assertEqual(button.property("screenReaderStateText"), name)
                     self.assertIn(description, button.accessibleDescription())
 
 

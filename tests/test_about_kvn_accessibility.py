@@ -39,8 +39,10 @@ class AboutKvnAccessibilityTests(unittest.TestCase):
         for card, (name, description) in expected.items():
             with self.subTest(name=name):
                 self.assertEqual(card.accessibleName(), name)
+                self.assertEqual(card.property("screenReaderStateText"), name)
                 self.assertIn(description, card.accessibleDescription())
                 self.assertEqual(card.button.accessibleName(), name)
+                self.assertEqual(card.button.property("screenReaderStateText"), name)
                 self.assertIn(description, card.button.accessibleDescription())
 
 
