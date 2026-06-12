@@ -49,8 +49,11 @@ class TelegramProxySettingsText:
 TELEGRAM_PROXY_SETTINGS_TEXT = TelegramProxySettingsText(
     page_subtitle="Локальный прокси для Telegram. Используйте его, если Telegram подключается нестабильно.",
     setup_title="Подключить Telegram",
-    setup_description="Откройте ссылку. Telegram сам предложит добавить прокси.",
-    setup_fallback="Если Telegram не открылся, скопируйте ссылку и отправьте её себе в чат.",
+    setup_description=(
+        "Откройте ссылку. Telegram сам предложит добавить прокси. "
+        "Если Telegram не открылся, скопируйте ссылку и отправьте её себе в чат."
+    ),
+    setup_fallback="",
     settings_title="Основные настройки",
     proxy_mode_title="Режим прокси",
     proxy_mode_description="SOCKS5 — основной режим. MTProxy нужен для secret, Fake TLS и Cloudflare-сценариев.",

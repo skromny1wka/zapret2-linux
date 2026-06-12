@@ -171,6 +171,7 @@ def apply_ui_texts(
             setup_desc_label.setText(text.setup_description)
         if setup_fallback_label is not None:
             setup_fallback_label.setText(text.setup_fallback)
+            setup_fallback_label.setVisible(bool(text.setup_fallback))
         if host_label is not None:
             host_label.setText("Адрес:")
         if port_label is not None:

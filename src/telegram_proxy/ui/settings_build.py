@@ -228,9 +228,7 @@ def build_telegram_proxy_settings_panel(
 
     layout.addWidget(setup_card)
 
-    setup_fallback_label = caption_label_cls(text.setup_fallback)
-    setup_fallback_label.setWordWrap(True)
-    layout.addWidget(setup_fallback_label)
+    setup_fallback_label = None
 
     settings_card = setting_card_group_cls(text.settings_title, content_parent)
     settings_host_row = QWidget(settings_card)
