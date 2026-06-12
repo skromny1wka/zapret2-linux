@@ -230,7 +230,7 @@ def enable_keyboard_click(widget) -> None:
     if widget is None:
         return
     try:
-        if widget.focusPolicy() == Qt.FocusPolicy.NoFocus:
+        if widget.focusPolicy() != Qt.FocusPolicy.StrongFocus:
             widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
     except Exception:
         return
@@ -273,8 +273,11 @@ def _activate_keyboard_click_target(widget) -> bool:
     clicked = getattr(widget, "clicked", None)
     emit = getattr(clicked, "emit", None)
     if emit is not None:
-        emit()
-        return True
+        try:
+            emit()
+            return True
+        except TypeError:
+            pass
     for child_name in ("button", "linkButton"):
         child = getattr(widget, child_name, None)
         click = getattr(child, "click", None)
@@ -293,9 +296,6 @@ def _enable_keyboard_click_for_button(widget) -> None:
     except Exception:
         return
     if clicked is None:
-        return
-    type_name = type(widget).__name__
-    if "Button" not in type_name:
         return
     enable_keyboard_click(widget)
 

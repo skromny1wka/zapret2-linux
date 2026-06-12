@@ -112,6 +112,30 @@ class AccessibilityHelpersTests(unittest.TestCase):
 
         self.assertEqual(clicked, [True])
 
+    def test_set_control_accessibility_enables_tab_and_enter_for_clickable_widget(self) -> None:
+        from PyQt6.QtCore import QEvent, Qt, pyqtSignal
+        from PyQt6.QtGui import QKeyEvent
+        from PyQt6.QtWidgets import QWidget
+
+        from ui.accessibility import set_control_accessibility
+
+        class ClickablePanel(QWidget):
+            clicked = pyqtSignal()
+
+        panel = ClickablePanel()
+        self.addCleanup(panel.deleteLater)
+        panel.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+        clicked: list[bool] = []
+        panel.clicked.connect(lambda: clicked.append(True))
+
+        set_control_accessibility(panel, name="Открыть раздел: Логи")
+        event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Return, Qt.KeyboardModifier.NoModifier)
+        panel.keyPressEvent(event)
+
+        self.assertEqual(panel.focusPolicy(), Qt.FocusPolicy.StrongFocus)
+        self.assertTrue(event.isAccepted())
+        self.assertEqual(clicked, [True])
+
     def test_set_control_accessibility_names_spinbox_inner_field_and_skips_buttons(self) -> None:
         from PyQt6.QtCore import Qt
         from qfluentwidgets import SpinBox
