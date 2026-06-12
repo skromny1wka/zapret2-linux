@@ -218,6 +218,12 @@ class _ListWidget:
     def addItem(self, item) -> None:  # noqa: N802
         self.items.append(item)
 
+    def count(self) -> int:
+        return len(self.items)
+
+    def item(self, row: int):
+        return self.items[row] if 0 <= row < len(self.items) else None
+
     def currentItem(self):  # noqa: N802
         return self.current_item
 
@@ -803,6 +809,31 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
         self.assertTrue(handled)
         self.assertTrue(event.accepted)
         self.assertEqual(activated, ["tls_fake"])
+
+    def test_strategy_list_focus_in_selects_first_row_for_keyboard(self) -> None:
+        from PyQt6.QtCore import QEvent, Qt
+
+        from profile.ui.profile_setup_page import ProfileStrategyListWidget
+
+        widget = ProfileStrategyListWidget.__new__(ProfileStrategyListWidget)
+        item = _StrategyItem(
+            data={
+                ProfileStrategyListWidget._ROLE_STRATEGY_ID: "tls_fake",
+                Qt.ItemDataRole.AccessibleTextRole: (
+                    "TLS fake, не выбрана. Нажмите Enter или Пробел, чтобы выбрать стратегию."
+                ),
+            }
+        )
+        widget._list = _ListWidget()
+        widget._list.items.append(item)
+
+        event = _KeyEvent(0, QEvent.Type.FocusIn)
+
+        handled = ProfileStrategyListWidget.eventFilter(widget, widget._list, event)
+
+        self.assertFalse(handled)
+        self.assertIs(widget._list.current_item, item)
+        self.assertIn("TLS fake, не выбрана", widget._list.property("screenReaderStateText"))
 
     def test_strategy_item_refresh_updates_screen_reader_text(self) -> None:
         from types import SimpleNamespace

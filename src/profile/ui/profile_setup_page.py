@@ -505,6 +505,10 @@ class ProfileStrategyListWidget(QWidget):
         layout.addWidget(self._list, 1)
 
     def eventFilter(self, watched, event):  # noqa: N802
+        if watched is self._list and event.type() == QEvent.Type.FocusIn:
+            self._focus_first_strategy_row()
+            self._update_current_strategy_accessibility(self._list.currentItem())
+            return False
         if watched is self._list and event.type() == QEvent.Type.KeyPress:
             if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
                 item = self._list.currentItem()
@@ -513,6 +517,16 @@ class ProfileStrategyListWidget(QWidget):
                     event.accept()
                     return True
         return super().eventFilter(watched, event)
+
+    def _focus_first_strategy_row(self) -> None:
+        if self._list.currentItem() is not None:
+            return
+        for row in range(self._list.count()):
+            item = self._list.item(row)
+            if item is None:
+                continue
+            self._list.setCurrentItem(item)
+            return
 
     def set_rows(self, *, entries, states, current_strategy_id: str) -> None:
         next_entries = dict(entries or {})
