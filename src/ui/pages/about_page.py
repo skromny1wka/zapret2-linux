@@ -491,7 +491,7 @@ class AboutPage(BasePage):
     def _open_forum_for_beginners(self):
         self._request_about_open_action(
             "forum_for_beginners",
-            error_default="Не удалось открыть Telegram:\n{error}",
+            error_default="Не удалось открыть вики-сайт:\n{error}",
         )
 
     def _open_help_folder(self):

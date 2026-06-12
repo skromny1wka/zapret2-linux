@@ -40,7 +40,7 @@ class AboutHelpAccessibilityTests(unittest.TestCase):
         self.assertFalse(hasattr(widgets, "youtube_playlist_card"))
 
         expected = {
-            widgets.forum_card: ("Открыть сайт-форум для новичков", "Авторизация через Telegram-бота"),
+            widgets.forum_card: ("Открыть вики-сайт", "Документация и инструкции"),
             widgets.info_card: ("Открыть руководство и ответы", "Руководство и ответы на вопросы"),
             widgets.folder_card: ("Открыть папку с инструкциями", "Открыть локальную папку help"),
             widgets.android_card: ("Открыть инструкцию для Android", "Открыть инструкцию на сайте"),

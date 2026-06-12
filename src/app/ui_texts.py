@@ -726,12 +726,12 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Open",
     },
     "page.about.help.docs.forum.title": {
-        "ru": "Сайт-форум для новичков",
-        "en": "Beginner forum site",
+        "ru": "Вики-сайт",
+        "en": "Wiki site",
     },
     "page.about.help.docs.forum.desc": {
-        "ru": "Авторизация через Telegram-бота",
-        "en": "Authorization via Telegram bot",
+        "ru": "Документация и инструкции",
+        "en": "Documentation and guides",
     },
     "page.about.help.docs.info.title": {
         "ru": "Что это такое?",

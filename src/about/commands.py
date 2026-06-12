@@ -25,6 +25,17 @@ def open_support_discussions() -> AboutActionResult:
         return AboutActionResult(False, str(e))
 
 
+def open_docs_home() -> AboutActionResult:
+    from config.urls import DOCS_URL
+
+    try:
+        webbrowser.open(DOCS_URL)
+        log(f"Открыт вики-сайт: {DOCS_URL}", "INFO")
+        return AboutActionResult(True, DOCS_URL)
+    except Exception as e:
+        return AboutActionResult(False, str(e))
+
+
 def open_telegram(domain: str, *, post: int | None = None) -> AboutActionResult:
     try:
         from config.telegram_links import open_telegram_link
@@ -70,6 +81,7 @@ def open_help_folder() -> AboutActionResult:
 __all__ = [
     "AboutActionResult",
     "open_discord",
+    "open_docs_home",
     "open_github",
     "open_help_folder",
     "open_support_discussions",

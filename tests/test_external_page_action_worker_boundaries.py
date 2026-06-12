@@ -87,6 +87,38 @@ class ExternalPageActionWorkerBoundaryTests(unittest.TestCase):
         self.assertIn("schedule_next_after_finish", finished_source)
         self.assertIn("_about_open_state_obj().reset()", cleanup_source)
 
+    def test_about_forum_help_action_opens_wiki_site(self) -> None:
+        from ui.page_deps.system import build_about_page_kwargs
+
+        class _ExternalActionsFeature:
+            def __init__(self) -> None:
+                self.action_fn = None
+
+            def create_external_action_worker(self, _request_id, *, action_name, action_fn, parent=None):
+                self.action_fn = action_fn
+                return (action_name, parent)
+
+        opened_urls: list[str] = []
+        feature = _ExternalActionsFeature()
+
+        with patch("about.commands.webbrowser.open", side_effect=opened_urls.append):
+            kwargs = build_about_page_kwargs(
+                page_name=PageName.ABOUT,
+                external_actions_feature=feature,
+                show_page=lambda *_args, **_kwargs: None,
+                ui_state_store=object(),
+            )
+            worker = kwargs["create_open_action_worker"](
+                1,
+                action_name="forum_for_beginners",
+                parent=None,
+            )
+            result = feature.action_fn()
+
+        self.assertEqual(worker, ("forum_for_beginners", None))
+        self.assertTrue(result.ok)
+        self.assertEqual(opened_urls, ["https://publish.obsidian.md/zapret/Privacy/Zapret/home"])
+
     def test_support_open_actions_are_queued_while_worker_runs(self) -> None:
         class _Runtime:
             def is_running(self) -> bool:

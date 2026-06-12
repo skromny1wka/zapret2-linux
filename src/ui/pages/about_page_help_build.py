@@ -123,16 +123,16 @@ def build_about_page_help_content(
     forum_card = push_setting_card_cls(
         tr_fn("page.about.help.button.open", "Открыть"),
         fluent_icon.SEND,
-        tr_fn("page.about.help.docs.forum.title", "Сайт-форум для новичков"),
-        tr_fn("page.about.help.docs.forum.desc", "Авторизация через Telegram-бота"),
+        tr_fn("page.about.help.docs.forum.title", "Вики-сайт"),
+        tr_fn("page.about.help.docs.forum.desc", "Документация и инструкции"),
     )
     set_help_card_accessibility(
         forum_card,
         action_name=tr_fn(
             "page.about.help.docs.forum.accessible_name",
-            "Открыть сайт-форум для новичков",
+            "Открыть вики-сайт",
         ),
-        description=tr_fn("page.about.help.docs.forum.desc", "Авторизация через Telegram-бота"),
+        description=tr_fn("page.about.help.docs.forum.desc", "Документация и инструкции"),
     )
     forum_card.clicked.connect(on_open_forum)
 

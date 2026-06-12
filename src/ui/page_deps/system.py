@@ -133,7 +133,7 @@ def build_about_page_kwargs(*, page_name: PageName, external_actions_feature, sh
             "support_discussions": about_commands.open_support_discussions,
             "support_telegram": lambda: about_commands.open_telegram("zaprethelp"),
             "support_discord": lambda: about_commands.open_discord("https://discord.gg/kkcBDG2uws"),
-            "forum_for_beginners": lambda: about_commands.open_telegram("bypassblock", post=1359),
+            "forum_for_beginners": about_commands.open_docs_home,
             "help_folder": about_commands.open_help_folder,
             "telegram_news": lambda: about_commands.open_telegram("bypassblock"),
             "kvn_channel": lambda: about_commands.open_telegram("vpndiscordyooutube"),
