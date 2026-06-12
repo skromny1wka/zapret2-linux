@@ -271,15 +271,17 @@ def stop_and_delete_service(service_name: str, retry_count: int = 3) -> bool:
         # видна SCM, WinDivert может продолжать получать 1058 при новом старте.
         for attempt in range(retry_count):
             delete_requested = delete_service(service_name)
-            if delete_requested and not service_exists(service_name):
+            if delete_requested and not service_exists(service_name) and not service_registry_exists(service_name):
                 return True
+            if delete_requested and not service_exists(service_name) and service_registry_exists(service_name):
+                log(f"Служба {service_name} исчезла из SCM, но registry-ключ ещё остался", "WARNING")
 
             if attempt < retry_count - 1:
                 log(f"Попытка {attempt + 1}/{retry_count} удаления {service_name}", "DEBUG")
                 time.sleep(0.35)
 
-        if service_exists(service_name):
-            log(f"Служба {service_name} всё ещё видна после удаления через Win API", "WARNING")
+        if service_exists(service_name) or service_registry_exists(service_name):
+            log(f"Служба {service_name} всё ещё видна после удаления через Win API или registry", "WARNING")
             if stop_and_delete_service_sc_fallback(service_name):
                 return True
         return False
@@ -582,6 +584,20 @@ def service_exists(service_name: str) -> bool:
             
     except Exception as e:
         log(f"Ошибка проверки службы {service_name}: {e}", "DEBUG")
+        return False
+
+
+def service_registry_exists(service_name: str) -> bool:
+    try:
+        import winreg
+
+        path = f"SYSTEM\\CurrentControlSet\\Services\\{service_name}"
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path, 0, winreg.KEY_READ):
+            return True
+    except FileNotFoundError:
+        return False
+    except Exception as e:
+        log(f"Ошибка проверки registry-ключа службы {service_name}: {e}", "DEBUG")
         return False
 
 

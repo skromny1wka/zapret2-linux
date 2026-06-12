@@ -57,6 +57,22 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
         self.assertTrue(removed)
         fallback.assert_called_once_with("Monkey")
 
+    def test_stop_and_delete_uses_fallback_when_registry_key_survives_delete(self) -> None:
+        from utils import service_manager
+
+        with (
+            patch.object(service_manager, "stop_service", return_value=True),
+            patch.object(service_manager, "delete_service", return_value=True),
+            patch.object(service_manager, "service_exists", return_value=False),
+            patch.object(service_manager, "service_registry_exists", return_value=True),
+            patch.object(service_manager, "stop_and_delete_service_sc_fallback", return_value=True) as fallback,
+            patch.object(service_manager.time, "sleep"),
+        ):
+            removed = service_manager.stop_and_delete_service("Monkey", retry_count=1)
+
+        self.assertTrue(removed)
+        fallback.assert_called_once_with("Monkey")
+
     def test_sc_fallback_deletes_stopped_service_registry_tree_when_scm_keeps_entry(self) -> None:
         from utils import service_manager
 
