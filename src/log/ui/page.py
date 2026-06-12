@@ -591,21 +591,37 @@ class LogsPage(BasePage):
             self.open_logs_folder_btn.setText(
                 tr_catalog("page.logs.button.folder", language=self._ui_language, default="Папка")
             )
+            send_name = tr_catalog(
+                "page.logs.send.accessibility.prepare.name",
+                language=self._ui_language,
+                default="Подготовить обращение в поддержку",
+            )
+            send_description = tr_catalog(
+                "page.logs.send.action.send.description",
+                language=self._ui_language,
+                default="Собрать ZIP из свежих логов, скопировать шаблон обращения и открыть GitHub Discussions.",
+            )
+            set_control_accessibility(self.send_log_btn, name=send_name, description=send_description)
+            set_state_text(self.send_log_btn, send_name)
             set_tooltip(
                 self.send_log_btn,
-                tr_catalog(
-                    "page.logs.send.action.send.description",
-                    language=self._ui_language,
-                    default="Собрать ZIP из свежих логов, скопировать шаблон обращения и открыть GitHub Discussions.",
-                )
+                send_description,
             )
+            folder_name = tr_catalog(
+                "page.logs.send.accessibility.folder.name",
+                language=self._ui_language,
+                default="Открыть папку логов и обращений",
+            )
+            folder_description = tr_catalog(
+                "page.logs.send.action.folder.description",
+                language=self._ui_language,
+                default="Открыть папку logs, где лежат логи и подготовленные support bundles.",
+            )
+            set_control_accessibility(self.open_logs_folder_btn, name=folder_name, description=folder_description)
+            set_state_text(self.open_logs_folder_btn, folder_name)
             set_tooltip(
                 self.open_logs_folder_btn,
-                tr_catalog(
-                    "page.logs.send.action.folder.description",
-                    language=self._ui_language,
-                    default="Открыть папку logs, где лежат логи и подготовленные support bundles.",
-                )
+                folder_description,
             )
         except Exception:
             pass

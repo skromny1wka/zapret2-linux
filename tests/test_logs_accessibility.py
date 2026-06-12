@@ -269,6 +269,48 @@ class LogsAccessibilityTests(unittest.TestCase):
             widgets.send_status_label.property("screenReaderStateText"),
             "Статус подготовки обращения: пока обращение не подготовлено",
         )
+        self.assertEqual(widgets.send_log_btn.accessibleName(), "Подготовить обращение в поддержку")
+        self.assertEqual(
+            widgets.send_log_btn.property("screenReaderStateText"),
+            "Подготовить обращение в поддержку",
+        )
+        self.assertIn("Собрать ZIP", widgets.send_log_btn.accessibleDescription())
+        self.assertEqual(widgets.open_logs_folder_btn.accessibleName(), "Открыть папку логов и обращений")
+        self.assertEqual(
+            widgets.open_logs_folder_btn.property("screenReaderStateText"),
+            "Открыть папку логов и обращений",
+        )
+        self.assertIn("support bundles", widgets.open_logs_folder_btn.accessibleDescription())
+
+    def test_send_action_buttons_keep_screen_reader_state_after_language_refresh(self) -> None:
+        page = logs_page.LogsPage.__new__(logs_page.LogsPage)
+        page._ui_language = "ru"
+        page.send_card = None
+        page._send_actions_title = None
+        page._orchestra_text_label = QLabel()
+        page.send_desc_label = QLabel()
+        page.send_info_label = QLabel()
+        page.send_log_btn = PushButton()
+        page.open_logs_folder_btn = PushButton()
+
+        self.addCleanup(page._orchestra_text_label.deleteLater)
+        self.addCleanup(page.send_desc_label.deleteLater)
+        self.addCleanup(page.send_info_label.deleteLater)
+        self.addCleanup(page.send_log_btn.deleteLater)
+        self.addCleanup(page.open_logs_folder_btn.deleteLater)
+
+        logs_page.LogsPage._retranslate_send_tab(page)
+
+        self.assertEqual(page.send_log_btn.accessibleName(), "Подготовить обращение в поддержку")
+        self.assertEqual(
+            page.send_log_btn.property("screenReaderStateText"),
+            "Подготовить обращение в поддержку",
+        )
+        self.assertEqual(page.open_logs_folder_btn.accessibleName(), "Открыть папку логов и обращений")
+        self.assertEqual(
+            page.open_logs_folder_btn.property("screenReaderStateText"),
+            "Открыть папку логов и обращений",
+        )
 
     def test_errors_text_initial_state_is_text_for_screen_reader(self) -> None:
         parent = QWidget()

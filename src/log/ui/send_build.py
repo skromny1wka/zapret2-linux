@@ -190,27 +190,26 @@ def build_logs_send_tab(
         tr_catalog_fn("page.logs.send.button.send", language=ui_language, default="Подготовить обращение"),
         icon=FluentIcon.GITHUB,
     )
+    send_action_name = tr_catalog_fn(
+        "page.logs.send.accessibility.prepare.name",
+        language=ui_language,
+        default="Подготовить обращение в поддержку",
+    )
+    send_action_description = tr_catalog_fn(
+        "page.logs.send.action.send.description",
+        language=ui_language,
+        default="Собрать ZIP из свежих логов, скопировать шаблон обращения и открыть GitHub Discussions.",
+    )
     set_tooltip(
         send_log_btn,
-        tr_catalog_fn(
-            "page.logs.send.action.send.description",
-            language=ui_language,
-            default="Собрать ZIP из свежих логов, скопировать шаблон обращения и открыть GitHub Discussions.",
-        )
+        send_action_description,
     )
     set_control_accessibility(
         send_log_btn,
-        name=tr_catalog_fn(
-            "page.logs.send.accessibility.prepare.name",
-            language=ui_language,
-            default="Подготовить обращение в поддержку",
-        ),
-        description=tr_catalog_fn(
-            "page.logs.send.action.send.description",
-            language=ui_language,
-            default="Собрать ZIP из свежих логов, скопировать шаблон обращения и открыть GitHub Discussions.",
-        ),
+        name=send_action_name,
+        description=send_action_description,
     )
+    set_state_text(send_log_btn, send_action_name)
     send_log_btn.clicked.connect(on_prepare_support)
     send_actions_bar.add_button(send_log_btn)
 
@@ -218,27 +217,26 @@ def build_logs_send_tab(
         tr_catalog_fn("page.logs.button.folder", language=ui_language, default="Папка"),
         icon=FluentIcon.FOLDER,
     )
+    folder_action_name = tr_catalog_fn(
+        "page.logs.send.accessibility.folder.name",
+        language=ui_language,
+        default="Открыть папку логов и обращений",
+    )
+    folder_action_description = tr_catalog_fn(
+        "page.logs.send.action.folder.description",
+        language=ui_language,
+        default="Открыть папку logs, где лежат логи и подготовленные support bundles.",
+    )
     set_tooltip(
         open_logs_folder_btn,
-        tr_catalog_fn(
-            "page.logs.send.action.folder.description",
-            language=ui_language,
-            default="Открыть папку logs, где лежат логи и подготовленные support bundles.",
-        )
+        folder_action_description,
     )
     set_control_accessibility(
         open_logs_folder_btn,
-        name=tr_catalog_fn(
-            "page.logs.send.accessibility.folder.name",
-            language=ui_language,
-            default="Открыть папку логов и обращений",
-        ),
-        description=tr_catalog_fn(
-            "page.logs.send.action.folder.description",
-            language=ui_language,
-            default="Открыть папку logs, где лежат логи и подготовленные support bundles.",
-        ),
+        name=folder_action_name,
+        description=folder_action_description,
     )
+    set_state_text(open_logs_folder_btn, folder_action_name)
     open_logs_folder_btn.clicked.connect(on_open_folder)
     send_actions_bar.add_button(open_logs_folder_btn)
 
