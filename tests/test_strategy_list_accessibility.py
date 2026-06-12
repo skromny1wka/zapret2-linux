@@ -7,6 +7,7 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
 
 from profile.ui.profile_setup_page import ProfileStrategyListWidget
@@ -32,6 +33,13 @@ class StrategyListAccessibilityTests(unittest.TestCase):
         self.assertIn("set_control_accessibility(", source)
         self.assertIn('name="Список готовых стратегий"', source)
         self.assertIn("стрелками вверх и вниз", source)
+
+    def test_strategy_widget_forwards_keyboard_focus_to_list(self) -> None:
+        widget = ProfileStrategyListWidget()
+        self.addCleanup(widget.deleteLater)
+
+        self.assertEqual(widget.focusPolicy(), Qt.FocusPolicy.StrongFocus)
+        self.assertIs(widget.focusProxy(), widget._list)
 
     def test_strategy_search_explains_keyboard_path_to_results(self) -> None:
         widget = ProfileStrategyListWidget()

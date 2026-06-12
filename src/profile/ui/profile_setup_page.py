@@ -475,6 +475,8 @@ class ProfileStrategyListWidget(QWidget):
         self._list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self._list.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._list.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setFocusProxy(self._list)
         set_control_accessibility(
             self._list,
             name="Список готовых стратегий",
