@@ -354,6 +354,9 @@ class Winws2StrategyRunner(StrategyRunnerBase):
     def _winws2_at_config_dir(self) -> str:
         return os.path.join(str(self.work_dir or ""), "tmp", "winws2_at_config")
 
+    def _winws2_startup_output_dir(self) -> str:
+        return os.path.join(str(self.work_dir or ""), "tmp", "winws2_startup_output")
+
     def _write_winws2_at_config(self, preset_path: str, prepared_text: str) -> str:
         config_text = self._build_winws2_at_config_text(prepared_text)
         digest_source = f"{os.path.abspath(str(preset_path or ''))}\0{config_text}".encode("utf-8", "surrogatepass")
@@ -376,6 +379,23 @@ class Winws2StrategyRunner(StrategyRunnerBase):
             f.write(config_text)
         prune_at_config_cache(config_dir, config_path, filename_prefix="winws2_at_")
         return config_path
+
+    def _startup_output_path_for_artifact(self, artifact: PreparedPresetArtifact) -> str:
+        digest_source = (
+            f"{os.path.abspath(str(artifact.preset_path or ''))}\0"
+            f"{' '.join(str(arg or '') for arg in artifact.launch_args)}"
+        ).encode("utf-8", "surrogatepass")
+        digest = hashlib.sha1(digest_source).hexdigest()[:20]
+        return os.path.join(self._winws2_startup_output_dir(), f"winws2_startup_{digest}.log")
+
+    @staticmethod
+    def _read_startup_output_file(path: str) -> str:
+        try:
+            with open(path, "rb") as f:
+                data = f.read(64 * 1024)
+            return data.decode("utf-8", errors="replace").strip()
+        except Exception:
+            return ""
 
     @staticmethod
     def _launch_args_files_exist(launch_args: tuple[str, ...]) -> bool:
@@ -767,6 +787,10 @@ class Winws2StrategyRunner(StrategyRunnerBase):
                 f"path={config_path}, bytes={size}{digest_part}, source={artifact.preset_path}",
                 "INFO",
             )
+        try:
+            log(f"Winws2 startup output: {self._startup_output_path_for_artifact(artifact)}", "DEBUG")
+        except Exception:
+            pass
 
     def _spawn_process_locked(
         self,
@@ -803,6 +827,18 @@ class Winws2StrategyRunner(StrategyRunnerBase):
             return False
 
         try:
+            startup_output_path = self._startup_output_path_for_artifact(artifact)
+            startup_output_file = None
+            startup_stdout = subprocess.DEVNULL
+            startup_stderr = subprocess.DEVNULL
+            try:
+                os.makedirs(os.path.dirname(startup_output_path), exist_ok=True)
+                startup_output_file = open(startup_output_path, "wb")
+                startup_stdout = startup_output_file
+                startup_stderr = startup_output_file
+            except Exception as exc:
+                log(f"Не удалось открыть файл стартового вывода winws2: {exc}", "DEBUG")
+
             self._prepare_state_for_spawn_locked(artifact.preset_path, strategy_name)
             self._set_runner_state_locked(
                 PresetRunnerState.STARTING,
@@ -810,15 +846,22 @@ class Winws2StrategyRunner(StrategyRunnerBase):
                 strategy_name=strategy_name,
                 reason="preset_switch_start" if preset_switch else "start_from_preset",
             )
-            self.running_process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
-                startupinfo=self._create_startup_info(),
-                creationflags=CREATE_NO_WINDOW,
-                cwd=self.work_dir
-            )
+            try:
+                self.running_process = subprocess.Popen(
+                    cmd,
+                    stdout=startup_stdout,
+                    stderr=startup_stderr,
+                    stdin=subprocess.DEVNULL,
+                    startupinfo=self._create_startup_info(),
+                    creationflags=CREATE_NO_WINDOW,
+                    cwd=self.work_dir
+                )
+            finally:
+                if startup_output_file is not None:
+                    try:
+                        startup_output_file.close()
+                    except Exception:
+                        pass
             self.current_launch_label = strategy_name
             self.current_strategy_args = list(artifact.launch_args)
             self._last_spawn_exit_code = None
@@ -851,7 +894,9 @@ class Winws2StrategyRunner(StrategyRunnerBase):
             else:
                 log(f"Strategy '{strategy_name}' exited immediately (code: {exit_code})", failure_log_level)
 
-            stderr_output = self._read_process_startup_output(self.running_process)
+            stderr_output = self._read_startup_output_file(startup_output_path)
+            if not stderr_output:
+                stderr_output = self._read_process_startup_output(self.running_process)
             if stderr_output:
                 log(f"Error: {stderr_output[:500]}", failure_log_level)
 

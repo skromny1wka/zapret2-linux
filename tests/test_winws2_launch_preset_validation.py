@@ -480,52 +480,106 @@ class Winws2LaunchPresetValidationTests(unittest.TestCase):
 
         self.assertEqual(output, "winws stdout diagnostic")
 
-    def test_winws2_long_running_spawn_uses_devnull_not_pipes(self) -> None:
+    def test_winws2_long_running_spawn_uses_file_output_not_pipes(self) -> None:
         import subprocess
         from types import SimpleNamespace
         from unittest.mock import Mock, patch
 
         from winws_runtime.runners.zapret2_runner import Winws2StrategyRunner
 
-        runner = object.__new__(Winws2StrategyRunner)
-        runner.winws_exe = "winws2.exe"
-        runner.work_dir = "C:/Zapret/Dev"
-        runner.running_process = None
-        runner.current_launch_label = None
-        runner.current_strategy_args = None
-        runner._last_spawn_exit_code = None
-        runner._last_spawn_stderr = ""
-        runner._prepare_state_for_spawn_locked = Mock()
-        runner._set_runner_state_locked = Mock()
-        runner._log_winws2_launch_command = Mock()
-        runner._create_startup_info = Mock(return_value=None)
-        runner._set_last_error = Mock()
-        runner._run_preset_dry_run_locked = Mock(return_value=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            runner = object.__new__(Winws2StrategyRunner)
+            runner.winws_exe = "winws2.exe"
+            runner.work_dir = tmp
+            runner.running_process = None
+            runner.current_launch_label = None
+            runner.current_strategy_args = None
+            runner._last_spawn_exit_code = None
+            runner._last_spawn_stderr = ""
+            runner._prepare_state_for_spawn_locked = Mock()
+            runner._set_runner_state_locked = Mock()
+            runner._log_winws2_launch_command = Mock()
+            runner._create_startup_info = Mock(return_value=None)
+            runner._set_last_error = Mock()
+            runner._run_preset_dry_run_locked = Mock(return_value=True)
 
-        fake_process = SimpleNamespace(pid=2468, returncode=None)
-        artifact = SimpleNamespace(
-            launch_args=("@config.txt",),
-            preset_path="preset.txt",
-            normalized_text="--wf-tcp-out=443\n",
-        )
-
-        with (
-            patch("winws_runtime.runners.zapret2_runner.subprocess.Popen", return_value=fake_process) as popen_mock,
-            patch("winws_runtime.runners.zapret2_runner.wait_for_process_stable_start", return_value=True) as stable_start,
-        ):
-            self.assertTrue(
-                runner._spawn_process_locked(
-                    artifact,
-                    "Preset",
-                    preset_switch=False,
-                    stable_start_window_seconds=0.35,
-                )
+            fake_process = SimpleNamespace(pid=2468, returncode=None)
+            artifact = SimpleNamespace(
+                launch_args=("@config.txt",),
+                preset_path="preset.txt",
+                normalized_text="--wf-tcp-out=443\n",
             )
 
+            with (
+                patch("winws_runtime.runners.zapret2_runner.subprocess.Popen", return_value=fake_process) as popen_mock,
+                patch("winws_runtime.runners.zapret2_runner.wait_for_process_stable_start", return_value=True) as stable_start,
+            ):
+                self.assertTrue(
+                    runner._spawn_process_locked(
+                        artifact,
+                        "Preset",
+                        preset_switch=False,
+                        stable_start_window_seconds=0.35,
+                    )
+                )
+
         kwargs = popen_mock.call_args.kwargs
-        self.assertIs(kwargs["stdout"], subprocess.DEVNULL)
-        self.assertIs(kwargs["stderr"], subprocess.DEVNULL)
+        self.assertIsNot(kwargs["stdout"], subprocess.PIPE)
+        self.assertIsNot(kwargs["stderr"], subprocess.PIPE)
+        self.assertIs(kwargs["stdout"], kwargs["stderr"])
+        self.assertIsNot(kwargs["stdout"], subprocess.DEVNULL)
+        self.assertTrue(kwargs["stdout"].closed)
         self.assertEqual(stable_start.call_args.kwargs["stable_window"], 0.35)
+
+    def test_winws2_immediate_exit_reads_startup_output_file(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+
+        from winws_runtime.runners.zapret2_runner import Winws2StrategyRunner
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runner = object.__new__(Winws2StrategyRunner)
+            runner.winws_exe = "winws2.exe"
+            runner.work_dir = tmp
+            runner.running_process = None
+            runner.current_launch_label = None
+            runner.current_strategy_args = None
+            runner._last_spawn_exit_code = None
+            runner._last_spawn_stderr = ""
+            runner._prepare_state_for_spawn_locked = Mock()
+            runner._set_runner_state_locked = Mock()
+            runner._log_winws2_launch_command = Mock()
+            runner._create_startup_info = Mock(return_value=None)
+            runner._set_last_error = Mock()
+            runner._run_preset_dry_run_locked = Mock(return_value=True)
+            runner._read_process_startup_output = Mock(return_value="")
+
+            fake_process = SimpleNamespace(pid=2468, returncode=87)
+            artifact = SimpleNamespace(
+                launch_args=("@config.txt",),
+                preset_path="preset.txt",
+                normalized_text="--wf-tcp-out=443\n",
+            )
+
+            def fake_popen(*_args, **kwargs):
+                kwargs["stderr"].write(b"windivert: error opening filter: The parameter is incorrect.\\n")
+                kwargs["stderr"].flush()
+                return fake_process
+
+            with (
+                patch("winws_runtime.runners.zapret2_runner.subprocess.Popen", side_effect=fake_popen),
+                patch("winws_runtime.runners.zapret2_runner.wait_for_process_stable_start", return_value=False),
+            ):
+                self.assertFalse(
+                    runner._spawn_process_locked(
+                        artifact,
+                        "Preset",
+                        preset_switch=False,
+                    )
+                )
+
+        self.assertIn("parameter is incorrect", runner._last_spawn_stderr.lower())
+        runner._read_process_startup_output.assert_not_called()
 
     def test_winws2_retry_preserves_short_startup_stable_window(self) -> None:
         from unittest.mock import Mock
