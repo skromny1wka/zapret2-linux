@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from PyQt6.QtCore import QEvent, QTimer
+from PyQt6.QtCore import QEvent, Qt, QTimer
 from PyQt6.QtGui import QTextCursor, QTextDocument
 from PyQt6.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QFileDialog
 
@@ -61,6 +61,26 @@ def _make_menu_action(text: str, *, icon=None, parent=None):
     except Exception:
         pass
     return action
+
+
+def _set_raw_preset_menu_item_accessibility(menu, *, text: str, disabled: bool = False) -> None:
+    menu_view = getattr(menu, "view", None)
+    if menu_view is None:
+        return
+    try:
+        item = menu_view.item(menu_view.count() - 1)
+    except Exception:
+        item = None
+    if item is None:
+        return
+    accessible_text = f"Действие preset: {str(text or '').strip()}"
+    if disabled:
+        accessible_text = f"{accessible_text}, недоступно"
+    try:
+        item.setData(Qt.ItemDataRole.AccessibleTextRole, accessible_text)
+        item.setData(Qt.ItemDataRole.AccessibleDescriptionRole, accessible_text)
+    except Exception:
+        pass
 
 
 @dataclass(frozen=True, slots=True)
@@ -1824,11 +1844,20 @@ class PresetRawEditorPage(BasePage):
                 action_map[delete_action] = "delete"
             if rename_action is not None:
                 menu.addAction(rename_action)
+                _set_raw_preset_menu_item_accessibility(menu, text="Переименовать")
             menu.addAction(duplicate_action)
+            _set_raw_preset_menu_item_accessibility(menu, text="Дублировать")
             menu.addAction(export_action)
+            _set_raw_preset_menu_item_accessibility(menu, text="Экспорт")
             menu.addAction(reset_action)
+            _set_raw_preset_menu_item_accessibility(menu, text="Вернуть встроенный")
             if delete_action is not None:
                 menu.addAction(delete_action)
+                _set_raw_preset_menu_item_accessibility(
+                    menu,
+                    text="Удалить",
+                    disabled=self._is_current_selected_file(),
+                )
             chosen = exec_popup_menu(
                 menu,
                 self.menuButton.mapToGlobal(self.menuButton.rect().bottomLeft()),

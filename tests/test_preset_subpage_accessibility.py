@@ -1,11 +1,59 @@
 import os
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PyQt6.QtCore import QPoint, Qt
 from PyQt6.QtWidgets import QApplication, QWidget
 
 from presets.ui.common.preset_subpage_base import PresetRawEditorPage, RawPresetRuntimeActions, _RenameDialog
+
+
+class _FakeAction:
+    def __init__(self, text: str) -> None:
+        self.text = text
+        self.enabled = True
+
+    def setEnabled(self, enabled: bool) -> None:  # noqa: N802
+        self.enabled = bool(enabled)
+
+
+class _FakeMenuItem:
+    def __init__(self) -> None:
+        self._data = {}
+
+    def setData(self, role, value) -> None:  # noqa: N802
+        self._data[int(role)] = value
+
+    def data(self, role):
+        return self._data.get(int(role))
+
+
+class _FakeMenuView:
+    def __init__(self) -> None:
+        self._items: list[_FakeMenuItem] = []
+
+    def add_item(self) -> None:
+        self._items.append(_FakeMenuItem())
+
+    def count(self) -> int:
+        return len(self._items)
+
+    def item(self, row: int):
+        return self._items[row] if 0 <= row < len(self._items) else None
+
+
+class _FakeMenu:
+    def __init__(self, *, parent=None) -> None:
+        self.parent = parent
+        self.actions: list[_FakeAction] = []
+        self.view = _FakeMenuView()
+
+    def addAction(self, action: _FakeAction) -> None:  # noqa: N802
+        self.actions.append(action)
+        self.view.add_item()
 
 
 class PresetSubpageAccessibilityTests(unittest.TestCase):
@@ -49,6 +97,46 @@ class PresetSubpageAccessibilityTests(unittest.TestCase):
         self.assertIn("После ввода перейдите к тексту пресета клавишей Tab", page.searchInput.accessibleDescription())
         self.assertEqual(page.editor.accessibleName(), "Текст открытого пресета")
         self.assertEqual(page.editor.property("screenReaderStateText"), "Текст открытого пресета")
+
+    def test_raw_preset_actions_menu_items_are_named_for_screen_reader(self) -> None:
+        import presets.ui.common.preset_subpage_base as preset_subpage_base
+
+        page = PresetRawEditorPage.__new__(PresetRawEditorPage)
+        page._preset_origin = "user"
+        page._preset_file_name = "custom.txt"
+        page._ui_language = "ru"
+        page.menuButton = SimpleNamespace(
+            rect=lambda: SimpleNamespace(bottomLeft=lambda: QPoint(0, 0)),
+            mapToGlobal=lambda point: point,
+        )
+        page._is_current_selected_file = lambda: True
+        menu_holder: dict[str, _FakeMenu] = {}
+
+        class CapturingMenu(_FakeMenu):
+            def __init__(self, *, parent=None) -> None:
+                super().__init__(parent=parent)
+                menu_holder["menu"] = self
+
+        with (
+            patch.object(preset_subpage_base, "RoundMenu", CapturingMenu),
+            patch.object(preset_subpage_base, "Action", _FakeAction),
+            patch.object(preset_subpage_base, "_make_menu_action", lambda text, **_kwargs: _FakeAction(text)),
+            patch.object(preset_subpage_base, "exec_popup_menu", return_value=None),
+        ):
+            PresetRawEditorPage._open_menu(page)
+
+        accessible_items = [
+            menu_holder["menu"].view.item(row).data(Qt.ItemDataRole.AccessibleTextRole)
+            for row in range(menu_holder["menu"].view.count())
+            if menu_holder["menu"].view.item(row) is not None
+            and menu_holder["menu"].view.item(row).data(Qt.ItemDataRole.AccessibleTextRole)
+        ]
+
+        self.assertIn("Действие preset: Переименовать", accessible_items)
+        self.assertIn("Действие preset: Дублировать", accessible_items)
+        self.assertIn("Действие preset: Экспорт", accessible_items)
+        self.assertIn("Действие preset: Вернуть встроенный", accessible_items)
+        self.assertIn("Действие preset: Удалить, недоступно", accessible_items)
 
     def test_rename_dialog_is_named_for_screen_reader(self) -> None:
         parent = QWidget()
