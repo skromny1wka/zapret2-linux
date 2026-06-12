@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
 )
 
 from ui.pages.base_page import BasePage
-from ui.accessibility import set_control_accessibility, set_state_text
+from ui.accessibility import remove_line_edit_buttons_from_tab_order, set_control_accessibility, set_state_text
 from ui.combo_accessibility import set_combo_items_accessibility
 from ui.fluent_widgets import set_tooltip
 from ui.latest_value_worker_state import LatestValueWorkerState
@@ -311,6 +311,7 @@ class OrchestraLockedPage(BasePage):
             self._tr("page.orchestra.locked.search.placeholder", "Поиск по доменам...")
         )
         self.search_input.setClearButtonEnabled(True)
+        remove_line_edit_buttons_from_tab_order(self.search_input)
         self.search_input.textChanged.connect(self._filter_list)
         top_row.addWidget(self.search_input)
 

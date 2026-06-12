@@ -356,6 +356,31 @@ class OrchestraAccessibilityTests(unittest.TestCase):
             "История рейтингов стратегий: история появится после обучения",
         )
 
+    def test_orchestra_search_clear_buttons_do_not_take_tab_focus(self) -> None:
+        pages_and_inputs = []
+        for page in (
+            OrchestraWhitelistPage(orchestra_feature=_OrchestraFeatureStub()),
+            OrchestraLockedPage(orchestra_feature=_OrchestraFeatureStub()),
+            OrchestraBlockedPage(orchestra_feature=_OrchestraFeatureStub()),
+            OrchestraRatingsPage(orchestra_feature=_OrchestraFeatureStub()),
+        ):
+            self.addCleanup(page.deleteLater)
+            pages_and_inputs.append(
+                getattr(page, "filter_input", None) or getattr(page, "search_input", None)
+            )
+
+        for line_edit in pages_and_inputs:
+            line_edit.setText("example")
+            buttons = [
+                child
+                for child in line_edit.findChildren(object)
+                if str(getattr(child, "objectName", lambda: "")() or "") == "lineEditButton"
+                and hasattr(child, "setFocusPolicy")
+            ]
+
+            self.assertTrue(buttons)
+            self.assertTrue(all(button.focusPolicy() == Qt.FocusPolicy.NoFocus for button in buttons))
+
     def test_status_card_exposes_status_as_screen_reader_state(self) -> None:
         def create_card(title: str):
             card = QWidget()
