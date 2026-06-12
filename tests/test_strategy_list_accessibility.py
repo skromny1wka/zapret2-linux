@@ -50,6 +50,7 @@ class StrategyListAccessibilityTests(unittest.TestCase):
         self.assertEqual(widget._search.accessibleName(), "Поиск готовых стратегий")
         description = widget._search.accessibleDescription()
         self.assertIn("перейдите в список клавишей Tab", description)
+        self.assertIn("или нажмите Стрелка вниз", description)
         self.assertIn("выберите стратегию стрелками", description)
         self.assertIn("нажмите Enter или Пробел", description)
 
