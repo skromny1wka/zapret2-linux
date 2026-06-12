@@ -310,7 +310,7 @@ class TelegramWSProxy:
         index: int,
         endpoint: UpstreamProxyEndpoint,
         now: float,
-    ) -> tuple[int, int, int]:
+    ) -> tuple[int, int, int, int]:
         penalty = self._upstream_penalty_active(endpoint, now)
         if not penalty and (index == 0 or endpoint.tls):
             group = 0
@@ -320,8 +320,10 @@ class TelegramWSProxy:
             group = 2
         else:
             group = 3
-        active = self._upstream_active_counts.get(self._upstream_endpoint_key(endpoint), 0)
-        return group, active, index
+        key = self._upstream_endpoint_key(endpoint)
+        failures = self._upstream_connect_failure_counts.get(key, 0)
+        active = self._upstream_active_counts.get(key, 0)
+        return group, failures, active, index
 
     def _mark_upstream_active(self, endpoint: UpstreamProxyEndpoint) -> None:
         key = self._upstream_endpoint_key(endpoint)

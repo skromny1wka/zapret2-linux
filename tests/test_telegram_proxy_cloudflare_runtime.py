@@ -980,6 +980,36 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
 
         self.assertEqual(hosts, ["fast.tls", "timeout.tls"])
 
+    def test_penalized_upstreams_are_ranked_by_connect_failure_count(self) -> None:
+        from telegram_proxy.proxy.routing import UpstreamProxyConfig, UpstreamProxyEndpoint
+        from telegram_proxy.wss_proxy import TelegramWSProxy
+
+        proxy = TelegramWSProxy(
+            upstream_config=UpstreamProxyConfig(
+                enabled=True,
+                host="uk.tls",
+                port=443,
+                tls=True,
+                mode="always",
+                fallback_proxies=(
+                    UpstreamProxyEndpoint(host="no.tls", port=443, tls=True),
+                    UpstreamProxyEndpoint(host="nl.tls", port=443, tls=True),
+                ),
+            ),
+        )
+        endpoints = {endpoint.host: endpoint for endpoint in proxy._upstream_proxy_candidates()}
+
+        with patch("telegram_proxy.wss_proxy.time.monotonic", return_value=100.0):
+            proxy._mark_upstream_connect_failure(endpoints["uk.tls"], "uk-1", TimeoutError())
+            proxy._mark_upstream_connect_failure(endpoints["uk.tls"], "uk-2", TimeoutError())
+            proxy._mark_upstream_connect_failure(endpoints["uk.tls"], "uk-3", TimeoutError())
+            proxy._mark_upstream_connect_failure(endpoints["no.tls"], "no-1", TimeoutError())
+            proxy._mark_upstream_connect_failure(endpoints["nl.tls"], "nl-1", TimeoutError())
+        with patch("telegram_proxy.wss_proxy.time.monotonic", return_value=101.0):
+            hosts = [endpoint.host for endpoint in proxy._upstream_proxy_candidates()]
+
+        self.assertEqual(hosts, ["no.tls", "nl.tls", "uk.tls"])
+
     def test_upstream_connect_rechecks_candidate_order_after_failure(self) -> None:
         from telegram_proxy.proxy.routing import UpstreamProxyConfig, UpstreamProxyEndpoint
         from telegram_proxy.wss_proxy import TelegramWSProxy
