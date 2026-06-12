@@ -18,6 +18,7 @@ from ui.queued_worker_state import QueuedWorkerState
 USER_PRESETS_TIMING_LOG_LEVEL = "⏱ PRESETS"
 USER_PRESETS_VISIBLE_TIMING_LABELS = frozenset(
     {
+        "user_presets.metadata.read",
         "user_presets.rows_plan.build",
         "user_presets.rows_plan.apply",
     }
@@ -76,8 +77,11 @@ class UserPresetsMetadataLoadWorker(QThread):
         try:
             all_presets = dict(self._load_all_metadata())
             folder_state = dict(self._load_folder_state() or {})
-            elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-            log(f"user_presets.metadata.read: {elapsed_ms:.1f}ms ({len(all_presets)} presets)", "DEBUG")
+            _log_user_presets_timing(
+                "user_presets.metadata.read",
+                started_at,
+                extra=f"{len(all_presets)} presets",
+            )
         except Exception as exc:
             self.failed.emit(self._request_id, str(exc))
             return

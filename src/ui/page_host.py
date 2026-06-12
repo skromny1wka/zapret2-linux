@@ -39,11 +39,67 @@ class WindowPageHost:
         self._shown_pages: set[PageName] = set()
 
     @staticmethod
-    def _log_step_timing(page_name: PageName, stage: str, started_at: float, *, threshold_ms: int = 15) -> None:
+    def _log_step_timing(
+        page_name: PageName,
+        stage: str,
+        started_at: float,
+        *,
+        threshold_ms: int = 15,
+        extra: str | None = None,
+    ) -> None:
         elapsed_ms = (time.perf_counter() - started_at) * 1000
         if elapsed_ms < int(threshold_ms):
             return
-        log_page_metric(page_name, stage, elapsed_ms)
+        log_page_metric(page_name, stage, elapsed_ms, extra=extra)
+
+    @staticmethod
+    def _widget_debug_name(widget) -> str:
+        if widget is None:
+            return "none"
+        try:
+            object_name = str(widget.objectName() or "").strip()
+            if object_name:
+                return object_name
+        except Exception:
+            pass
+        try:
+            return type(widget).__name__
+        except Exception:
+            return "unknown"
+
+    @staticmethod
+    def _widget_tree_counts(widget) -> tuple[int, int]:
+        if widget is None:
+            return 0, 0
+        try:
+            children = list(widget.findChildren(QWidget))
+        except Exception:
+            return 0, 0
+        visible = 0
+        for child in children:
+            try:
+                if child.isVisible():
+                    visible += 1
+            except Exception:
+                pass
+        return len(children), visible
+
+    @classmethod
+    def _switch_detail_extra(cls, stack, target_page) -> str:
+        try:
+            current_page = stack.currentWidget()
+        except Exception:
+            current_page = None
+        try:
+            stack_count = int(stack.count())
+        except Exception:
+            stack_count = 0
+        child_count, visible_count = cls._widget_tree_counts(target_page)
+        return (
+            f"from={cls._widget_debug_name(current_page)}, "
+            f"to={cls._widget_debug_name(target_page)}, "
+            f"children={child_count}, visible={visible_count}, stack={stack_count}"
+        )
 
     @staticmethod
     def _show_budget_ms(page_name: PageName, *, first_show: bool, use_nav_route: bool) -> int:
@@ -145,11 +201,12 @@ class WindowPageHost:
 
         try:
             step_started_at = time.perf_counter()
+            switch_extra = self._switch_detail_extra(stack, page)
             try:
                 stack.setCurrentWidget(page, False)
             except TypeError:
                 stack.setCurrentWidget(page)
-            self._log_optional_switch_step(page_name, "show.switch.set_current", step_started_at)
+            self._log_optional_switch_step(page_name, "show.switch.set_current", step_started_at, extra=switch_extra)
             return True
         except Exception:
             return False
@@ -164,10 +221,17 @@ class WindowPageHost:
                     pass
                 self._log_optional_switch_step(page_name, "show.switch.restore_animation", step_started_at)
 
-    def _log_optional_switch_step(self, page_name: PageName | None, stage: str, started_at: float) -> None:
+    def _log_optional_switch_step(
+        self,
+        page_name: PageName | None,
+        stage: str,
+        started_at: float,
+        *,
+        extra: str | None = None,
+    ) -> None:
         if page_name is None:
             return
-        self._log_step_timing(page_name, stage, started_at)
+        self._log_step_timing(page_name, stage, started_at, extra=extra)
 
     def _restore_stack_updates_after_switch(self, stack, set_updates_enabled, page_name: PageName | None) -> None:
         step_started_at = time.perf_counter()

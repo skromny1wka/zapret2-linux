@@ -64,7 +64,20 @@ from .editable_settings import (
 PROFILE_LIST_PAYLOAD_CACHE_LIMIT = 24
 PROFILE_SETUP_PAYLOAD_CACHE_LIMIT = 128
 PROFILE_TIMING_LOG_LEVEL = "⏱ PROFILE"
-PROFILE_VISIBLE_TIMING_LABELS = frozenset({"profile_feature.list_profiles.total"})
+PROFILE_VISIBLE_TIMING_LABELS = frozenset(
+    {
+        "profile_feature.folder_state.load",
+        "profile_feature.list_profiles.cached",
+        "profile_feature.list_profiles.total",
+        "profile_feature.profile_list_item.build",
+        "profile_feature.profiles.normalize",
+        "profile_feature.selected_preset.parse",
+        "profile_feature.selected_preset.read",
+        "profile_feature.sources.build",
+        "profile_feature.strategy_catalogs.load",
+        "profile_feature.templates.load",
+    }
+)
 
 
 @dataclass(slots=True)
