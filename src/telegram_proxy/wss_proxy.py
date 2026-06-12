@@ -421,10 +421,21 @@ class TelegramWSProxy:
     ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter, UpstreamProxyEndpoint] | None:
         media_tag = " media" if is_media else ""
         prefix = "MTProxy " if mtproxy else ""
-        candidates = self._upstream_proxy_candidates()
-        for index, endpoint in enumerate(candidates):
-            next_step = "try next bundled SOCKS5" if index + 1 < len(candidates) else "none"
-            fallback_tag = "backup " if index > 0 else ""
+        attempted: set[tuple[str, int, str, str, bool, str, bool]] = set()
+        attempt_index = 0
+        while True:
+            candidates = tuple(
+                endpoint
+                for endpoint in self._upstream_proxy_candidates()
+                if self._upstream_endpoint_key(endpoint) not in attempted
+            )
+            if not candidates:
+                return None
+            endpoint = candidates[0]
+            endpoint_key = self._upstream_endpoint_key(endpoint)
+            next_step = "try next bundled SOCKS5" if len(candidates) > 1 else "none"
+            fallback_tag = "backup " if attempt_index > 0 else ""
+            attempt_index += 1
             tls_tag = "yes" if endpoint.tls else "no"
             self._log(
                 f"[{label}] {prefix}DC{dc}{media_tag} {fallback_tag}upstream proxy "
@@ -473,6 +484,7 @@ class TelegramWSProxy:
                 )
                 self._mark_upstream_connect_failure(endpoint, label, exc)
                 self._unmark_upstream_active(endpoint)
+                attempted.add(endpoint_key)
                 continue
 
             elapsed = time.monotonic() - t_connect
@@ -489,7 +501,6 @@ class TelegramWSProxy:
             self.stats.upstream_connections += 1
             self._record_route(dc=dc, is_media=is_media, route="внешний SOCKS5", status="OK")
             return rr, rw, endpoint
-        return None
 
     @property
     def is_running(self) -> bool:

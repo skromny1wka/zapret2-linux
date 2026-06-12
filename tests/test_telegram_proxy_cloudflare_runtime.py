@@ -980,6 +980,52 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
 
         self.assertEqual(hosts, ["fast.tls", "timeout.tls"])
 
+    def test_upstream_connect_rechecks_candidate_order_after_failure(self) -> None:
+        from telegram_proxy.proxy.routing import UpstreamProxyConfig, UpstreamProxyEndpoint
+        from telegram_proxy.wss_proxy import TelegramWSProxy
+
+        class _RemoteWriter:
+            def __init__(self):
+                self.transport = None
+
+        stale_endpoint = UpstreamProxyEndpoint(host="stale.tls", port=443, tls=True)
+        proxy = TelegramWSProxy(
+            upstream_config=UpstreamProxyConfig(
+                enabled=True,
+                host="primary.tls",
+                port=443,
+                tls=True,
+                mode="always",
+                fallback_proxies=(
+                    stale_endpoint,
+                    UpstreamProxyEndpoint(host="fresh.tls", port=443, tls=True),
+                ),
+            ),
+        )
+
+        seen_hosts: list[str] = []
+
+        async def fake_connect(proxy_host, *_args, **_kwargs):
+            seen_hosts.append(proxy_host)
+            if proxy_host == "primary.tls":
+                proxy._mark_upstream_connect_failure(stale_endpoint, "other-request", TimeoutError())
+                raise TimeoutError()
+            return object(), _RemoteWriter()
+
+        with patch("telegram_proxy.wss_proxy.socks5.connect_via_socks5", side_effect=fake_connect):
+            result = asyncio.run(
+                proxy._open_upstream_proxy(
+                    upstream_host="149.154.175.50",
+                    upstream_port=80,
+                    label="test",
+                    dc=0,
+                    is_media=False,
+                )
+            )
+
+        self.assertIsNotNone(result)
+        self.assertEqual(seen_hosts, ["primary.tls", "fresh.tls"])
+
     def test_upstream_connect_uses_short_failover_timeout(self) -> None:
         from telegram_proxy.proxy.routing import UpstreamProxyConfig, UpstreamProxyEndpoint
         from telegram_proxy.wss_proxy import TelegramWSProxy
