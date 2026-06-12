@@ -23,6 +23,7 @@ class DomainChipAccessibilityTests(unittest.TestCase):
         self.assertEqual(chip.accessibleName(), "Домен youtube.com")
         self.assertEqual(len(buttons), 1)
         self.assertEqual(buttons[0].accessibleName(), "Удалить домен youtube.com")
+        self.assertEqual(buttons[0].property("screenReaderStateText"), "Удалить домен youtube.com")
         self.assertIn("youtube.com", buttons[0].accessibleDescription())
 
     def test_domain_chip_remove_button_removes_domain_from_keyboard_target(self) -> None:

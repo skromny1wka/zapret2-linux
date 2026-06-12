@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import QFrame, QHBoxLayout
 
 from qfluentwidgets import CaptionLabel, PushButton, isDarkTheme
 
-from ui.accessibility import set_control_accessibility
+from ui.accessibility import set_control_accessibility, set_state_text
 
 
 class DomainChip(QFrame):
@@ -44,6 +44,7 @@ class DomainChip(QFrame):
             name=f"Удалить домен {self._domain}",
             description=f"Удалить домен {self._domain} из списка проверки.",
         )
+        set_state_text(close_btn, f"Удалить домен {self._domain}")
         close_btn.clicked.connect(lambda: self.removed.emit(self._domain))
         layout.addWidget(close_btn)
 
