@@ -38,7 +38,7 @@ from dns.custom_providers import build_dns_providers_with_custom
 from dns.dns_providers import DNS_PROVIDERS
 from dns import page_plans as dns_page_plans
 from dns.ui.adapters import build_adapter_cards, refresh_adapter_cards
-from dns.ui.cards import DNSProviderCard, AdapterCard
+from dns.ui.cards import DNSProviderCard
 from dns.ui.custom_dns_dialog import CustomDnsDialog
 from dns.ui.dns_build import build_auto_dns_ui, build_custom_dns_ui
 from dns.ui.page_build import build_network_page_shell
@@ -608,7 +608,6 @@ class NetworkPage(BasePage):
             adapters=self._adapters,
             dns_info=self._dns_info,
             build_adapter_cards_fn=build_adapter_cards,
-            adapter_card_cls=AdapterCard,
             adapters_layout=self.adapters_layout,
             on_state_changed=self._request_dns_selection_sync,
             normalize_alias_fn=self._dns.normalize_adapter_alias,

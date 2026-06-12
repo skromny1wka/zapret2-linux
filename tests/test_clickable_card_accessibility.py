@@ -90,27 +90,5 @@ class ClickableCardAccessibilityTests(unittest.TestCase):
         self.assertIn("border-left", card.styleSheet())
         self.assertIn("rgba", card.styleSheet())
 
-    def test_adapter_card_checkbox_works_from_keyboard(self) -> None:
-        from dns.ui.cards import AdapterCard
-
-        card = AdapterCard("Ethernet", {"ipv4": ["8.8.8.8"], "ipv6": []})
-
-        self.assertEqual(card.focusPolicy(), Qt.FocusPolicy.StrongFocus)
-        self.assertIn("Сетевой адаптер Ethernet", card.accessibleName())
-        self.assertEqual(
-            card.property("screenReaderStateText"),
-            "Сетевой адаптер Ethernet, выбран, DNS v4 8.8.8.8",
-        )
-        self.assertTrue(card.checkbox.isChecked())
-
-        self._press_key(card, Qt.Key.Key_Return)
-
-        self.assertFalse(card.checkbox.isChecked())
-        self.assertEqual(
-            card.property("screenReaderStateText"),
-            "Сетевой адаптер Ethernet, не выбран, DNS v4 8.8.8.8",
-        )
-
-
 if __name__ == "__main__":
     unittest.main()

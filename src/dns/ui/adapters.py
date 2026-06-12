@@ -7,7 +7,6 @@ def build_adapter_cards(
     *,
     adapters: list[tuple[str, str]],
     dns_info: dict,
-    adapter_card_cls,
     adapters_layout,
     normalize_alias_fn,
     on_state_changed,
@@ -17,11 +16,7 @@ def build_adapter_cards(
         clean_name = normalize_alias_fn(name)
         adapter_dns = dns_info.get(clean_name, {"ipv4": [], "ipv6": []})
 
-        if hasattr(adapters_layout, "add_adapter"):
-            card = adapters_layout.add_adapter(name, adapter_dns)
-        else:
-            card = adapter_card_cls(name, adapter_dns)
-            adapters_layout.addWidget(card)
+        card = adapters_layout.add_adapter(name, adapter_dns)
         card.checkbox.stateChanged.connect(on_state_changed)
         cards.append(card)
     return cards

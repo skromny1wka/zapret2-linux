@@ -6,7 +6,7 @@ import unittest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtCore import QEvent, Qt
-from PyQt6.QtGui import QKeyEvent
+from PyQt6.QtGui import QFocusEvent, QKeyEvent
 from PyQt6.QtWidgets import QApplication
 
 from dns.ui.adapters import build_adapter_cards, refresh_adapter_cards
@@ -18,8 +18,8 @@ class AdapterChoiceListTests(unittest.TestCase):
         cls._app = QApplication.instance() or QApplication([])
 
     def test_adapter_list_uses_delegate_rows_and_keeps_checkbox_contract(self) -> None:
+        from dns.ui.adapter_list import AdapterChoiceHandle
         from dns.ui.adapter_list import AdapterChoiceListWidget
-        from dns.ui.cards import AdapterCard
 
         changed: list[int] = []
         view = AdapterChoiceListWidget()
@@ -27,14 +27,13 @@ class AdapterChoiceListTests(unittest.TestCase):
         cards = build_adapter_cards(
             adapters=[("Ethernet", "Intel")],
             dns_info={"Ethernet": {"ipv4": ["8.8.8.8"], "ipv6": []}},
-            adapter_card_cls=AdapterCard,
             adapters_layout=view,
             normalize_alias_fn=lambda value: value,
             on_state_changed=changed.append,
         )
 
         self.assertEqual(len(cards), 1)
-        self.assertEqual(len(view.findChildren(AdapterCard)), 0)
+        self.assertIsInstance(cards[0], AdapterChoiceHandle)
         self.assertEqual(cards[0].adapter_name, "Ethernet")
         self.assertTrue(cards[0].checkbox.isChecked())
         self.assertEqual(
@@ -55,13 +54,11 @@ class AdapterChoiceListTests(unittest.TestCase):
 
     def test_adapter_list_updates_dns_text_and_toggles_from_keyboard(self) -> None:
         from dns.ui.adapter_list import AdapterChoiceListWidget
-        from dns.ui.cards import AdapterCard
 
         view = AdapterChoiceListWidget()
         cards = build_adapter_cards(
             adapters=[("Ethernet", "Intel")],
             dns_info={"Ethernet": {"ipv4": [], "ipv6": []}},
-            adapter_card_cls=AdapterCard,
             adapters_layout=view,
             normalize_alias_fn=lambda value: value,
             on_state_changed=lambda _state: None,
@@ -81,6 +78,45 @@ class AdapterChoiceListTests(unittest.TestCase):
 
         self.assertTrue(event.isAccepted())
         self.assertFalse(cards[0].checkbox.isChecked())
+
+    def test_adapter_list_focuses_first_adapter_and_reads_state_for_keyboard_selection(self) -> None:
+        from dns.ui.adapter_list import AdapterChoiceListWidget
+
+        view = AdapterChoiceListWidget()
+        cards = build_adapter_cards(
+            adapters=[("Ethernet", "Intel")],
+            dns_info={"Ethernet": {"ipv4": ["8.8.8.8"], "ipv6": []}},
+            adapters_layout=view,
+            normalize_alias_fn=lambda value: value,
+            on_state_changed=lambda _state: None,
+        )
+
+        self.assertIsNone(view.currentItem())
+
+        view.focusInEvent(QFocusEvent(QEvent.Type.FocusIn, Qt.FocusReason.TabFocusReason))
+
+        self.assertIs(view.currentItem(), cards[0].item)
+        self.assertEqual(
+            view.property("screenReaderStateText"),
+            "Список сетевых адаптеров: Сетевой адаптер Ethernet, выбран, DNS v4 8.8.8.8. "
+            "Нажмите Enter или Пробел, чтобы включить или исключить этот адаптер.",
+        )
+
+        event = QKeyEvent(QEvent.Type.KeyPress, int(Qt.Key.Key_Space), Qt.KeyboardModifier.NoModifier)
+        view.keyPressEvent(event)
+
+        self.assertTrue(event.isAccepted())
+        self.assertFalse(cards[0].checkbox.isChecked())
+        self.assertEqual(
+            view.property("screenReaderStateText"),
+            "Список сетевых адаптеров: Сетевой адаптер Ethernet, не выбран, DNS v4 8.8.8.8. "
+            "Нажмите Enter или Пробел, чтобы включить или исключить этот адаптер.",
+        )
+
+    def test_adapter_card_widget_is_removed_from_dns_cards_module(self) -> None:
+        import dns.ui.cards as cards_module
+
+        self.assertFalse(hasattr(cards_module, "AdapterCard"))
 
 
 class _RefreshPlan:

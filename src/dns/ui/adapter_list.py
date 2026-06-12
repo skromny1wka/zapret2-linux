@@ -76,8 +76,8 @@ class AdapterChoiceHandle(QObject):
     def update_dns_display(self, dns_v4, dns_v6=None) -> None:
         dns_text = _format_dns_text(_normalize_dns_list(dns_v4), _normalize_dns_list(dns_v6 or []))
         self.dns_label.setText(dns_text)
-        self._sync_row()
         self._refresh_accessibility()
+        self._sync_row()
 
     def accessibleName(self) -> str:  # noqa: N802
         return str(self.property("accessibleName") or "")
@@ -86,8 +86,8 @@ class AdapterChoiceHandle(QObject):
         return str(self.property("accessibleDescription") or "")
 
     def _on_checked_changed(self, _state: int) -> None:
-        self._sync_row()
         self._refresh_accessibility()
+        self._sync_row()
 
     def _sync_row(self) -> None:
         self.item.setData(CHECKED_ROLE, self.checkbox.isChecked())
@@ -126,6 +126,13 @@ class AdapterChoiceListWidget(QListWidget):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setItemDelegate(AdapterChoiceListDelegate(self))
+        set_control_accessibility(
+            self,
+            name="Список сетевых адаптеров",
+            description="Выберите адаптер стрелками вверх и вниз, затем нажмите Enter или Пробел.",
+        )
+        set_state_text(self, "Список сетевых адаптеров")
+        self.currentItemChanged.connect(lambda current, _previous: self._update_current_adapter_accessibility(current))
         self.itemClicked.connect(self.activate_item)
         self.itemActivated.connect(self.activate_item)
         self.setStyleSheet(
@@ -167,18 +174,43 @@ class AdapterChoiceListWidget(QListWidget):
             return
         super().keyPressEvent(event)
 
+    def focusInEvent(self, event):  # noqa: N802
+        super().focusInEvent(event)
+        if self.currentItem() is None:
+            self._focus_first_adapter()
+        self._update_current_adapter_accessibility(self.currentItem())
+
     def refresh_item(self, item: QListWidgetItem) -> None:
         row = self.row(item)
         if row >= 0:
             index = self.model().index(row, 0)
             self.viewport().update(self.visualRect(index))
         self._sync_height()
+        if self.currentItem() is item:
+            self._update_current_adapter_accessibility(item)
 
     def _handle_for_item(self, item: QListWidgetItem) -> AdapterChoiceHandle | None:
         for child in self.children():
             if isinstance(child, AdapterChoiceHandle) and child.item is item:
                 return child
         return None
+
+    def _focus_first_adapter(self) -> None:
+        for row in range(self.count()):
+            item = self.item(row)
+            if item is not None and item.flags() & Qt.ItemFlag.ItemIsSelectable:
+                self.setCurrentItem(item)
+                return
+
+    def _update_current_adapter_accessibility(self, item: QListWidgetItem | None) -> None:
+        text = str(item.data(Qt.ItemDataRole.AccessibleTextRole) or "").strip() if item is not None else ""
+        if text:
+            set_state_text(
+                self,
+                f"Список сетевых адаптеров: {text}. Нажмите Enter или Пробел, чтобы включить или исключить этот адаптер.",
+            )
+            return
+        set_state_text(self, "Список сетевых адаптеров")
 
     def _sync_height(self) -> None:
         total = 2 * self.frameWidth()
