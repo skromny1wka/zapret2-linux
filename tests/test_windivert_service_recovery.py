@@ -393,6 +393,11 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
                 "probe_windivert_state_runtime",
                 side_effect=[disabled_probe, ready_probe],
             ),
+            patch.object(
+                system_ops,
+                "find_blocking_windivert_registry_services_runtime",
+                return_value=["Monkey"],
+            ),
             patch.object(system_ops, "restore_known_windivert_services_demand_start_runtime") as restore_start,
             patch.object(system_ops.time, "sleep"),
             patch.object(system_ops, "log"),
@@ -419,6 +424,11 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
             patch.object(system_ops, "probe_windivert_state_runtime", return_value=disabled_probe),
             patch.object(
                 system_ops,
+                "find_blocking_windivert_registry_services_runtime",
+                return_value=["Monkey"],
+            ),
+            patch.object(
+                system_ops,
                 "restore_known_windivert_services_demand_start_runtime",
                 return_value=False,
             ) as restore_start,
@@ -435,6 +445,24 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
         self.assertTrue(
             any("administrator rights" in call.args[0] for call in log.call_args_list)
         )
+
+    def test_probe_uses_no_install_for_network_readiness(self) -> None:
+        from winws_runtime.runtime import system_ops
+
+        with (
+            patch.object(system_ops, "_load_windivert_dll_runtime", return_value=object()),
+            patch.object(
+                system_ops,
+                "_probe_windivert_open_runtime",
+                side_effect=[(False, 1060), (False, 1060)],
+            ) as open_probe,
+        ):
+            result = system_ops.probe_windivert_state_runtime()
+
+        self.assertFalse(result.installed)
+        self.assertFalse(result.ready)
+        network_flags = open_probe.call_args_list[1].kwargs["flags"]
+        self.assertTrue(network_flags & system_ops._WINDIVERT_FLAG_NO_INSTALL)
 
     def test_spawn_readiness_allows_winws_when_1058_probe_has_clean_registry(self) -> None:
         from winws_runtime.runtime import system_ops
@@ -468,10 +496,40 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
 
         self.assertTrue(result.ready)
         self.assertEqual(result.stage, "network_open_probe_bypassed:registry_clean")
-        restore_start.assert_called_once_with()
+        restore_start.assert_not_called()
         self.assertTrue(
             any("allowing winws2" in call.args[0] for call in log.call_args_list)
         )
+
+    def test_spawn_readiness_allows_winws_to_install_driver_when_service_is_absent(self) -> None:
+        from winws_runtime.runtime import system_ops
+
+        missing_driver_probe = system_ops.WinDivertRuntimeProbeResult(
+            installed=False,
+            ready=False,
+            error_code=1060,
+            stage="network_open",
+        )
+
+        with (
+            patch.object(system_ops, "probe_windivert_state_runtime", return_value=missing_driver_probe),
+            patch.object(
+                system_ops,
+                "find_blocking_windivert_registry_services_runtime",
+                return_value=[],
+            ),
+            patch.object(system_ops, "restore_known_windivert_services_demand_start_runtime") as restore_start,
+            patch.object(system_ops.time, "sleep"),
+            patch.object(system_ops, "log"),
+        ):
+            result = system_ops.wait_for_windivert_spawn_ready_runtime(
+                max_wait_seconds=1.0,
+                poll_interval=0.001,
+            )
+
+        self.assertTrue(result.ready)
+        self.assertEqual(result.stage, "network_open_probe_bypassed:registry_clean")
+        restore_start.assert_not_called()
 
     def test_running_disabled_delete_pending_monkey_is_detected_as_stale(self) -> None:
         from winws_runtime.runtime import system_ops

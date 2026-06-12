@@ -249,8 +249,10 @@ def probe_windivert_state_runtime() -> WinDivertRuntimeProbeResult:
 
     1. `NO_INSTALL + REFLECT`:
        проверяем, установлен ли драйвер вообще, без скрытой авто-установки.
-    2. Обычный `NETWORK + SNIFF`:
-       проверяем, готов ли драйвер реально открыть фильтр для нового запуска.
+    2. `NO_INSTALL + NETWORK + SNIFF`:
+       проверяем уже готовый драйвер, но не запускаем установку из GUI-probe.
+       Реальную авто-установку должен делать сам winws2: в его коде есть
+       отдельная защита от гонок старта WinDivert.
     """
     dll = _load_windivert_dll_runtime()
     if dll is None:
@@ -273,7 +275,7 @@ def probe_windivert_state_runtime() -> WinDivertRuntimeProbeResult:
         dll,
         filter_text=b"true",
         layer=_WINDIVERT_LAYER_NETWORK,
-        flags=_WINDIVERT_FLAG_SNIFF,
+        flags=_WINDIVERT_FLAG_SNIFF | _WINDIVERT_FLAG_NO_INSTALL,
     )
     return WinDivertRuntimeProbeResult(
         installed=installed,
@@ -526,6 +528,21 @@ def wait_for_windivert_spawn_ready_runtime(
             )
         if last_probe.ready:
             return last_probe
+
+        blocking_services = find_blocking_windivert_registry_services_runtime()
+        if int(last_probe.error_code or 0) in (1058, 1060) and not blocking_services:
+            log(
+                "WinDivert readiness probe did not find a ready driver, but service registry is clean; "
+                "allowing winws2 to perform the real driver open",
+                "WARNING",
+            )
+            return WinDivertRuntimeProbeResult(
+                installed=last_probe.installed,
+                ready=True,
+                error_code=last_probe.error_code,
+                stage="network_open_probe_bypassed:registry_clean",
+            )
+
         if int(last_probe.error_code or 0) == 1058 and not restored_service_start_type:
             restored_service_start_type = True
             log("WinDivert service disabled during readiness probe; restoring manual start", "WARNING")
@@ -537,7 +554,7 @@ def wait_for_windivert_spawn_ready_runtime(
                 )
             if restored_ok and not find_blocking_windivert_registry_services_runtime():
                 log(
-                    "WinDivert readiness probe still reports 1058, but service registry is clean; "
+                    "WinDivert readiness probe still reports 1058 after restore, but service registry is clean; "
                     "allowing winws2 to perform the real driver open",
                     "WARNING",
                 )
