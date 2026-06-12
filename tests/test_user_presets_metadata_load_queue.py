@@ -161,7 +161,7 @@ class UserPresetsMetadataLoadQueueTests(unittest.TestCase):
         self.assertIn("from ui.queued_worker_state import QueuedWorkerState", module_source)
         self.assertIn("_single_metadata_state = QueuedWorkerState", init_source)
         self.assertIn("_single_metadata_state_obj()", request_source)
-        self.assertIn("_single_metadata_state_obj().has_pending()", finished_source)
+        self.assertIn("schedule_next_after_finish", finished_source)
         self.assertIn("state.pop_next()", run_scheduled_source)
 
     def test_full_metadata_load_replays_latest_request_after_running_worker_finishes(self) -> None:
@@ -744,7 +744,7 @@ class UserPresetsMetadataLoadQueueTests(unittest.TestCase):
             service._request_single_metadata_refresh("Second.txt", page)
 
             self.assertEqual(_SingleMetadataWorker.instances, [])
-            self.assertEqual(service._single_metadata_pending, ["First.txt", "Second.txt"])
+            self.assertEqual(service._single_metadata_pending, ["Second.txt"])
 
             scheduled_callbacks[0]()
 

@@ -429,10 +429,17 @@ class UserPresetsRuntimeService:
             self.schedule_presets_reload(page, 0)
 
     def _on_single_metadata_worker_finished(self, worker: UserPresetsSingleMetadataWorker, page=None) -> None:
-        if not self._is_current_worker_finish(worker, "_single_metadata_request_id"):
-            return
-        if self._single_metadata_state_obj().has_pending():
-            self._schedule_single_metadata_refresh(page)
+        self._single_metadata_state_obj().schedule_next_after_finish(
+            worker,
+            is_current_worker_finish=lambda _runtime, finished_worker: self._is_current_worker_finish(
+                finished_worker,
+                "_single_metadata_request_id",
+            ),
+            single_shot=self._single_shot_or_run,
+            start=lambda file_name: self._request_single_metadata_refresh(str(file_name or ""), page),
+            queue_item=lambda file_name: self._queue_single_metadata_refresh(str(file_name or "")) or True,
+            is_cleanup_in_progress=lambda: False,
+        )
 
     def _schedule_single_metadata_refresh(self, page=None) -> None:
         state = self._single_metadata_state_obj()
@@ -889,11 +896,18 @@ class UserPresetsRuntimeService:
         log(f"Ошибка подготовки watcher файлов пресетов: {error}", "DEBUG")
 
     def _on_watched_preset_files_sync_plan_worker_finished(self, worker: UserPresetsWatcherSyncPlanWorker) -> None:
-        if not self._is_current_worker_finish(worker, "_watched_preset_files_sync_plan_request_id"):
-            return
-        plan_state = self._watched_preset_files_sync_plan_state_obj()
-        pending = plan_state.pending
-        plan_state.pending = plan_state.empty_value
+        self._watched_preset_files_sync_plan_state_obj().schedule_pending_after_finish(
+            worker,
+            is_current_worker_finish=lambda _runtime, finished_worker: self._is_current_worker_finish(
+                finished_worker,
+                "_watched_preset_files_sync_plan_request_id",
+            ),
+            single_shot=self._single_shot_or_run,
+            run_scheduled=self._run_scheduled_watched_preset_files_sync_plan,
+        )
+
+    def _run_scheduled_watched_preset_files_sync_plan(self) -> None:
+        pending = self._watched_preset_files_sync_plan_state_obj().take_pending_for_scheduled_start()
         if pending is None:
             return
         page, file_names = pending
@@ -1054,10 +1068,15 @@ class UserPresetsRuntimeService:
         log(f"Ошибка загрузки пресетов: {error}", "ERROR")
 
     def _on_metadata_worker_finished(self, worker: UserPresetsMetadataLoadWorker) -> None:
-        if not self._is_current_worker_finish(worker, "_metadata_load_request_id"):
-            return
-        if self._metadata_load_state_obj().has_pending():
-            self._schedule_metadata_load()
+        self._metadata_load_state_obj().schedule_pending_after_finish(
+            worker,
+            is_current_worker_finish=lambda _runtime, finished_worker: self._is_current_worker_finish(
+                finished_worker,
+                "_metadata_load_request_id",
+            ),
+            single_shot=self._single_shot_or_run,
+            run_scheduled=self._run_scheduled_metadata_load,
+        )
 
     def _schedule_metadata_load(self) -> None:
         self._metadata_load_state_obj().schedule_start(
@@ -1212,10 +1231,15 @@ class UserPresetsRuntimeService:
         log(f"Ошибка подготовки списка пресетов: {error}", "ERROR")
 
     def _on_rows_plan_worker_finished(self, worker: UserPresetsRowsPlanWorker) -> None:
-        if not self._is_current_worker_finish(worker, "_rows_plan_request_id"):
-            return
-        if self._rows_plan_state_obj().has_pending():
-            self._schedule_rows_plan_refresh()
+        self._rows_plan_state_obj().schedule_pending_after_finish(
+            worker,
+            is_current_worker_finish=lambda _runtime, finished_worker: self._is_current_worker_finish(
+                finished_worker,
+                "_rows_plan_request_id",
+            ),
+            single_shot=self._single_shot_or_run,
+            run_scheduled=self._run_scheduled_rows_plan_refresh,
+        )
 
     def _schedule_rows_plan_refresh(self) -> None:
         self._rows_plan_state_obj().schedule_start(

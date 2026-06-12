@@ -81,6 +81,22 @@ class UserPresetsRowsWorkerArchitectureTests(unittest.TestCase):
 
         self.assertNotIn("worker.deleteLater()", finish_sources)
 
+    def test_runtime_finished_handlers_use_shared_finish_guards(self) -> None:
+        import presets.user_presets_runtime_service as runtime_service
+
+        single_source = inspect.getsource(runtime_service.UserPresetsRuntimeService._on_single_metadata_worker_finished)
+        metadata_source = inspect.getsource(runtime_service.UserPresetsRuntimeService._on_metadata_worker_finished)
+        rows_source = inspect.getsource(runtime_service.UserPresetsRuntimeService._on_rows_plan_worker_finished)
+        watcher_source = inspect.getsource(
+            runtime_service.UserPresetsRuntimeService._on_watched_preset_files_sync_plan_worker_finished
+        )
+
+        self.assertIn("schedule_next_after_finish", single_source)
+        for source in (metadata_source, rows_source, watcher_source):
+            self.assertIn("schedule_pending_after_finish", source)
+        for source in (single_source, metadata_source, rows_source, watcher_source):
+            self.assertNotIn("if self._", source)
+
     def test_runtime_refresh_requests_rows_plan_worker_instead_of_building_rows_in_gui(self) -> None:
         from presets.user_presets_runtime_service import UserPresetsRuntimeService
 
