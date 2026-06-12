@@ -822,9 +822,11 @@ class WindowNotificationCenter(QObject):
         description = str(action.get("description") or "").strip()
         if not description:
             description = f"Выполняет действие уведомления: {button_text}."
+        name = f"Действие уведомления: {button_text}"
+        set_state_text(button, name)
         set_control_accessibility(
             button,
-            name=f"Действие уведомления: {button_text}",
+            name=name,
             description=description,
         )
 

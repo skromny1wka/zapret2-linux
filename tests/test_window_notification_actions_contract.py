@@ -86,6 +86,7 @@ class WindowNotificationActionsContractTests(unittest.TestCase):
         self.assertEqual(len(bar.widgets), 1)
         button = bar.widgets[0]
         self.assertEqual(button.accessibleName(), "Действие уведомления: Открыть логи")
+        self.assertEqual(button.property("screenReaderStateText"), "Действие уведомления: Открыть логи")
         self.assertIn("Открывает страницу логов", button.accessibleDescription())
 
     def test_infobar_notification_has_screen_reader_text(self) -> None:
