@@ -8,13 +8,13 @@ from PyQt6.QtWidgets import QWidget
 class PulsingDot(QWidget):
     """Animated status dot with a low-frequency timer."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, *, size: int = 32):
         super().__init__(parent)
         self._color = QColor("#aeb5c1")
         self._pulse_phase = 0.0
         self._is_pulsing = False
 
-        self.setFixedSize(32, 32)
+        self.setFixedSize(max(12, int(size)), max(12, int(size)))
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
 
         self._timer = QTimer(self)
@@ -69,13 +69,16 @@ class PulsingDot(QWidget):
 
         cx = self.width() / 2
         cy = self.height() / 2
-        base_r = 6
+        side = max(12, min(self.width(), self.height()))
+        base_r = max(3.0, side * 0.1875)
+        pulse_extra = max(1.0, side / 2 - base_r - 1)
+        glow_extra = max(1.0, side * 0.09375)
 
         if self._is_pulsing:
             for phase_offset in (0.0, 0.5):
                 phase = (self._pulse_phase + phase_offset) % 1.0
                 opacity = max(0.0, 0.72 * (1.0 - phase))
-                radius = base_r + 10 * phase
+                radius = base_r + pulse_extra * phase
                 c = QColor(self._color)
                 c.setAlphaF(opacity)
                 painter.setPen(Qt.PenStyle.NoPen)
@@ -87,15 +90,18 @@ class PulsingDot(QWidget):
         glow.setAlphaF(0.42)
         painter.setPen(Qt.PenStyle.NoPen)
         painter.setBrush(glow)
+        glow_r = int(base_r + glow_extra)
         painter.drawEllipse(
-            int(cx - base_r - 3),
-            int(cy - base_r - 3),
-            (base_r + 3) * 2,
-            (base_r + 3) * 2,
+            int(cx - glow_r),
+            int(cy - glow_r),
+            glow_r * 2,
+            glow_r * 2,
         )
 
         painter.setBrush(self._color)
-        painter.drawEllipse(int(cx - base_r), int(cy - base_r), base_r * 2, base_r * 2)
+        r = int(base_r)
+        painter.drawEllipse(int(cx - r), int(cy - r), r * 2, r * 2)
 
         painter.setBrush(QColor(255, 255, 255, 90))
-        painter.drawEllipse(int(cx - 2), int(cy - 3), 3, 3)
+        shine = max(2, int(side * 0.09375))
+        painter.drawEllipse(int(cx - shine), int(cy - shine - 1), shine, shine)

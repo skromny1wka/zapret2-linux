@@ -123,6 +123,27 @@ class _SpinnerWidget:
         self.hidden += 1
 
 
+class _PulseWidget(_VisibleWidget):
+    def __init__(self, visible: bool = True) -> None:
+        super().__init__(visible)
+        self.started = 0
+        self.stopped = 0
+        self.hidden = 0
+        self.colors: list[str] = []
+
+    def start_pulse(self) -> None:
+        self.started += 1
+
+    def stop_pulse(self) -> None:
+        self.stopped += 1
+
+    def hide(self) -> None:
+        self.hidden += 1
+
+    def set_color(self, color: str) -> None:
+        self.colors.append(str(color))
+
+
 class _BreadcrumbWidget:
     def __init__(self) -> None:
         self.block_calls: list[bool] = []
@@ -230,27 +251,27 @@ class PresetStatusBarPlanTests(unittest.TestCase):
             "Показывает путь до текущей страницы. Выберите пункт, чтобы вернуться назад.",
         )
 
-    def test_loaded_status_uses_success_check_and_clear_text(self) -> None:
+    def test_loaded_status_uses_success_pulse_and_clear_text(self) -> None:
         from presets.ui.common.preset_status_bar import build_preset_status_plan
 
         plan = build_preset_status_plan("loaded", launch_method=ZAPRET2_MODE)
 
         self.assertEqual(plan.text, "Пресет загружен")
         self.assertEqual(plan.mode, "success")
-        self.assertEqual(plan.indicator, "check")
+        self.assertEqual(plan.indicator, "pulse")
 
     def test_status_bar_theme_refresh_skips_duplicate_text(self) -> None:
         from unittest.mock import Mock, patch
 
         from presets.ui.common.preset_status_bar import PresetStatusBar, PresetStatusPlan
 
-        plan = PresetStatusPlan("Пресет применён", "success", "check")
+        plan = PresetStatusPlan("Пресет применён", "success", "pulse")
         bar = PresetStatusBar.__new__(PresetStatusBar)
         bar._last_plan = plan
         bar._last_theme_key = ("#5caee8", False)
-        bar._last_indicator = "check"
+        bar._last_indicator = "pulse"
         bar.spinner = _SpinnerWidget()
-        bar.check_label = _VisibleWidget(True)
+        bar.pulse_dot = _PulseWidget(True)
         bar.text_label = _TextWidget("Пресет применён")
         bar._apply_mode_style = Mock()
 
@@ -412,8 +433,8 @@ class PresetStatusBarPlanTests(unittest.TestCase):
 
         self.assertEqual(winws2_plan.text, "Пресет выбран, winws2 не запущен")
         self.assertEqual(winws1_plan.text, "Пресет выбран, winws не запущен")
-        self.assertEqual(winws2_plan.indicator, "check")
-        self.assertEqual(winws1_plan.indicator, "check")
+        self.assertEqual(winws2_plan.indicator, "pulse")
+        self.assertEqual(winws1_plan.indicator, "pulse")
 
     def test_applying_status_uses_spinner_and_requested_text(self) -> None:
         from presets.ui.common.preset_status_bar import build_preset_status_plan
@@ -453,9 +474,9 @@ class PresetStatusBarPlanTests(unittest.TestCase):
 
         self.assertEqual(plan.text, "Пресет применён")
         self.assertEqual(plan.mode, "success")
-        self.assertEqual(plan.indicator, "check")
+        self.assertEqual(plan.indicator, "pulse")
 
-    def test_title_status_icon_is_icon_only_and_larger_than_text_bar_icon(self) -> None:
+    def test_title_status_icon_is_pulsing_dot_only_and_larger_than_text_bar_icon(self) -> None:
         from presets.ui.common.preset_status_bar import PresetStatusIcon, build_preset_status_plan
 
         icon = PresetStatusIcon(size=24)
@@ -464,12 +485,9 @@ class PresetStatusBarPlanTests(unittest.TestCase):
         self.assertFalse(hasattr(icon, "text_label"))
         self.assertEqual(icon.minimumWidth(), 28)
         self.assertEqual(icon.minimumHeight(), 28)
-        self.assertEqual(icon.check_label.size().width(), 24)
-        self.assertTrue(icon.check_label.isVisible())
-        self.assertIn("background-color: #8cc63f", icon.check_label.styleSheet())
-        self.assertIn("border-radius: 12px", icon.check_label.styleSheet())
-        self.assertIn("color: #ffffff", icon.check_label.styleSheet())
-        self.assertNotIn("font-weight: 700", icon.check_label.styleSheet())
+        self.assertEqual(icon.pulse_dot.size().width(), 24)
+        self.assertTrue(icon.pulse_dot.isVisible())
+        self.assertTrue(icon.pulse_dot._is_pulsing)
 
     def test_status_bar_skips_duplicate_plan_render(self) -> None:
         from presets.ui.common.preset_status_bar import PresetStatusBar, build_preset_status_plan
@@ -479,14 +497,14 @@ class PresetStatusBarPlanTests(unittest.TestCase):
         status_bar.set_plan(plan)
         status_bar.spinner.stop = Mock(side_effect=AssertionError("same status must not stop spinner again"))
         status_bar.spinner.start = Mock(side_effect=AssertionError("same status must not start spinner again"))
-        status_bar.check_label.setVisible = Mock(side_effect=AssertionError("same status must not update visibility"))
+        status_bar.pulse_dot.setVisible = Mock(side_effect=AssertionError("same status must not update visibility"))
         status_bar.text_label.setText = Mock(side_effect=AssertionError("same status must not rewrite text"))
 
         status_bar.set_plan(plan)
 
         status_bar.spinner.stop.assert_not_called()
         status_bar.spinner.start.assert_not_called()
-        status_bar.check_label.setVisible.assert_not_called()
+        status_bar.pulse_dot.setVisible.assert_not_called()
         status_bar.text_label.setText.assert_not_called()
 
     def test_status_bar_text_change_keeps_same_indicator_render(self) -> None:
@@ -496,13 +514,13 @@ class PresetStatusBarPlanTests(unittest.TestCase):
         status_bar.set_plan(build_preset_status_plan("saved", launch_method=ZAPRET2_MODE, text="Сохранено"))
         status_bar.spinner.stop = Mock(side_effect=AssertionError("same indicator must not stop spinner again"))
         status_bar.spinner.start = Mock(side_effect=AssertionError("same indicator must not start spinner again"))
-        status_bar.check_label.setVisible = Mock(side_effect=AssertionError("same indicator must not update visibility"))
+        status_bar.pulse_dot.setVisible = Mock(side_effect=AssertionError("same indicator must not update visibility"))
 
         status_bar.set_plan(build_preset_status_plan("saved", launch_method=ZAPRET2_MODE, text="Сохранено повторно"))
 
         status_bar.spinner.stop.assert_not_called()
         status_bar.spinner.start.assert_not_called()
-        status_bar.check_label.setVisible.assert_not_called()
+        status_bar.pulse_dot.setVisible.assert_not_called()
 
     def test_title_status_icon_skips_duplicate_plan_render(self) -> None:
         from presets.ui.common.preset_status_bar import PresetStatusIcon, build_preset_status_plan
@@ -512,7 +530,7 @@ class PresetStatusBarPlanTests(unittest.TestCase):
         icon.set_plan(plan)
         icon.spinner.stop = Mock(side_effect=AssertionError("same status must not stop spinner again"))
         icon.spinner.start = Mock(side_effect=AssertionError("same status must not start spinner again"))
-        icon.check_label.setVisible = Mock(side_effect=AssertionError("same status must not update visibility"))
+        icon.pulse_dot.setVisible = Mock(side_effect=AssertionError("same status must not update visibility"))
         icon.setToolTip = Mock(side_effect=AssertionError("same status must not rewrite tooltip"))
         icon.setVisible = Mock(side_effect=AssertionError("same status must not update visibility"))
 
@@ -520,7 +538,7 @@ class PresetStatusBarPlanTests(unittest.TestCase):
 
         icon.spinner.stop.assert_not_called()
         icon.spinner.start.assert_not_called()
-        icon.check_label.setVisible.assert_not_called()
+        icon.pulse_dot.setVisible.assert_not_called()
         icon.setToolTip.assert_not_called()
         icon.setVisible.assert_not_called()
 
@@ -539,29 +557,24 @@ class PresetStatusBarPlanTests(unittest.TestCase):
 
         icon.setToolTip.assert_not_called()
 
-    def test_title_status_icon_style_update_skips_duplicate_stylesheet(self) -> None:
+    def test_title_status_icon_style_update_skips_duplicate_dot_color(self) -> None:
         from unittest.mock import patch
 
         from presets.ui.common.preset_status_bar import PresetStatusIcon
 
         icon = PresetStatusIcon.__new__(PresetStatusIcon)
         icon._icon_size = 24
-        current_style = (
-            "color: #ffffff; "
-            "background-color: #6f7378; "
-            "border-radius: 12px; "
-            "font-size: 14px; "
-            "font-weight: 600;"
-        )
-        icon.check_label = _StyleWidget(current_style)
+        icon._last_dot_color = None
+        icon.pulse_dot = _PulseWidget()
 
         with patch(
             "presets.ui.common.preset_status_bar.get_theme_tokens",
             return_value=SimpleNamespace(is_light=False),
         ):
             PresetStatusIcon._apply_mode_style(icon, "neutral")
+            PresetStatusIcon._apply_mode_style(icon, "neutral")
 
-        self.assertEqual(icon.check_label.style_calls, [])
+        self.assertEqual(icon.pulse_dot.colors, ["#6f7378"])
 
     def test_title_status_icon_text_change_keeps_same_indicator_render(self) -> None:
         from presets.ui.common.preset_status_bar import PresetStatusIcon, build_preset_status_plan
@@ -570,14 +583,14 @@ class PresetStatusBarPlanTests(unittest.TestCase):
         icon.set_plan(build_preset_status_plan("saved", launch_method=ZAPRET2_MODE, text="Сохранено"))
         icon.spinner.stop = Mock(side_effect=AssertionError("same indicator must not stop spinner again"))
         icon.spinner.start = Mock(side_effect=AssertionError("same indicator must not start spinner again"))
-        icon.check_label.setVisible = Mock(side_effect=AssertionError("same indicator must not update visibility"))
+        icon.pulse_dot.setVisible = Mock(side_effect=AssertionError("same indicator must not update visibility"))
         icon.setVisible = Mock(side_effect=AssertionError("same indicator must not update widget visibility"))
 
         icon.set_plan(build_preset_status_plan("saved", launch_method=ZAPRET2_MODE, text="Сохранено повторно"))
 
         icon.spinner.stop.assert_not_called()
         icon.spinner.start.assert_not_called()
-        icon.check_label.setVisible.assert_not_called()
+        icon.pulse_dot.setVisible.assert_not_called()
         icon.setVisible.assert_not_called()
 
     def test_raw_editor_runtime_toggle_uses_single_button_plan(self) -> None:

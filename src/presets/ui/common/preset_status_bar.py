@@ -3,12 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QSizePolicy, QWidget
+from PyQt6.QtWidgets import QHBoxLayout, QSizePolicy, QWidget
 from qfluentwidgets import CaptionLabel
 
 from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE, normalize_launch_method
 from ui.accessibility import set_state_text
 from ui.fluent_widgets import set_tooltip
+from ui.pulsing_dot import PulsingDot
 from ui.theme import get_theme_tokens
 from ui.widgets.win11_spinner import Win11Spinner
 
@@ -39,23 +40,23 @@ def build_preset_status_plan(
     if status_key == "loading":
         return PresetStatusPlan("Загрузка пресета...", "busy", "spinner")
     if status_key == "loaded":
-        return PresetStatusPlan("Пресет загружен", "success", "check")
+        return PresetStatusPlan("Пресет загружен", "success", "pulse")
     if status_key == "selected_stopped":
         return PresetStatusPlan(
             f"Пресет выбран, {_winws_name_for_method(launch_method)} не запущен",
             "success",
-            "check",
+            "pulse",
         )
     if status_key == "selected":
-        return PresetStatusPlan("Пресет выбран", "success", "check")
+        return PresetStatusPlan("Пресет выбран", "success", "pulse")
     if status_key == "applying":
         return PresetStatusPlan("Применяем пресет...", "busy", "spinner")
     if status_key == "applied":
-        return PresetStatusPlan("Пресет применён", "success", "check")
+        return PresetStatusPlan("Пресет применён", "success", "pulse")
     if status_key == "saving":
         return PresetStatusPlan("Сохраняем изменения...", "busy", "spinner")
     if status_key == "saved":
-        return PresetStatusPlan(custom_text or "Изменения сохранены", "success", "check")
+        return PresetStatusPlan(custom_text or "Изменения сохранены", "success", "pulse")
     if status_key == "dirty":
         return PresetStatusPlan("Есть несохранённые изменения", "neutral", "none")
     if status_key == "error":
@@ -122,6 +123,15 @@ def set_style_sheet_if_changed(widget, style: str) -> bool:
     return True
 
 
+def set_pulse_dot_color_if_changed(widget: PulsingDot, color: str) -> bool:
+    value = str(color or "")
+    if getattr(widget, "_last_preset_status_color", None) == value:
+        return False
+    setattr(widget, "_last_preset_status_color", value)
+    widget.set_color(value)
+    return True
+
+
 def _preset_status_state_text(text: str) -> str:
     value = str(text or "").strip()
     return f"Статус пресета: {value}" if value else "Статус пресета"
@@ -139,9 +149,8 @@ class PresetStatusBar(QWidget):
         self.spinner = Win11Spinner(size=16, parent=self)
         self.spinner.hide()
 
-        self.check_label = QLabel("✓", self)
-        self.check_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.check_label.setFixedSize(16, 16)
+        self.pulse_dot = PulsingDot(self, size=16)
+        self.pulse_dot.hide()
 
         self.text_label = CaptionLabel("", self)
         self.text_label.setWordWrap(False)
@@ -151,7 +160,7 @@ class PresetStatusBar(QWidget):
         layout.setContentsMargins(0, 2, 0, 0)
         layout.setSpacing(6)
         layout.addWidget(self.spinner, 0, Qt.AlignmentFlag.AlignVCenter)
-        layout.addWidget(self.check_label, 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(self.pulse_dot, 0, Qt.AlignmentFlag.AlignVCenter)
         layout.addWidget(self.text_label, 0, Qt.AlignmentFlag.AlignVCenter)
         layout.addStretch(1)
 
@@ -170,11 +179,17 @@ class PresetStatusBar(QWidget):
         if indicator_changed:
             self._last_indicator = indicator
             if indicator == "spinner":
-                self.check_label.hide()
+                self.pulse_dot.stop_pulse()
+                self.pulse_dot.hide()
                 self.spinner.start()
+            elif indicator == "pulse":
+                self.spinner.stop()
+                self.pulse_dot.setVisible(True)
+                self.pulse_dot.start_pulse()
             else:
                 self.spinner.stop()
-                self.check_label.setVisible(indicator == "check")
+                self.pulse_dot.stop_pulse()
+                self.pulse_dot.hide()
 
         set_text_if_changed(self.text_label, normalized_plan.text)
         state_text = _preset_status_state_text(normalized_plan.text)
@@ -198,7 +213,7 @@ class PresetStatusBar(QWidget):
         else:
             color = "#5f6368" if is_light else "#b8b8b8"
 
-        set_style_sheet_if_changed(self.check_label, f"color: {color}; font-size: 14px; font-weight: 700;")
+        set_pulse_dot_color_if_changed(self.pulse_dot, color)
         set_style_sheet_if_changed(self.text_label, f"color: {color};")
 
 
@@ -216,15 +231,14 @@ class PresetStatusIcon(QWidget):
         self.spinner = Win11Spinner(size=self._icon_size, parent=self)
         self.spinner.hide()
 
-        self.check_label = QLabel("✓", self)
-        self.check_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.check_label.setFixedSize(self._icon_size, self._icon_size)
+        self.pulse_dot = PulsingDot(self, size=self._icon_size)
+        self.pulse_dot.hide()
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
         layout.addWidget(self.spinner, 0, Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.check_label, 0, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.pulse_dot, 0, Qt.AlignmentFlag.AlignCenter)
 
         self.set_plan(build_preset_status_plan("neutral", launch_method=ZAPRET2_MODE))
 
@@ -241,16 +255,22 @@ class PresetStatusIcon(QWidget):
         if indicator_changed:
             self._last_indicator = indicator
             if indicator == "spinner":
-                self.check_label.hide()
+                self.pulse_dot.stop_pulse()
+                self.pulse_dot.hide()
                 self.spinner.start()
+            elif indicator == "pulse":
+                self.spinner.stop()
+                self.pulse_dot.setVisible(True)
+                self.pulse_dot.start_pulse()
             else:
                 self.spinner.stop()
-                self.check_label.setVisible(indicator == "check")
+                self.pulse_dot.stop_pulse()
+                self.pulse_dot.hide()
 
         set_tooltip(self, normalized_plan.text)
         set_state_text(self, _preset_status_state_text(normalized_plan.text))
         if indicator_changed:
-            self.setVisible(indicator in {"spinner", "check"})
+            self.setVisible(indicator in {"spinner", "pulse"})
         self._apply_mode_style(mode)
 
     def _apply_mode_style(self, mode: str) -> None:
@@ -265,14 +285,7 @@ class PresetStatusIcon(QWidget):
                 is_light = False
             background = "#5f6368" if is_light else "#6f7378"
 
-        set_style_sheet_if_changed(
-            self.check_label,
-            "color: #ffffff; "
-            f"background-color: {background}; "
-            f"border-radius: {self._icon_size // 2}px; "
-            f"font-size: {max(12, self._icon_size - 10)}px; "
-            "font-weight: 600;"
-        )
+        set_pulse_dot_color_if_changed(self.pulse_dot, background)
 
 
 __all__ = [
