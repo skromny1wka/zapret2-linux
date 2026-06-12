@@ -386,6 +386,9 @@ def aggressive_windivert_cleanup_runtime() -> bool:
     else:
         ok = clear_stopped_windivert_delete_flags_runtime() and ok
         ok = restore_known_windivert_services_demand_start_runtime() and ok
+        services_removed = bool(stop_and_delete_runtime_services(retry_count=2))
+        if services_removed:
+            ok = services_removed and ok
     time.sleep(0.3)
     ok = force_kill_all_winws_processes() and ok
     ok = wait_for_windivert_cleanup_settle_runtime(

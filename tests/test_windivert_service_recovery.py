@@ -157,6 +157,35 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
         clear_delete_flag.assert_called_once_with()
         restore_start.assert_called_once_with()
 
+    def test_aggressive_cleanup_retries_delete_after_clearing_stale_service_flags(self) -> None:
+        from winws_runtime.runtime import system_ops
+
+        with (
+            patch.object(system_ops, "force_kill_all_winws_processes", return_value=True),
+            patch.object(system_ops, "unload_known_windivert_drivers_runtime", return_value=True),
+            patch.object(
+                system_ops,
+                "stop_and_delete_runtime_services",
+                side_effect=[False, True],
+            ) as stop_and_delete,
+            patch.object(system_ops, "clear_stopped_windivert_delete_flags_runtime", return_value=True),
+            patch.object(system_ops, "restore_known_windivert_services_demand_start_runtime", return_value=True),
+            patch.object(system_ops, "wait_for_windivert_cleanup_settle_runtime", return_value=True) as wait_cleanup,
+            patch.object(system_ops.time, "sleep"),
+            patch.object(system_ops, "log"),
+        ):
+            cleaned = system_ops.aggressive_windivert_cleanup_runtime()
+
+        self.assertTrue(cleaned)
+        self.assertEqual(stop_and_delete.call_count, 2)
+        stop_and_delete.assert_any_call(retry_count=3)
+        stop_and_delete.assert_any_call(retry_count=2)
+        wait_cleanup.assert_called_once_with(
+            max_wait_seconds=5.0,
+            poll_interval=0.25,
+            retry_cleanup=True,
+        )
+
     def test_clear_stopped_windivert_delete_flags_skips_running_services(self) -> None:
         from utils import service_manager
         from winws_runtime.runtime import system_ops
