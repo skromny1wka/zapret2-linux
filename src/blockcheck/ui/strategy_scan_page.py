@@ -462,11 +462,18 @@ class StrategyScanPage(BasePage):
         for option in menu_plan.options:
             action = Action(option, menu)
             action.setCheckable(True)
-            action.setChecked(option == menu_plan.current_value)
+            is_current = option == menu_plan.current_value
+            action.setChecked(is_current)
             action.triggered.connect(
                 lambda checked=False, selected_target=option: self._on_pick_quick_domain(selected_target)
             )
             menu.addAction(action)
+            menu_item = menu.view.item(menu.view.count() - 1)
+            if menu_item is not None:
+                state = "выбрана" if is_current else "не выбрана"
+                accessible_text = f"Быстрая цель: {option}, {state}"
+                menu_item.setData(Qt.ItemDataRole.AccessibleTextRole, accessible_text)
+                menu_item.setData(Qt.ItemDataRole.AccessibleDescriptionRole, accessible_text)
 
         if not menu.actions():
             return

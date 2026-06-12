@@ -1,6 +1,7 @@
 import os
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -111,6 +112,36 @@ class StrategyScanPageAccessibilityTests(unittest.TestCase):
         self.assertEqual(
             menu.view.item(1).data(Qt.ItemDataRole.AccessibleTextRole),
             "Протокол подбора стратегии: STUN Voice (Discord/Telegram), не выбран",
+        )
+
+    def test_quick_target_menu_items_are_named_for_screen_reader(self) -> None:
+        page = StrategyScanPage(
+            blockcheck_feature=_BlockcheckFeatureStub(),
+            create_strategy_scan_worker=lambda *_args, **_kwargs: None,
+        )
+        self.addCleanup(page.deleteLater)
+        captured = []
+
+        with patch(
+            "blockcheck.ui.strategy_scan_page.exec_popup_menu",
+            side_effect=lambda menu, *_args, **_kwargs: captured.append(menu),
+        ):
+            page._open_quick_targets_menu(
+                SimpleNamespace(
+                    options=("discord.com", "youtube.com"),
+                    current_value="youtube.com",
+                )
+            )
+
+        self.assertEqual(len(captured), 1)
+        menu = captured[0]
+        self.assertEqual(
+            menu.view.item(0).data(Qt.ItemDataRole.AccessibleTextRole),
+            "Быстрая цель: discord.com, не выбрана",
+        )
+        self.assertEqual(
+            menu.view.item(1).data(Qt.ItemDataRole.AccessibleTextRole),
+            "Быстрая цель: youtube.com, выбрана",
         )
 
     def test_runtime_status_updates_state_text_for_screen_reader(self) -> None:
