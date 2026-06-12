@@ -450,6 +450,23 @@ class PresetStatusBarPlanTests(unittest.TestCase):
         self.assertFalse(status_bar.pulse_dot._is_pulsing)
         self.assertEqual(status_bar.pulse_dot._color.name().lower(), "#d83b01")
 
+    def test_status_bar_dot_exposes_preset_state_text(self) -> None:
+        from presets.ui.common.preset_status_bar import PresetStatusBar, build_preset_status_plan
+
+        status_bar = PresetStatusBar()
+        self.addCleanup(status_bar.deleteLater)
+
+        status_bar.set_plan(build_preset_status_plan("selected_stopped", launch_method=ZAPRET2_MODE))
+
+        self.assertEqual(
+            status_bar.pulse_dot.property("screenReaderStateText"),
+            "Статус пресета: Пресет выбран, winws2 не запущен",
+        )
+        self.assertEqual(
+            status_bar.pulse_dot.accessibleName(),
+            "Статус пресета: Пресет выбран, winws2 не запущен",
+        )
+
     def test_title_status_icon_selected_stopped_shows_static_red_dot(self) -> None:
         from presets.ui.common.preset_status_bar import PresetStatusIcon, build_preset_status_plan
 
@@ -461,6 +478,20 @@ class PresetStatusBarPlanTests(unittest.TestCase):
         self.assertTrue(icon.pulse_dot.isVisible())
         self.assertFalse(icon.pulse_dot._is_pulsing)
         self.assertEqual(icon.pulse_dot._color.name().lower(), "#d83b01")
+
+    def test_title_status_icon_dot_exposes_preset_state_text(self) -> None:
+        from presets.ui.common.preset_status_bar import PresetStatusIcon, build_preset_status_plan
+
+        icon = PresetStatusIcon(size=24)
+        self.addCleanup(icon.deleteLater)
+
+        icon.set_plan(build_preset_status_plan("applied", launch_method=ZAPRET2_MODE))
+
+        self.assertEqual(
+            icon.pulse_dot.property("screenReaderStateText"),
+            "Статус пресета: Пресет применён",
+        )
+        self.assertEqual(icon.pulse_dot.accessibleName(), "Статус пресета: Пресет применён")
 
     def test_applying_status_uses_spinner_and_requested_text(self) -> None:
         from presets.ui.common.preset_status_bar import build_preset_status_plan
