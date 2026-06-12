@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ui.accessibility import set_control_accessibility, set_state_text
+from ui.accessibility import enable_keyboard_click, set_control_accessibility, set_state_text
 
 
 def set_help_card_accessibility(card, *, action_name: str, description: str) -> None:
@@ -10,6 +10,7 @@ def set_help_card_accessibility(card, *, action_name: str, description: str) -> 
 
     set_state_text(card, action_name)
     set_control_accessibility(card, name=action_name, description=description)
+    enable_keyboard_click(card)
     button = getattr(card, "button", None)
     if button is not None:
         set_state_text(button, action_name)

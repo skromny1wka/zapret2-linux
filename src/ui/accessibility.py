@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import MethodType
+
 from PyQt6.QtCore import Qt
 
 
@@ -105,7 +107,52 @@ def set_item_accessible_text(item, text: object, *, description: object | None =
                 pass
 
 
+def enable_keyboard_click(widget) -> None:
+    """Делает кликабельную карточку доступной через Tab, Enter и Пробел."""
+
+    if widget is None:
+        return
+    try:
+        if widget.focusPolicy() == Qt.FocusPolicy.NoFocus:
+            widget.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+    except Exception:
+        return
+    try:
+        if widget.property("_keyboardClickEnabled"):
+            return
+        widget.setProperty("_keyboardClickEnabled", True)
+    except Exception:
+        pass
+
+    original_key_press = getattr(widget, "keyPressEvent", None)
+
+    def _keyboard_click_key_press(self, event):  # noqa: ANN001
+        try:
+            key = event.key()
+        except Exception:
+            key = None
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
+            clicked = getattr(self, "clicked", None)
+            emit = getattr(clicked, "emit", None)
+            if emit is not None:
+                emit()
+                try:
+                    event.accept()
+                except Exception:
+                    pass
+                return
+        if original_key_press is not None:
+            return original_key_press(event)
+        return None
+
+    try:
+        widget.keyPressEvent = MethodType(_keyboard_click_key_press, widget)
+    except Exception:
+        pass
+
+
 __all__ = [
+    "enable_keyboard_click",
     "set_accessible_description",
     "set_accessible_name",
     "set_control_accessibility",
