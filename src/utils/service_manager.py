@@ -19,6 +19,7 @@ except ImportError:
 
 
 # Windows API константы
+SC_MANAGER_CONNECT = 0x0001
 SC_MANAGER_ALL_ACCESS = 0xF003F
 SERVICE_ALL_ACCESS = 0xF01FF
 SERVICE_QUERY_STATUS = 0x0004
@@ -277,7 +278,7 @@ def set_service_start_type(service_name: str, start_type: int) -> bool:
     if advapi32 is None or OpenSCManager is None or OpenService is None or ChangeServiceConfig is None:
         return False
     try:
-        sc_manager = OpenSCManager(None, None, SC_MANAGER_ALL_ACCESS)
+        sc_manager = OpenSCManager(None, None, SC_MANAGER_CONNECT)
         if not sc_manager:
             log(f"Не удалось открыть SCManager для настройки {service_name}", "DEBUG")
             return False
@@ -410,7 +411,7 @@ def service_exists(service_name: str) -> bool:
         True если служба существует
     """
     try:
-        sc_manager = OpenSCManager(None, None, SC_MANAGER_ALL_ACCESS)
+        sc_manager = OpenSCManager(None, None, SC_MANAGER_CONNECT)
         if not sc_manager:
             return False
         
@@ -437,7 +438,7 @@ def get_service_state(service_name: str) -> int | None:
     if advapi32 is None or OpenSCManager is None or OpenService is None or QueryServiceStatus is None:
         return None
     try:
-        sc_manager = OpenSCManager(None, None, SC_MANAGER_ALL_ACCESS)
+        sc_manager = OpenSCManager(None, None, SC_MANAGER_CONNECT)
         if not sc_manager:
             return None
 

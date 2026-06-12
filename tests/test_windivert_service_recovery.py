@@ -41,6 +41,25 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
         self.assertFalse(removed)
         service_exists.assert_called_with("Monkey")
 
+    def test_service_state_query_uses_minimal_sc_manager_access(self) -> None:
+        from utils import service_manager
+
+        def query_status(_service, status_ptr) -> bool:
+            status_ptr._obj.dwCurrentState = service_manager.SERVICE_RUNNING
+            return True
+
+        with (
+            patch.object(service_manager, "advapi32", object()),
+            patch.object(service_manager, "OpenSCManager", return_value=111) as open_sc_manager,
+            patch.object(service_manager, "OpenService", return_value=222),
+            patch.object(service_manager, "QueryServiceStatus", side_effect=query_status),
+            patch.object(service_manager, "CloseServiceHandle"),
+        ):
+            state = service_manager.get_service_state("Monkey")
+
+        self.assertEqual(state, service_manager.SERVICE_RUNNING)
+        open_sc_manager.assert_called_once_with(None, None, 0x0001)
+
     def test_monkey_disabled_service_is_reported_as_windivert_driver_problem(self) -> None:
         from winws_runtime.health import process_health_check
 
