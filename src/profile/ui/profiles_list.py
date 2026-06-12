@@ -122,6 +122,7 @@ class ProfilesList(QWidget):
         set_control_accessibility(self._view, name="Список профилей", description=profile_list_description)
         self._view.set_screen_reader_list_name("Список профилей")
         self._view.setModel(self._model)
+        set_state_text(self._view, "Список профилей: список пока загружается")
         self._view.setSelectionMode(QListView.SelectionMode.SingleSelection)
         self._view.setEditTriggers(QListView.EditTrigger.NoEditTriggers)
         self._view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)

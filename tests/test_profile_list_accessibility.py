@@ -24,7 +24,8 @@ class ProfileListAccessibilityTests(unittest.TestCase):
         self.assertEqual(widget.accessibleName(), "Список профилей: список пока загружается")
         self.assertIn("стрелками вверх и вниз", widget.accessibleDescription())
         self.assertEqual(widget.property("screenReaderStateText"), "Список профилей: список пока загружается")
-        self.assertEqual(widget._view.accessibleName(), "Список профилей")
+        self.assertEqual(widget._view.accessibleName(), "Список профилей: список пока загружается")
+        self.assertEqual(widget._view.property("screenReaderStateText"), "Список профилей: список пока загружается")
         self.assertIn("Enter открывает выбранный profile", widget._view.accessibleDescription())
         self.assertIn("клавиша меню открывает действия", widget._view.accessibleDescription())
 
