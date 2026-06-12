@@ -158,6 +158,26 @@ class Win11ToggleRowTests(unittest.TestCase):
 
         self.assertEqual(events, [True])
 
+    def test_toggle_row_works_from_keyboard(self) -> None:
+        from ui.widgets.win11_controls import Win11ToggleRow
+
+        row = Win11ToggleRow(
+            "fa5s.bolt",
+            "Автозапуск DPI",
+            "Запускать DPI после старта программы",
+        )
+        events: list[bool] = []
+        row.toggled.connect(events.append)
+
+        self.assertEqual(row.focusPolicy(), Qt.FocusPolicy.StrongFocus)
+
+        event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Space, Qt.KeyboardModifier.NoModifier)
+        QApplication.sendEvent(row, event)
+
+        self.assertTrue(event.isAccepted())
+        self.assertTrue(row.isChecked())
+        self.assertEqual(events, [True])
+
     def test_combo_row_menu_items_are_named_for_screen_reader(self) -> None:
         from ui.widgets.win11_controls import Win11ComboRow
 

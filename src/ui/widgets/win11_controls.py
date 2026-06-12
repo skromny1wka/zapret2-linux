@@ -102,6 +102,7 @@ class Win11ToggleRow(FluentSettingCard):
             description or None,
             parent=parent,
         )
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         try:
             self.setIconSize(18, 18)
         except Exception:
@@ -243,6 +244,15 @@ class Win11ToggleRow(FluentSettingCard):
         if bool(getattr(self, "_programmatic_set_checked", False)):
             return
         self.toggled.emit(bool(checked))
+
+    def keyPressEvent(self, event):  # noqa: N802
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
+            toggle = getattr(self, "_switch_button", None)
+            if toggle is not None:
+                toggle.setChecked(not self.isChecked())
+                event.accept()
+                return
+        super().keyPressEvent(event)
 
     def _update_toggle_accessibility(self) -> None:
         state = "включено" if self.isChecked() else "выключено"
