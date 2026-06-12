@@ -616,6 +616,7 @@ class ProfileStrategyListWidget(QWidget):
         self._list.clear()
         visible = 0
         current_item = None
+        first_item = None
 
         rows = list(self._entries.items())
         rows.sort(key=lambda pair: (
@@ -663,6 +664,8 @@ class ProfileStrategyListWidget(QWidget):
             item.setSizeHint(QSize(0, 31))
             if is_current:
                 current_item = item
+            if first_item is None:
+                first_item = item
             self._item_by_strategy_id[strategy_id] = item
             self._list.addItem(item)
             visible += 1
@@ -670,8 +673,10 @@ class ProfileStrategyListWidget(QWidget):
         summary_text = f"{visible} из {len(self._entries)}"
         set_widget_text_if_changed(self._summary, summary_text)
         set_state_text(self._summary, f"Показано готовых стратегий: {summary_text}")
+        focus_item = current_item or first_item
+        if focus_item is not None:
+            self._list.setCurrentItem(focus_item)
         if current_item is not None:
-            self._list.setCurrentItem(current_item)
             current_item.setSelected(True)
         self._update_current_strategy_accessibility(self._list.currentItem())
 
@@ -880,6 +885,7 @@ class ProfileStrategyListWidget(QWidget):
         self._item_by_strategy_id.clear()
         self._list.clear()
         current_item = None
+        first_item = None
 
         for row in tuple(getattr(plan, "rows", ()) or ()):
             item = QListWidgetItem()
@@ -897,14 +903,18 @@ class ProfileStrategyListWidget(QWidget):
             item.setSizeHint(QSize(0, 31))
             if row.is_current:
                 current_item = item
+            if first_item is None:
+                first_item = item
             self._item_by_strategy_id[row.strategy_id] = item
             self._list.addItem(item)
 
         summary_text = f"{int(getattr(plan, 'visible_count', 0) or 0)} из {int(getattr(plan, 'total_count', 0) or 0)}"
         set_widget_text_if_changed(self._summary, summary_text)
         set_state_text(self._summary, f"Показано готовых стратегий: {summary_text}")
+        focus_item = current_item or first_item
+        if focus_item is not None:
+            self._list.setCurrentItem(focus_item)
         if current_item is not None:
-            self._list.setCurrentItem(current_item)
             current_item.setSelected(True)
         self._update_current_strategy_accessibility(self._list.currentItem())
 

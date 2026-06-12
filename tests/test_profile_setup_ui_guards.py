@@ -209,6 +209,7 @@ class _ListWidget:
         self.current_item = None
         self.current_item_calls = []
         self.update_calls = []
+        self.properties = {}
 
     def clear(self) -> None:
         self.clear_calls += 1
@@ -232,6 +233,12 @@ class _ListWidget:
 
     def update(self, rect) -> None:
         self.update_calls.append(rect)
+
+    def setProperty(self, name, value) -> None:  # noqa: N802
+        self.properties[str(name)] = value
+
+    def property(self, name):
+        return self.properties.get(str(name))
 
 
 class _StrategyItem:
@@ -710,6 +717,69 @@ class ProfileSetupUiGuardTests(unittest.TestCase):
             "TLS fake, выбрана, в избранном, работает, Fake, Подмена TLS. "
             "Нажмите Enter, чтобы выбрать стратегию.",
         )
+
+    def test_strategy_list_focuses_first_visible_row_when_current_strategy_is_hidden(self) -> None:
+        from types import SimpleNamespace
+
+        from profile.ui.profile_setup_page import ProfileStrategyListWidget
+
+        widget = ProfileStrategyListWidget.__new__(ProfileStrategyListWidget)
+        widget._search = _TextWidget("")
+        widget._list = _ListWidget()
+        widget._entries = {
+            "tls_fake": SimpleNamespace(
+                name="TLS fake",
+                args="--lua-desync=fake",
+                visual=SimpleNamespace(
+                    label="Fake",
+                    description="Подмена TLS",
+                    icon_name="",
+                    color="",
+                ),
+            )
+        }
+        widget._states = {}
+        widget._current_strategy_id = "hidden_strategy"
+        widget._item_by_strategy_id = {}
+        widget._summary = _TextWidget("")
+
+        ProfileStrategyListWidget._rebuild_tree(widget)
+
+        self.assertEqual(widget._list.current_item, widget._list.items[0])
+        self.assertIn("TLS fake, не выбрана", widget._list.property("screenReaderStateText"))
+
+    def test_strategy_list_plan_focuses_first_visible_row_when_current_strategy_is_hidden(self) -> None:
+        from profile.strategy_list_filter import ProfileStrategyListPlan, ProfileStrategyListRow
+        from profile.ui.profile_setup_page import ProfileStrategyListWidget
+
+        widget = ProfileStrategyListWidget.__new__(ProfileStrategyListWidget)
+        widget._list = _ListWidget()
+        widget._item_by_strategy_id = {}
+        widget._summary = _TextWidget("")
+        plan = ProfileStrategyListPlan(
+            rows=(
+                ProfileStrategyListRow(
+                    strategy_id="tls_fake",
+                    name="TLS fake",
+                    status_text="",
+                    accessible_text="TLS fake, не выбрана. Нажмите Enter, чтобы выбрать стратегию.",
+                    is_current=False,
+                    visual_icon_name="",
+                    visual_color="",
+                    visual_label="",
+                    visual_description="",
+                    tooltip_text="",
+                ),
+            ),
+            visible_count=1,
+            total_count=1,
+            current_strategy_id="hidden_strategy",
+        )
+
+        ProfileStrategyListWidget._apply_strategy_list_plan(widget, plan)
+
+        self.assertEqual(widget._list.current_item, widget._list.items[0])
+        self.assertIn("TLS fake, не выбрана", widget._list.property("screenReaderStateText"))
 
     def test_strategy_list_keyboard_activation_uses_current_row(self) -> None:
         from types import SimpleNamespace

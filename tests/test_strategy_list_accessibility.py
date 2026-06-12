@@ -12,6 +12,12 @@ from PyQt6.QtWidgets import QApplication
 from profile.ui.profile_setup_page import ProfileStrategyListWidget
 
 
+def _make_sync_strategy_list() -> ProfileStrategyListWidget:
+    widget = ProfileStrategyListWidget()
+    widget._strategy_filter_runtime = None
+    return widget
+
+
 class StrategyListAccessibilityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -48,7 +54,7 @@ class StrategyListAccessibilityTests(unittest.TestCase):
         )
 
     def test_strategy_summary_reads_visible_count(self) -> None:
-        widget = ProfileStrategyListWidget()
+        widget = _make_sync_strategy_list()
         self.addCleanup(widget.deleteLater)
 
         widget.set_rows(
@@ -75,7 +81,7 @@ class StrategyListAccessibilityTests(unittest.TestCase):
         )
 
     def test_strategy_list_updates_screen_reader_text_when_current_row_changes(self) -> None:
-        widget = ProfileStrategyListWidget()
+        widget = _make_sync_strategy_list()
         self.addCleanup(widget.deleteLater)
 
         visual = SimpleNamespace(label="Fake", description="Подмена TLS", icon_name="", color="")
