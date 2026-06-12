@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import MethodType
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QListView, QSizePolicy
@@ -34,6 +35,27 @@ class UserPresetsPageBuildWidgets:
     presets_list: object
     presets_model: object
     presets_delegate: object
+
+
+def wire_preset_search_keyboard_activation(preset_search_input, presets_list) -> None:
+    """Enter в поиске пресетов активирует текущий элемент списка."""
+
+    if preset_search_input is None or presets_list is None:
+        return
+    if bool(getattr(preset_search_input, "_preset_search_keyboard_activation", False)):
+        return
+    original_key_press = getattr(preset_search_input, "keyPressEvent", None)
+
+    def _search_key_press(self, event):
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            presets_list.setFocus(Qt.FocusReason.OtherFocusReason)
+            presets_list.keyPressEvent(event)
+            return
+        if callable(original_key_press):
+            original_key_press(event)
+
+    preset_search_input.keyPressEvent = MethodType(_search_key_press, preset_search_input)
+    preset_search_input._preset_search_keyboard_activation = True
 
 
 def build_user_presets_page_shell(
@@ -219,6 +241,7 @@ def build_user_presets_page_shell(
     presets_delegate.set_ui_language(ui_language)
     presets_delegate.action_triggered.connect(on_preset_list_action)
     presets_list.setModel(presets_model)
+    wire_preset_search_keyboard_activation(preset_search_input, presets_list)
     apply_user_presets_accessibility(
         tr_fn=tr_fn,
         tr_prefix=tr_prefix,

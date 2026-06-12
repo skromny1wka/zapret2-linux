@@ -9,6 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeyEvent
+from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QVBoxLayout, QWidget
 from qfluentwidgets import FluentIcon, LineEdit, PrimaryToolButton, StrongBodyLabel
 
@@ -227,6 +228,32 @@ class UserPresetsAccessibilityTests(unittest.TestCase):
         view.keyPressEvent(event)
 
         self.assertTrue(event.isAccepted())
+        self.assertEqual(requested, ["Default.txt"])
+
+    def test_preset_search_enter_activates_current_preset(self) -> None:
+        parent, widgets = self._build_widgets()
+        self.addCleanup(parent.deleteLater)
+        widgets.presets_model.set_rows(
+            [
+                {
+                    "kind": "preset",
+                    "name": "Default",
+                    "file_name": "Default.txt",
+                }
+            ]
+        )
+        widgets.presets_list.setCurrentIndex(widgets.presets_model.index(0, 0))
+        requested: list[str] = []
+        widgets.presets_list.preset_activated.connect(requested.append)
+        parent.show()
+        self._app.processEvents()
+        widgets.preset_search_input.setFocus()
+        self._app.processEvents()
+
+        QTest.keyClick(widgets.preset_search_input, Qt.Key.Key_Return)
+        self._app.processEvents()
+
+        self.assertIs(self._app.focusWidget(), widgets.presets_list)
         self.assertEqual(requested, ["Default.txt"])
 
     def test_preset_list_toggles_selected_folder_with_space(self) -> None:
