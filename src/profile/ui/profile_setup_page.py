@@ -753,7 +753,13 @@ class ProfileStrategyListWidget(QWidget):
             accessible_status_parts = _strategy_status_parts(state, is_current=is_current, include_unselected=True)
             status_text = " • ".join(status_parts)
 
-            item.setText(name)
+            accessible_text = _strategy_screen_reader_text(
+                name=name,
+                status_parts=accessible_status_parts,
+                visual_label=visual_label,
+                visual_description=visual_description,
+            )
+            item.setText(accessible_text)
             item.setData(self._ROLE_STRATEGY_ID, strategy_id)
             item.setData(self._ROLE_NAME_TEXT, name)
             item.setData(self._ROLE_STATUS_TEXT, status_text)
@@ -764,12 +770,7 @@ class ProfileStrategyListWidget(QWidget):
             item.setData(self._ROLE_VISUAL_DESCRIPTION, visual_description)
             item.setData(
                 Qt.ItemDataRole.AccessibleTextRole,
-                _strategy_screen_reader_text(
-                    name=name,
-                    status_parts=accessible_status_parts,
-                    visual_label=visual_label,
-                    visual_description=visual_description,
-                ),
+                accessible_text,
             )
             tooltip_parts = [visual_description.strip(), args]
             item.setData(self._ROLE_TOOLTIP_TEXT, "\n\n".join(part for part in tooltip_parts if part))
@@ -840,6 +841,12 @@ class ProfileStrategyListWidget(QWidget):
             if str(item.data(Qt.ItemDataRole.AccessibleTextRole) or "") != accessible_text:
                 item.setData(Qt.ItemDataRole.AccessibleTextRole, accessible_text)
                 changed = True
+            try:
+                if str(item.text() or "") != accessible_text:
+                    item.setText(accessible_text)
+                    changed = True
+            except Exception:
+                pass
         if changed:
             self._list.viewport().update(self._list.visualItemRect(item))
             if self._list.currentItem() is item:
@@ -1008,7 +1015,7 @@ class ProfileStrategyListWidget(QWidget):
 
         for row in tuple(getattr(plan, "rows", ()) or ()):
             item = QListWidgetItem()
-            item.setText(row.name)
+            item.setText(row.accessible_text or row.name)
             item.setData(self._ROLE_STRATEGY_ID, row.strategy_id)
             item.setData(self._ROLE_NAME_TEXT, row.name)
             item.setData(self._ROLE_STATUS_TEXT, row.status_text)

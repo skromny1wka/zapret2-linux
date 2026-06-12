@@ -148,6 +148,23 @@ class StrategyListAccessibilityTests(unittest.TestCase):
             "Нажмите Enter или Пробел, чтобы выбрать стратегию.",
         )
 
+    def test_strategy_rows_use_screen_reader_text_as_plain_item_text(self) -> None:
+        widget = _make_sync_strategy_list()
+        self.addCleanup(widget.deleteLater)
+
+        widget.set_rows(
+            entries={
+                "alpha": SimpleNamespace(name="Alpha", args="--alpha"),
+                "beta": SimpleNamespace(name="Beta", args="--beta"),
+            },
+            states={},
+            current_strategy_id="beta",
+        )
+
+        self.assertIn("Beta, выбрана", widget._list.currentItem().text())
+        widget._list.setCurrentRow(0)
+        self.assertIn("Alpha, не выбрана", widget._list.currentItem().text())
+
     def test_strategy_list_view_activates_current_row_from_keyboard(self) -> None:
         from profile.ui.profile_setup_page import ProfileStrategyListView
 
@@ -184,7 +201,7 @@ class StrategyListAccessibilityTests(unittest.TestCase):
         widget.keyPressEvent(down_event)
 
         self.assertTrue(down_event.isAccepted())
-        self.assertEqual(widget._list.currentItem().text(), "Beta")
+        self.assertEqual(widget._list.currentItem().data(ProfileStrategyListWidget._ROLE_NAME_TEXT), "Beta")
         self.assertIn("Готовая стратегия: Beta", widget._list.property("screenReaderStateText"))
 
         enter_event = QKeyEvent(QEvent.Type.KeyPress, int(Qt.Key.Key_Return), Qt.KeyboardModifier.NoModifier)
