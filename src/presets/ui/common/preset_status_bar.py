@@ -44,8 +44,8 @@ def build_preset_status_plan(
     if status_key == "selected_stopped":
         return PresetStatusPlan(
             f"Пресет выбран, {_winws_name_for_method(launch_method)} не запущен",
-            "success",
-            "pulse",
+            "stopped",
+            "dot",
         )
     if status_key == "selected":
         return PresetStatusPlan("Пресет выбран", "success", "pulse")
@@ -186,6 +186,10 @@ class PresetStatusBar(QWidget):
                 self.spinner.stop()
                 self.pulse_dot.setVisible(True)
                 self.pulse_dot.start_pulse()
+            elif indicator == "dot":
+                self.spinner.stop()
+                self.pulse_dot.stop_pulse()
+                self.pulse_dot.setVisible(True)
             else:
                 self.spinner.stop()
                 self.pulse_dot.stop_pulse()
@@ -206,7 +210,7 @@ class PresetStatusBar(QWidget):
             accent = "#5caee8"
             is_light = False
 
-        if mode == "error":
+        if mode in {"error", "stopped"}:
             color = "#d83b01"
         elif mode in {"success", "busy"}:
             color = accent
@@ -262,6 +266,10 @@ class PresetStatusIcon(QWidget):
                 self.spinner.stop()
                 self.pulse_dot.setVisible(True)
                 self.pulse_dot.start_pulse()
+            elif indicator == "dot":
+                self.spinner.stop()
+                self.pulse_dot.stop_pulse()
+                self.pulse_dot.setVisible(True)
             else:
                 self.spinner.stop()
                 self.pulse_dot.stop_pulse()
@@ -270,11 +278,11 @@ class PresetStatusIcon(QWidget):
         set_tooltip(self, normalized_plan.text)
         set_state_text(self, _preset_status_state_text(normalized_plan.text))
         if indicator_changed:
-            self.setVisible(indicator in {"spinner", "pulse"})
+            self.setVisible(indicator in {"spinner", "pulse", "dot"})
         self._apply_mode_style(mode)
 
     def _apply_mode_style(self, mode: str) -> None:
-        if mode == "error":
+        if mode in {"error", "stopped"}:
             background = "#d83b01"
         elif mode in {"success", "busy"}:
             background = "#8cc63f"
