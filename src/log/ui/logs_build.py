@@ -102,15 +102,17 @@ def build_logs_primary_tab_ui(
     refresh_btn.setIcon(refresh_icon_normal)
     refresh_btn.setFixedSize(36, 36)
     refresh_btn.setCursor(refresh_timer_parent.cursor() if hasattr(refresh_timer_parent, "cursor") else refresh_btn.cursor())
+    refresh_name = tr_catalog_fn("page.logs.accessibility.refresh.name", language=ui_language, default="Обновить список логов")
     set_control_accessibility(
         refresh_btn,
-        name=tr_catalog_fn("page.logs.accessibility.refresh.name", language=ui_language, default="Обновить список логов"),
+        name=refresh_name,
         description=tr_catalog_fn(
             "page.logs.accessibility.refresh.description",
             language=ui_language,
             default="Обновить список файлов логов и статистику.",
         ),
     )
+    set_state_text(refresh_btn, refresh_name)
     refresh_btn.clicked.connect(on_refresh)
     row1.addWidget(refresh_btn)
     controls_main.addLayout(row1)
@@ -153,15 +155,17 @@ def build_logs_primary_tab_ui(
         tr_catalog_fn("page.logs.button.copy", language=ui_language, default="Копировать"),
         icon=FluentIcon.COPY,
     )
+    copy_name = tr_catalog_fn("page.logs.accessibility.copy.name", language=ui_language, default="Копировать текущий лог")
     set_control_accessibility(
         copy_btn,
-        name=tr_catalog_fn("page.logs.accessibility.copy.name", language=ui_language, default="Копировать текущий лог"),
+        name=copy_name,
         description=tr_catalog_fn(
             "page.logs.action.copy.description",
             language=ui_language,
             default="Скопировать содержимое текущего лога в буфер обмена.",
         ),
     )
+    set_state_text(copy_btn, copy_name)
     copy_btn.clicked.connect(on_copy)
     controls_actions_bar.add_button(copy_btn)
 
@@ -169,15 +173,17 @@ def build_logs_primary_tab_ui(
         tr_catalog_fn("page.logs.button.clear", language=ui_language, default="Очистить"),
         icon=FluentIcon.ERASE_TOOL,
     )
+    clear_name = tr_catalog_fn("page.logs.accessibility.clear_view.name", language=ui_language, default="Очистить окно просмотра лога")
     set_control_accessibility(
         clear_btn,
-        name=tr_catalog_fn("page.logs.accessibility.clear_view.name", language=ui_language, default="Очистить окно просмотра лога"),
+        name=clear_name,
         description=tr_catalog_fn(
             "page.logs.action.clear.description",
             language=ui_language,
             default="Очистить только текущее окно просмотра, не удаляя файл лога.",
         ),
     )
+    set_state_text(clear_btn, clear_name)
     clear_btn.clicked.connect(on_clear_view)
     controls_actions_bar.add_button(clear_btn)
 
@@ -185,15 +191,17 @@ def build_logs_primary_tab_ui(
         tr_catalog_fn("page.logs.button.folder", language=ui_language, default="Папка"),
         icon=FluentIcon.FOLDER,
     )
+    folder_name = tr_catalog_fn("page.logs.accessibility.folder.name", language=ui_language, default="Открыть папку логов")
     set_control_accessibility(
         folder_btn,
-        name=tr_catalog_fn("page.logs.accessibility.folder.name", language=ui_language, default="Открыть папку логов"),
+        name=folder_name,
         description=tr_catalog_fn(
             "page.logs.action.folder.description",
             language=ui_language,
             default="Открыть папку logs с файлами приложения.",
         ),
     )
+    set_state_text(folder_btn, folder_name)
     folder_btn.clicked.connect(on_open_folder)
     controls_actions_bar.add_button(folder_btn)
 

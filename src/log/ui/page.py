@@ -460,9 +460,25 @@ class LogsPage(BasePage):
             )
 
         try:
+            refresh_name = tr_catalog(
+                "page.logs.accessibility.refresh.name",
+                language=self._ui_language,
+                default="Обновить список логов",
+            )
+            refresh_description = tr_catalog(
+                "page.logs.accessibility.refresh.description",
+                language=self._ui_language,
+                default="Обновить список файлов логов и статистику.",
+            )
+            set_control_accessibility(
+                self.refresh_btn,
+                name=refresh_name,
+                description=refresh_description,
+            )
+            set_state_text(self.refresh_btn, refresh_name)
             set_tooltip(
                 self.refresh_btn,
-                tr_catalog("page.logs.tooltip.refresh", language=self._ui_language, default="Обновить список файлов"),
+                refresh_description,
             )
         except Exception:
             pass
@@ -471,29 +487,53 @@ class LogsPage(BasePage):
             self.copy_btn.setText(tr_catalog("page.logs.button.copy", language=self._ui_language, default="Копировать"))
             self.clear_btn.setText(tr_catalog("page.logs.button.clear", language=self._ui_language, default="Очистить"))
             self.folder_btn.setText(tr_catalog("page.logs.button.folder", language=self._ui_language, default="Папка"))
+            copy_name = tr_catalog(
+                "page.logs.accessibility.copy.name",
+                language=self._ui_language,
+                default="Копировать текущий лог",
+            )
+            copy_description = tr_catalog(
+                "page.logs.action.copy.description",
+                language=self._ui_language,
+                default="Скопировать содержимое текущего лога в буфер обмена.",
+            )
+            set_control_accessibility(self.copy_btn, name=copy_name, description=copy_description)
+            set_state_text(self.copy_btn, copy_name)
             set_tooltip(
                 self.copy_btn,
-                tr_catalog(
-                    "page.logs.action.copy.description",
-                    language=self._ui_language,
-                    default="Скопировать содержимое текущего лога в буфер обмена.",
-                )
+                copy_description,
             )
+            clear_name = tr_catalog(
+                "page.logs.accessibility.clear_view.name",
+                language=self._ui_language,
+                default="Очистить окно просмотра лога",
+            )
+            clear_description = tr_catalog(
+                "page.logs.action.clear.description",
+                language=self._ui_language,
+                default="Очистить только текущее окно просмотра, не удаляя файл лога.",
+            )
+            set_control_accessibility(self.clear_btn, name=clear_name, description=clear_description)
+            set_state_text(self.clear_btn, clear_name)
             set_tooltip(
                 self.clear_btn,
-                tr_catalog(
-                    "page.logs.action.clear.description",
-                    language=self._ui_language,
-                    default="Очистить только текущее окно просмотра, не удаляя файл лога.",
-                )
+                clear_description,
             )
+            folder_name = tr_catalog(
+                "page.logs.accessibility.folder.name",
+                language=self._ui_language,
+                default="Открыть папку логов",
+            )
+            folder_description = tr_catalog(
+                "page.logs.action.folder.description",
+                language=self._ui_language,
+                default="Открыть папку logs с файлами приложения.",
+            )
+            set_control_accessibility(self.folder_btn, name=folder_name, description=folder_description)
+            set_state_text(self.folder_btn, folder_name)
             set_tooltip(
                 self.folder_btn,
-                tr_catalog(
-                    "page.logs.action.folder.description",
-                    language=self._ui_language,
-                    default="Открыть папку logs с файлами приложения.",
-                )
+                folder_description,
             )
         except Exception:
             pass

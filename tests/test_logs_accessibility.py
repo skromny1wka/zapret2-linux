@@ -187,6 +187,18 @@ class LogsAccessibilityTests(unittest.TestCase):
 
         self.assertEqual(widgets.log_combo.accessibleName(), "Выбор файла лога")
         self.assertIn("выберите файл стрелками вверх и вниз", widgets.log_combo.accessibleDescription())
+        self.assertEqual(widgets.refresh_btn.accessibleName(), "Обновить список логов")
+        self.assertEqual(widgets.refresh_btn.property("screenReaderStateText"), "Обновить список логов")
+        self.assertIn("список файлов логов", widgets.refresh_btn.accessibleDescription())
+        self.assertEqual(widgets.copy_btn.accessibleName(), "Копировать текущий лог")
+        self.assertEqual(widgets.copy_btn.property("screenReaderStateText"), "Копировать текущий лог")
+        self.assertEqual(widgets.clear_btn.accessibleName(), "Очистить окно просмотра лога")
+        self.assertEqual(
+            widgets.clear_btn.property("screenReaderStateText"),
+            "Очистить окно просмотра лога",
+        )
+        self.assertEqual(widgets.folder_btn.accessibleName(), "Открыть папку логов")
+        self.assertEqual(widgets.folder_btn.property("screenReaderStateText"), "Открыть папку логов")
         self.assertEqual(
             widgets.log_text.property("screenReaderStateText"),
             "Содержимое текущего лога: лог пока не загружен",
@@ -199,6 +211,34 @@ class LogsAccessibilityTests(unittest.TestCase):
             widgets.stats_label.property("screenReaderStateText"),
             "Статистика логов: пока нет данных",
         )
+
+    def test_logs_action_buttons_keep_screen_reader_state_after_language_refresh(self) -> None:
+        page = logs_page.LogsPage.__new__(logs_page.LogsPage)
+        page._ui_language = "ru"
+        page.controls_card = None
+        page.log_card = None
+        page._controls_actions_title = None
+        page.refresh_btn = TransparentToolButton()
+        page.copy_btn = PushButton()
+        page.clear_btn = PushButton()
+        page.folder_btn = PushButton()
+        page._logs_secondary_initialized = False
+
+        self.addCleanup(page.refresh_btn.deleteLater)
+        self.addCleanup(page.copy_btn.deleteLater)
+        self.addCleanup(page.clear_btn.deleteLater)
+        self.addCleanup(page.folder_btn.deleteLater)
+
+        logs_page.LogsPage._retranslate_logs_tab(page)
+
+        self.assertEqual(page.refresh_btn.accessibleName(), "Обновить список логов")
+        self.assertEqual(page.refresh_btn.property("screenReaderStateText"), "Обновить список логов")
+        self.assertEqual(page.copy_btn.accessibleName(), "Копировать текущий лог")
+        self.assertEqual(page.copy_btn.property("screenReaderStateText"), "Копировать текущий лог")
+        self.assertEqual(page.clear_btn.accessibleName(), "Очистить окно просмотра лога")
+        self.assertEqual(page.clear_btn.property("screenReaderStateText"), "Очистить окно просмотра лога")
+        self.assertEqual(page.folder_btn.accessibleName(), "Открыть папку логов")
+        self.assertEqual(page.folder_btn.property("screenReaderStateText"), "Открыть папку логов")
 
     def test_send_status_initial_state_is_text_for_screen_reader(self) -> None:
         parent = QWidget()
