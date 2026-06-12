@@ -5,6 +5,7 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QVBoxLayout, QWidget
 
 from profile.ui.shell import build_profile_shell
@@ -58,6 +59,15 @@ class ProfileShellAccessibilityTests(unittest.TestCase):
         self.assertIn("После ввода перейдите в список клавишей Tab", search_description)
         self.assertIn("выберите profile стрелками вверх и вниз", search_description)
         self.assertIn("нажмите Enter или Пробел", search_description)
+
+        search_buttons = [
+            child
+            for child in widgets.profile_search_input.findChildren(object)
+            if str(getattr(child, "objectName", lambda: "")() or "") == "lineEditButton"
+            and hasattr(child, "setFocusPolicy")
+        ]
+        self.assertTrue(search_buttons)
+        self.assertTrue(all(button.focusPolicy() == Qt.FocusPolicy.NoFocus for button in search_buttons))
 
 
 if __name__ == "__main__":

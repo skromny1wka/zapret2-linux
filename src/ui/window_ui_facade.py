@@ -60,7 +60,7 @@ def _get_sidebar_search_nav_widget_cls():
     from PyQt6.QtCore import QTimer, pyqtSignal
     from PyQt6.QtWidgets import QWidget, QHBoxLayout
     from app.ui_texts import tr as tr_catalog
-    from ui.accessibility import set_control_accessibility, set_state_text
+    from ui.accessibility import remove_line_edit_buttons_from_tab_order, set_control_accessibility, set_state_text
     from qfluentwidgets import SearchLineEdit
 
     class _SidebarSearchNavWidget(QWidget):
@@ -93,6 +93,7 @@ def _get_sidebar_search_nav_widget_cls():
                 self._search.setClearButtonEnabled(True)
             except Exception:
                 pass
+            remove_line_edit_buttons_from_tab_order(self._search)
             self._search.textChanged.connect(self.textChanged.emit)
 
             layout = QHBoxLayout(self)

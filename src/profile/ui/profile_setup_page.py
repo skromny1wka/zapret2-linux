@@ -51,7 +51,12 @@ from qfluentwidgets import (
 )
 from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE, is_preset_launch_method, is_zapret2_launch_method
 from ui.pages.base_page import BasePage
-from ui.accessibility import set_breadcrumb_accessibility, set_control_accessibility, set_state_text
+from ui.accessibility import (
+    remove_line_edit_buttons_from_tab_order,
+    set_breadcrumb_accessibility,
+    set_control_accessibility,
+    set_state_text,
+)
 from ui.fluent_widgets import set_tooltip
 from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.message_box_accessibility import set_message_box_button_accessibility
@@ -89,12 +94,6 @@ def set_widget_text_if_changed(widget, text: str) -> bool:
         pass
     widget.setText(value)
     return True
-
-
-def _remove_search_line_edit_buttons_from_tab_order(search) -> None:
-    for child in search.findChildren(QWidget):
-        if str(child.objectName() or "") == "lineEditButton":
-            child.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
 
 def set_widget_checked_if_changed(widget, checked: bool) -> bool:
@@ -495,7 +494,7 @@ class ProfileStrategyListWidget(QWidget):
                 "затем нажмите Enter или Пробел."
             ),
         )
-        _remove_search_line_edit_buttons_from_tab_order(self._search)
+        remove_line_edit_buttons_from_tab_order(self._search)
         self._search.textChanged.connect(self._apply_filter)
         top_layout.addWidget(self._search, 1)
 

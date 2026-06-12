@@ -6,6 +6,7 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication
 
 
@@ -37,6 +38,15 @@ class WindowUiFacadeLazyImportTests(unittest.TestCase):
         self.assertIn("Enter открывает выбранный результат", widget.accessibleDescription())
         self.assertEqual(widget._search.accessibleName(), "Глобальный поиск по ZapretGUI")
         self.assertIn("Enter открывает выбранный результат", widget._search.accessibleDescription())
+
+        search_buttons = [
+            child
+            for child in widget._search.findChildren(object)
+            if str(getattr(child, "objectName", lambda: "")() or "") == "lineEditButton"
+            and hasattr(child, "setFocusPolicy")
+        ]
+        self.assertTrue(search_buttons)
+        self.assertTrue(all(button.focusPolicy() == Qt.FocusPolicy.NoFocus for button in search_buttons))
 
 
 if __name__ == "__main__":

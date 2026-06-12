@@ -107,6 +107,28 @@ def set_item_accessible_text(item, text: object, *, description: object | None =
                 pass
 
 
+def remove_line_edit_buttons_from_tab_order(line_edit) -> None:
+    """Убирает служебные кнопки qfluentwidgets LineEdit/SearchLineEdit из Tab-порядка."""
+
+    if line_edit is None:
+        return
+    try:
+        children = line_edit.findChildren(object)
+    except Exception:
+        return
+    for child in children:
+        try:
+            object_name = str(child.objectName() or "")
+        except Exception:
+            continue
+        if object_name != "lineEditButton":
+            continue
+        try:
+            child.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        except Exception:
+            pass
+
+
 def set_breadcrumb_accessibility(widget, parts: object) -> None:
     """Записывает путь навигации как обычный текст для диктора."""
 
@@ -171,6 +193,7 @@ def enable_keyboard_click(widget) -> None:
 
 __all__ = [
     "enable_keyboard_click",
+    "remove_line_edit_buttons_from_tab_order",
     "set_breadcrumb_accessibility",
     "set_accessible_description",
     "set_accessible_name",

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ui.accessibility import set_control_accessibility, set_state_text
+from ui.accessibility import remove_line_edit_buttons_from_tab_order, set_control_accessibility, set_state_text
 
 
 def apply_profile_shell_accessibility(
@@ -85,6 +85,7 @@ def apply_profile_shell_accessibility(
             ),
         ),
     )
+    remove_line_edit_buttons_from_tab_order(profile_search_input)
 
 
 __all__ = ["apply_profile_shell_accessibility"]

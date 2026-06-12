@@ -124,6 +124,31 @@ class AccessibilityHelpersTests(unittest.TestCase):
         self.assertEqual(item.data(Qt.ItemDataRole.AccessibleTextRole), "Статус: OK")
         self.assertEqual(item.data(Qt.ItemDataRole.AccessibleDescriptionRole), "Проверка прошла успешно")
 
+    def test_remove_line_edit_buttons_from_tab_order_skips_qfluent_search_buttons(self) -> None:
+        from PyQt6.QtCore import Qt
+        from qfluentwidgets import SearchLineEdit
+
+        from ui.accessibility import remove_line_edit_buttons_from_tab_order
+
+        search = SearchLineEdit()
+        self.addCleanup(search.deleteLater)
+        search.setClearButtonEnabled(True)
+        search.setText("profile")
+        search.show()
+        self._app.processEvents()
+
+        buttons = [
+            child
+            for child in search.findChildren(object)
+            if str(getattr(child, "objectName", lambda: "")() or "") == "lineEditButton"
+            and hasattr(child, "setFocusPolicy")
+        ]
+        self.assertTrue(buttons)
+
+        remove_line_edit_buttons_from_tab_order(search)
+
+        self.assertTrue(all(button.focusPolicy() == Qt.FocusPolicy.NoFocus for button in buttons))
+
     def test_set_segmented_items_accessibility_marks_selected_item(self) -> None:
         import os
 

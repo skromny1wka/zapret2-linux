@@ -10,7 +10,12 @@ from PyQt6.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QFi
 
 from ui.pages.base_page import BasePage
 from ui.fluent_widgets import set_tooltip, style_semantic_caption_label
-from ui.accessibility import set_breadcrumb_accessibility, set_control_accessibility, set_state_text
+from ui.accessibility import (
+    remove_line_edit_buttons_from_tab_order,
+    set_breadcrumb_accessibility,
+    set_control_accessibility,
+    set_state_text,
+)
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.message_box_accessibility import set_message_box_button_accessibility
@@ -762,6 +767,7 @@ class PresetRawEditorPage(BasePage):
         )
         set_state_text(self.searchInput, search_input_name)
         self.searchInput.setClearButtonEnabled(True)
+        remove_line_edit_buttons_from_tab_order(self.searchInput)
         self.searchInput.setFixedHeight(34)
         self.searchInput.setMinimumWidth(220)
         self.searchInput.setMaximumWidth(300)
