@@ -60,7 +60,7 @@ def _get_sidebar_search_nav_widget_cls():
     from PyQt6.QtCore import QTimer, pyqtSignal
     from PyQt6.QtWidgets import QWidget, QHBoxLayout
     from app.ui_texts import tr as tr_catalog
-    from ui.accessibility import set_control_accessibility
+    from ui.accessibility import set_control_accessibility, set_state_text
     from qfluentwidgets import SearchLineEdit
 
     class _SidebarSearchNavWidget(QWidget):
@@ -82,11 +82,13 @@ def _get_sidebar_search_nav_widget_cls():
                 name="Глобальный поиск по ZapretGUI",
                 description=search_description,
             )
+            set_state_text(self, "Глобальный поиск по ZapretGUI")
             set_control_accessibility(
                 self._search,
                 name="Глобальный поиск по ZapretGUI",
                 description=search_description,
             )
+            set_state_text(self._search, "Глобальный поиск по ZapretGUI")
             try:
                 self._search.setClearButtonEnabled(True)
             except Exception:
