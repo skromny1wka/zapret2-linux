@@ -506,15 +506,33 @@ class Win11RadioOption(FluentSettingCard):
 
     def _radio_options_in_layout(self) -> list["Win11RadioOption"]:
         parent = self.parentWidget()
-        layout = parent.layout() if parent is not None else None
+        while parent is not None:
+            layout = parent.layout()
+            options = self._radio_options_in_containing_layout(layout)
+            if options:
+                return options
+            parent = parent.parentWidget()
+        return []
+
+    def _radio_options_in_containing_layout(self, layout) -> list["Win11RadioOption"]:
         if layout is None:
             return []
         options: list[Win11RadioOption] = []
+        contains_self = False
         for index in range(layout.count()):
             item = layout.itemAt(index)
-            widget = item.widget() if item is not None else None
+            if item is None:
+                continue
+            widget = item.widget()
+            if widget is self:
+                contains_self = True
             if isinstance(widget, Win11RadioOption) and widget.isEnabled():
                 options.append(widget)
+            nested_options = self._radio_options_in_containing_layout(item.layout())
+            if nested_options:
+                return nested_options
+        if not contains_self:
+            return []
         return options
 
 class Win11NumberRow(FluentSettingCard):
