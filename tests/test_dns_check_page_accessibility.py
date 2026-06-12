@@ -61,6 +61,37 @@ class DNSCheckPageAccessibilityTests(unittest.TestCase):
             "Ход проверки DNS: выполняется",
         )
 
+    def test_full_check_start_restores_empty_result_screen_reader_state(self) -> None:
+        from ui.accessibility import set_state_text
+
+        page = DNSCheckPage(dns_feature=_DnsFeatureStub())
+        self.addCleanup(page.deleteLater)
+        page._check_runtime = _StartRuntimeStub()
+        page._check_state.runtime = page._check_runtime
+        set_state_text(page.result_text, "Старый результат DNS-проверки")
+
+        page.start_check()
+
+        self.assertEqual(
+            page.result_text.accessibleName(),
+            "Результаты проверки DNS: проверка ещё не запускалась",
+        )
+        self.assertEqual(
+            page.result_text.property("screenReaderStateText"),
+            "Результаты проверки DNS: проверка ещё не запускалась",
+        )
+
+
+class _StartRuntimeStub:
+    def __init__(self) -> None:
+        self.started = False
+
+    def is_running(self) -> bool:
+        return False
+
+    def start_qobject_worker(self, **_kwargs) -> None:
+        self.started = True
+
 
 if __name__ == "__main__":
     unittest.main()
