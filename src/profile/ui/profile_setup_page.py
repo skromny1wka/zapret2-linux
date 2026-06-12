@@ -2218,6 +2218,7 @@ class ProfileSetupPageBase(BasePage):
             name="Сохранить список profile",
             description="Проверяет и сохраняет пользовательскую часть списка profile.",
         )
+        set_state_text(self._list_file_save_button, "Сохранить список profile")
         self._list_file_save_button.clicked.connect(self._on_list_file_save_clicked)
         editor_actions_layout.addWidget(self._list_file_save_button)
         self._list_file_status_label = CaptionLabel("Загрузка файла списка...")
@@ -2281,6 +2282,7 @@ class ProfileSetupPageBase(BasePage):
             name="Сохранить текст profile",
             description="Проверяет текст как один profile и записывает его в текущий preset.",
         )
+        set_state_text(self._raw_profile_save_button, "Сохранить текст profile")
         raw_actions_layout.addWidget(self._raw_profile_save_button)
         raw_actions_layout.addStretch(1)
         match_layout.addWidget(raw_actions)
