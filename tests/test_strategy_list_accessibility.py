@@ -144,6 +144,33 @@ class StrategyListAccessibilityTests(unittest.TestCase):
         self.assertTrue(event.isAccepted())
         self.assertEqual(activated, ["TLS fake"])
 
+    def test_strategy_widget_forwards_arrow_and_enter_keys_to_list(self) -> None:
+        widget = _make_sync_strategy_list()
+        self.addCleanup(widget.deleteLater)
+        widget.set_rows(
+            entries={
+                "alpha": SimpleNamespace(name="Alpha", args="--alpha"),
+                "beta": SimpleNamespace(name="Beta", args="--beta"),
+            },
+            states={},
+            current_strategy_id="alpha",
+        )
+        activated: list[str] = []
+        widget.strategy_activated.connect(activated.append)
+
+        down_event = QKeyEvent(QEvent.Type.KeyPress, int(Qt.Key.Key_Down), Qt.KeyboardModifier.NoModifier)
+        widget.keyPressEvent(down_event)
+
+        self.assertTrue(down_event.isAccepted())
+        self.assertEqual(widget._list.currentItem().text(), "Beta")
+        self.assertIn("Готовая стратегия: Beta", widget._list.property("screenReaderStateText"))
+
+        enter_event = QKeyEvent(QEvent.Type.KeyPress, int(Qt.Key.Key_Return), Qt.KeyboardModifier.NoModifier)
+        widget.keyPressEvent(enter_event)
+
+        self.assertTrue(enter_event.isAccepted())
+        self.assertEqual(activated, ["beta"])
+
 
 if __name__ == "__main__":
     unittest.main()

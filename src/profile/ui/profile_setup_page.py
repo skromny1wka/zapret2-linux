@@ -549,6 +549,64 @@ class ProfileStrategyListWidget(QWidget):
                     return True
         return super().eventFilter(watched, event)
 
+    def keyPressEvent(self, event):  # noqa: N802
+        if self._handle_strategy_keyboard_event(event):
+            return
+        super().keyPressEvent(event)
+
+    def _handle_strategy_keyboard_event(self, event) -> bool:
+        key = event.key()
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
+            item = self._list.currentItem()
+            if item is None:
+                self._focus_first_strategy_row()
+                item = self._list.currentItem()
+            if item is not None:
+                self._list.setFocus(Qt.FocusReason.OtherFocusReason)
+                self._on_item_activated(item)
+                event.accept()
+                return True
+            return False
+
+        if key not in (
+            Qt.Key.Key_Down,
+            Qt.Key.Key_Up,
+            Qt.Key.Key_Home,
+            Qt.Key.Key_End,
+            Qt.Key.Key_PageDown,
+            Qt.Key.Key_PageUp,
+        ):
+            return False
+
+        count = self._list.count()
+        if count <= 0:
+            return False
+
+        row = self._list.currentRow()
+        if row < 0:
+            row = 0
+        elif key == Qt.Key.Key_Down:
+            row = min(count - 1, row + 1)
+        elif key == Qt.Key.Key_Up:
+            row = max(0, row - 1)
+        elif key == Qt.Key.Key_Home:
+            row = 0
+        elif key == Qt.Key.Key_End:
+            row = count - 1
+        elif key == Qt.Key.Key_PageDown:
+            row = min(count - 1, row + 10)
+        elif key == Qt.Key.Key_PageUp:
+            row = max(0, row - 10)
+
+        self._list.setFocus(Qt.FocusReason.OtherFocusReason)
+        self._list.setCurrentRow(row)
+        item = self._list.currentItem()
+        if item is not None:
+            item.setSelected(True)
+            self._update_current_strategy_accessibility(item)
+        event.accept()
+        return True
+
     def _focus_first_strategy_row(self) -> None:
         if self._list.currentItem() is not None:
             return
