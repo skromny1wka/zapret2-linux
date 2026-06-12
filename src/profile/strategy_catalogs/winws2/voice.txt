@@ -33,6 +33,18 @@ label = recommended
 description = 6 повторов fake для STUN и Discord IP Discovery
 --lua-desync=fake:blob=0x00:repeats=6
 
+[fake_6_stun_pat]
+name = Fake x6 stun_pat
+author = community
+description = 6 повтора stun_pat
+--lua-desync=fake:blob=stun_pat:repeats=6
+
+[fake_4_stun_pat]
+name = Fake x4 stun_pat
+author = community
+description = 4 повтора stun_pat
+--lua-desync=fake:blob=stun_pat:repeats=4
+
 [stock_builtin_discord_voice_tls_max]
 name = Fake tls_max
 author = builtin
