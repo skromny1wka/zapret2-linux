@@ -1065,7 +1065,7 @@ class NetworkPage(BasePage):
                 request_id,
                 action=str(payload.get("action") or ""),
                 enabled=payload.get("enabled"),
-                adapters=[card.adapter_name for card in self.adapter_cards],
+                adapters=self._get_selected_adapters(),
             ),
             on_failed=self._on_force_dns_action_failed,
             on_finished=self._on_force_dns_action_worker_finished,

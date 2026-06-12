@@ -169,11 +169,12 @@ def check_ipv6_connectivity() -> bool:
     return detect_ipv6_availability()
 
 
-def enable_force_dns(*, include_disconnected: bool = False) -> DnsCommandResult:
+def enable_force_dns(*, include_disconnected: bool = False, adapters: list[str] | None = None) -> DnsCommandResult:
     from dns.runtime import enable_force_dns as _enable_force_dns
 
     success, ok_count, total, message = _enable_force_dns(
         include_disconnected=include_disconnected,
+        adapters=adapters,
     )
     return DnsCommandResult(
         success=bool(success),
@@ -183,10 +184,13 @@ def enable_force_dns(*, include_disconnected: bool = False) -> DnsCommandResult:
     )
 
 
-def disable_force_dns(*, reset_to_auto: bool) -> DnsCommandResult:
+def disable_force_dns(*, reset_to_auto: bool, adapters: list[str] | None = None) -> DnsCommandResult:
     from dns.runtime import disable_force_dns as _disable_force_dns
 
-    success, message = _disable_force_dns(reset_to_auto=reset_to_auto)
+    success, message = _disable_force_dns(
+        reset_to_auto=reset_to_auto,
+        adapters=adapters,
+    )
     return DnsCommandResult(success=bool(success), message=str(message or ""))
 
 

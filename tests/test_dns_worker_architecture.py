@@ -1407,6 +1407,119 @@ class DnsWorkerArchitectureTests(unittest.TestCase):
         self.assertNotIn("worker.start()", async_source)
         self.assertNotIn("worker.deleteLater()", cleanup_source)
 
+    def test_force_dns_toggle_uses_selected_adapters(self) -> None:
+        selected_adapters = ["Ethernet", "Беспроводная сеть"]
+        enable_force_dns = Mock(
+            return_value=SimpleNamespace(
+                success=True,
+                affected_count=2,
+                total_count=2,
+                message="ok",
+            )
+        )
+        worker = page_workers.DnsForceDnsActionWorker(
+            1,
+            action="toggle",
+            enabled=True,
+            adapters=selected_adapters,
+            get_force_dns_status=Mock(return_value=False),
+            enable_force_dns=enable_force_dns,
+            disable_force_dns=Mock(),
+            refresh_dns_info=Mock(return_value={}),
+        )
+
+        worker._run_toggle()
+
+        enable_force_dns.assert_called_once_with(
+            include_disconnected=False,
+            adapters=selected_adapters,
+        )
+
+    def test_force_dns_command_passes_selected_adapters_to_runtime(self) -> None:
+        selected_adapters = ["Ethernet", "Беспроводная сеть"]
+
+        with patch(
+            "dns.runtime.enable_force_dns",
+            return_value=(True, 2, 2, "ok"),
+        ) as enable_force_dns:
+            result = dns_commands.enable_force_dns(
+                include_disconnected=False,
+                adapters=selected_adapters,
+            )
+
+        enable_force_dns.assert_called_once_with(
+            include_disconnected=False,
+            adapters=selected_adapters,
+        )
+        self.assertTrue(result.success)
+        self.assertEqual(result.affected_count, 2)
+
+    def test_force_dns_reset_uses_selected_adapters(self) -> None:
+        selected_adapters = ["Ethernet", "Беспроводная сеть"]
+        disable_force_dns = Mock(return_value=SimpleNamespace(success=True, message="ok"))
+        worker = page_workers.DnsForceDnsActionWorker(
+            1,
+            action="reset_dhcp",
+            enabled=None,
+            adapters=selected_adapters,
+            get_force_dns_status=Mock(return_value=False),
+            enable_force_dns=Mock(),
+            disable_force_dns=disable_force_dns,
+            refresh_dns_info=Mock(return_value={}),
+        )
+
+        worker._run_reset_dhcp()
+
+        disable_force_dns.assert_called_once_with(
+            reset_to_auto=True,
+            adapters=selected_adapters,
+        )
+
+    def test_force_dns_reset_command_passes_selected_adapters_to_runtime(self) -> None:
+        selected_adapters = ["Ethernet", "Беспроводная сеть"]
+
+        with patch("dns.runtime.disable_force_dns", return_value=(True, "ok")) as disable_force_dns:
+            result = dns_commands.disable_force_dns(
+                reset_to_auto=True,
+                adapters=selected_adapters,
+            )
+
+        disable_force_dns.assert_called_once_with(
+            reset_to_auto=True,
+            adapters=selected_adapters,
+        )
+        self.assertTrue(result.success)
+
+    def test_force_dns_page_worker_receives_checked_adapters_only(self) -> None:
+        page = NetworkPage.__new__(NetworkPage)
+        page.adapter_cards = [
+            SimpleNamespace(
+                adapter_name="Ethernet",
+                checkbox=SimpleNamespace(isChecked=Mock(return_value=True)),
+            ),
+            SimpleNamespace(
+                adapter_name="Беспроводная сеть",
+                checkbox=SimpleNamespace(isChecked=Mock(return_value=True)),
+            ),
+            SimpleNamespace(
+                adapter_name="vEthernet (WSL)",
+                checkbox=SimpleNamespace(isChecked=Mock(return_value=False)),
+            ),
+        ]
+        page.create_force_dns_action_worker = Mock(return_value=object())
+        page._force_dns_action_runtime = SimpleNamespace(start_qthread_worker=Mock())
+
+        NetworkPage._start_force_dns_action_worker(page, {"action": "toggle", "enabled": True})
+        worker_factory = page._force_dns_action_runtime.start_qthread_worker.call_args.kwargs["worker_factory"]
+        worker_factory(7)
+
+        page.create_force_dns_action_worker.assert_called_once_with(
+            7,
+            action="toggle",
+            enabled=True,
+            adapters=["Ethernet", "Беспроводная сеть"],
+        )
+
     def test_dns_feature_does_not_expose_heavy_direct_commands(self) -> None:
         feature = build_dns_feature()
 

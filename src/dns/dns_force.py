@@ -144,7 +144,8 @@ class DNSForceManager:
     def force_dns_on_all_adapters(
         self,
         include_disconnected: bool = True,
-        enable_ipv6: bool = True
+        enable_ipv6: bool = True,
+        adapters: Optional[List[str]] = None,
     ) -> Tuple[int, int]:
         """Применяет DNS ко всем адаптерам"""
         
@@ -154,7 +155,15 @@ class DNSForceManager:
         
         self._set_status("Getting adapters...")
         
-        adapters = self.get_network_adapters(include_disconnected=include_disconnected)
+        if adapters is None:
+            adapters = self.get_network_adapters(include_disconnected=include_disconnected)
+        else:
+            adapters = [
+                normalized
+                for normalized in (_normalize_alias(adapter) for adapter in adapters)
+                if normalized
+            ]
+            adapters = list(dict.fromkeys(adapters))
         
         if not adapters:
             self._set_status("No adapters found")
@@ -234,7 +243,11 @@ class DNSForceManager:
         
         return all_adapters
     
-    def enable_force_dns(self, include_disconnected: bool = True) -> Tuple[bool, int, int, str]:
+    def enable_force_dns(
+        self,
+        include_disconnected: bool = True,
+        adapters: Optional[List[str]] = None,
+    ) -> Tuple[bool, int, int, str]:
         """
         Включает принудительный DNS
         
@@ -249,7 +262,8 @@ class DNSForceManager:
             log("Применение принудительного DNS...", "DNS")
             success, total = self.force_dns_on_all_adapters(
                 include_disconnected=include_disconnected,
-                enable_ipv6=self.ipv6_available
+                enable_ipv6=self.ipv6_available,
+                adapters=adapters,
             )
             
             if success > 0:
@@ -275,7 +289,11 @@ class DNSForceManager:
             self.set_force_dns_enabled(False)
             return (False, 0, 0, str(e))
     
-    def disable_force_dns(self, reset_to_auto: bool = False) -> Tuple[bool, str]:
+    def disable_force_dns(
+        self,
+        reset_to_auto: bool = False,
+        adapters: Optional[List[str]] = None,
+    ) -> Tuple[bool, str]:
         """
         Отключает принудительный DNS.
 
@@ -297,17 +315,25 @@ class DNSForceManager:
                 return (True, msg)
 
             # Явный сброс на автоматическое получение (DHCP)
-            return self._reset_to_auto()
+            return self._reset_to_auto(adapters=adapters)
 
         except Exception as e:
             log(f"Ошибка отключения Force DNS: {e}", "ERROR")
             return (False, str(e))
     
-    def _reset_to_auto(self) -> Tuple[bool, str]:
+    def _reset_to_auto(self, adapters: Optional[List[str]] = None) -> Tuple[bool, str]:
         """Сбрасывает DNS на автоматическое получение на всех адаптерах"""
         log("Сброс DNS на автоматическое получение...", "DNS")
         
-        adapters = self.get_network_adapters(include_disconnected=True)
+        if adapters is None:
+            adapters = self.get_network_adapters(include_disconnected=True)
+        else:
+            adapters = [
+                normalized
+                for normalized in (_normalize_alias(adapter) for adapter in adapters)
+                if normalized
+            ]
+            adapters = list(dict.fromkeys(adapters))
         success_count = 0
         
         for adapter in adapters:

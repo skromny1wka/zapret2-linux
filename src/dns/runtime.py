@@ -163,12 +163,26 @@ def get_force_dns_status() -> bool:
     return _new_force_dns_manager().is_force_dns_enabled()
 
 
-def enable_force_dns(*, include_disconnected: bool = False) -> tuple[bool, int, int, str]:
-    return _new_force_dns_manager().enable_force_dns(include_disconnected=include_disconnected)
+def enable_force_dns(
+    *,
+    include_disconnected: bool = False,
+    adapters: list[str] | None = None,
+) -> tuple[bool, int, int, str]:
+    return _new_force_dns_manager().enable_force_dns(
+        include_disconnected=include_disconnected,
+        adapters=adapters,
+    )
 
 
-def disable_force_dns(*, reset_to_auto: bool) -> tuple[bool, str]:
-    return _new_force_dns_manager().disable_force_dns(reset_to_auto=reset_to_auto)
+def disable_force_dns(
+    *,
+    reset_to_auto: bool,
+    adapters: list[str] | None = None,
+) -> tuple[bool, str]:
+    return _new_force_dns_manager().disable_force_dns(
+        reset_to_auto=reset_to_auto,
+        adapters=adapters,
+    )
 
 
 def flush_dns_cache() -> tuple[bool, str]:

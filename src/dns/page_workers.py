@@ -107,7 +107,10 @@ class DnsForceDnsActionWorker(QThread):
             return {"plan": plan, "message": "", "changed": False}
 
         if requested_enabled:
-            command_result = self._enable_force_dns(include_disconnected=False)
+            command_result = self._enable_force_dns(
+                include_disconnected=False,
+                adapters=self._adapters,
+            )
             plan = dns_page_plans.build_force_dns_toggle_plan(
                 requested_enabled=True,
                 success=bool(command_result.success),
@@ -130,7 +133,10 @@ class DnsForceDnsActionWorker(QThread):
     def _run_reset_dhcp(self) -> dict[str, object]:
         from dns import page_plans as dns_page_plans
 
-        command_result = self._disable_force_dns(reset_to_auto=True)
+        command_result = self._disable_force_dns(
+            reset_to_auto=True,
+            adapters=self._adapters,
+        )
         force_dns_active = bool(self._get_force_dns_status())
         plan = dns_page_plans.build_reset_dhcp_result_plan(
             success=bool(command_result.success),
