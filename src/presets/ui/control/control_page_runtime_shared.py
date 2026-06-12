@@ -26,7 +26,9 @@ def set_text_if_changed(widget, text: str) -> bool:
 
 def set_button_text_accessibility(button, text: str, *, description: str, accessible_name: str | None = None) -> bool:
     changed = set_text_if_changed(button, text)
-    set_control_accessibility(button, name=str(accessible_name or text or ""), description=description)
+    state_text = str(accessible_name or text or "")
+    set_control_accessibility(button, name=state_text, description=description)
+    set_state_text(button, state_text)
     return changed
 
 

@@ -16,6 +16,7 @@ class _ButtonTarget:
         self._text = ""
         self._accessible_name = ""
         self._accessible_description = ""
+        self._properties = {}
 
     def text(self) -> str:
         return self._text
@@ -40,6 +41,12 @@ class _ButtonTarget:
 
     def setMinimumWidth(self, _width: int) -> None:  # noqa: N802
         pass
+
+    def property(self, name: str) -> object:  # noqa: A003
+        return self._properties.get(name)
+
+    def setProperty(self, name: str, value: object) -> None:  # noqa: N802
+        self._properties[name] = value
 
 
 class _TitleLabel:
@@ -195,6 +202,7 @@ class ControlAccessibilityTests(unittest.TestCase):
 
         self.assertEqual(card.button.accessibleName(), "Открыть тест соединения")
         self.assertIn("Проверить доступность сети", card.button.accessibleDescription())
+        self.assertEqual(card.button.property("screenReaderStateText"), "Открыть тест соединения")
 
     def test_winws1_language_refresh_updates_control_button_screen_reader_names(self) -> None:
         from presets.ui.control.zapret1.runtime_helpers import apply_winws1_pages_language
@@ -235,6 +243,10 @@ class ControlAccessibilityTests(unittest.TestCase):
         self.assertEqual(kwargs["internet_cleanup_card"].button.accessibleName(), "Сбросить сеть Windows")
         self.assertEqual(kwargs["folder_card"].button.accessibleName(), "Открыть папку программы")
         self.assertEqual(kwargs["docs_card"].button.accessibleName(), "Открыть документацию")
+        self.assertEqual(kwargs["test_card"].button.property("screenReaderStateText"), "Открыть тест соединения")
+        self.assertEqual(kwargs["internet_cleanup_card"].button.property("screenReaderStateText"), "Сбросить сеть Windows")
+        self.assertEqual(kwargs["folder_card"].button.property("screenReaderStateText"), "Открыть папку программы")
+        self.assertEqual(kwargs["docs_card"].button.property("screenReaderStateText"), "Открыть документацию")
 
     def test_winws2_language_refresh_updates_control_button_screen_reader_names(self) -> None:
         from presets.ui.control.zapret2.runtime_helpers import apply_profile_language
@@ -267,6 +279,10 @@ class ControlAccessibilityTests(unittest.TestCase):
         self.assertEqual(kwargs["internet_cleanup_card"].button.accessibleName(), "Сбросить сеть Windows")
         self.assertEqual(kwargs["folder_card"].button.accessibleName(), "Открыть папку программы")
         self.assertEqual(kwargs["docs_card"].button.accessibleName(), "Открыть документацию")
+        self.assertEqual(kwargs["test_card"].button.property("screenReaderStateText"), "Открыть тест соединения")
+        self.assertEqual(kwargs["internet_cleanup_card"].button.property("screenReaderStateText"), "Сбросить сеть Windows")
+        self.assertEqual(kwargs["folder_card"].button.property("screenReaderStateText"), "Открыть папку программы")
+        self.assertEqual(kwargs["docs_card"].button.property("screenReaderStateText"), "Открыть документацию")
 
 
 if __name__ == "__main__":
