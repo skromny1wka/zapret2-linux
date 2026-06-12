@@ -124,6 +124,28 @@ class ProfileTypeSelectorTests(unittest.TestCase):
 
         self.assertIs(self._app.focusWidget(), selector._buttons["tcp"])
 
+    def test_enter_toggles_profile_type_button_and_updates_screen_reader_state(self) -> None:
+        from profile.ui.widgets.profile_type_selector import ProfileTypeSelector
+
+        selector = ProfileTypeSelector()
+        self.addCleanup(selector.deleteLater)
+        selector.show()
+        self._app.processEvents()
+        emitted: list[set[str]] = []
+        selector.profile_types_changed.connect(emitted.append)
+
+        selector._buttons["tcp"].setFocus()
+        self._app.processEvents()
+
+        QTest.keyClick(selector._buttons["tcp"], Qt.Key.Key_Return)
+        self._app.processEvents()
+
+        self.assertEqual(selector.get_active_profile_types(), {"tcp"})
+        self.assertEqual(emitted[-1], {"tcp"})
+        self.assertEqual(selector._buttons["all"].accessibleName(), "Тип profile: Все, не выбрано")
+        self.assertEqual(selector._buttons["tcp"].accessibleName(), "Тип profile: TCP, выбрано")
+        self.assertEqual(selector._buttons["tcp"].property("screenReaderStateText"), "Тип profile: TCP, выбрано")
+
 
 if __name__ == "__main__":
     unittest.main()

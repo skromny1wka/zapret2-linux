@@ -5,7 +5,7 @@
 """
 
 from PyQt6.QtWidgets import QWidget, QHBoxLayout
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 from qfluentwidgets import PillPushButton
 
 from ui.accessibility import set_accessible_description, set_control_accessibility, set_state_text
@@ -34,6 +34,13 @@ class _ProfileTypeButton(PillPushButton):
     @property
     def profile_type(self) -> str:
         return self._profile_type
+
+    def keyPressEvent(self, event):  # noqa: N802
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
+            self.click()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
 
 class ProfileTypeSelector(QWidget):
