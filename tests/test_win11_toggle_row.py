@@ -216,6 +216,26 @@ class Win11ToggleRowTests(unittest.TestCase):
         self.assertIn("Запускать DPI после старта программы", row.accessibleDescription())
         self.assertEqual(row._switch_button.accessibleName(), "Автозапуск DPI, выключено")
 
+    def test_toggle_row_internal_indicator_is_skipped_in_tab_order(self) -> None:
+        from ui.widgets.win11_controls import Win11ToggleRow
+
+        row = Win11ToggleRow(
+            "fa5s.bolt",
+            "Автозапуск DPI",
+            "Запускать DPI после старта программы",
+        )
+        self.addCleanup(row.deleteLater)
+
+        indicators = [
+            child
+            for child in row.findChildren(object)
+            if type(child).__name__ == "Indicator"
+            and hasattr(child, "setFocusPolicy")
+        ]
+
+        self.assertTrue(indicators)
+        self.assertTrue(all(indicator.focusPolicy() == Qt.FocusPolicy.NoFocus for indicator in indicators))
+
     def test_toggle_row_loads_icon_after_first_paint(self) -> None:
         from ui.widgets.win11_controls import Win11ToggleRow
 

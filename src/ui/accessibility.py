@@ -69,6 +69,7 @@ def set_control_accessibility(
         set_accessible_description(widget, description)
     remove_line_edit_buttons_from_tab_order(widget)
     remove_scrollbar_arrow_buttons_from_tab_order(widget)
+    remove_switch_indicators_from_tab_order(widget)
     _sync_spinbox_children_accessibility(widget, name=name, description=description)
 
 
@@ -81,6 +82,7 @@ def set_state_text(widget, text: object) -> None:
     set_accessible_name(widget, value)
     remove_line_edit_buttons_from_tab_order(widget)
     remove_scrollbar_arrow_buttons_from_tab_order(widget)
+    remove_switch_indicators_from_tab_order(widget)
     _sync_spinbox_children_accessibility(widget, name=value, description=None)
     try:
         if _clean_text(widget.property("screenReaderStateText")) == value:
@@ -178,6 +180,24 @@ def remove_scrollbar_arrow_buttons_from_tab_order(widget) -> None:
         return
     for child in children:
         if type(child).__name__ != "ArrowButton":
+            continue
+        try:
+            child.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        except Exception:
+            pass
+
+
+def remove_switch_indicators_from_tab_order(widget) -> None:
+    """Убирает служебный Indicator qfluentwidgets SwitchButton из Tab-порядка."""
+
+    if widget is None:
+        return
+    try:
+        children = widget.findChildren(object)
+    except Exception:
+        return
+    for child in children:
+        if type(child).__name__ != "Indicator":
             continue
         try:
             child.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -290,6 +310,7 @@ def enable_keyboard_toggle(widget) -> None:
 __all__ = [
     "enable_keyboard_click",
     "enable_keyboard_toggle",
+    "remove_switch_indicators_from_tab_order",
     "remove_line_edit_buttons_from_tab_order",
     "remove_scrollbar_arrow_buttons_from_tab_order",
     "set_breadcrumb_accessibility",
