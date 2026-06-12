@@ -8,7 +8,7 @@ from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from qfluentwidgets import SubtitleLabel
+from qfluentwidgets import PushButton, SubtitleLabel
 from PyQt6.QtWidgets import QApplication, QWidget
 
 from donater.ui.build import (
@@ -24,6 +24,7 @@ from donater.ui.pairing_workflow import (
 )
 from donater.ui.page_lifecycle import apply_premium_language, render_activation_status_label
 from donater.ui.status_workflow import apply_connection_test_plan, render_server_status_label
+from donater.ui.accessibility import apply_premium_button_accessibility
 from donater.ui.page import PremiumPage
 from donater.ui.status_card import StatusCard
 
@@ -113,6 +114,33 @@ class PremiumControlsAccessibilityTests(unittest.TestCase):
         self.assertIn("Telegram-бота", actions.extend_btn.accessibleDescription())
         self.assertEqual(activation.key_input.accessibleName(), "Код привязки Premium: пока не создан")
         self.assertIn("код, который нужно отправить", activation.key_input.accessibleDescription())
+
+    def test_disabled_premium_buttons_report_unavailable_state(self) -> None:
+        activate_btn = PushButton("Создать код")
+        test_btn = PushButton("Проверить соединение")
+        self.addCleanup(activate_btn.deleteLater)
+        self.addCleanup(test_btn.deleteLater)
+        activate_btn.setEnabled(False)
+        test_btn.setEnabled(False)
+
+        apply_premium_button_accessibility(
+            tr_fn=lambda _key, default: default,
+            activate_btn=activate_btn,
+            test_btn=test_btn,
+        )
+
+        self.assertEqual(activate_btn.accessibleName(), "Создать код привязки Premium, недоступно")
+        self.assertEqual(
+            activate_btn.property("screenReaderStateText"),
+            "Создать код привязки Premium, недоступно",
+        )
+        self.assertIn("сейчас недоступно", activate_btn.accessibleDescription().lower())
+        self.assertEqual(test_btn.accessibleName(), "Проверить соединение Premium, недоступно")
+        self.assertEqual(
+            test_btn.property("screenReaderStateText"),
+            "Проверить соединение Premium, недоступно",
+        )
+        self.assertIn("сейчас недоступно", test_btn.accessibleDescription().lower())
 
     def test_reset_activation_dialog_buttons_are_named_for_screen_reader(self) -> None:
         page = PremiumPage.__new__(PremiumPage)

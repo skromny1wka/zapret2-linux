@@ -67,7 +67,15 @@ def apply_premium_button_accessibility(
 ) -> None:
     """Задаёт понятные имена Premium-кнопок для экранного диктора."""
 
-    def _set_button(widget, *, name: str, description: str) -> None:
+    def _set_button(widget, *, name: str, description: str, mark_unavailable: bool = True) -> None:
+        is_enabled = True
+        try:
+            is_enabled = bool(widget.isEnabled())
+        except Exception:
+            pass
+        if mark_unavailable and not is_enabled:
+            name = f"{name}, недоступно"
+            description = f"{description} Сейчас недоступно: дождитесь завершения текущего действия."
         set_control_accessibility(widget, name=name, description=description)
         set_state_text(widget, name)
 
@@ -84,6 +92,7 @@ def apply_premium_button_accessibility(
                 "page.premium.action.create_code.description",
                 "Создаёт код, который нужно отправить Premium-боту в Telegram.",
             ),
+            mark_unavailable=not activate_loading,
         )
     if open_bot_btn is not None:
         _set_button(
@@ -125,6 +134,7 @@ def apply_premium_button_accessibility(
                 "page.premium.action.test_connection.description",
                 "Проверить доступность Premium backend и соединение с сервером.",
             ),
+            mark_unavailable=not test_loading,
         )
     if extend_btn is not None:
         _set_button(
