@@ -80,6 +80,7 @@ class BlockcheckPageAccessibilityTests(unittest.TestCase):
         )
         self.assertIn("Показывает", page._progress_bar.accessibleDescription())
         self.assertEqual(page._status_label.accessibleName(), "Статус BlockCheck: Готово")
+        page._ensure_run_output_ui()
         self.assertEqual(page._log_edit.accessibleName(), "Подробный лог BlockCheck: пока нет записей")
         self.assertEqual(
             page._log_edit.property("screenReaderStateText"),
@@ -87,6 +88,30 @@ class BlockcheckPageAccessibilityTests(unittest.TestCase):
         )
         self.assertEqual(page._expand_log_btn.accessibleName(), "Развернуть лог BlockCheck")
         self.assertEqual(page._prepare_support_btn.accessibleName(), "Подготовить обращение по BlockCheck")
+
+    def test_first_open_does_not_build_run_output_until_needed(self) -> None:
+        with patch.object(BlockcheckPage, "_request_page_initial_state_load", lambda self: None):
+            page = BlockcheckPage(
+                blockcheck_feature=_FeatureStub(),
+                diagnostics_feature=_FeatureStub(),
+                dns_feature=_FeatureStub(),
+                create_strategy_scan_worker=lambda *_args, **_kwargs: None,
+            )
+        self.addCleanup(page.deleteLater)
+
+        self.assertIsNone(page._results_card)
+        self.assertIsNone(page._dpi_card)
+        self.assertIsNone(page._log_card)
+        self.assertIsNone(page._table)
+        self.assertIsNone(page._log_edit)
+
+        page._ensure_run_output_ui()
+
+        self.assertIsNotNone(page._results_card)
+        self.assertIsNotNone(page._dpi_card)
+        self.assertIsNotNone(page._log_card)
+        self.assertIsNotNone(page._table)
+        self.assertIsNotNone(page._log_edit)
 
     def test_mode_combo_menu_items_are_named_for_screen_reader(self) -> None:
         with patch.object(BlockcheckPage, "_request_page_initial_state_load", lambda self: None):

@@ -147,7 +147,18 @@ class BlockcheckPage(BasePage):
         self._tabs_pivot = None
         self._domains_section_label: QLabel | None = None
         self._tcp_section_label: QLabel | None = None
+        self._results_card = None
+        self._table = None
         self._tcp_table = None
+        self._dpi_card = None
+        self._dpi_badge = None
+        self._dpi_detail = None
+        self._dns_summary = None
+        self._recommendation = None
+        self._log_card = None
+        self._expand_log_btn = None
+        self._log_edit = None
+        self._log_expanded = False
         self._runtime_warnings_seen: set[str] = set()
         self._actions_title_label = None
         self._actions_bar = None
@@ -390,69 +401,79 @@ class BlockcheckPage(BasePage):
         self._apply_initial_domain_chips(self._initial_state.user_domains)
         self._log_ui_timing("blockcheck_ui.domain_chips.apply", section_started_at)
 
-        # ── Results Table Card ──
-        section_started_at = time.perf_counter()
-        results_widgets = build_results_section(
-            tr_fn=lambda key, default: tr_catalog(key, default=default),
-            settings_card_cls=SettingsCard,
-            strong_body_label_cls=StrongBodyLabel,
-            table_widget_cls=TableWidget,
-        )
-        self._results_card = results_widgets.results_card
-        self._domains_section_label = results_widgets.domains_section_label
-        self._table = results_widgets.results_table
-        self._tcp_section_label = results_widgets.tcp_section_label
-        self._tcp_table = results_widgets.tcp_table
-        self._add_tab_widget(self._results_card)
-        self._log_ui_timing("blockcheck_ui.results_section.build", section_started_at)
-
-        # ── DPI Summary Card (hidden until tests complete) ──
-        section_started_at = time.perf_counter()
-        dpi_widgets = build_dpi_summary_section(
-            tr_fn=lambda key, default: tr_catalog(key, default=default),
-            settings_card_cls=SettingsCard,
-            qlabel_cls=QLabel,
-            body_label_cls=BodyLabel,
-            caption_label_cls=CaptionLabel,
-            qt_namespace=Qt,
-        )
-        self._dpi_card = dpi_widgets.card
-        self._dpi_badge = dpi_widgets.badge
-        self._dpi_detail = dpi_widgets.detail
-        self._dns_summary = dpi_widgets.dns_summary
-        self._recommendation = dpi_widgets.recommendation
-        self._add_tab_widget(self._dpi_card)
-        self._log_ui_timing("blockcheck_ui.dpi_summary.build", section_started_at)
-
-        # ── Log Card ──
-        section_started_at = time.perf_counter()
-        self._log_expanded = False
-        log_widgets = build_log_card_section(
-            tr_fn=lambda key, default: tr_catalog(key, default=default),
-            settings_card_cls=SettingsCard,
-            qhbox_layout_cls=QHBoxLayout,
-            caption_label_cls=CaptionLabel,
-            push_button_cls=PushButton,
-            qta_module=qta,
-            theme_color_fn=themeColor,
-            text_edit_cls=ScrollBlockingTextEdit,
-            qfont_cls=QFont,
-            on_toggle_expand=self._toggle_log_expand,
-            on_prepare_support=self._prepare_support_from_blockcheck,
-        )
-        self._log_card = log_widgets.card
-        self._expand_log_btn = log_widgets.expand_button
-        self._support_status_label = log_widgets.support_status_label
-        self._prepare_support_btn = log_widgets.prepare_support_button
-        self._log_edit = log_widgets.log_edit
-        self._add_tab_widget(self._log_card)
-        self._log_ui_timing("blockcheck_ui.log_card.build", section_started_at)
-
         # Strategy scan tab (lazy-created)
         section_started_at = time.perf_counter()
         self._switch_tab(0)
         self._log_ui_timing("blockcheck_ui.initial_tab.switch", section_started_at)
         self._log_ui_timing("blockcheck_ui.build.total", total_started_at)
+
+    def _ensure_run_output_ui(self) -> None:
+        """Создаёт тяжёлые виджеты запуска только когда они реально нужны."""
+        started_at = time.perf_counter()
+        active_tab_index = int(getattr(self, "_active_tab_index", 0) or 0)
+        show_blockcheck = self.TAB_ORDER[active_tab_index] == self.TAB_BLOCKCHECK
+
+        if self._results_card is None:
+            section_started_at = time.perf_counter()
+            results_widgets = build_results_section(
+                tr_fn=lambda key, default: tr_catalog(key, default=default),
+                settings_card_cls=SettingsCard,
+                strong_body_label_cls=StrongBodyLabel,
+                table_widget_cls=TableWidget,
+            )
+            self._results_card = results_widgets.results_card
+            self._domains_section_label = results_widgets.domains_section_label
+            self._table = results_widgets.results_table
+            self._tcp_section_label = results_widgets.tcp_section_label
+            self._tcp_table = results_widgets.tcp_table
+            self._add_tab_widget(self._results_card)
+            self._results_card.setVisible(show_blockcheck)
+            self._log_ui_timing("blockcheck_ui.results_section.build", section_started_at)
+
+        if self._dpi_card is None:
+            section_started_at = time.perf_counter()
+            dpi_widgets = build_dpi_summary_section(
+                tr_fn=lambda key, default: tr_catalog(key, default=default),
+                settings_card_cls=SettingsCard,
+                qlabel_cls=QLabel,
+                body_label_cls=BodyLabel,
+                caption_label_cls=CaptionLabel,
+                qt_namespace=Qt,
+            )
+            self._dpi_card = dpi_widgets.card
+            self._dpi_badge = dpi_widgets.badge
+            self._dpi_detail = dpi_widgets.detail
+            self._dns_summary = dpi_widgets.dns_summary
+            self._recommendation = dpi_widgets.recommendation
+            self._add_tab_widget(self._dpi_card)
+            self._dpi_card.setVisible(show_blockcheck)
+            self._log_ui_timing("blockcheck_ui.dpi_summary.build", section_started_at)
+
+        if self._log_card is None:
+            section_started_at = time.perf_counter()
+            log_widgets = build_log_card_section(
+                tr_fn=lambda key, default: tr_catalog(key, default=default),
+                settings_card_cls=SettingsCard,
+                qhbox_layout_cls=QHBoxLayout,
+                caption_label_cls=CaptionLabel,
+                push_button_cls=PushButton,
+                qta_module=qta,
+                theme_color_fn=themeColor,
+                text_edit_cls=ScrollBlockingTextEdit,
+                qfont_cls=QFont,
+                on_toggle_expand=self._toggle_log_expand,
+                on_prepare_support=self._prepare_support_from_blockcheck,
+            )
+            self._log_card = log_widgets.card
+            self._expand_log_btn = log_widgets.expand_button
+            self._support_status_label = log_widgets.support_status_label
+            self._prepare_support_btn = log_widgets.prepare_support_button
+            self._log_edit = log_widgets.log_edit
+            self._add_tab_widget(self._log_card)
+            self._log_card.setVisible(show_blockcheck)
+            self._log_ui_timing("blockcheck_ui.log_card.build", section_started_at)
+
+        self._log_ui_timing("blockcheck_ui.run_output.ensure", started_at)
 
     # ------------------------------------------------------------------
     # Theme
@@ -663,6 +684,7 @@ class BlockcheckPage(BasePage):
     def _on_start(self):
         if self._run_runtime.is_running():
             return
+        self._ensure_run_output_ui()
         self._cleanup_in_progress = False
 
         mode = self._mode_combo.currentData()
@@ -753,6 +775,7 @@ class BlockcheckPage(BasePage):
         """Add/update a row in the results table for a completed target."""
         if self._cleanup_in_progress:
             return
+        self._ensure_run_output_ui()
         update_target_result_table(
             target_result=target_result,
             table=self._table,
@@ -763,6 +786,7 @@ class BlockcheckPage(BasePage):
     def _on_log(self, message: str):
         if self._cleanup_in_progress:
             return
+        self._ensure_run_output_ui()
         self._log_edit.append(message)
 
         text = str(message or "").strip()
@@ -1050,6 +1074,7 @@ class BlockcheckPage(BasePage):
 
     def _toggle_log_expand(self):
         """Развернуть/свернуть лог на всю страницу."""
+        self._ensure_run_output_ui()
         self._log_expanded = not self._log_expanded
 
         if self._log_expanded:
@@ -1075,6 +1100,7 @@ class BlockcheckPage(BasePage):
 
     def _update_dpi_summary(self, report):
         """Show DPI summary card after tests complete."""
+        self._ensure_run_output_ui()
         self._dpi_card.setVisible(True)
         content = build_dpi_summary_content(
             report=report,
@@ -1417,11 +1443,13 @@ class BlockcheckPage(BasePage):
                     self.TAB_DNS_SPOOFING,
                     tr_catalog("page.blockcheck.tab.dns_spoofing", language=language, default="DNS подмена"),
                 )
-                self._update_tabs_accessibility()
+            self._update_tabs_accessibility()
             self._control_card.set_title(tr_catalog("page.blockcheck.control", language=language, default="Управление"))
             self._domains_card.set_title(tr_catalog("page.blockcheck.custom_domains", language=language, default="Пользовательские домены"))
-            self._results_card.set_title(tr_catalog("page.blockcheck.results", language=language, default="Результаты"))
-            self._log_card.set_title(tr_catalog("page.blockcheck.log", language=language, default="Подробный лог"))
+            if self._results_card is not None:
+                self._results_card.set_title(tr_catalog("page.blockcheck.results", language=language, default="Результаты"))
+            if self._log_card is not None:
+                self._log_card.set_title(tr_catalog("page.blockcheck.log", language=language, default="Подробный лог"))
 
             if self._domains_section_label is not None:
                 self._domains_section_label.setText(
@@ -1440,16 +1468,17 @@ class BlockcheckPage(BasePage):
                     )
                 )
 
-            self._table.setHorizontalHeaderLabels([
-                tr_catalog("page.blockcheck.col_target", language=language, default="Цель"),
-                "HTTP",
-                "TLS 1.2",
-                "TLS 1.3",
-                tr_catalog("page.blockcheck.col_dns_isp", language=language, default="DNS/ISP"),
-                "DPI",
-                "Ping",
-                tr_catalog("page.blockcheck.col_details", language=language, default="Детали"),
-            ])
+            if self._table is not None:
+                self._table.setHorizontalHeaderLabels([
+                    tr_catalog("page.blockcheck.col_target", language=language, default="Цель"),
+                    "HTTP",
+                    "TLS 1.2",
+                    "TLS 1.3",
+                    tr_catalog("page.blockcheck.col_dns_isp", language=language, default="DNS/ISP"),
+                    "DPI",
+                    "Ping",
+                    tr_catalog("page.blockcheck.col_details", language=language, default="Детали"),
+                ])
 
             if self._tcp_table is not None:
                 self._tcp_table.setHorizontalHeaderLabels([
