@@ -1106,8 +1106,13 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
         async def fake_relay(*_args, **_kwargs):
             return 1, False
 
+        async def fake_wait_for(awaitable, *, timeout):
+            timeouts.append(timeout)
+            return await awaitable
+
         direct_calls: list[tuple[str, int]] = []
         upstream_calls: list[tuple[str, int, int, bool]] = []
+        timeouts: list[float] = []
         logs: list[str] = []
         proxy = TelegramWSProxy(
             on_log=logs.append,
@@ -1121,7 +1126,10 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
         proxy._upstream_proxy_connect = fake_upstream
         proxy._relay_tcp = fake_relay
 
-        with patch("telegram_proxy.wss_proxy.asyncio.open_connection", side_effect=fake_direct_tcp):
+        with (
+            patch("telegram_proxy.wss_proxy.asyncio.open_connection", side_effect=fake_direct_tcp),
+            patch("telegram_proxy.wss_proxy.asyncio.wait_for", side_effect=fake_wait_for),
+        ):
             asyncio.run(
                 proxy._tcp_fallback(
                     object(),
@@ -1137,6 +1145,8 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
 
         self.assertEqual(direct_calls, [("149.154.175.100", 443)])
         self.assertEqual(upstream_calls, [])
+        self.assertGreaterEqual(timeouts[0], 2.5)
+        self.assertLessEqual(timeouts[0], 3.5)
         self.assertIn("DC3 TCP fallback -> 149.154.175.100:443", "\n".join(logs))
 
     def test_no_wss_dc_uses_upstream_after_direct_tcp_failure(self) -> None:

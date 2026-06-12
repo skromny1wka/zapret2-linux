@@ -79,6 +79,9 @@ log = logging.getLogger("tg_proxy")
 # WebSocket / TCP connect timeout
 CONNECT_TIMEOUT = 10.0
 
+# Direct TCP fallback is only a quick probe before external SOCKS.
+TCP_FALLBACK_CONNECT_TIMEOUT = 3.0
+
 # External SOCKS should still fail over faster than direct TCP, but real client
 # paths to bundled VPS nodes can occasionally need more than 3 seconds.
 UPSTREAM_CONNECT_TIMEOUT = 5.0
@@ -1729,7 +1732,7 @@ class TelegramWSProxy:
         try:
             rr, rw = await asyncio.wait_for(
                 asyncio.open_connection(target_host, target_port),
-                timeout=CONNECT_TIMEOUT,
+                timeout=TCP_FALLBACK_CONNECT_TIMEOUT,
             )
             apply_socket_options(rw.transport, self._buffer_size)
         except Exception as exc:
