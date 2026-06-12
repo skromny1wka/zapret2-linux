@@ -373,6 +373,8 @@ class TelegramWSProxy:
                     tls_verify=bool(endpoint.tls_verify),
                 )
             )
+        if any(endpoint.tls for endpoint in result):
+            result = [endpoint for endpoint in result if endpoint.tls]
         if len(result) <= 1:
             return tuple(result)
         now = time.monotonic()
@@ -1789,7 +1791,7 @@ class TelegramWSProxy:
             recv_total, _watchdog_fired = await self._relay_tcp(client_reader, client_writer, rr, rw, label, dc=dc)
             if recv_total > 0:
                 self._mark_upstream_recv_ok(endpoint)
-            else:
+            elif int(upstream_port or 0) != 80:
                 self._mark_upstream_zero_recv(endpoint, label)
         return True
 
