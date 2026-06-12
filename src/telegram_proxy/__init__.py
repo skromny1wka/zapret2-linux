@@ -34,8 +34,17 @@ def _is_ignorable_transport_reset_error(exc: BaseException | None) -> bool:
     return winerror == 10054 or errno == 10054
 
 
+def _is_proactor_connection_lost_callback(context: dict) -> bool:
+    message = str(context.get("message") or "")
+    handle = str(context.get("handle") or "")
+    callback_name = "_ProactorBasePipeTransport._call_connection_lost"
+    return callback_name in message or callback_name in handle
+
+
 def _is_ignorable_asyncio_loop_exception(context: dict) -> bool:
     exception = context.get("exception")
+    if _is_ignorable_transport_reset_error(exception) and _is_proactor_connection_lost_callback(context):
+        return True
     protocol = context.get("protocol")
     transport = context.get("transport")
     if protocol is None and transport is None:

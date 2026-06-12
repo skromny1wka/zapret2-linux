@@ -6,6 +6,22 @@ from unittest.mock import patch
 
 
 class TelegramProxySocks5Tests(unittest.TestCase):
+    def test_proactor_connection_lost_reset_is_quiet_loop_failure(self) -> None:
+        import telegram_proxy
+
+        exc = ConnectionResetError("remote host closed connection")
+        exc.winerror = 10054
+
+        self.assertTrue(
+            telegram_proxy._is_ignorable_asyncio_loop_exception(
+                {
+                    "message": "Exception in callback _ProactorBasePipeTransport._call_connection_lost()",
+                    "exception": exc,
+                    "handle": object(),
+                }
+            )
+        )
+
     def test_handshake_timeout_is_quiet_protocol_failure(self) -> None:
         from telegram_proxy.proxy import socks5
 
