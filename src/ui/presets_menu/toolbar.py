@@ -3,6 +3,8 @@ from __future__ import annotations
 from PyQt6.QtWidgets import QHBoxLayout, QSizePolicy, QVBoxLayout, QWidget
 from qfluentwidgets import PrimaryPushButton, PushButton
 
+from ui.accessibility import set_control_accessibility, set_state_text
+
 
 class PresetsToolbarLayout:
     """Общий переносимый тулбар страницы пресетов."""
@@ -46,16 +48,36 @@ class PresetsToolbarLayout:
         *,
         accent: bool = False,
         fixed_height: int = 32,
+        accessible_name: str | None = None,
+        accessible_description: str | None = None,
     ) -> QWidget:
         button_cls = PrimaryPushButton if accent else PushButton
         button = button_cls(text, parent=self.container, icon=icon)
         button.setFixedHeight(int(fixed_height))
+        name = accessible_name or text
+        set_control_accessibility(button, name=name, description=accessible_description)
+        set_state_text(button, name)
         return button
 
-    def create_primary_tool_button(self, button_cls, icon_arg, *, size: int = 36):
+    def create_primary_tool_button(
+        self,
+        button_cls,
+        icon_arg,
+        *,
+        size: int = 36,
+        accessible_name: str | None = None,
+        accessible_description: str | None = None,
+    ):
         button = button_cls(icon_arg)
         button.setParent(self.container)
         button.setFixedSize(int(size), int(size))
+        if accessible_name:
+            set_control_accessibility(
+                button,
+                name=accessible_name,
+                description=accessible_description,
+            )
+            set_state_text(button, accessible_name)
         return button
 
     def set_buttons(self, buttons) -> None:

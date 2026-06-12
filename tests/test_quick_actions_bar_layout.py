@@ -5,9 +5,10 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt6.QtCore import QEvent
+from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import QApplication, QLabel, QWidget
-from qfluentwidgets import FluentIcon, LineEdit, PushButton, SettingCardGroup
+from qfluentwidgets import FluentIcon, LineEdit, PrimaryToolButton, PushButton, SettingCardGroup
 
 from ui.fluent_widgets import (
     QuickActionsBar,
@@ -61,6 +62,37 @@ class QuickActionsBarLayoutTests(unittest.TestCase):
 
         self.assertEqual(widgets[:2], [first, second])
         self.assertIn(search, widgets)
+
+    def test_presets_toolbar_action_button_is_named_and_keyboard_clickable(self) -> None:
+        parent = QWidget()
+        toolbar = PresetsToolbarLayout(parent)
+        button = toolbar.create_action_button("Импорт", FluentIcon.DOWNLOAD)
+        clicked: list[bool] = []
+        button.clicked.connect(lambda: clicked.append(True))
+
+        event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Return, Qt.KeyboardModifier.NoModifier)
+        button.keyPressEvent(event)
+
+        self.assertEqual(button.accessibleName(), "Импорт")
+        self.assertEqual(button.property("screenReaderStateText"), "Импорт")
+        self.assertEqual(button.focusPolicy(), Qt.FocusPolicy.StrongFocus)
+        self.assertTrue(event.isAccepted())
+        self.assertEqual(clicked, [True])
+
+    def test_presets_toolbar_icon_button_can_be_named_for_screen_reader(self) -> None:
+        parent = QWidget()
+        toolbar = PresetsToolbarLayout(parent)
+        button = toolbar.create_primary_tool_button(
+            PrimaryToolButton,
+            FluentIcon.ADD,
+            accessible_name="Создать пресет",
+            accessible_description="Создаёт новый пользовательский пресет.",
+        )
+
+        self.assertEqual(button.accessibleName(), "Создать пресет")
+        self.assertEqual(button.property("screenReaderStateText"), "Создать пресет")
+        self.assertIn("новый пользовательский пресет", button.accessibleDescription())
+        self.assertEqual(button.focusPolicy(), Qt.FocusPolicy.StrongFocus)
 
     def test_presets_toolbar_moves_search_to_next_row_when_width_is_tight(self) -> None:
         parent = QWidget()
