@@ -146,17 +146,20 @@ class WhitelistDomainRow(QFrame):
 
     def _update_accessibility(self) -> None:
         if self.is_default:
+            row_name = f"Системный домен белого списка: {self.domain}"
             set_control_accessibility(
                 self,
-                name=f"Системный домен белого списка: {self.domain}",
+                name=row_name,
                 description="Системный домен нельзя удалить.",
             )
         else:
+            row_name = f"Домен белого списка: {self.domain}"
             set_control_accessibility(
                 self,
-                name=f"Домен белого списка: {self.domain}",
+                name=row_name,
                 description="Этот домен не обрабатывается оркестратором.",
             )
+        set_state_text(self, row_name)
         if self._delete_btn is not None:
             delete_name = f"Удалить {self.domain} из белого списка"
             set_control_accessibility(

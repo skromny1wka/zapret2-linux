@@ -631,6 +631,10 @@ class OrchestraAccessibilityTests(unittest.TestCase):
         self.addCleanup(whitelist_row.deleteLater)
 
         self.assertEqual(locked_row.accessibleName(), "Залоченная стратегия: example.com, TCP, стратегия 3")
+        self.assertEqual(
+            locked_row.property("screenReaderStateText"),
+            "Залоченная стратегия: example.com, TCP, стратегия 3",
+        )
         self.assertEqual(locked_row.strat_spin.accessibleName(), "Стратегия для example.com TCP, выбрано: 3")
         self.assertEqual(
             locked_row.strat_spin.property("screenReaderStateText"),
@@ -649,6 +653,10 @@ class OrchestraAccessibilityTests(unittest.TestCase):
         )
 
         self.assertEqual(blocked_row.accessibleName(), "Заблокированная стратегия: blocked.example, UDP, стратегия 5")
+        self.assertEqual(
+            blocked_row.property("screenReaderStateText"),
+            "Заблокированная стратегия: blocked.example, UDP, стратегия 5",
+        )
         self.assertEqual(blocked_row.strat_spin.accessibleName(), "Заблокированная стратегия для blocked.example UDP, выбрано: 5")
         self.assertEqual(
             blocked_row.strat_spin.property("screenReaderStateText"),
@@ -666,6 +674,7 @@ class OrchestraAccessibilityTests(unittest.TestCase):
         )
 
         self.assertEqual(whitelist_row.accessibleName(), "Домен белого списка: safe.example")
+        self.assertEqual(whitelist_row.property("screenReaderStateText"), "Домен белого списка: safe.example")
         self.assertEqual(whitelist_row._delete_btn.accessibleName(), "Удалить safe.example из белого списка")
         self.assertEqual(
             whitelist_row._delete_btn.property("screenReaderStateText"),

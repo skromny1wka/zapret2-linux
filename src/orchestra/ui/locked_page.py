@@ -157,6 +157,7 @@ class LockedDomainRow(QFrame):
             name=f"Залоченная стратегия: {self.domain}, {proto_text}, стратегия {selected_strategy}",
             description="Стратегия зафиксирована для этого домена.",
         )
+        set_state_text(self, f"Залоченная стратегия: {self.domain}, {proto_text}, стратегия {selected_strategy}")
         set_state_text(self.strat_spin, strategy_state)
         set_control_accessibility(
             self.strat_spin,
