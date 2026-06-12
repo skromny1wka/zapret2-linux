@@ -158,11 +158,13 @@ class WhitelistDomainRow(QFrame):
                 description="Этот домен не обрабатывается оркестратором.",
             )
         if self._delete_btn is not None:
+            delete_name = f"Удалить {self.domain} из белого списка"
             set_control_accessibility(
                 self._delete_btn,
-                name=f"Удалить {self.domain} из белого списка",
+                name=delete_name,
                 description="Удаляет пользовательский домен из белого списка.",
             )
+            set_state_text(self._delete_btn, delete_name)
 
 
 class OrchestraWhitelistPage(BasePage):

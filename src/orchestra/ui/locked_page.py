@@ -164,11 +164,13 @@ class LockedDomainRow(QFrame):
             description="Стрелками вверх и вниз можно изменить номер стратегии. Изменение сохранится автоматически.",
         )
         if self._delete_btn is not None:
+            delete_name = f"Разлочить {self.domain} {proto_text}"
             set_control_accessibility(
                 self._delete_btn,
-                name=f"Разлочить {self.domain} {proto_text}",
+                name=delete_name,
                 description="Убирает фиксацию стратегии для этого домена.",
             )
+            set_state_text(self._delete_btn, delete_name)
 
 
 class OrchestraLockedPage(BasePage):

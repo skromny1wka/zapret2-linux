@@ -231,17 +231,21 @@ class BlockedDomainRow(QFrame):
                 description="Стрелками вверх и вниз можно изменить номер заблокированной стратегии.",
             )
         if self._add_btn is not None:
+            add_name = f"Добавить ещё одну блокировку для {self.hostname} {proto_text}"
             set_control_accessibility(
                 self._add_btn,
-                name=f"Добавить ещё одну блокировку для {self.hostname} {proto_text}",
+                name=add_name,
                 description="Заполняет форму этим доменом, чтобы добавить ещё одну заблокированную стратегию.",
             )
+            set_state_text(self._add_btn, add_name)
         if self._delete_btn is not None:
+            delete_name = f"Разблокировать {self.hostname} {proto_text}, стратегия {selected_strategy}"
             set_control_accessibility(
                 self._delete_btn,
-                name=f"Разблокировать {self.hostname} {proto_text}, стратегия {selected_strategy}",
+                name=delete_name,
                 description="Удаляет эту блокировку стратегии.",
             )
+            set_state_text(self._delete_btn, delete_name)
 
 
 class OrchestraBlockedPage(BasePage):
