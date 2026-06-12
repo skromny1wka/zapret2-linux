@@ -763,7 +763,7 @@ class PresetRawEditorPage(BasePage):
             name=search_input_name,
             description=(
                 "Введите текст, чтобы найти строку внутри открытого пресета. "
-                "После ввода перейдите к тексту пресета клавишей Tab."
+                "После ввода перейдите к тексту пресета клавишей Tab или нажмите Стрелка вниз."
             ),
         )
         set_state_text(self.searchInput, search_input_name)
@@ -774,6 +774,7 @@ class PresetRawEditorPage(BasePage):
         self.searchInput.setMaximumWidth(300)
         self.searchInput.setProperty("noDrag", True)
         self.searchInput.textChanged.connect(self._search_preset_text)
+        self.searchInput.installEventFilter(self)
         actions_layout.addWidget(self.searchInput, 0)
         self.add_widget(actions)
 
@@ -1397,6 +1398,11 @@ class PresetRawEditorPage(BasePage):
 
     def eventFilter(self, obj, event):
         event_type = event.type()
+        if obj is getattr(self, "searchInput", None) and event_type == QEvent.Type.KeyPress:
+            if event.key() == Qt.Key.Key_Down:
+                self.editor.setFocus(Qt.FocusReason.OtherFocusReason)
+                event.accept()
+                return True
         if event_type in {QEvent.Type.FocusOut, QEvent.Type.Leave} and self._is_editor_object(obj):
             self._schedule_pending_content_commit()
         elif event_type == QEvent.Type.MouseButtonPress and not self._is_editor_object(obj):

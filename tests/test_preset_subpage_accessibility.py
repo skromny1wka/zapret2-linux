@@ -6,6 +6,7 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtCore import QPoint, Qt
+from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QWidget
 
 from presets.ui.common.preset_subpage_base import PresetRawEditorPage, RawPresetRuntimeActions, _RenameDialog
@@ -61,6 +62,10 @@ class PresetSubpageAccessibilityTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
 
+    def tearDown(self) -> None:
+        self.app.closeAllWindows()
+        self.app.processEvents()
+
     def test_main_controls_are_named_for_screen_reader(self) -> None:
         page = PresetRawEditorPage(
             create_raw_preset_load_worker=lambda *_args, **_kwargs: None,
@@ -95,8 +100,37 @@ class PresetSubpageAccessibilityTests(unittest.TestCase):
         self.assertEqual(page.searchInput.accessibleName(), "Поиск по тексту пресета")
         self.assertEqual(page.searchInput.property("screenReaderStateText"), "Поиск по тексту пресета")
         self.assertIn("После ввода перейдите к тексту пресета клавишей Tab", page.searchInput.accessibleDescription())
+        self.assertIn("или нажмите Стрелка вниз", page.searchInput.accessibleDescription())
         self.assertEqual(page.editor.accessibleName(), "Текст открытого пресета")
         self.assertEqual(page.editor.property("screenReaderStateText"), "Текст открытого пресета")
+
+    def test_arrow_down_from_search_moves_focus_to_preset_text(self) -> None:
+        page = PresetRawEditorPage(
+            create_raw_preset_load_worker=lambda *_args, **_kwargs: None,
+            create_raw_preset_save_worker=lambda *_args, **_kwargs: None,
+            create_raw_preset_activate_worker=lambda *_args, **_kwargs: None,
+            create_raw_preset_action_worker=lambda *_args, **_kwargs: None,
+            launch_method="zapret2",
+            title="Пресет",
+            open_back=lambda: None,
+            open_root=lambda: None,
+            runtime_actions=RawPresetRuntimeActions(
+                start=lambda *_args, **_kwargs: None,
+                stop=lambda *_args, **_kwargs: None,
+                is_available=lambda: True,
+            ),
+            ui_state_store=None,
+        )
+        self.addCleanup(page.deleteLater)
+        page.show()
+        self.app.processEvents()
+        page.searchInput.setFocus()
+        self.app.processEvents()
+
+        QTest.keyClick(page.searchInput, Qt.Key.Key_Down)
+        self.app.processEvents()
+
+        self.assertIs(self.app.focusWidget(), page.editor)
 
     def test_raw_preset_actions_menu_items_are_named_for_screen_reader(self) -> None:
         import presets.ui.common.preset_subpage_base as preset_subpage_base
