@@ -45,6 +45,16 @@ class _Widget:
 
 
 class AccessibilityHelpersTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        import os
+
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+        from PyQt6.QtWidgets import QApplication
+
+        cls._app = QApplication.instance() or QApplication([])
+
     def test_set_accessible_name_uses_widget_text_by_default(self) -> None:
         from ui.accessibility import set_accessible_name
 
@@ -166,6 +176,42 @@ class AccessibilityHelpersTests(unittest.TestCase):
 
         self.assertEqual(widget.items["about"].accessibleName(), "Вкладки: О программе, выбрано")
         self.assertEqual(widget.items["support"].accessibleName(), "Вкладки: Поддержка, не выбрано")
+
+    def test_set_segmented_items_accessibility_enables_keyboard_selection(self) -> None:
+        import os
+
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+        from PyQt6.QtCore import QEvent, Qt
+        from PyQt6.QtGui import QKeyEvent
+        from PyQt6.QtWidgets import QApplication
+        from qfluentwidgets import SegmentedWidget
+
+        from ui.segmented_accessibility import set_segmented_items_accessibility
+
+        app = QApplication.instance() or QApplication([])
+        self.assertIsNotNone(app)
+
+        selected: list[str] = []
+        widget = SegmentedWidget()
+        widget.addItem("first", "Первый", lambda: selected.append("first"))
+        widget.addItem("second", "Второй", lambda: selected.append("second"))
+        widget.setCurrentItem("first")
+
+        set_segmented_items_accessibility(widget, name="Раздел")
+
+        right_event = QKeyEvent(QEvent.Type.KeyPress, int(Qt.Key.Key_Right), Qt.KeyboardModifier.NoModifier)
+        QApplication.sendEvent(widget.items["first"], right_event)
+
+        self.assertTrue(right_event.isAccepted())
+        self.assertEqual(widget.currentRouteKey(), "second")
+        self.assertEqual(selected, ["second"])
+
+        enter_event = QKeyEvent(QEvent.Type.KeyPress, int(Qt.Key.Key_Return), Qt.KeyboardModifier.NoModifier)
+        QApplication.sendEvent(widget.items["second"], enter_event)
+
+        self.assertTrue(enter_event.isAccepted())
+        self.assertEqual(selected, ["second", "second"])
 
     def test_set_tooltip_also_sets_accessible_description(self) -> None:
         from unittest.mock import patch
