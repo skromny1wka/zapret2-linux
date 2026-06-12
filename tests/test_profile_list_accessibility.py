@@ -52,6 +52,15 @@ class ProfileListAccessibilityTests(unittest.TestCase):
         self.assertIn("Enter открывает выбранный profile", widget._view.accessibleDescription())
         self.assertIn("клавиша меню открывает действия", widget._view.accessibleDescription())
 
+    def test_profile_list_wrapper_forwards_keyboard_focus_to_view(self) -> None:
+        from profile.ui.profiles_list import ProfilesList
+
+        widget = ProfilesList()
+        self.addCleanup(widget.deleteLater)
+
+        self.assertEqual(widget.focusPolicy(), Qt.FocusPolicy.StrongFocus)
+        self.assertIs(widget.focusProxy(), widget._view)
+
     def test_profile_list_focuses_first_loaded_row_for_screen_reader(self) -> None:
         from profile.list_view_state import build_profile_list_view_state
         from profile.ui.profiles_list import ProfilesList
