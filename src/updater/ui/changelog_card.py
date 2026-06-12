@@ -88,6 +88,7 @@ class ChangelogCard(CardWidget):
             name="Закрыть уведомление об обновлении",
             description="Скрывает карточку обновления.",
         )
+        set_state_text(self.close_btn, "Закрыть уведомление об обновлении")
         self.close_btn.clicked.connect(self._on_dismiss)
         header.addWidget(self.close_btn)
 
@@ -153,6 +154,7 @@ class ChangelogCard(CardWidget):
             name="Отложить обновление",
             description="Скрывает карточку обновления. Установку можно запустить позже.",
         )
+        set_state_text(self.later_btn, "Отложить обновление")
         self.later_btn.clicked.connect(self._on_dismiss)
         buttons_layout.addWidget(self.later_btn)
 
