@@ -428,6 +428,10 @@ class OrchestraBlockedPage(BasePage):
             )
         )
         self._hint_label = hint_label
+        set_state_text(
+            hint_label,
+            f"Подсказка чёрного списка Оркестратора: {hint_label.text()}",
+        )
         list_layout.addWidget(hint_label)
 
         # Контейнер для рядов (без скролла - страница сама прокручивается)
@@ -509,6 +513,10 @@ class OrchestraBlockedPage(BasePage):
                     "page.orchestra.blocked.hint",
                     "Измените номер стратегии и она автоматически сохранится • Системные блокировки неизменяемы",
                 )
+            )
+            set_state_text(
+                self._hint_label,
+                f"Подсказка чёрного списка Оркестратора: {self._hint_label.text()}",
             )
 
         set_tooltip(

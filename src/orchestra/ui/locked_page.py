@@ -349,6 +349,10 @@ class OrchestraLockedPage(BasePage):
             )
         )
         self._hint_label = hint_label
+        set_state_text(
+            hint_label,
+            f"Подсказка залоченных стратегий Оркестратора: {hint_label.text()}",
+        )
         list_layout.addWidget(hint_label)
 
         # Контейнер для рядов (без скролла - страница сама прокручивается)
@@ -413,6 +417,10 @@ class OrchestraLockedPage(BasePage):
                     "page.orchestra.locked.hint",
                     "Измените номер стратегии и она автоматически сохранится",
                 )
+            )
+            set_state_text(
+                self._hint_label,
+                f"Подсказка залоченных стратегий Оркестратора: {self._hint_label.text()}",
             )
 
         set_tooltip(

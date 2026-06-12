@@ -135,6 +135,10 @@ class OrchestraAccessibilityTests(unittest.TestCase):
         )
         self.assertEqual(page.unlock_all_btn.accessibleName(), "Разлочить все стратегии")
         self.assertEqual(page.unlock_all_btn.property("screenReaderStateText"), "Разлочить все стратегии")
+        self.assertEqual(
+            page._hint_label.property("screenReaderStateText"),
+            "Подсказка залоченных стратегий Оркестратора: Измените номер стратегии и она автоматически сохранится",
+        )
 
         page.proto_combo.setCurrentIndex(1)
         page.strat_spin.setValue(7)
@@ -209,6 +213,13 @@ class OrchestraAccessibilityTests(unittest.TestCase):
         self.assertEqual(
             page.unblock_all_btn.property("screenReaderStateText"),
             "Очистить пользовательские блокировки",
+        )
+        self.assertEqual(
+            page._hint_label.property("screenReaderStateText"),
+            (
+                "Подсказка чёрного списка Оркестратора: "
+                "Измените номер стратегии и она автоматически сохранится • Системные блокировки неизменяемы"
+            ),
         )
 
         page.proto_combo.setCurrentIndex(1)
