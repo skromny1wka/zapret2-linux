@@ -33,6 +33,10 @@ class AboutPageAccessibilityTests(unittest.TestCase):
         )
 
         self.assertEqual(widgets.update_btn.accessibleName(), "Открыть настройки обновлений")
+        self.assertEqual(
+            widgets.update_btn.property("screenReaderStateText"),
+            "Открыть настройки обновлений",
+        )
         self.assertIn("автоматической проверки", widgets.update_btn.accessibleDescription())
         self.assertEqual(widgets.about_app_name_label.accessibleName(), "Название программы: Zapret 2 GUI")
         self.assertEqual(
@@ -50,6 +54,7 @@ class AboutPageAccessibilityTests(unittest.TestCase):
             "Статус подписки: Free версия",
         )
         self.assertEqual(widgets.premium_btn.accessibleName(), "Открыть Premium и VPN")
+        self.assertEqual(widgets.premium_btn.property("screenReaderStateText"), "Открыть Premium и VPN")
         self.assertIn("Premium", widgets.premium_btn.accessibleDescription())
 
     def test_subscription_status_update_reads_state_for_screen_reader(self) -> None:
@@ -127,8 +132,10 @@ class AboutPageAccessibilityTests(unittest.TestCase):
             page.about_version_value_label.accessible_name,
         )
         self.assertEqual(page.update_btn.accessible_name, "Открыть настройки обновлений")
+        self.assertEqual(page.update_btn.property("screenReaderStateText"), "Открыть настройки обновлений")
         self.assertIn("автоматической проверки", page.update_btn.accessible_description)
         self.assertEqual(page.premium_btn.accessible_name, "Открыть Premium и VPN")
+        self.assertEqual(page.premium_btn.property("screenReaderStateText"), "Открыть Premium и VPN")
         self.assertIn("Premium", page.premium_btn.accessible_description)
 
 
