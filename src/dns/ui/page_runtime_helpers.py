@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 
 def build_dynamic_network_ui(
     *,
@@ -123,20 +125,39 @@ def build_dns_choices_ui(
     dns_cards_container.show()
     custom_card.show()
 
-    auto_widgets = build_auto_dns_ui_fn(
-        tr_fn=tr_fn,
-        settings_card_cls=settings_card_cls,
-        qhbox_layout_cls=qhbox_layout_cls,
-        qframe_cls=qframe_cls,
-        strong_body_label_cls=strong_body_label_cls,
-        qlabel_cls=qlabel_cls,
-        qta_module=qta_module,
-        icon_color=tokens.fg_faint,
-        indicator_off_qss=dns_provider_card_cls.indicator_off(),
-        on_select=lambda _event: on_auto_selected(),
-    )
-    dns_cards_layout.addWidget(auto_widgets.card)
-    dns_cards_layout.addWidget(custom_card)
+    if hasattr(dns_cards_layout, "add_auto_choice"):
+        auto_card = dns_cards_layout.add_auto_choice(
+            tr_fn("page.network.dns.auto", "Автоматически (DHCP)")
+        )
+        try:
+            dns_cards_layout.auto_selected.connect(on_auto_selected)
+        except Exception:
+            pass
+        auto_widgets = SimpleNamespace(
+            card=auto_card,
+            indicator=None,
+            icon_label=None,
+            title_label=None,
+        )
+        try:
+            dns_cards_layout.set_custom_choice(custom_card)
+        except Exception:
+            pass
+    else:
+        auto_widgets = build_auto_dns_ui_fn(
+            tr_fn=tr_fn,
+            settings_card_cls=settings_card_cls,
+            qhbox_layout_cls=qhbox_layout_cls,
+            qframe_cls=qframe_cls,
+            strong_body_label_cls=strong_body_label_cls,
+            qlabel_cls=qlabel_cls,
+            qta_module=qta_module,
+            icon_color=tokens.fg_faint,
+            indicator_off_qss=dns_provider_card_cls.indicator_off(),
+            on_select=lambda _event: on_auto_selected(),
+        )
+        dns_cards_layout.addWidget(auto_widgets.card)
+        dns_cards_layout.addWidget(custom_card)
 
     provider_cards = build_provider_cards_fn(
         providers_by_category=providers,

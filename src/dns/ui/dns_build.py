@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from qfluentwidgets import FluentIcon
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QLabel
 
 from dns.ui.selection import (
     ACCESSIBLE_BASE_PROPERTY,
@@ -76,10 +77,14 @@ def build_custom_dns_ui(
     _ = settings_card_cls, qframe_cls, indicator_off_qss
     custom_card = DNSChoiceCard()
     custom_layout = qhbox_layout_cls(custom_card)
-    custom_layout.setContentsMargins(8, 3, 12, 3)
-    custom_layout.setSpacing(8)
+    custom_layout.setContentsMargins(18, 3, 12, 3)
+    custom_layout.setSpacing(10)
 
-    custom_label = body_label_cls(tr_fn("page.network.custom.label", "Свой:"))
+    custom_icon = QLabel()
+    custom_icon.setPixmap(get_cached_qta_pixmap("fa5s.edit", color="#8a929d", size=16))
+    custom_layout.addWidget(custom_icon)
+
+    custom_label = body_label_cls(tr_fn("page.network.custom.label", "Свой DNS"))
     custom_layout.addWidget(custom_label)
 
     custom_primary = line_edit_cls()

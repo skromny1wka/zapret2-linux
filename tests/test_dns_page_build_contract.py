@@ -63,6 +63,8 @@ class DnsPageBuildContractTests(unittest.TestCase):
         self.assertIs(shell.adapters_container.parent(), content_parent)
 
     def test_network_page_places_custom_dns_inside_dns_choices_list(self) -> None:
+        from dns.ui.cards import DNSProviderCard
+        from dns.ui.choice_list import DnsChoiceListWidget
         from dns.ui.page import NetworkPage
 
         dns_feature = SimpleNamespace(
@@ -73,11 +75,13 @@ class DnsPageBuildContractTests(unittest.TestCase):
 
         page = NetworkPage(deps=SimpleNamespace(dns_feature=dns_feature))
 
-        self.assertIs(page.custom_card.parent(), page.dns_cards_container)
-        self.assertLess(
-            page.dns_cards_layout.indexOf(page.custom_card),
-            page.dns_cards_layout.count(),
+        self.assertIsInstance(page.dns_cards_container, DnsChoiceListWidget)
+        self.assertIs(
+            page.dns_cards_container.itemWidget(page.dns_cards_container.custom_item()),
+            page.custom_card,
         )
+        self.assertEqual(len(page.dns_cards_container.findChildren(DNSProviderCard)), 0)
+        self.assertGreater(page.dns_cards_container.count(), len(page.dns_cards))
 
 
 if __name__ == "__main__":

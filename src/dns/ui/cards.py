@@ -37,42 +37,36 @@ class DNSChoiceCard(QWidget):
         self.setProperty("selected", False)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.setMinimumHeight(34)
+        self.setMinimumHeight(36)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self._apply_card_style()
 
     def _apply_card_style(self, tokens=None) -> None:
         theme_tokens = tokens or get_theme_tokens()
-        r, g, b = theme_tokens.accent_rgb
         accent = theme_tokens.accent_hex
         transparent_left = "rgba(0, 0, 0, 0)"
         if self._is_selected:
-            bg = f"rgba({r}, {g}, {b}, 0.24)"
-            bg_hover = f"rgba({r}, {g}, {b}, 0.31)"
-            border = f"rgba({r}, {g}, {b}, 0.40)"
+            bg = theme_tokens.accent_soft_bg
+            bg_hover = theme_tokens.accent_soft_bg_hover
             left = accent
         else:
             bg = theme_tokens.surface_bg
             bg_hover = theme_tokens.surface_bg_hover
-            border = theme_tokens.surface_border
             left = transparent_left
-        hover_border = border if self._is_selected else theme_tokens.surface_border_hover
+        hover_left = left if self._is_selected else transparent_left
         self.setStyleSheet(
             f"""
             QWidget#dnsCard {{
                 background-color: {bg};
-                border-top: 1px solid {border};
-                border-right: 1px solid {border};
-                border-bottom: 1px solid {border};
                 border-left: 4px solid {left};
-                border-radius: 8px;
+                border-top: none;
+                border-right: none;
+                border-bottom: none;
+                border-radius: 10px;
             }}
             QWidget#dnsCard:hover {{
                 background-color: {bg_hover};
-                border-top: 1px solid {hover_border};
-                border-right: 1px solid {hover_border};
-                border-bottom: 1px solid {hover_border};
-                border-left: 4px solid {accent};
+                border-left: 4px solid {hover_left};
             }}
             """
         )

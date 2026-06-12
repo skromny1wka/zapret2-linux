@@ -55,7 +55,11 @@ def update_force_dns_status_label(
 
 
 def update_dns_selection_block_state(*, blocked: bool, dns_cards_container, custom_card) -> None:
-    for widget in (dns_cards_container, custom_card):
+    widgets = [dns_cards_container]
+    if custom_card is not None and not _is_child_of(custom_card, dns_cards_container):
+        widgets.append(custom_card)
+
+    for widget in widgets:
         if widget is None:
             continue
         if blocked:
@@ -64,6 +68,23 @@ def update_dns_selection_block_state(*, blocked: bool, dns_cards_container, cust
             widget.setGraphicsEffect(effect)
         else:
             widget.setGraphicsEffect(None)
+
+
+def _is_child_of(widget, parent) -> bool:
+    if widget is None or parent is None:
+        return False
+    try:
+        current = widget.parentWidget()
+    except Exception:
+        return False
+    while current is not None:
+        if current is parent:
+            return True
+        try:
+            current = current.parentWidget()
+        except Exception:
+            return False
+    return False
 
 
 def highlight_force_dns_card(*, card, get_theme_tokens_fn, schedule_fn) -> None:

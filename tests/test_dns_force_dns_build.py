@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget
 from qfluentwidgets import CaptionLabel, PushButton, SettingCardGroup
 
 from dns.ui.force_dns_build import build_force_dns_card_ui
+from dns.ui.force_dns_ui import update_dns_selection_block_state
 from ui.fluent_widgets import (
     enable_setting_card_group_auto_height,
     insert_widget_into_setting_card_group,
@@ -170,6 +171,19 @@ class ForceDnsBuildTests(unittest.TestCase):
 
         self.assertEqual(widgets.force_button.accessibleName(), "Выключить принудительный DNS")
         self.assertEqual(widgets.force_button.property("screenReaderStateText"), "Выключить принудительный DNS")
+
+    def test_force_dns_opacity_is_not_applied_twice_to_nested_custom_dns_row(self) -> None:
+        dns_container = QWidget()
+        custom_row = QWidget(dns_container)
+
+        update_dns_selection_block_state(
+            blocked=True,
+            dns_cards_container=dns_container,
+            custom_card=custom_row,
+        )
+
+        self.assertIsNotNone(dns_container.graphicsEffect())
+        self.assertIsNone(custom_row.graphicsEffect())
 
 
 if __name__ == "__main__":

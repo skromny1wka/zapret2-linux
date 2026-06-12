@@ -23,6 +23,27 @@ def build_provider_cards(
     dns_cards: dict[str, object] = {}
     category_labels: list[object] = []
 
+    if hasattr(dns_cards_layout, "add_provider"):
+        try:
+            dns_cards_layout.provider_selected.connect(on_selected)
+        except Exception:
+            pass
+        for category, providers in providers_by_category.items():
+            try:
+                dns_cards_layout.add_section(category)
+            except Exception:
+                pass
+            for name, data in providers.items():
+                dns_cards[name] = dns_cards_layout.add_provider(
+                    name,
+                    data,
+                    show_ipv6=show_ipv6,
+                )
+        return ProviderCardsBuildResult(
+            dns_cards=dns_cards,
+            category_labels=[],
+        )
+
     for category, providers in providers_by_category.items():
         category_label = caption_label_cls(category)
         dns_cards_layout.addWidget(category_label)

@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QWidget, QVBoxLayout
 
+from dns.ui.choice_list import DnsChoiceListWidget
+
 
 @dataclass(slots=True)
 class NetworkPageShellWidgets:
@@ -70,10 +72,8 @@ def build_network_page_shell(
     loading_layout.addWidget(loading_bar, alignment=Qt.AlignmentFlag.AlignCenter)
     loading_card.add_layout(loading_layout)
 
-    dns_cards_container = QWidget(content_parent)
-    dns_cards_layout = qvbox_layout_cls(dns_cards_container)
-    dns_cards_layout.setContentsMargins(0, 0, 0, 0)
-    dns_cards_layout.setSpacing(4)
+    dns_cards_container = DnsChoiceListWidget(content_parent)
+    dns_cards_layout = dns_cards_container
     dns_cards_container.hide()
 
     custom_widgets = build_custom_dns_ui_fn(
