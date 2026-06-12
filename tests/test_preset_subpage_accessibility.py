@@ -33,16 +33,22 @@ class PresetSubpageAccessibilityTests(unittest.TestCase):
         self.addCleanup(page.deleteLater)
 
         self.assertEqual(page.menuButton.accessibleName(), "Открыть меню действий пресета")
+        self.assertEqual(page.menuButton.property("screenReaderStateText"), "Открыть меню действий пресета")
         self.assertIn("переименовать", page.menuButton.accessibleDescription())
         self.assertEqual(page.activateButton.accessibleName(), "Сделать пресет активным")
+        self.assertEqual(page.activateButton.property("screenReaderStateText"), "Сделать пресет активным")
         self.assertIn("выбранным для запуска", page.activateButton.accessibleDescription())
         self.assertEqual(page.openExternalButton.accessibleName(), "Открыть пресет в редакторе")
+        self.assertEqual(page.openExternalButton.property("screenReaderStateText"), "Открыть пресет в редакторе")
         self.assertIn("внешнем текстовом редакторе", page.openExternalButton.accessibleDescription())
         self.assertEqual(page.runtimeToggleButton.accessibleName(), "Запустить пресет")
+        self.assertEqual(page.runtimeToggleButton.property("screenReaderStateText"), "Запустить пресет")
         self.assertIn("Запускает Zapret", page.runtimeToggleButton.accessibleDescription())
         self.assertEqual(page.searchInput.accessibleName(), "Поиск по тексту пресета")
+        self.assertEqual(page.searchInput.property("screenReaderStateText"), "Поиск по тексту пресета")
         self.assertIn("После ввода перейдите к тексту пресета клавишей Tab", page.searchInput.accessibleDescription())
         self.assertEqual(page.editor.accessibleName(), "Текст открытого пресета")
+        self.assertEqual(page.editor.property("screenReaderStateText"), "Текст открытого пресета")
 
     def test_rename_dialog_is_named_for_screen_reader(self) -> None:
         parent = QWidget()
