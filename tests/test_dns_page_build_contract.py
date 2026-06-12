@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import QApplication, QFrame, QHBoxLayout, QVBoxLayout, QWid
 from qfluentwidgets import BodyLabel, IndeterminateProgressBar, LineEdit, PushButton
 
 from dns.ui.page_build import build_network_page_shell
+from dns.ui.page_runtime_helpers import build_dns_choices_ui
 from ui.fluent_widgets import SettingsCard
 
 
@@ -82,6 +83,66 @@ class DnsPageBuildContractTests(unittest.TestCase):
         )
         self.assertEqual(len(page.dns_cards_container.findChildren(DNSProviderCard)), 0)
         self.assertGreater(page.dns_cards_container.count(), len(page.dns_cards))
+
+    def test_custom_dns_row_is_not_shown_before_it_is_inserted_into_choice_list(self) -> None:
+        class _ChoiceList:
+            def __init__(self):
+                self.auto_selected = _Signal()
+
+            def show(self):
+                pass
+
+            def add_auto_choice(self, _title):
+                return object()
+
+            def set_custom_choice(self, custom_card):
+                custom_card.set_parented()
+
+        class _CustomCard:
+            def __init__(self):
+                self.was_shown_without_parent = False
+                self.parented = False
+
+            def show(self):
+                if not self.parented:
+                    self.was_shown_without_parent = True
+
+            def set_parented(self):
+                self.parented = True
+
+        custom_card = _CustomCard()
+
+        build_dns_choices_ui(
+            cleanup_in_progress=False,
+            dns_choices_built=False,
+            tr_fn=lambda _key, default: default,
+            settings_card_cls=object,
+            qhbox_layout_cls=object,
+            qframe_cls=object,
+            strong_body_label_cls=object,
+            caption_label_cls=object,
+            qlabel_cls=object,
+            qta_module=None,
+            get_theme_tokens_fn=lambda: SimpleNamespace(fg_faint="#888888"),
+            build_auto_dns_ui_fn=lambda **_kwargs: None,
+            build_provider_cards_fn=lambda **_kwargs: SimpleNamespace(dns_cards={}, category_labels=[]),
+            providers={},
+            dns_cards_layout=_ChoiceList(),
+            on_auto_selected=lambda: None,
+            on_provider_selected=lambda _name, _data: None,
+            ipv6_available=True,
+            dns_cards_container=SimpleNamespace(show=lambda: None),
+            custom_card=custom_card,
+            dns_provider_card_cls=SimpleNamespace(indicator_off=lambda: ""),
+            apply_inline_theme_styles_fn=lambda _tokens: None,
+        )
+
+        self.assertFalse(custom_card.was_shown_without_parent)
+
+
+class _Signal:
+    def connect(self, _callback):
+        pass
 
 
 if __name__ == "__main__":

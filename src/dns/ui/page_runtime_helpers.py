@@ -123,7 +123,6 @@ def build_dns_choices_ui(
     tokens = get_theme_tokens_fn()
 
     dns_cards_container.show()
-    custom_card.show()
 
     if hasattr(dns_cards_layout, "add_auto_choice"):
         auto_card = dns_cards_layout.add_auto_choice(
@@ -143,6 +142,7 @@ def build_dns_choices_ui(
             dns_cards_layout.set_custom_choice(custom_card)
         except Exception:
             pass
+        custom_card.show()
     else:
         auto_widgets = build_auto_dns_ui_fn(
             tr_fn=tr_fn,
@@ -158,6 +158,7 @@ def build_dns_choices_ui(
         )
         dns_cards_layout.addWidget(auto_widgets.card)
         dns_cards_layout.addWidget(custom_card)
+        custom_card.show()
 
     provider_cards = build_provider_cards_fn(
         providers_by_category=providers,
