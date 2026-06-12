@@ -62,6 +62,7 @@ class _FakeButton:
         self.text = ""
         self._accessible_name = ""
         self._accessible_description = ""
+        self.properties = {}
 
     def setText(self, text):  # noqa: N802
         self.text = text
@@ -78,6 +79,12 @@ class _FakeButton:
     def accessibleDescription(self):  # noqa: N802
         return self._accessible_description
 
+    def setProperty(self, name, value):  # noqa: N802
+        self.properties[name] = value
+
+    def property(self, name):
+        return self.properties.get(name)
+
 
 class _FakePushSettingCard:
     def __init__(self, action_text, icon, title, content):
@@ -89,6 +96,7 @@ class _FakePushSettingCard:
         self.clicked = _FakeSignal()
         self._accessible_name = ""
         self._accessible_description = ""
+        self.properties = {}
 
     def setAccessibleName(self, value):  # noqa: N802
         self._accessible_name = value
@@ -101,6 +109,12 @@ class _FakePushSettingCard:
 
     def accessibleDescription(self):  # noqa: N802
         return self._accessible_description
+
+    def setProperty(self, name, value):  # noqa: N802
+        self.properties[name] = value
+
+    def property(self, name):
+        return self.properties.get(name)
 
 
 class _FakeLabel:
@@ -242,8 +256,10 @@ class UpdaterSettingsBuildTests(unittest.TestCase):
         expected_name = "Открыть Telegram канал обновлений"
 
         self.assertEqual(widgets.card.accessibleName(), expected_name)
+        self.assertEqual(widgets.card.property("screenReaderStateText"), expected_name)
         self.assertIn("версии программы", widgets.card.accessibleDescription())
         self.assertEqual(widgets.button.accessibleName(), expected_name)
+        self.assertEqual(widgets.button.property("screenReaderStateText"), expected_name)
         self.assertIn("версии программы", widgets.button.accessibleDescription())
 
 

@@ -43,6 +43,7 @@ class _Card:
         self.content = ""
         self._accessible_name = ""
         self._accessible_description = ""
+        self.properties = {}
 
     def set_title(self, text):
         self.title = text
@@ -61,6 +62,12 @@ class _Card:
 
     def accessibleDescription(self):  # noqa: N802
         return self._accessible_description
+
+    def setProperty(self, name, value):  # noqa: N802
+        self.properties[name] = value
+
+    def property(self, name):
+        return self.properties.get(name)
 
 
 class _Stateful:
@@ -262,8 +269,10 @@ class UpdaterLanguageAccessibilityTests(unittest.TestCase):
         )
 
         self.assertEqual(telegram_card.accessibleName(), "Открыть канал обновлений")
+        self.assertEqual(telegram_card.property("screenReaderStateText"), "Открыть канал обновлений")
         self.assertEqual(telegram_card.accessibleDescription(), "Открывает канал с версиями программы.")
         self.assertEqual(telegram_button.accessibleName(), "Открыть канал обновлений")
+        self.assertEqual(telegram_button.property("screenReaderStateText"), "Открыть канал обновлений")
         self.assertEqual(telegram_button.accessibleDescription(), "Открывает канал с версиями программы.")
 
 

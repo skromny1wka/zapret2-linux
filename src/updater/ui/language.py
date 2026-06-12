@@ -125,10 +125,12 @@ def apply_servers_page_language(
         name=telegram_action_name,
         description=telegram_action_description,
     )
+    set_state_text(telegram_card, telegram_action_name)
     set_control_accessibility(
         telegram_button,
         name=telegram_action_name,
         description=telegram_action_description,
     )
+    set_state_text(telegram_button, telegram_action_name)
 
     refresh_server_rows()

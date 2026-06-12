@@ -140,7 +140,9 @@ def build_servers_telegram_section(
         "Открывает Telegram канал, где публикуются версии программы и новости обновлений.",
     )
     set_control_accessibility(tg_card, name=telegram_action_name, description=telegram_action_description)
+    set_state_text(tg_card, telegram_action_name)
     set_control_accessibility(tg_btn, name=telegram_action_name, description=telegram_action_description)
+    set_state_text(tg_btn, telegram_action_name)
 
     return ServersTelegramWidgets(
         card=tg_card,
