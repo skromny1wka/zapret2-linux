@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QModelIndex, QObject, QRect, QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QModelIndex, QObject, QPoint, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QFont, QFontMetrics, QPainter
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -80,6 +80,7 @@ class DnsChoiceListWidget(QListWidget):
     auto_selected = pyqtSignal()
     provider_selected = pyqtSignal(str, dict)
     custom_selected = pyqtSignal()
+    custom_provider_context_requested = pyqtSignal(str, dict, QPoint)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -93,6 +94,7 @@ class DnsChoiceListWidget(QListWidget):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.viewport().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.setItemDelegate(DnsChoiceListDelegate(self))
         set_control_accessibility(
             self,
@@ -103,6 +105,7 @@ class DnsChoiceListWidget(QListWidget):
         self.currentItemChanged.connect(lambda current, _previous: self._update_current_dns_accessibility(current))
         self.itemClicked.connect(self.activate_item)
         self.itemActivated.connect(self.activate_item)
+        self.viewport().customContextMenuRequested.connect(self._show_provider_context_menu)
         self.setStyleSheet(
             """
             QListWidget#dnsChoiceList {
@@ -206,6 +209,14 @@ class DnsChoiceListWidget(QListWidget):
             self.activate_item(self.currentItem())
             event.accept()
             return
+        if event.key() == Qt.Key.Key_Menu or (
+            event.key() == Qt.Key.Key_F10
+            and bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+        ):
+            item = self.currentItem()
+            if item is not None and self._emit_custom_provider_context(item, self.visualItemRect(item).center()):
+                event.accept()
+                return
         super().keyPressEvent(event)
 
     def focusInEvent(self, event):  # noqa: N802
@@ -224,6 +235,24 @@ class DnsChoiceListWidget(QListWidget):
             self.viewport().update(self.visualRect(index))
         if self.currentItem() is item:
             self._update_current_dns_accessibility(item)
+
+    def _show_provider_context_menu(self, pos: QPoint) -> None:
+        item = self.itemAt(pos)
+        if item is None:
+            return
+        self.setCurrentItem(item)
+        self._emit_custom_provider_context(item, pos)
+
+    def _emit_custom_provider_context(self, item: QListWidgetItem, pos: QPoint) -> bool:
+        if str(item.data(KIND_ROLE) or "") != "provider":
+            return False
+        name = str(item.data(KEY_ROLE) or "")
+        data = item.data(PROVIDER_DATA_ROLE)
+        provider_data = dict(data or {})
+        if not str(provider_data.get("custom_id") or "").strip():
+            return False
+        self.custom_provider_context_requested.emit(name, provider_data, self.viewport().mapToGlobal(pos))
+        return True
 
     def _refresh_custom_widget_selection(self, item: QListWidgetItem, selected: bool) -> None:
         if self._custom_item is None or item is not self._custom_item:

@@ -97,17 +97,17 @@ def build_force_dns_card_ui(
     )
 
     custom_dns_btn = action_button_cls(
-        tr_fn("page.network.custom.button", "Свой DNS"),
+        tr_fn("page.network.custom.button", "Добавить свой DNS"),
         icon=FluentIcon.EDIT,
     )
     if callable(on_custom_dns):
         custom_dns_btn.clicked.connect(on_custom_dns)
     custom_description = tr_fn(
         "page.network.custom.button.description",
-        "Открывает окно, где можно добавить, изменить или удалить свои DNS серверы.",
+        "Открывает окно добавления нового DNS сервера.",
     )
     set_tooltip(custom_dns_btn, custom_description)
-    custom_name = tr_fn("page.network.custom.button.accessible_name", "Настроить свой DNS")
+    custom_name = tr_fn("page.network.custom.button.accessible_name", "Добавить свой DNS")
     set_state_text(custom_dns_btn, custom_name)
     set_control_accessibility(
         custom_dns_btn,

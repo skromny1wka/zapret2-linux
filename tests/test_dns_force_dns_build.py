@@ -84,7 +84,7 @@ class ForceDnsBuildTests(unittest.TestCase):
 
         self.assertEqual(widgets.force_button.text(), "Включить принудительный DNS")
         self.assertEqual(widgets.reset_button.text(), "Вернуть DNS автоматически")
-        self.assertEqual(widgets.custom_button.text(), "Свой DNS")
+        self.assertEqual(widgets.custom_button.text(), "Добавить свой DNS")
         self.assertEqual(widgets.card.actions_layout.count(), 3)
         self.assertFalse(hasattr(widgets, "toggle"))
         widgets.custom_button.click()
@@ -150,8 +150,8 @@ class ForceDnsBuildTests(unittest.TestCase):
         self.assertEqual(widgets.reset_button.accessibleName(), "Вернуть DNS автоматически")
         self.assertEqual(widgets.reset_button.property("screenReaderStateText"), "Вернуть DNS автоматически")
         self.assertIn("DNS будет снова получаться автоматически", widgets.reset_button.accessibleDescription())
-        self.assertEqual(widgets.custom_button.accessibleName(), "Настроить свой DNS")
-        self.assertEqual(widgets.custom_button.property("screenReaderStateText"), "Настроить свой DNS")
+        self.assertEqual(widgets.custom_button.accessibleName(), "Добавить свой DNS")
+        self.assertEqual(widgets.custom_button.property("screenReaderStateText"), "Добавить свой DNS")
         self.assertIn("Открывает окно", widgets.custom_button.accessibleDescription())
 
     def test_force_dns_active_action_button_has_screen_reader_state_text(self) -> None:

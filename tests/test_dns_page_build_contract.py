@@ -154,6 +154,69 @@ class DnsPageBuildContractTests(unittest.TestCase):
 
         self.assertIn("Мой DNS", page.dns_cards)
 
+    def test_network_page_custom_dns_button_adds_one_new_dns(self) -> None:
+        from dns.ui.page import NetworkPage
+
+        dns_feature = SimpleNamespace(
+            normalize_adapter_alias=lambda value: str(value),
+            consume_warmed_page_data=lambda: None,
+            create_page_load_worker=lambda request_id, parent=None: None,
+        )
+
+        with (
+            patch("dns.ui.page.get_custom_dns_servers", return_value=[]),
+            patch("dns.ui.page.set_custom_dns_servers", side_effect=lambda value: value),
+            patch(
+                "dns.ui.page.CustomDnsDialog",
+                return_value=_FakeCustomDnsDialog(
+                    {"id": "my-dns", "name": "Мой DNS", "ipv4": ["8.8.8.8"], "ipv6": []}
+                ),
+            ),
+        ):
+            page = NetworkPage(deps=SimpleNamespace(dns_feature=dns_feature))
+            page._open_custom_dns_dialog()
+
+        self.assertEqual([server["name"] for server in page._custom_dns_servers], ["Мой DNS"])
+        self.assertIn("Мой DNS", page.dns_cards)
+
+    def test_network_page_custom_dns_row_actions_update_saved_dns(self) -> None:
+        from dns.ui.page import NetworkPage
+
+        dns_feature = SimpleNamespace(
+            normalize_adapter_alias=lambda value: str(value),
+            consume_warmed_page_data=lambda: None,
+            create_page_load_worker=lambda request_id, parent=None: None,
+        )
+
+        with (
+            patch(
+                "dns.ui.page.get_custom_dns_servers",
+                return_value=[
+                    {"id": "my-dns", "name": "Мой DNS", "ipv4": ["8.8.8.8"], "ipv6": []},
+                ],
+            ),
+            patch("dns.ui.page.set_custom_dns_servers", side_effect=lambda value: value),
+            patch(
+                "dns.ui.page.CustomDnsDialog",
+                return_value=_FakeCustomDnsDialog(
+                    {"id": "my-dns", "name": "Рабочий DNS", "ipv4": ["9.9.9.9"], "ipv6": []}
+                ),
+            ),
+        ):
+            page = NetworkPage(deps=SimpleNamespace(dns_feature=dns_feature))
+            page._edit_custom_dns_server(0)
+
+            self.assertEqual(page._custom_dns_servers[0]["name"], "Рабочий DNS")
+
+            page._duplicate_custom_dns_server(0)
+            self.assertEqual([server["name"] for server in page._custom_dns_servers], ["Рабочий DNS", "Рабочий DNS копия"])
+
+            page._copy_custom_dns_server(0)
+            self.assertEqual(QApplication.clipboard().text(), "9.9.9.9")
+
+            page._delete_custom_dns_server(0)
+            self.assertEqual([server["name"] for server in page._custom_dns_servers], ["Рабочий DNS копия"])
+
     def test_custom_dns_row_is_not_inserted_or_shown_by_choices_builder(self) -> None:
         class _ChoiceList:
             def __init__(self):
@@ -218,6 +281,17 @@ class DnsPageBuildContractTests(unittest.TestCase):
 class _Signal:
     def connect(self, _callback):
         pass
+
+
+class _FakeCustomDnsDialog:
+    def __init__(self, server):
+        self._server = dict(server)
+
+    def exec(self):
+        return True
+
+    def server(self):
+        return dict(self._server)
 
 
 if __name__ == "__main__":

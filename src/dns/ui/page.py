@@ -3,16 +3,18 @@
 
 from __future__ import annotations
 
+from uuid import uuid4
+
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QFrame,
 )
 import qtawesome as qta
 
 from qfluentwidgets import (
     BodyLabel, CaptionLabel, CheckBox, IndeterminateProgressBar, InfoBar,
-    LineEdit, MessageBox, PushButton, SettingCardGroup, StrongBodyLabel,
+    LineEdit, MessageBox, PushButton, RoundMenu, SettingCardGroup, StrongBodyLabel,
 )
 
 from settings.store import get_custom_dns_servers, set_custom_dns_servers
@@ -30,6 +32,8 @@ from ui.fluent_widgets import (
     insert_widget_into_setting_card_group,
     set_tooltip,
 )
+from ui.popup_menu import exec_popup_menu
+from ui.presets_menu.common import fluent_icon, make_menu_action
 from ui.theme import get_cached_qta_pixmap, get_theme_tokens
 from app.ui_texts import tr as tr_catalog
 from log.log import log
@@ -39,7 +43,7 @@ from dns.dns_providers import DNS_PROVIDERS
 from dns import page_plans as dns_page_plans
 from dns.ui.adapters import build_adapter_cards, refresh_adapter_cards
 from dns.ui.cards import DNSProviderCard
-from dns.ui.custom_dns_dialog import CustomDnsDialog
+from dns.ui.custom_dns_dialog import CustomDnsDialog, unique_copy_name
 from dns.ui.dns_build import build_auto_dns_ui, build_custom_dns_ui
 from dns.ui.page_build import build_network_page_shell
 from dns.ui.providers_build import build_provider_cards
@@ -346,20 +350,20 @@ class NetworkPage(BasePage):
             )
         if hasattr(self, "force_dns_custom_btn"):
             self.force_dns_custom_btn.setText(
-                self._tr("page.network.custom.button", "Свой DNS")
+                self._tr("page.network.custom.button", "Добавить свой DNS")
             )
             custom_description = self._tr(
                 "page.network.custom.button.description",
-                "Открывает окно, где можно добавить, изменить или удалить свои DNS серверы.",
+                "Открывает окно добавления нового DNS сервера.",
             )
             set_tooltip(self.force_dns_custom_btn, custom_description)
             set_state_text(
                 self.force_dns_custom_btn,
-                self._tr("page.network.custom.button.accessible_name", "Настроить свой DNS"),
+                self._tr("page.network.custom.button.accessible_name", "Добавить свой DNS"),
             )
             set_control_accessibility(
                 self.force_dns_custom_btn,
-                name=self._tr("page.network.custom.button.accessible_name", "Настроить свой DNS"),
+                name=self._tr("page.network.custom.button.accessible_name", "Добавить свой DNS"),
                 description=custom_description,
             )
 
@@ -490,6 +494,10 @@ class NetworkPage(BasePage):
         provider_cards = result["provider_cards"]
         self.dns_cards.update(provider_cards.dns_cards)
         self._dns_category_labels.extend(provider_cards.category_labels)
+        try:
+            self.dns_cards_layout.custom_provider_context_requested.connect(self._show_custom_dns_provider_menu)
+        except Exception:
+            pass
         self._update_dns_selection_state()
         try:
             self.loading_bar.stop()
@@ -731,14 +739,109 @@ class NetworkPage(BasePage):
         )
 
     def _open_custom_dns_dialog(self):
-        """Открывает окно управления своими DNS."""
-        dialog = CustomDnsDialog(
-            self,
-            servers=self._custom_dns_servers,
-        )
+        """Открывает окно добавления нового пользовательского DNS."""
+        dialog = CustomDnsDialog(self)
         if not dialog.exec():
             return
-        self._custom_dns_servers = set_custom_dns_servers(dialog.servers())
+        server = dialog.server()
+        if not server.get("id"):
+            return
+        self._custom_dns_servers = set_custom_dns_servers([*self._custom_dns_servers, server])
+        self._refresh_custom_dns_providers()
+
+    def _show_custom_dns_provider_menu(self, name: str, data: dict, global_pos) -> None:
+        index = self._custom_dns_server_index(
+            custom_id=str((data or {}).get("custom_id") or ""),
+            name=name,
+        )
+        if index < 0:
+            return
+
+        menu = RoundMenu(parent=self)
+        action_map: dict[object, str] = {}
+
+        def add_action(text: str, *, icon_name: str, command: str):
+            action = make_menu_action(text, icon=fluent_icon(icon_name), parent=menu)
+            menu.addAction(action)
+            menu_item = menu.view.item(menu.view.count() - 1)
+            if menu_item is not None:
+                menu_item.setData(Qt.ItemDataRole.AccessibleTextRole, text)
+                menu_item.setData(Qt.ItemDataRole.AccessibleDescriptionRole, text)
+            action_map[action] = command
+
+        add_action("Редактировать", icon_name="EDIT", command="edit")
+        add_action("Создать копию", icon_name="COPY", command="duplicate")
+        add_action("Копировать DNS", icon_name="COPY", command="copy")
+        menu.addSeparator()
+        add_action("Удалить", icon_name="DELETE", command="delete")
+
+        chosen = exec_popup_menu(menu, global_pos, owner=self, capture_action=True)
+        command = action_map.get(chosen, "")
+        if command == "edit":
+            self._edit_custom_dns_server(index)
+        elif command == "duplicate":
+            self._duplicate_custom_dns_server(index)
+        elif command == "copy":
+            self._copy_custom_dns_server(index)
+        elif command == "delete":
+            self._delete_custom_dns_server(index)
+
+    def _custom_dns_server_index(self, *, custom_id: str, name: str) -> int:
+        custom_id = str(custom_id or "").strip()
+        name = str(name or "").strip()
+        for index, server in enumerate(self._custom_dns_servers):
+            if custom_id and str(server.get("id") or "") == custom_id:
+                return index
+        for index, server in enumerate(self._custom_dns_servers):
+            if name and str(server.get("name") or "") == name:
+                return index
+        return -1
+
+    def _edit_custom_dns_server(self, index: int) -> None:
+        if not (0 <= index < len(self._custom_dns_servers)):
+            return
+        dialog = CustomDnsDialog(self, server=self._custom_dns_servers[index])
+        if not dialog.exec():
+            return
+        updated = dialog.server()
+        if not updated.get("id"):
+            return
+        servers = list(self._custom_dns_servers)
+        servers[index] = updated
+        self._custom_dns_servers = set_custom_dns_servers(servers)
+        self._refresh_custom_dns_providers()
+
+    def _duplicate_custom_dns_server(self, index: int) -> None:
+        if not (0 <= index < len(self._custom_dns_servers)):
+            return
+        server = dict(self._custom_dns_servers[index])
+        server["id"] = f"custom-{uuid4().hex[:12]}"
+        server["name"] = unique_copy_name(
+            str(server.get("name") or "Свой DNS"),
+            [str(item.get("name") or "") for item in self._custom_dns_servers],
+        )
+        self._custom_dns_servers = set_custom_dns_servers([*self._custom_dns_servers, server])
+        self._refresh_custom_dns_providers()
+
+    def _copy_custom_dns_server(self, index: int) -> None:
+        if not (0 <= index < len(self._custom_dns_servers)):
+            return
+        dns_values = [
+            str(item).strip()
+            for item in self._custom_dns_servers[index].get("ipv4", []) or []
+            if str(item).strip()
+        ]
+        if not dns_values:
+            return
+        clipboard = QApplication.clipboard()
+        if clipboard is not None:
+            clipboard.setText(", ".join(dns_values))
+
+    def _delete_custom_dns_server(self, index: int) -> None:
+        if not (0 <= index < len(self._custom_dns_servers)):
+            return
+        servers = [server for item_index, server in enumerate(self._custom_dns_servers) if item_index != index]
+        self._custom_dns_servers = set_custom_dns_servers(servers)
         self._refresh_custom_dns_providers()
 
     def _refresh_custom_dns_providers(self) -> None:
@@ -761,6 +864,10 @@ class NetworkPage(BasePage):
             pass
         try:
             self.dns_cards_layout.custom_selected.disconnect()
+        except Exception:
+            pass
+        try:
+            self.dns_cards_layout.custom_provider_context_requested.disconnect()
         except Exception:
             pass
         try:

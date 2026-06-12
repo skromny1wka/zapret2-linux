@@ -91,7 +91,7 @@ class CustomDnsAccessibilityTests(unittest.TestCase):
     def test_custom_dns_dialog_input_clear_buttons_do_not_take_tab_focus(self) -> None:
         parent = QWidget()
         self.addCleanup(parent.deleteLater)
-        dialog = CustomDnsDialog(parent, servers=[])
+        dialog = CustomDnsDialog(parent)
         self.addCleanup(dialog.deleteLater)
         dialog.nameEdit.setText("Мой DNS")
         dialog.primaryEdit.setText("8.8.8.8")

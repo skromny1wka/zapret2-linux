@@ -104,6 +104,35 @@ class DnsChoiceListTests(unittest.TestCase):
         self.assertTrue(event.isAccepted())
         self.assertEqual(selected, ["auto"])
 
+    def test_choice_list_context_menu_is_only_for_custom_dns_rows(self) -> None:
+        from dns.ui.choice_list import DnsChoiceListWidget
+
+        view = DnsChoiceListWidget()
+        regular = view.add_provider(
+            "Cloudflare",
+            {"desc": "Быстрый", "ipv4": ["1.1.1.1"], "ipv6": []},
+            show_ipv6=False,
+        )
+        custom = view.add_provider(
+            "Мой DNS",
+            {
+                "desc": "Пользовательский",
+                "ipv4": ["8.8.8.8"],
+                "ipv6": [],
+                "custom_id": "custom-1",
+            },
+            show_ipv6=False,
+        )
+        requested: list[tuple[str, dict]] = []
+        view.custom_provider_context_requested.connect(
+            lambda name, data, _pos: requested.append((name, data))
+        )
+
+        self.assertFalse(view._emit_custom_provider_context(regular.item, view.visualItemRect(regular.item).center()))
+        self.assertTrue(view._emit_custom_provider_context(custom.item, view.visualItemRect(custom.item).center()))
+        self.assertEqual(requested[0][0], "Мой DNS")
+        self.assertEqual(requested[0][1]["custom_id"], "custom-1")
+
 
 if __name__ == "__main__":
     unittest.main()
