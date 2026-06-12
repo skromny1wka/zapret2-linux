@@ -509,27 +509,23 @@ def wait_for_windivert_spawn_ready_runtime(
     interval = max(0.05, float(poll_interval))
     last_probe = WinDivertRuntimeProbeResult(installed=True, ready=True, error_code=None, stage="initial")
     restored_service_start_type = False
-    last_stale_services: list[str] = []
 
     while time.monotonic() < deadline:
         last_probe = probe_windivert_state_runtime()
         stale_services = find_stale_windivert_delete_pending_services_runtime()
         if stale_services:
-            if stale_services != last_stale_services:
-                log(
-                    "WinDivert service is still unloading after stop: "
-                    f"{','.join(stale_services)}",
-                    "WARNING",
-                )
-                last_stale_services = list(stale_services)
-            last_probe = WinDivertRuntimeProbeResult(
-                installed=True,
-                ready=False,
-                error_code=_ERROR_SERVICE_MARKED_FOR_DELETE,
-                stage=f"stale_delete_pending:{','.join(stale_services)}",
+            service_list = ",".join(stale_services)
+            log(
+                "WinDivert service is still unloading after stop; "
+                f"allowing winws2 to perform the real driver open: {service_list}",
+                "INFO",
             )
-            time.sleep(interval)
-            continue
+            return WinDivertRuntimeProbeResult(
+                installed=True,
+                ready=True,
+                error_code=_ERROR_SERVICE_MARKED_FOR_DELETE,
+                stage=f"stale_delete_pending_bypassed:{service_list}",
+            )
         if last_probe.ready:
             return last_probe
 

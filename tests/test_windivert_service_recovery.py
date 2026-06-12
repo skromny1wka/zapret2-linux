@@ -651,7 +651,7 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
             [f"{service_name}:7" for service_name in system_ops._KNOWN_WINDIVERT_SERVICES],
         )
 
-    def test_spawn_readiness_reports_running_disabled_delete_pending_monkey_as_not_ready(self) -> None:
+    def test_spawn_readiness_allows_delete_pending_monkey_for_fast_restart(self) -> None:
         from winws_runtime.runtime import system_ops
 
         ready_probe = system_ops.WinDivertRuntimeProbeResult(
@@ -668,35 +668,7 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
                 "find_stale_windivert_delete_pending_services_runtime",
                 return_value=["Monkey"],
             ),
-            patch.object(system_ops, "log"),
-        ):
-            result = system_ops.wait_for_windivert_spawn_ready_runtime(
-                max_wait_seconds=1.0,
-                poll_interval=0.001,
-            )
-
-        self.assertFalse(result.ready)
-        self.assertEqual(result.error_code, system_ops._ERROR_SERVICE_MARKED_FOR_DELETE)
-        self.assertEqual(result.stage, "stale_delete_pending:Monkey")
-
-    def test_spawn_readiness_waits_for_transient_delete_pending_monkey(self) -> None:
-        from winws_runtime.runtime import system_ops
-
-        ready_probe = system_ops.WinDivertRuntimeProbeResult(
-            installed=True,
-            ready=True,
-            error_code=None,
-            stage="network_open",
-        )
-
-        with (
-            patch.object(system_ops, "probe_windivert_state_runtime", return_value=ready_probe),
-            patch.object(
-                system_ops,
-                "find_stale_windivert_delete_pending_services_runtime",
-                side_effect=[["Monkey"], []],
-            ),
-            patch.object(system_ops.time, "sleep"),
+            patch.object(system_ops.time, "sleep") as sleep,
             patch.object(system_ops, "log"),
         ):
             result = system_ops.wait_for_windivert_spawn_ready_runtime(
@@ -705,7 +677,9 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
             )
 
         self.assertTrue(result.ready)
-        self.assertEqual(result.stage, "network_open")
+        self.assertEqual(result.error_code, system_ops._ERROR_SERVICE_MARKED_FOR_DELETE)
+        self.assertEqual(result.stage, "stale_delete_pending_bypassed:Monkey")
+        sleep.assert_not_called()
 
     def test_runner_treats_access_denied_readiness_as_transient_cleanup_case(self) -> None:
         from winws_runtime.runners import runner_base
