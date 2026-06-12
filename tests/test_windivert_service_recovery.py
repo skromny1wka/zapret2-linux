@@ -207,6 +207,25 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
 
         self.assertEqual(stale_services, ["Monkey"])
 
+    def test_disabled_delete_pending_service_is_stale_when_state_cannot_be_read(self) -> None:
+        from winws_runtime.runtime import system_ops
+
+        with (
+            patch.object(
+                system_ops,
+                "get_known_windivert_service_states_runtime",
+                return_value={"Monkey": None},
+            ),
+            patch.object(
+                system_ops,
+                "get_known_windivert_service_registry_flags_runtime",
+                return_value={"Monkey": {"start": system_ops._SERVICE_DISABLED, "delete_flag": 1}},
+            ),
+        ):
+            stale_services = system_ops.find_stale_windivert_delete_pending_services_runtime()
+
+        self.assertEqual(stale_services, ["Monkey"])
+
     def test_stop_pending_disabled_delete_pending_windivert_is_detected_as_stale(self) -> None:
         from winws_runtime.runtime import system_ops
 

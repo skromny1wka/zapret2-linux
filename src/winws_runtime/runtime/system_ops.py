@@ -137,9 +137,9 @@ def find_stale_windivert_delete_pending_services_runtime() -> list[str]:
         start_type = flags.get("start")
         delete_flag = flags.get("delete_flag")
         if (
-            state in (_SERVICE_RUNNING, _SERVICE_STOP_PENDING)
-            and start_type == _SERVICE_DISABLED
+            start_type == _SERVICE_DISABLED
             and int(delete_flag or 0) == 1
+            and state in (_SERVICE_RUNNING, _SERVICE_STOP_PENDING, None)
         ):
             stale.append(service_name)
 
