@@ -1915,6 +1915,7 @@ class ProfileSetupPageBase(BasePage):
             name="Файл списка profile",
             description="Путь к hostlist или ipset файлу для текущего profile.",
         )
+        remove_line_edit_buttons_from_tab_order(self._filter_value)
         settings_layout.addWidget(self._filter_value, 1)
 
         self._in_range_mode = CompactDisplayComboBox()
@@ -1932,6 +1933,7 @@ class ProfileSetupPageBase(BasePage):
             name="Значение in-range",
             description="Число или выражение для --in-range.",
         )
+        remove_line_edit_buttons_from_tab_order(self._in_range_value)
         settings_layout.addWidget(self._in_range_value)
 
         self._out_range_mode = CompactDisplayComboBox()
@@ -1949,6 +1951,7 @@ class ProfileSetupPageBase(BasePage):
             name="Значение out-range",
             description="Число или выражение для --out-range.",
         )
+        remove_line_edit_buttons_from_tab_order(self._out_range_value)
         settings_layout.addWidget(self._out_range_value)
 
         self._in_range_mode.currentIndexChanged.connect(
