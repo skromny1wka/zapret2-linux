@@ -174,6 +174,39 @@ class FolderContextMenuArchitectureTests(unittest.TestCase):
         self.assertEqual(dialog.cancelButton.accessibleName(), "Отменить переименование папки")
         self.assertEqual(dialog.cancelButton.property("screenReaderStateText"), "Отменить переименование папки")
 
+    def test_folder_name_dialog_clear_button_does_not_take_tab_focus(self) -> None:
+        dialogs = [
+            folder_context_menu.FolderNameDialog(
+                title="Создать папку",
+                subtitle="Создаёт папку для группировки пресетов.",
+                button_text="Создать",
+                parent=self._dialog_parent(),
+            ),
+            folder_context_menu.FolderNameDialog(
+                title="Переименовать папку",
+                subtitle="Меняет имя папки.",
+                button_text="Переименовать",
+                current_name="Видео",
+                parent=self._dialog_parent(),
+            ),
+        ]
+        for dialog in dialogs:
+            self.addCleanup(dialog.deleteLater)
+            dialog.nameEdit.setText("Видео")
+            dialog.show()
+        self.app.processEvents()
+
+        for dialog in dialogs:
+            with self.subTest(name=dialog.nameEdit.accessibleName()):
+                buttons = [
+                    child
+                    for child in dialog.nameEdit.findChildren(object)
+                    if str(getattr(child, "objectName", lambda: "")() or "") == "lineEditButton"
+                    and hasattr(child, "setFocusPolicy")
+                ]
+                self.assertTrue(buttons)
+                self.assertTrue(all(button.focusPolicy() == Qt.FocusPolicy.NoFocus for button in buttons))
+
     def test_delete_folder_dialog_buttons_are_named_for_screen_reader(self) -> None:
         labels = folder_context_menu.FolderMenuLabels(
             reset_title="Сбросить папки",

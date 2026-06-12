@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from PyQt6.QtCore import Qt
 from qfluentwidgets import BodyLabel, CaptionLabel, LineEdit, MessageBox, MessageBoxBase, RoundMenu, SubtitleLabel
 
-from ui.accessibility import set_control_accessibility, set_state_text
+from ui.accessibility import remove_line_edit_buttons_from_tab_order, set_control_accessibility, set_state_text
 from ui.fluent_widgets import style_semantic_caption_label
 from ui.message_box_accessibility import set_message_box_button_accessibility
 from ui.popup_menu import exec_popup_menu
@@ -82,6 +82,7 @@ class FolderNameDialog(MessageBoxBase):
             yes_description = "Создаёт папку."
             cancel_name = "Отменить создание папки"
         set_control_accessibility(self.nameEdit, name=name, description=description)
+        remove_line_edit_buttons_from_tab_order(self.nameEdit)
         set_state_text(self.yesButton, yes_name)
         set_control_accessibility(self.yesButton, name=yes_name, description=yes_description)
         set_state_text(self.cancelButton, cancel_name)
