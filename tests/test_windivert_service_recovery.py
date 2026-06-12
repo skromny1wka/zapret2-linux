@@ -271,6 +271,22 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
         self.assertEqual(diagnosis.win32_error, 1058)
         self.assertEqual(diagnosis.cause, "WinDivert service disabled")
 
+    def test_lua_compat_mismatch_is_reported_as_version_mismatch(self) -> None:
+        from winws_runtime.health import process_health_check
+
+        stderr = "\n".join(
+            (
+                "github version v1.0.1 lua_compat_ver 6",
+                "Error: LUA ERROR: /lua/zapret-lib.lua:4: Incompatible NFQWS2_COMPAT_VER. Use pktws and lua scripts from the same release !",
+            )
+        )
+
+        diagnosis = process_health_check.diagnose_winws_exit(87, stderr)
+
+        self.assertIsNotNone(diagnosis)
+        self.assertEqual(diagnosis.cause, "winws2.exe и Lua-скрипты от разных версий")
+        self.assertIn("Обновите папку lua", diagnosis.solution)
+
     def test_monkey_disabled_service_is_reported_as_windivert_driver_problem(self) -> None:
         from winws_runtime.health import process_health_check
 
@@ -746,6 +762,10 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
         runner = object.__new__(Winws2StrategyRunner)
         runner._last_spawn_exit_code = 87
         runner._last_spawn_stderr = ""
+        runner._should_retry_transient_windivert_service_error = Mock(return_value=False)
+        runner._is_windivert_system_error = Mock(return_value=False)
+        runner._is_windivert_conflict_error = Mock(return_value=False)
+        runner._aggressive_windivert_cleanup = Mock()
         runner._start_from_preset_file_locked = Mock(return_value=True)
 
         with patch.object(
@@ -762,6 +782,7 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
 
         self.assertFalse(retried)
         runner._start_from_preset_file_locked.assert_not_called()
+        runner._aggressive_windivert_cleanup.assert_called_once_with()
 
     def test_runtime_cleanup_keeps_windivert_service_running(self) -> None:
         from winws_runtime.runtime import runtime_api

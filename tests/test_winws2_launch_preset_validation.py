@@ -636,6 +636,7 @@ class Winws2LaunchPresetValidationTests(unittest.TestCase):
         runner._should_retry_transient_windivert_service_error = Mock(return_value=False)
         runner._is_windivert_system_error = Mock(return_value=False)
         runner._is_windivert_conflict_error = Mock(return_value=False)
+        runner._aggressive_windivert_cleanup = Mock()
         runner._start_from_preset_file_locked = Mock(return_value=True)
 
         with patch(
@@ -654,6 +655,7 @@ class Winws2LaunchPresetValidationTests(unittest.TestCase):
         self.assertFalse(retried)
         find_stale.assert_called_once_with()
         runner._start_from_preset_file_locked.assert_not_called()
+        runner._aggressive_windivert_cleanup.assert_called_once_with()
 
     def test_winws2_dry_run_artifact_stays_inside_at_config(self) -> None:
         from winws_runtime.runners.preset_runner_support import PreparedPresetArtifact

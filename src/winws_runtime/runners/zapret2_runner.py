@@ -1217,6 +1217,14 @@ class Winws2StrategyRunner(StrategyRunnerBase):
                 stable_start_window_seconds=stable_start_window_seconds,
             )
 
+        if stale_services:
+            log(
+                "WinDivert service stayed stale after failed winws2 start; "
+                f"cleaning without retry: {','.join(stale_services)}",
+                "WARNING",
+            )
+            self._aggressive_windivert_cleanup()
+
         if transient_service_retry:
             log(
                 "Transient WinDivert service error detected, retrying with aggressive cleanup",

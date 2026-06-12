@@ -873,6 +873,13 @@ def _handle_invalid_parameter(exit_code: int, stderr: str) -> WinDivertDiagnosis
     import re
     stderr_lower = (stderr or "").lower()
 
+    if "incompatible nfqws2_compat_ver" in stderr_lower:
+        return WinDivertDiagnosis(
+            cause="winws2.exe и Lua-скрипты от разных версий",
+            solution="Обновите папку lua вместе с winws2.exe или переустановите программу",
+            severity="critical",
+        )
+
     if "windivert" in stderr_lower and "error opening filter" in stderr_lower:
         if "the service cannot be started" in stderr_lower or "service is disabled" in stderr_lower:
             return _handle_service_disabled(exit_code, stderr)
