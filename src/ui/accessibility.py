@@ -67,6 +67,7 @@ def set_control_accessibility(
     set_accessible_name(widget, name)
     if description is not None:
         set_accessible_description(widget, description)
+    remove_line_edit_buttons_from_tab_order(widget)
     _sync_spinbox_children_accessibility(widget, name=name, description=description)
 
 

@@ -119,6 +119,27 @@ class AccessibilityHelpersTests(unittest.TestCase):
         self.assertTrue(buttons)
         self.assertTrue(all(button.focusPolicy() == Qt.FocusPolicy.NoFocus for button in buttons))
 
+    def test_set_control_accessibility_skips_line_edit_clear_button_in_tab_order(self) -> None:
+        from PyQt6.QtCore import Qt
+        from qfluentwidgets import LineEdit
+
+        from ui.accessibility import set_control_accessibility
+
+        line_edit = LineEdit()
+        self.addCleanup(line_edit.deleteLater)
+
+        set_control_accessibility(line_edit, name="Домен для белого списка")
+
+        buttons = [
+            child
+            for child in line_edit.findChildren(object)
+            if str(getattr(child, "objectName", lambda: "")() or "") == "lineEditButton"
+            and hasattr(child, "setFocusPolicy")
+        ]
+
+        self.assertTrue(buttons)
+        self.assertTrue(all(button.focusPolicy() == Qt.FocusPolicy.NoFocus for button in buttons))
+
     def test_set_state_text_marks_text_status_for_screen_reader(self) -> None:
         from ui.accessibility import set_state_text
 
@@ -176,6 +197,30 @@ class AccessibilityHelpersTests(unittest.TestCase):
 
         remove_line_edit_buttons_from_tab_order(search)
 
+        self.assertTrue(all(button.focusPolicy() == Qt.FocusPolicy.NoFocus for button in buttons))
+
+    def test_remove_line_edit_buttons_from_tab_order_handles_buttons_created_after_text_change(self) -> None:
+        from PyQt6.QtCore import Qt
+        from qfluentwidgets import SearchLineEdit
+
+        from ui.accessibility import remove_line_edit_buttons_from_tab_order
+
+        search = SearchLineEdit()
+        self.addCleanup(search.deleteLater)
+        search.setClearButtonEnabled(True)
+
+        remove_line_edit_buttons_from_tab_order(search)
+        search.setText("profile")
+        self._app.processEvents()
+
+        buttons = [
+            child
+            for child in search.findChildren(object)
+            if str(getattr(child, "objectName", lambda: "")() or "") == "lineEditButton"
+            and hasattr(child, "setFocusPolicy")
+        ]
+
+        self.assertTrue(buttons)
         self.assertTrue(all(button.focusPolicy() == Qt.FocusPolicy.NoFocus for button in buttons))
 
     def test_set_segmented_items_accessibility_marks_selected_item(self) -> None:
