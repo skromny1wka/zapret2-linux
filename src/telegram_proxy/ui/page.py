@@ -274,7 +274,7 @@ class TelegramProxyPage(BasePage):
         self._diag_layout = shell.diag_layout
 
         self.add_widget(self._pivot)
-        self.add_widget(self._stacked)
+        self.add_widget(self._stacked, stretch=1)
         self._stacked.setCurrentIndex(0)
         self._log_ui_timing("telegram_proxy_ui.setup_ui.total", started_at)
 

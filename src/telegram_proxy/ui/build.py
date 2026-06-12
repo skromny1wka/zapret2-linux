@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QSizePolicy, QStackedWidget
 from qfluentwidgets import FluentIcon
 
 from ui.accessibility import set_control_accessibility, set_state_text
@@ -73,6 +73,7 @@ def update_telegram_proxy_pivot_accessibility(pivot, *, current: object | None =
 def build_telegram_proxy_shell(*, segmented_widget_cls, parent, on_switch_tab) -> TelegramProxyShellWidgets:
     pivot = segmented_widget_cls(parent)
     stacked = QStackedWidget(parent)
+    stacked.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
     settings_panel = QWidget(stacked)
     settings_layout = QVBoxLayout(settings_panel)
@@ -81,12 +82,14 @@ def build_telegram_proxy_shell(*, segmented_widget_cls, parent, on_switch_tab) -
     stacked.addWidget(settings_panel)
 
     logs_panel = QWidget(stacked)
+    logs_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     logs_layout = QVBoxLayout(logs_panel)
     logs_layout.setContentsMargins(0, 0, 0, 0)
     logs_layout.setSpacing(8)
     stacked.addWidget(logs_panel)
 
     diag_panel = QWidget(stacked)
+    diag_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     diag_layout = QVBoxLayout(diag_panel)
     diag_layout.setContentsMargins(0, 0, 0, 0)
     diag_layout.setSpacing(8)
@@ -160,6 +163,7 @@ def build_telegram_proxy_logs_panel(
 
     log_edit = ScrollBlockingPlainTextEdit()
     log_edit.setReadOnly(True)
+    log_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     log_edit.setPlaceholderText("Лог подключений появится здесь...")
     set_control_accessibility(
         log_edit,
@@ -168,7 +172,7 @@ def build_telegram_proxy_logs_panel(
     )
     set_state_text(log_edit, "Лог Telegram Proxy: пока нет событий подключений")
     apply_text_line_limit(log_edit, TELEGRAM_PROXY_LOG_VIEW_MAX_LINES)
-    layout.addWidget(log_edit)
+    layout.addWidget(log_edit, 1)
 
     return TelegramProxyLogsWidgets(
         btn_copy_logs=btn_copy_logs,
@@ -229,6 +233,7 @@ def build_telegram_proxy_diag_panel(
 
     diag_edit = ScrollBlockingPlainTextEdit()
     diag_edit.setReadOnly(True)
+    diag_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     diag_edit.setPlaceholderText("Нажмите 'Запустить диагностику'...")
     set_control_accessibility(
         diag_edit,
@@ -237,7 +242,7 @@ def build_telegram_proxy_diag_panel(
     )
     set_state_text(diag_edit, "Результат диагностики Telegram Proxy: диагностика пока не запускалась")
     apply_text_line_limit(diag_edit, TELEGRAM_PROXY_DIAG_VIEW_MAX_LINES)
-    layout.addWidget(diag_edit)
+    layout.addWidget(diag_edit, 1)
 
     return TelegramProxyDiagWidgets(
         diag_desc_label=desc,

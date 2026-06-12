@@ -5,7 +5,7 @@ from types import SimpleNamespace
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication, QLabel, QSpinBox, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QLabel, QSizePolicy, QSpinBox, QVBoxLayout, QWidget
 from qfluentwidgets import (
     BodyLabel,
     CaptionLabel,
@@ -127,6 +127,49 @@ class TelegramProxyAccessibilityTests(unittest.TestCase):
             widgets.log_edit.property("screenReaderStateText"),
             "Лог Telegram Proxy: пока нет событий подключений",
         )
+
+    def test_logs_panel_expands_log_view_inside_page(self) -> None:
+        layout = self._layout()
+
+        widgets = build_telegram_proxy_logs_panel(
+            layout,
+            push_button_cls=PushButton,
+            on_copy_all_logs=lambda: None,
+            on_open_log_file=lambda: None,
+            on_clear_logs=lambda: None,
+        )
+
+        self.assertEqual(layout.stretch(layout.indexOf(widgets.log_edit)), 1)
+        self.assertEqual(
+            widgets.log_edit.sizePolicy().verticalPolicy(),
+            QSizePolicy.Policy.Expanding,
+        )
+
+    def test_shell_stacked_area_expands_between_tabs(self) -> None:
+        parent = QWidget()
+        self.addCleanup(parent.deleteLater)
+
+        widgets = build_telegram_proxy_shell(
+            segmented_widget_cls=SegmentedWidget,
+            parent=parent,
+            on_switch_tab=lambda _index: None,
+        )
+
+        self.assertEqual(
+            widgets.stacked.sizePolicy().verticalPolicy(),
+            QSizePolicy.Policy.Expanding,
+        )
+        self.assertEqual(
+            widgets.logs_panel.sizePolicy().verticalPolicy(),
+            QSizePolicy.Policy.Expanding,
+        )
+
+    def test_page_gives_stacked_tabs_remaining_height(self) -> None:
+        import inspect
+
+        source = inspect.getsource(TelegramProxyPage._setup_ui)
+
+        self.assertIn("self.add_widget(self._stacked, stretch=1)", source)
 
     def test_diagnostics_panel_controls_are_named_for_screen_reader(self) -> None:
         widgets = build_telegram_proxy_diag_panel(
