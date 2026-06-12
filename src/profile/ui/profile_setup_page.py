@@ -560,7 +560,7 @@ class ProfileStrategyListWidget(QWidget):
         self._states = next_states
         self._current_strategy_id = next_current_id
         self._rows_signature = next_signature
-        self._request_tree_rebuild()
+        self._request_tree_rebuild(immediate=True)
 
     def _can_update_strategy_rows_in_place(self, next_entries: dict, next_states: dict) -> bool:
         if set(self._entries.keys()) != set(next_entries.keys()):
@@ -745,7 +745,7 @@ class ProfileStrategyListWidget(QWidget):
     def _apply_filter(self) -> None:
         self._request_tree_rebuild()
 
-    def _request_tree_rebuild(self) -> None:
+    def _request_tree_rebuild(self, *, immediate: bool = False) -> None:
         runtime = self.__dict__.get("_strategy_filter_runtime")
         if runtime is None:
             self._rebuild_tree()
@@ -761,6 +761,13 @@ class ProfileStrategyListWidget(QWidget):
             str(self._current_strategy_id or "none").strip() or "none",
             search,
         )
+        if immediate:
+            try:
+                self._strategy_filter_timer.stop()
+            except Exception:
+                pass
+            self._run_debounced_tree_rebuild()
+            return
         try:
             self._strategy_filter_timer.start(120)
         except Exception:

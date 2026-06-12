@@ -2844,6 +2844,39 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         widget._rebuild_tree.assert_called_once()
         widget.set_current_strategy_id.assert_not_called()
 
+    def test_strategy_list_initial_rows_start_worker_without_search_delay(self) -> None:
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        widget = ProfileStrategyListWidget.__new__(ProfileStrategyListWidget)
+        widget._entries = {}
+        widget._states = {}
+        widget._current_strategy_id = "none"
+        widget._item_by_strategy_id = {}
+        widget._rows_signature = None
+        widget._strategy_filter_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+        widget._strategy_filter_state = LatestValueWorkerState(widget._strategy_filter_runtime, empty_value=None)
+        widget._strategy_filter_timer = SimpleNamespace(start=Mock())
+        widget._search = SimpleNamespace(text=Mock(return_value=""))
+        widget._run_debounced_tree_rebuild = Mock()
+        entries = {
+            "fake": SimpleNamespace(
+                name="Fake",
+                args="--lua-desync=fake",
+                visual=SimpleNamespace(icon_name="bolt", color="#fff", label="Fake", description="Fake TLS"),
+            )
+        }
+
+        ProfileStrategyListWidget.set_rows(
+            widget,
+            entries=entries,
+            states={},
+            current_strategy_id="fake",
+        )
+
+        widget._strategy_filter_timer.start.assert_not_called()
+        widget._run_debounced_tree_rebuild.assert_called_once()
+        self.assertEqual(widget._strategy_filter_state.pending[2:], ("fake", ""))
+
     def test_strategy_list_search_rebuild_is_debounced_through_worker(self) -> None:
         from ui.latest_value_worker_state import LatestValueWorkerState
 
