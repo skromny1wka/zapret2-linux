@@ -421,6 +421,36 @@ class AccessibilityHelpersTests(unittest.TestCase):
         self.assertTrue(enter_event.isAccepted())
         self.assertEqual(selected, ["second", "second"])
 
+    def test_segmented_keyboard_selection_refreshes_spoken_selected_state(self) -> None:
+        import os
+
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+        from PyQt6.QtCore import QEvent, Qt
+        from PyQt6.QtGui import QKeyEvent
+        from PyQt6.QtWidgets import QApplication
+        from qfluentwidgets import SegmentedWidget
+
+        from ui.segmented_accessibility import set_segmented_items_accessibility
+
+        app = QApplication.instance() or QApplication([])
+        self.assertIsNotNone(app)
+
+        widget = SegmentedWidget()
+        widget.addItem("first", "Первый")
+        widget.addItem("second", "Второй")
+        widget.setCurrentItem("first")
+
+        set_segmented_items_accessibility(widget, name="Раздел")
+
+        event = QKeyEvent(QEvent.Type.KeyPress, int(Qt.Key.Key_Right), Qt.KeyboardModifier.NoModifier)
+        QApplication.sendEvent(widget.items["first"], event)
+
+        self.assertTrue(event.isAccepted())
+        self.assertEqual(widget.currentRouteKey(), "second")
+        self.assertEqual(widget.items["first"].accessibleName(), "Раздел: Первый, не выбрано")
+        self.assertEqual(widget.items["second"].accessibleName(), "Раздел: Второй, выбрано")
+
     def test_combo_items_accessibility_updates_after_selection_change(self) -> None:
         from PyQt6.QtCore import Qt
         from qfluentwidgets import ComboBox

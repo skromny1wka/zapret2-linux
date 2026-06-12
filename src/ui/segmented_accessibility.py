@@ -6,6 +6,10 @@ from ui.accessibility import set_control_accessibility, set_state_text
 
 
 _FILTER_ATTR = "_zapretgui_segmented_keyboard_filter"
+_TITLE_ATTR = "_zapretgui_segmented_accessible_title"
+_LABELS_ATTR = "_zapretgui_segmented_accessible_labels"
+_SELECTED_WORD_ATTR = "_zapretgui_segmented_selected_word"
+_UNSELECTED_WORD_ATTR = "_zapretgui_segmented_unselected_word"
 
 
 def _clean_text(text: object) -> str:
@@ -73,6 +77,46 @@ def _set_segmented_focus(item: object) -> None:
                 pass
 
 
+def _refresh_segmented_items_accessibility(
+    widget,
+    *,
+    title: str,
+    labels: dict[str, object],
+    selected_word: str,
+    unselected_word: str,
+) -> None:
+    current_key = _segmented_current_key(widget)
+    items = _segmented_items(widget)
+    accessible_labels = {str(key): value for key, value in dict(labels or {}).items()}
+    for key, item in items.items():
+        try:
+            label = _clean_text(accessible_labels.get(str(key), item.text()))
+        except Exception:
+            label = ""
+        if not label:
+            continue
+        state = selected_word if str(key) == current_key else unselected_word
+        text = f"{title}: {label}, {state}"
+        set_control_accessibility(item, name=text)
+        set_state_text(item, text)
+
+
+def _refresh_segmented_items_accessibility_from_widget(widget) -> None:
+    title = _clean_text(getattr(widget, _TITLE_ATTR, ""))
+    if not title:
+        return
+    labels = getattr(widget, _LABELS_ATTR, {}) or {}
+    selected_word = _clean_text(getattr(widget, _SELECTED_WORD_ATTR, "")) or "выбрано"
+    unselected_word = _clean_text(getattr(widget, _UNSELECTED_WORD_ATTR, "")) or "не выбрано"
+    _refresh_segmented_items_accessibility(
+        widget,
+        title=title,
+        labels=dict(labels or {}),
+        selected_word=selected_word,
+        unselected_word=unselected_word,
+    )
+
+
 class _SegmentedKeyboardFilter(QObject):
     def __init__(self, widget) -> None:
         super().__init__(widget)
@@ -120,6 +164,7 @@ class _SegmentedKeyboardFilter(QObject):
         if not _click_segmented_item(widget, target_key, items):
             return False
         _set_segmented_focus(items[target_key])
+        _refresh_segmented_items_accessibility_from_widget(widget)
         event.accept()
         return True
 
@@ -155,21 +200,14 @@ def set_segmented_items_accessibility(
     title = _clean_text(name)
     if not title:
         return
-    current_key = _segmented_current_key(widget)
     items = _segmented_items(widget)
+    labels = dict(labels or {})
+    setattr(widget, _TITLE_ATTR, title)
+    setattr(widget, _LABELS_ATTR, labels)
+    setattr(widget, _SELECTED_WORD_ATTR, _clean_text(selected_word) or "выбрано")
+    setattr(widget, _UNSELECTED_WORD_ATTR, _clean_text(unselected_word) or "не выбрано")
     _ensure_segmented_keyboard_access(widget, items)
-    accessible_labels = {str(key): value for key, value in dict(labels or {}).items()}
-    for key, item in items.items():
-        try:
-            label = _clean_text(accessible_labels.get(str(key), item.text()))
-        except Exception:
-            label = ""
-        if not label:
-            continue
-        state = selected_word if str(key) == current_key else unselected_word
-        text = f"{title}: {label}, {state}"
-        set_control_accessibility(item, name=text)
-        set_state_text(item, text)
+    _refresh_segmented_items_accessibility_from_widget(widget)
 
 
 __all__ = ["set_segmented_items_accessibility"]
