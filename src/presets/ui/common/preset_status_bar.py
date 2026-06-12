@@ -199,6 +199,7 @@ class PresetStatusBar(QWidget):
         state_text = _preset_status_state_text(normalized_plan.text)
         set_state_text(self, state_text)
         set_state_text(self.text_label, state_text)
+        set_state_text(self.spinner, state_text)
         set_state_text(self.pulse_dot, state_text)
         self._apply_mode_style(mode)
 
@@ -279,6 +280,7 @@ class PresetStatusIcon(QWidget):
         set_tooltip(self, normalized_plan.text)
         state_text = _preset_status_state_text(normalized_plan.text)
         set_state_text(self, state_text)
+        set_state_text(self.spinner, state_text)
         set_state_text(self.pulse_dot, state_text)
         if indicator_changed:
             self.setVisible(indicator in {"spinner", "pulse", "dot"})

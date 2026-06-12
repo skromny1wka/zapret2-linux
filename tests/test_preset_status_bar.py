@@ -502,6 +502,34 @@ class PresetStatusBarPlanTests(unittest.TestCase):
         self.assertEqual(plan.mode, "busy")
         self.assertEqual(plan.indicator, "spinner")
 
+    def test_status_bar_spinner_exposes_preset_state_text(self) -> None:
+        from presets.ui.common.preset_status_bar import PresetStatusBar, build_preset_status_plan
+
+        status_bar = PresetStatusBar()
+        self.addCleanup(status_bar.deleteLater)
+
+        status_bar.set_plan(build_preset_status_plan("applying", launch_method=ZAPRET2_MODE))
+
+        self.assertEqual(
+            status_bar.spinner.property("screenReaderStateText"),
+            "Статус пресета: Применяем пресет...",
+        )
+        self.assertEqual(status_bar.spinner.accessibleName(), "Статус пресета: Применяем пресет...")
+
+    def test_title_status_icon_spinner_exposes_preset_state_text(self) -> None:
+        from presets.ui.common.preset_status_bar import PresetStatusIcon, build_preset_status_plan
+
+        icon = PresetStatusIcon(size=24)
+        self.addCleanup(icon.deleteLater)
+
+        icon.set_plan(build_preset_status_plan("applying", launch_method=ZAPRET2_MODE))
+
+        self.assertEqual(
+            icon.spinner.property("screenReaderStateText"),
+            "Статус пресета: Применяем пресет...",
+        )
+        self.assertEqual(icon.spinner.accessibleName(), "Статус пресета: Применяем пресет...")
+
     def test_runtime_state_overrides_loaded_text_while_preset_switch_is_busy(self) -> None:
         from presets.ui.common.preset_status_bar import build_runtime_preset_status_plan
 
