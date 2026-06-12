@@ -5,7 +5,7 @@ from __future__ import annotations
 from ipaddress import IPv4Address
 from uuid import uuid4
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtWidgets import QHBoxLayout, QListWidget, QListWidgetItem
 from qfluentwidgets import BodyLabel, CaptionLabel, LineEdit, MessageBoxBase, PushButton, SubtitleLabel
 
@@ -33,6 +33,7 @@ class CustomDnsDialog(MessageBoxBase):
         self.serversList = QListWidget(self.widget)
         self.serversList.setMinimumHeight(140)
         self.serversList.currentItemChanged.connect(self._on_current_item_changed)
+        self.serversList.installEventFilter(self)
 
         self.nameEdit = LineEdit(self.widget)
         self.nameEdit.setPlaceholderText("Название, например Мой DNS")
@@ -147,15 +148,18 @@ class CustomDnsDialog(MessageBoxBase):
         for row, server in enumerate(self._servers):
             item = QListWidgetItem(str(server.get("name") or "Свой DNS"))
             item.setData(Qt.ItemDataRole.UserRole, str(server.get("id") or ""))
+            item.setData(Qt.ItemDataRole.AccessibleTextRole, _server_accessible_text(server))
             self.serversList.addItem(item)
             if item.data(Qt.ItemDataRole.UserRole) == select_id:
                 selected_row = row
         self.serversList.blockSignals(False)
         if selected_row >= 0:
             self.serversList.setCurrentRow(selected_row)
+        self._update_servers_list_accessibility(self.serversList.currentItem())
         self._sync_buttons()
 
     def _on_current_item_changed(self, item, _previous) -> None:
+        self._update_servers_list_accessibility(item)
         if item is None:
             self._selected_id = ""
             self._clear_form()
@@ -186,8 +190,9 @@ class CustomDnsDialog(MessageBoxBase):
         set_control_accessibility(
             self.serversList,
             name="Список своих DNS",
-            description="Выберите DNS, чтобы изменить или удалить его.",
+            description="Выберите DNS стрелками вверх и вниз, затем нажмите Enter или Пробел, чтобы изменить его.",
         )
+        set_state_text(self.serversList, "Список своих DNS")
         set_control_accessibility(
             self.nameEdit,
             name="Название своего DNS",
@@ -228,6 +233,39 @@ class CustomDnsDialog(MessageBoxBase):
             description="Закрывает окно без применения изменений к странице.",
         )
 
+    def eventFilter(self, watched, event):  # noqa: N802
+        servers_list = getattr(self, "serversList", None)
+        if servers_list is not None and watched is servers_list:
+            if event.type() == QEvent.Type.FocusIn:
+                if self.serversList.currentItem() is None:
+                    self._focus_first_server()
+                self._update_servers_list_accessibility(self.serversList.currentItem())
+            elif event.type() == QEvent.Type.KeyPress and event.key() in (
+                Qt.Key.Key_Return,
+                Qt.Key.Key_Enter,
+                Qt.Key.Key_Space,
+            ):
+                item = self.serversList.currentItem()
+                if item is not None:
+                    self._on_current_item_changed(item, None)
+                    event.accept()
+                    return True
+        return super().eventFilter(watched, event)
+
+    def _focus_first_server(self) -> None:
+        if self.serversList.count() > 0:
+            self.serversList.setCurrentRow(0)
+
+    def _update_servers_list_accessibility(self, item) -> None:
+        text = str(item.data(Qt.ItemDataRole.AccessibleTextRole) or "").strip() if item is not None else ""
+        if text:
+            set_state_text(
+                self.serversList,
+                f"Список своих DNS: {text}. Нажмите Enter или Пробел, чтобы выбрать DNS для изменения.",
+            )
+            return
+        set_state_text(self.serversList, "Список своих DNS")
+
     def _show_warning(self, text: str) -> None:
         self.warningLabel.setText(text)
         self.warningLabel.show()
@@ -249,6 +287,14 @@ def _is_ipv4(value: str) -> bool:
     except Exception:
         return False
     return True
+
+
+def _server_accessible_text(server: dict) -> str:
+    name = str(server.get("name") or "Свой DNS").strip() or "Свой DNS"
+    ipv4 = [str(item).strip() for item in server.get("ipv4", []) or [] if str(item).strip()]
+    if ipv4:
+        return f"{name}, DNS {', '.join(ipv4)}"
+    return name
 
 
 __all__ = ["CustomDnsDialog"]

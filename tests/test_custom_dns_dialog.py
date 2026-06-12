@@ -5,6 +5,8 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtGui import QFocusEvent, QKeyEvent
 from PyQt6.QtWidgets import QApplication, QWidget
 
 
@@ -73,6 +75,38 @@ class CustomDnsDialogTests(unittest.TestCase):
 
         self.assertFalse(dialog.save_current())
         self.assertIn("IPv4", dialog.warningLabel.text())
+
+    def test_dialog_dns_list_reads_current_row_and_accepts_keyboard_selection(self) -> None:
+        from dns.ui.custom_dns_dialog import CustomDnsDialog
+
+        parent = QWidget()
+        parent.resize(640, 480)
+        dialog = CustomDnsDialog(
+            parent,
+            servers=[
+                {"id": "cloudflare", "name": "Cloudflare", "ipv4": ["1.1.1.1", "1.0.0.1"], "ipv6": []},
+            ],
+        )
+
+        self.assertIsNone(dialog.serversList.currentItem())
+
+        QApplication.sendEvent(
+            dialog.serversList,
+            QFocusEvent(QEvent.Type.FocusIn, Qt.FocusReason.TabFocusReason),
+        )
+
+        self.assertEqual(dialog.serversList.currentRow(), 0)
+        self.assertEqual(
+            dialog.serversList.property("screenReaderStateText"),
+            "Список своих DNS: Cloudflare, DNS 1.1.1.1, 1.0.0.1. "
+            "Нажмите Enter или Пробел, чтобы выбрать DNS для изменения.",
+        )
+
+        event = QKeyEvent(QEvent.Type.KeyPress, int(Qt.Key.Key_Space), Qt.KeyboardModifier.NoModifier)
+        QApplication.sendEvent(dialog.serversList, event)
+
+        self.assertTrue(event.isAccepted())
+        self.assertEqual(dialog.nameEdit.text(), "Cloudflare")
 
 
 if __name__ == "__main__":
