@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QVBoxLayout, QWidget
 from PyQt6.QtWidgets import QListWidget
 from qfluentwidgets import BodyLabel, CaptionLabel, ComboBox, LineEdit, PushButton, TransparentToolButton
@@ -122,6 +123,7 @@ class OrchestraAccessibilityTests(unittest.TestCase):
         self.assertEqual(page.search_input.accessibleName(), "Поиск по залоченным доменам")
         self.assertEqual(page.search_input.property("screenReaderStateText"), "Поиск по залоченным доменам")
         self.assertIn("После ввода перейдите к списку клавишей Tab", page.search_input.accessibleDescription())
+        self.assertIn("или нажмите Стрелка вниз", page.search_input.accessibleDescription())
         self.assertEqual(page.refresh_btn.accessibleName(), "Обновить список залоченных стратегий")
         self.assertEqual(
             page.refresh_btn.property("screenReaderStateText"),
@@ -143,6 +145,22 @@ class OrchestraAccessibilityTests(unittest.TestCase):
             page.strat_spin.property("screenReaderStateText"),
             "Номер стратегии для залочки, выбрано: 7",
         )
+
+    def test_locked_search_arrow_down_moves_focus_to_first_visible_row(self) -> None:
+        page = OrchestraLockedPage(orchestra_feature=_OrchestraFeatureStub())
+        self.addCleanup(page.deleteLater)
+        row = LockedDomainRow("example.com", 3, "tcp", page.rows_container)
+        page.rows_layout.addWidget(row)
+        page._domain_rows["example.com:tcp"] = row
+        page.show()
+        self.app.processEvents()
+        page.search_input.setFocus()
+        self.app.processEvents()
+
+        QTest.keyClick(page.search_input, Qt.Key.Key_Down)
+        self.app.processEvents()
+
+        self.assertIs(self.app.focusWidget(), row.strat_spin)
 
     def test_blocked_page_main_controls_are_named_for_screen_reader(self) -> None:
         page = OrchestraBlockedPage(orchestra_feature=_OrchestraFeatureStub())

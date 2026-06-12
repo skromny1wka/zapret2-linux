@@ -314,6 +314,7 @@ class OrchestraLockedPage(BasePage):
         self.search_input.setClearButtonEnabled(True)
         remove_line_edit_buttons_from_tab_order(self.search_input)
         self.search_input.textChanged.connect(self._filter_list)
+        self.search_input.installEventFilter(self)
         top_row.addWidget(self.search_input)
 
         # Кнопка обновления списка из settings.json
@@ -456,7 +457,7 @@ class OrchestraLockedPage(BasePage):
             name="Поиск по залоченным доменам",
             description=(
                 "Фильтрует список залоченных доменов по введённому тексту. "
-                "После ввода перейдите к списку клавишей Tab."
+                "После ввода перейдите к списку клавишей Tab или нажмите Стрелка вниз."
             ),
         )
         _set_named_state(self.search_input, "Поиск по залоченным доменам")
@@ -483,6 +484,24 @@ class OrchestraLockedPage(BasePage):
             pass
         self.proto_combo.currentIndexChanged.connect(self._update_accessibility_state)
         self.strat_spin.valueChanged.connect(self._update_accessibility_state)
+
+    def eventFilter(self, watched, event):  # noqa: N802
+        if watched is getattr(self, "search_input", None) and event.type() == QEvent.Type.KeyPress:
+            if event.key() == Qt.Key.Key_Down and self._focus_first_visible_row_control():
+                event.accept()
+                return True
+        return super().eventFilter(watched, event)
+
+    def _focus_first_visible_row_control(self) -> bool:
+        for row in self._domain_rows.values():
+            if row is None or not row.isVisible():
+                continue
+            target = getattr(row, "strat_spin", None)
+            if target is None:
+                continue
+            target.setFocus(Qt.FocusReason.OtherFocusReason)
+            return True
+        return False
 
     def _update_accessibility_state(self, *_args) -> None:
         selected_proto = str(self.proto_combo.currentText() or "").strip() or "не выбрано"
