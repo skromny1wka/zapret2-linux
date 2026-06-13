@@ -18,11 +18,13 @@ from profile.service import ProfilePresetService
 class _PresetStore:
     def __init__(self, text: str) -> None:
         self.text = text
+        self.save_count = 0
 
     def read_selected_preset_source(self, _launch_method: str):
         return self.text, SimpleNamespace(file_name="selected.txt", name="selected")
 
     def save_selected_preset_source(self, _launch_method: str, text: str) -> None:
+        self.save_count += 1
         self.text = text
 
 
@@ -150,7 +152,7 @@ class ProfileListPayloadTests(unittest.TestCase):
         self.assertFalse(discord.in_preset)
         self.assertTrue(discord.key.startswith("template:"))
 
-    def test_list_profiles_normalizes_multi_list_profile_and_saves_preset(self) -> None:
+    def test_list_profiles_normalizes_multi_list_profile_without_saving_preset(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             lists_dir = root / "lists"
@@ -160,18 +162,17 @@ class ProfileListPayloadTests(unittest.TestCase):
             templates_dir = root / "profile" / "templates"
             templates_dir.mkdir(parents=True)
             (templates_dir / "all_profiles.txt").write_text("", encoding="utf-8")
-            store = _PresetStore(
-                "\n".join(
-                    (
-                        "--filter-tcp=80,443",
-                        "--hostlist=lists/discord.txt",
-                        "--hostlist=lists/other.txt",
-                        "--hostlist-exclude=lists/list-exclude.txt",
-                        "--lua-desync=pass",
-                        "",
-                    )
+            original_text = "\n".join(
+                (
+                    "--filter-tcp=80,443",
+                    "--hostlist=lists/discord.txt",
+                    "--hostlist=lists/other.txt",
+                    "--hostlist-exclude=lists/list-exclude.txt",
+                    "--lua-desync=pass",
+                    "",
                 )
             )
+            store = _PresetStore(original_text)
             feature = SimpleNamespace(
                 _presets_feature=store,
                 _app_paths=AppPaths(user_root=root, local_root=root),
@@ -183,10 +184,10 @@ class ProfileListPayloadTests(unittest.TestCase):
         self.assertEqual(payload.normalized_split_profiles, 1)
         self.assertEqual(payload.normalized_created_profiles, 1)
         self.assertEqual(len(payload.items), 2)
-        self.assertIn("--new", store.text)
-        self.assertIn("--hostlist=lists/discord.txt", store.text)
-        self.assertIn("--hostlist=lists/other.txt", store.text)
-        self.assertNotIn("--hostlist-exclude=lists/list-exclude.txt", store.text)
+        self.assertEqual(store.save_count, 0)
+        self.assertEqual(store.text, original_text)
+        self.assertTrue(any("--hostlist=lists/discord.txt" in item.match_lines for item in payload.items))
+        self.assertTrue(any("--hostlist=lists/other.txt" in item.match_lines for item in payload.items))
 
     def test_service_exceptions_profile_from_all_profiles_is_hidden_and_not_split(self) -> None:
         with TemporaryDirectory() as temp_dir:

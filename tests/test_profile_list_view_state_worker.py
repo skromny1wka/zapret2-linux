@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import inspect
 import unittest
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
 
 class ProfileListViewStateWorkerTests(unittest.TestCase):
@@ -25,6 +27,32 @@ class ProfileListViewStateWorkerTests(unittest.TestCase):
         self.assertIn("profile.list_view_state", worker_source)
         self.assertNotIn("profile.ui.profile_list_model", warm_source)
         self.assertNotIn("profile.ui.profile_list_model", worker_source)
+
+    def test_profile_feature_logs_when_warm_cache_is_used(self) -> None:
+        from app.feature_facades.profile import ProfileFeature
+        from settings.mode import ZAPRET2_MODE
+
+        payload = object()
+        feature = ProfileFeature(SimpleNamespace(), SimpleNamespace())
+        feature._profile_list_load_result_cache[ZAPRET2_MODE] = SimpleNamespace(payload=payload)
+        service = SimpleNamespace(get_cached_profile_list=Mock(return_value=payload))
+
+        with patch("app.feature_facades.profile.log") as log_mock:
+            self.assertIs(feature._profile_list_load_result(service, ZAPRET2_MODE).payload, payload)
+
+        self.assertTrue(any("кэш профилей использован" in str(call.args[0]) for call in log_mock.call_args_list))
+
+    def test_profile_feature_logs_when_warm_cache_is_not_suitable(self) -> None:
+        from app.feature_facades.profile import ProfileFeature
+        from settings.mode import ZAPRET2_MODE
+
+        feature = ProfileFeature(SimpleNamespace(), SimpleNamespace())
+        service = SimpleNamespace(get_cached_profile_list=Mock(return_value=None))
+
+        with patch("app.feature_facades.profile.log") as log_mock:
+            self.assertIsNone(feature._profile_list_load_result(service, ZAPRET2_MODE))
+
+        self.assertTrue(any("кэш профилей не подошёл" in str(call.args[0]) for call in log_mock.call_args_list))
 
     def test_preset_setup_page_applies_worker_view_state_to_profile_list(self) -> None:
         from profile.ui.preset_setup_page import PresetSetupPageBase

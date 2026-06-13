@@ -273,7 +273,11 @@ class ProfilePresetService:
         self._log_timing("profile_feature.profiles.normalize", normalize_started_at)
         if normalization.changed:
             preset = normalization.preset
-            self.save_selected_preset(preset)
+            self._selected_preset_snapshot = _SelectedPresetSnapshot(
+                revision=preset_revision,
+                preset=preset,
+                manifest=manifest,
+            )
 
         catalogs_started_at = time.perf_counter()
         catalogs = load_strategy_catalogs(self._app_paths, self._engine)

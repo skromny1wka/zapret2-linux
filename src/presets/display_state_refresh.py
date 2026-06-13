@@ -31,6 +31,13 @@ class PresetProfileStrategySummaryWorker(QThread):
 
     def run(self) -> None:
         try:
+            warm_profile_list = getattr(self._profile_feature, "warm_profile_list", None)
+            if callable(warm_profile_list):
+                try:
+                    warm_profile_list(self._method)
+                except Exception as exc:
+                    log(f"PresetProfileStrategySummaryWorker: прогрев профилей не выполнен: {exc}", "DEBUG")
+
             from presets.display_state import resolve_profile_strategy_display_state
 
             result = resolve_profile_strategy_display_state(

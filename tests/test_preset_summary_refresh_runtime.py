@@ -27,6 +27,31 @@ class PresetSummaryRefreshRuntimeTests(unittest.TestCase):
         self.assertIn("_summary_runtime.stop", cleanup_source)
         self.assertIn("_summary_runtime.cancel", cleanup_source)
 
+    def test_summary_worker_warms_profile_list_before_resolving_summary(self) -> None:
+        from presets.display_state import ProfileStrategyDisplayState
+        from presets.display_state_refresh import PresetProfileStrategySummaryWorker
+        from settings.mode import ZAPRET2_MODE
+
+        events: list[str] = []
+        profile_feature = SimpleNamespace(
+            warm_profile_list=Mock(side_effect=lambda _method: events.append("warm")),
+            get_profile_strategy_display_state=Mock(
+                side_effect=lambda _method, max_items=2: (
+                    events.append("summary") or ProfileStrategyDisplayState(summary="OVH UDP", active_count=1)
+                )
+            ),
+        )
+        worker = PresetProfileStrategySummaryWorker(
+            1,
+            method=ZAPRET2_MODE,
+            profile_feature=profile_feature,
+        )
+
+        worker.run()
+
+        self.assertEqual(events, ["warm", "summary"])
+        profile_feature.warm_profile_list.assert_called_once_with(ZAPRET2_MODE)
+
     def test_summary_refresh_queue_lives_in_latest_worker_state(self) -> None:
         from presets.display_state_refresh import PresetProfileStrategySummaryRefreshRuntime
         from ui.latest_value_worker_state import LatestValueWorkerState

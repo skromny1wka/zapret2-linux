@@ -4,6 +4,7 @@ import threading
 from dataclasses import dataclass, field
 from typing import Any
 
+from log.log import log
 from profile.key_resolution import PresetProfileMoveResult
 from profile.state import StrategyApplyResult
 
@@ -69,15 +70,23 @@ class ProfileFeature:
         from settings.mode import normalize_launch_method
 
         method = normalize_launch_method(launch_method)
-        current_payload = service.get_cached_profile_list()
+        try:
+            current_payload = service.get_cached_profile_list()
+        except Exception as exc:
+            log(f"кэш профилей не подошёл ({method}): не удалось проверить актуальность: {exc}", "DEBUG")
+            return None
         if current_payload is None:
+            log(f"кэш профилей не подошёл ({method}): нет актуального списка", "DEBUG")
             return None
         with self._profile_list_load_result_lock:
             result = self._profile_list_load_result_cache.get(method)
         if result is None:
+            log(f"кэш профилей не подошёл ({method}): прогретый результат не найден", "DEBUG")
             return None
         if getattr(result, "payload", None) is not current_payload:
+            log(f"кэш профилей не подошёл ({method}): версия списка изменилась", "DEBUG")
             return None
+        log(f"кэш профилей использован ({method})", "DEBUG")
         return result
 
     def list_preset_order_profiles(self, launch_method: str):
