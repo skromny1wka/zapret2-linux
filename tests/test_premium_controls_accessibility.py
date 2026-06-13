@@ -391,6 +391,17 @@ class PremiumControlsAccessibilityTests(unittest.TestCase):
             "Статус Premium: Premium активен. Осталось 7 дней",
         )
 
+    def test_premium_status_card_exposes_initial_empty_state(self) -> None:
+        card = StatusCard()
+        self.addCleanup(card.deleteLater)
+
+        self.assertEqual(card.accessibleName(), "Статус Premium: статус пока не загружен")
+        self.assertEqual(
+            card.property("screenReaderStateText"),
+            "Статус Premium: статус пока не загружен",
+        )
+        self.assertIn("Premium", card.accessibleDescription())
+
 
 if __name__ == "__main__":
     unittest.main()

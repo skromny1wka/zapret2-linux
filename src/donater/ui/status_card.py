@@ -5,7 +5,7 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QSizePolicy
 
-from ui.accessibility import set_state_text
+from ui.accessibility import set_control_accessibility, set_state_text
 
 
 class StatusCard(QFrame):
@@ -63,8 +63,15 @@ class StatusCard(QFrame):
 
         spoken_parts = [str(text or "").strip(), str(details or "").strip()]
         spoken_text = ". ".join(part for part in spoken_parts if part)
-        if spoken_text:
-            set_state_text(self, f"Статус Premium: {spoken_text}")
+        if not spoken_text:
+            spoken_text = "статус пока не загружен"
+        state_text = f"Статус Premium: {spoken_text}"
+        set_control_accessibility(
+            self,
+            name=state_text,
+            description="Показывает состояние Premium-подписки и срок действия.",
+        )
+        set_state_text(self, state_text)
 
         self.setStyleSheet(f"""
             StatusCard {{
