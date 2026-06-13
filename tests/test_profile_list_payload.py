@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import patch
 
 from core.paths import AppPaths
+from profile.display_items import build_profile_display_items
 from profile.list_view_state import ordered_group_keys
 from profile.strategy_state import ProfileStrategyState
 from profile.service import ProfilePresetService
@@ -314,6 +315,10 @@ class ProfileListPayloadTests(unittest.TestCase):
     def test_cached_profile_payload_is_kept_per_selected_preset_revision(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
+            lists_dir = root / "lists"
+            lists_dir.mkdir()
+            (lists_dir / "facebook.txt").write_text("", encoding="utf-8")
+            (lists_dir / "ipset-facebook.txt").write_text("", encoding="utf-8")
             templates_dir = root / "profile" / "templates"
             templates_dir.mkdir(parents=True)
             (templates_dir / "all_profiles.txt").write_text("", encoding="utf-8")
@@ -374,6 +379,10 @@ class ProfileListPayloadTests(unittest.TestCase):
     def test_profile_payload_cache_drops_oldest_revision_after_limit(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
+            lists_dir = root / "lists"
+            lists_dir.mkdir()
+            (lists_dir / "facebook.txt").write_text("", encoding="utf-8")
+            (lists_dir / "ipset-facebook.txt").write_text("", encoding="utf-8")
             templates_dir = root / "profile" / "templates"
             templates_dir.mkdir(parents=True)
             (templates_dir / "all_profiles.txt").write_text("", encoding="utf-8")
@@ -684,7 +693,7 @@ class ProfileListPayloadTests(unittest.TestCase):
         self.assertTrue(payload.items[0].in_preset)
         self.assertIn("--hostlist=lists/googlevideo.txt", payload.items[0].match_lines)
 
-    def test_unnamed_preset_profile_uses_matching_template_display_name(self) -> None:
+    def test_unnamed_preset_profile_keeps_preset_inferred_display_name(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             templates_dir = root / "profile" / "templates"
@@ -721,10 +730,11 @@ class ProfileListPayloadTests(unittest.TestCase):
 
         self.assertEqual(len(payload.items), 1)
         self.assertTrue(payload.items[0].in_preset)
-        self.assertEqual(payload.items[0].display_name, "Facebook")
         self.assertEqual(payload.items[0].profile_name, "")
+        self.assertEqual(payload.items[0].display_name, "TCP 80,443 • hostlist facebook.txt")
+        self.assertNotEqual(payload.items[0].display_name, "Facebook")
 
-    def test_lowercase_preset_profile_name_uses_template_case_for_display_only(self) -> None:
+    def test_lowercase_preset_profile_name_wins_over_template_case(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             templates_dir = root / "profile" / "templates"
@@ -761,8 +771,10 @@ class ProfileListPayloadTests(unittest.TestCase):
                 payload = ProfilePresetService(feature, "zapret2_mode").list_profiles()
 
         self.assertEqual(len(payload.items), 1)
-        self.assertEqual(payload.items[0].display_name, "Facebook")
+        self.assertEqual(payload.items[0].display_name, "facebook")
         self.assertEqual(payload.items[0].profile_name, "facebook")
+        display_items = build_profile_display_items(payload.items)
+        self.assertEqual(display_items[0].display_name, "facebook")
 
     def test_profile_folder_does_not_depend_on_preset_membership(self) -> None:
         with TemporaryDirectory() as temp_dir:

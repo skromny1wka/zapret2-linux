@@ -12,7 +12,6 @@ class ProfileListSource:
     in_preset: bool
     order: int
     user_template_key: str = ""
-    display_name_override: str = ""
 
 
 def build_profile_list_sources(
@@ -149,7 +148,6 @@ def _select_source(candidates: list[ProfileListSource]) -> ProfileListSource:
     if preset_sources:
         preset_sources.sort(key=lambda source: (not source.profile.enabled, source.profile.index))
         selected = preset_sources[0]
-        display_name_override = _template_display_name_for_selected_preset_source(selected, candidates)
         if user_template_key and not selected.user_template_key:
             return ProfileListSource(
                 key=selected.key,
@@ -157,16 +155,6 @@ def _select_source(candidates: list[ProfileListSource]) -> ProfileListSource:
                 in_preset=selected.in_preset,
                 order=selected.order,
                 user_template_key=user_template_key,
-                display_name_override=display_name_override,
-            )
-        if display_name_override and not selected.display_name_override:
-            return ProfileListSource(
-                key=selected.key,
-                profile=selected.profile,
-                in_preset=selected.in_preset,
-                order=selected.order,
-                user_template_key=selected.user_template_key,
-                display_name_override=display_name_override,
             )
         return selected
 
@@ -189,25 +177,3 @@ def _template_kind_rank(profile: Profile) -> int:
     if profile.match.ipset_lines or profile.match.ipset_exclude_lines:
         return 1
     return 2
-
-
-def _template_display_name_for_selected_preset_source(
-    selected: ProfileListSource,
-    candidates: list[ProfileListSource],
-) -> str:
-    template_names = [
-        str(getattr(source.profile, "name", "") or getattr(source.profile, "display_name", "") or "").strip()
-        for source in candidates
-        if not source.in_preset
-    ]
-    selected_name = str(getattr(selected.profile, "name", "") or "").strip()
-    if selected_name:
-        return next(
-            (
-                name
-                for name in template_names
-                if name and name.casefold() == selected_name.casefold() and name != selected_name
-            ),
-            "",
-        )
-    return next((name for name in template_names if name), "")

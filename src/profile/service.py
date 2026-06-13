@@ -284,7 +284,6 @@ class ProfilePresetService:
                 order=source.order,
                 folder_state=folder_state,
                 user_template_key=getattr(source, "user_template_key", ""),
-                display_name_override=getattr(source, "display_name_override", ""),
             )
             items.append(item)
         self._log_timing("profile_feature.profile_list_item.build", items_started_at)
@@ -430,7 +429,6 @@ class ProfilePresetService:
             key=source.key,
             order=source.order,
             user_template_key=getattr(source, "user_template_key", ""),
-            display_name_override=getattr(source, "display_name_override", ""),
         )
         strategy_entries = dict(_basic_strategy_entries(profile, catalogs))
         match_summary = _match_summary(profile, list_type=item.list_type)
@@ -1240,7 +1238,6 @@ class ProfilePresetService:
         order: int | None = None,
         folder_state: dict | None = None,
         user_template_key: str = "",
-        display_name_override: str = "",
     ) -> ProfileListItem:
         strategy_entries = _basic_strategy_entries(profile, catalogs)
         strategy_branches = _strategy_branches_for_profile(profile, strategy_entries)
@@ -1258,12 +1255,11 @@ class ProfilePresetService:
             if effective_strategy_id not in {"", "none", "custom"}
             else ProfileStrategyState()
         )
-        visible_name = str(display_name_override or "").strip()
         return ProfileListItem(
             key=key or profile.key,
             persistent_key=profile.persistent_key,
             profile_index=profile.index if in_preset else -1,
-            display_name=visible_name or profile.display_name,
+            display_name=profile.display_name,
             enabled=profile.enabled if in_preset else False,
             in_preset=in_preset,
             strategy_id=effective_strategy_id,
@@ -1279,7 +1275,6 @@ class ProfilePresetService:
             group_collapsed=profile_folder_collapsed(folder_key, folder_state),
             user_profile_id=_user_profile_id_from_template_key(user_template_key),
             profile_name=profile.name,
-            display_name_override=visible_name,
             strategy_branches=strategy_branches,
         )
 
