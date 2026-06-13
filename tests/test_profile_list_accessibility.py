@@ -225,6 +225,27 @@ class ProfileListAccessibilityTests(unittest.TestCase):
         self.assertIn("Список профилей:", widget._view.property("screenReaderStateText"))
         self.assertIn("YouTube", widget._view.property("screenReaderStateText"))
 
+    def test_profile_list_empty_loaded_state_is_read_for_screen_reader(self) -> None:
+        from profile.list_view_state import build_profile_list_view_state
+        from profile.ui.profiles_list import ProfilesList
+
+        widget = ProfilesList()
+        self.addCleanup(widget.deleteLater)
+
+        state = build_profile_list_view_state(
+            (),
+            active_profile_types={"all"},
+            search_query="",
+            group_expanded={},
+        )
+        widget.apply_view_state(state)
+
+        self.assertEqual(widget._model.rowCount(), 0)
+        self.assertEqual(widget.accessibleName(), "Список профилей: список пуст")
+        self.assertEqual(widget.property("screenReaderStateText"), "Список профилей: список пуст")
+        self.assertEqual(widget._view.accessibleName(), "Список профилей: список пуст")
+        self.assertEqual(widget._view.property("screenReaderStateText"), "Список профилей: список пуст")
+
     def test_profile_list_opens_selected_profile_menu_from_keyboard(self) -> None:
         from profile.ui.profile_list_model import ProfileListModel
         from profile.ui.profile_list_view import ProfileListView

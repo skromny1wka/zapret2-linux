@@ -232,9 +232,20 @@ class ProfilesList(QWidget):
         except Exception:
             pass
         self._model.apply_view_state(view_state)
-        if not self._view.currentIndex().isValid() and self._model.rowCount() > 0:
+        if self._model.rowCount() <= 0:
+            state_text = self._empty_profile_list_state_text()
+            set_state_text(self, state_text)
+            set_state_text(self._view, state_text)
+        elif not self._view.currentIndex().isValid():
             self._view.setCurrentIndex(self._model.index(0, 0))
         self._view_state_items = None
+
+    def _empty_profile_list_state_text(self) -> str:
+        if str(self._search_query or "").strip():
+            return "Список профилей: по фильтру ничего не найдено"
+        if self._active_profile_types and "all" not in self._active_profile_types:
+            return "Список профилей: по выбранным типам ничего не найдено"
+        return "Список профилей: список пуст"
 
     def view_state_options(self) -> dict[str, Any]:
         options = self._model.view_state_options()
