@@ -27,6 +27,8 @@ from qfluentwidgets import (
 )
 
 _HAS_INFO_BADGE = InfoBadge is not None and _InfoLevel is not None
+_TOGGLE_ON_TEXT = "Вкл."
+_TOGGLE_OFF_TEXT = "Выкл."
 
 
 def _should_use_info_badge(info_badge_cls=InfoBadge, info_level_cls=_InfoLevel) -> bool:
@@ -112,6 +114,7 @@ class Win11ToggleRow(FluentSettingCard):
         self._desc_label = getattr(self, "contentLabel", None)
 
         self._switch_button = SwitchButton(self)
+        self._apply_switch_texts()
         self._apply_text_styles(initial_tokens)
 
         if self._switch_button is not None:
@@ -184,6 +187,16 @@ class Win11ToggleRow(FluentSettingCard):
 
     def _apply_text_styles(self, tokens=None) -> None:
         _apply_setting_card_text_styles(self._title_label, self._desc_label, tokens)
+
+    def _apply_switch_texts(self) -> None:
+        toggle = getattr(self, "_switch_button", None)
+        if toggle is None:
+            return
+        try:
+            toggle.setOnText(_TOGGLE_ON_TEXT)
+            toggle.setOffText(_TOGGLE_OFF_TEXT)
+        except Exception:
+            pass
 
     def setChecked(self, checked: bool, block_signals: bool = False):
         toggle = getattr(self, "_switch_button", None)

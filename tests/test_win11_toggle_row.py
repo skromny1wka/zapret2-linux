@@ -216,6 +216,23 @@ class Win11ToggleRowTests(unittest.TestCase):
         self.assertIn("Запускать DPI после старта программы", row.accessibleDescription())
         self.assertEqual(row._switch_button.accessibleName(), "Автозапуск DPI, выключено")
 
+    def test_toggle_row_uses_russian_visible_switch_text(self) -> None:
+        from ui.widgets.win11_controls import Win11ToggleRow
+
+        row = Win11ToggleRow(
+            "fa5s.bolt",
+            "Автозапуск DPI",
+            "Запускать DPI после старта программы",
+        )
+
+        self.assertEqual(row._switch_button.getOnText(), "Вкл.")
+        self.assertEqual(row._switch_button.getOffText(), "Выкл.")
+        self.assertEqual(row._switch_button.getText(), "Выкл.")
+
+        row.setChecked(True)
+
+        self.assertEqual(row._switch_button.getText(), "Вкл.")
+
     def test_toggle_row_internal_indicator_is_skipped_in_tab_order(self) -> None:
         from ui.widgets.win11_controls import Win11ToggleRow
 
