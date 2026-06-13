@@ -268,16 +268,16 @@ def build_provider_dns_plan(
     ipv6_available: bool,
 ) -> NetworkProviderDnsPlan:
     ipv4 = normalize_dns_list(data.get("ipv4", []))
-    if not ipv4:
+    ipv6 = normalize_dns_list(data.get("ipv6", [])) if ipv6_available else []
+    if not ipv4 and not ipv6:
         return NetworkProviderDnsPlan(
             valid=False,
             ipv4=[],
             ipv6=[],
             log_level="WARNING",
-            log_message=f"DNS: у провайдера {name} нет IPv4 адресов",
+            log_message=f"DNS: у провайдера {name} нет DNS адресов для текущей системы",
         )
 
-    ipv6 = normalize_dns_list(data.get("ipv6", [])) if ipv6_available else []
     return NetworkProviderDnsPlan(
         valid=True,
         ipv4=ipv4,

@@ -128,12 +128,14 @@ def apply_provider_dns(
     dns_manager = _get_dns_manager()
     success_count = 0
     for adapter in adapters:
-        ok_v4, _ = dns_manager.set_custom_dns(
-            adapter,
-            ipv4[0],
-            ipv4[1] if len(ipv4) > 1 else None,
-            "IPv4",
-        )
+        ok_v4 = True
+        if ipv4:
+            ok_v4, _ = dns_manager.set_custom_dns(
+                adapter,
+                ipv4[0],
+                ipv4[1] if len(ipv4) > 1 else None,
+                "IPv4",
+            )
         ok_v6 = True
         if ipv6_available and ipv6:
             ok_v6, _ = dns_manager.set_custom_dns(

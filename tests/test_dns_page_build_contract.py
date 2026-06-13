@@ -180,6 +180,32 @@ class DnsPageBuildContractTests(unittest.TestCase):
         self.assertEqual([server["name"] for server in page._custom_dns_servers], ["Мой DNS"])
         self.assertIn("Мой DNS", page.dns_cards)
 
+    def test_network_page_custom_dns_dialog_receives_detected_ipv6_availability(self) -> None:
+        from dns.ui.page import NetworkPage
+
+        dns_feature = SimpleNamespace(
+            normalize_adapter_alias=lambda value: str(value),
+            consume_warmed_page_data=lambda: None,
+            create_page_load_worker=lambda request_id, parent=None: None,
+        )
+
+        with (
+            patch("dns.ui.page.get_custom_dns_servers", return_value=[]),
+            patch("dns.ui.page.set_custom_dns_servers", side_effect=lambda value: value),
+            patch(
+                "dns.ui.page.CustomDnsDialog",
+                return_value=_FakeCustomDnsDialog(
+                    {"id": "my-dns", "name": "Мой DNS", "ipv4": [], "ipv6": ["2001:4860:4860::8888"]}
+                ),
+            ) as dialog_cls,
+        ):
+            page = NetworkPage(deps=SimpleNamespace(dns_feature=dns_feature))
+            page._ipv6_available = True
+            page._open_custom_dns_dialog()
+
+        self.assertTrue(dialog_cls.call_args.kwargs["ipv6_available"])
+        self.assertEqual(page._custom_dns_servers[0]["ipv6"], ["2001:4860:4860::8888"])
+
     def test_network_page_custom_dns_row_actions_update_saved_dns(self) -> None:
         from dns.ui.page import NetworkPage
 
@@ -221,6 +247,34 @@ class DnsPageBuildContractTests(unittest.TestCase):
 
             page._delete_custom_dns_server(0)
             self.assertEqual([server["name"] for server in page._custom_dns_servers], ["Рабочий DNS копия"])
+
+    def test_network_page_copies_ipv6_values_from_custom_dns_row(self) -> None:
+        from dns.ui.page import NetworkPage
+
+        dns_feature = SimpleNamespace(
+            normalize_adapter_alias=lambda value: str(value),
+            consume_warmed_page_data=lambda: None,
+            create_page_load_worker=lambda request_id, parent=None: None,
+        )
+
+        with patch("dns.ui.page.get_custom_dns_servers", return_value=[]):
+            page = NetworkPage(deps=SimpleNamespace(dns_feature=dns_feature))
+
+        page._custom_dns_servers = [
+            {
+                "id": "v6",
+                "name": "IPv6 DNS",
+                "ipv4": [],
+                "ipv6": ["2001:4860:4860::8888", "2001:4860:4860::8844"],
+            }
+        ]
+        with patch("dns.ui.page.InfoBar.success"):
+            page._copy_custom_dns_server(0)
+
+        self.assertEqual(
+            QApplication.clipboard().text(),
+            "2001:4860:4860::8888, 2001:4860:4860::8844",
+        )
 
     def test_custom_dns_context_menu_copy_action_mentions_clipboard(self) -> None:
         from dns.ui.page import NetworkPage

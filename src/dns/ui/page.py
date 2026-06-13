@@ -740,7 +740,7 @@ class NetworkPage(BasePage):
 
     def _open_custom_dns_dialog(self):
         """Открывает окно добавления нового пользовательского DNS."""
-        dialog = CustomDnsDialog(self)
+        dialog = CustomDnsDialog(self, ipv6_available=self._ipv6_available)
         if not dialog.exec():
             return
         server = dialog.server()
@@ -800,7 +800,11 @@ class NetworkPage(BasePage):
     def _edit_custom_dns_server(self, index: int) -> None:
         if not (0 <= index < len(self._custom_dns_servers)):
             return
-        dialog = CustomDnsDialog(self, server=self._custom_dns_servers[index])
+        dialog = CustomDnsDialog(
+            self,
+            server=self._custom_dns_servers[index],
+            ipv6_available=self._ipv6_available,
+        )
         if not dialog.exec():
             return
         updated = dialog.server()
@@ -828,7 +832,10 @@ class NetworkPage(BasePage):
             return
         dns_values = [
             str(item).strip()
-            for item in self._custom_dns_servers[index].get("ipv4", []) or []
+            for item in [
+                *(self._custom_dns_servers[index].get("ipv4", []) or []),
+                *(self._custom_dns_servers[index].get("ipv6", []) or []),
+            ]
             if str(item).strip()
         ]
         if not dns_values:
