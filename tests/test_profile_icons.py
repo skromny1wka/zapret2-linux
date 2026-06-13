@@ -148,6 +148,20 @@ class ProfileIconTests(unittest.TestCase):
 
         self.assertEqual(icon.icon_name, "fa5b.microsoft")
 
+    def test_rbxcdn_profiles_use_roblox_icon(self) -> None:
+        cases = (
+            ("tr.rbxcdn.com", "--hostlist=lists/tr-rbxcdn-com.txt"),
+            ("css.rbxcdn.com", "--hostlist=lists/css-rbxcdn-com.txt"),
+            ("js.rbxcdn.com", "--hostlist=lists/js-rbxcdn-com.txt"),
+        )
+
+        for display_name, list_line in cases:
+            with self.subTest(display_name=display_name):
+                icon = resolve_profile_icon(display_name, ("--filter-tcp=80,443", list_line))
+
+                self.assertEqual(icon.icon_name, "simple:roblox:RB")
+                self.assertEqual(icon.color, "#E2231A")
+
 
 if __name__ == "__main__":
     unittest.main()

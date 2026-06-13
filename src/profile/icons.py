@@ -82,6 +82,7 @@ _ICON_ALIASES: dict[str, str] = {
     "com-valorant": "valorant",
     "com-z-library": "z-library",
     "10tv": "7tv",
+    "rbxcdn": "roblox",
 }
 
 _NAMED_COLORS: dict[str, str] = {
