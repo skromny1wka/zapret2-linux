@@ -249,6 +249,38 @@ class TableAccessibilityTests(unittest.TestCase):
         self.assertIn("Example ISP", text)
         self.assertIn("статус DETECTED", text)
 
+    def test_blockcheck_tcp_result_table_reports_current_row_to_screen_reader(self) -> None:
+        from blockcheck.models import SingleTestResult, TargetResult, TestStatus, TestType
+        from blockcheck.ui.page_results_workflow import update_tcp_result_table
+
+        table = QTableWidget(0, 5)
+        target = TargetResult(
+            name="YouTube",
+            value="youtube.com",
+            tests=[
+                SingleTestResult(
+                    target_name="youtube.com",
+                    test_type=TestType.TCP_16_20,
+                    status=TestStatus.FAIL,
+                    error_code="TCP_16_20",
+                    detail="Блокировка после 16 KB",
+                    raw_data={
+                        "target_id": "youtube.com",
+                        "asn": "12345",
+                        "provider": "Example ISP",
+                        "bytes_received": 20480,
+                    },
+                )
+            ],
+        )
+
+        update_tcp_result_table(target_result=target, tcp_table=table, tcp_section_label=None)
+        row_text = table.item(0, 3).data(Qt.ItemDataRole.AccessibleTextRole)
+
+        table.setCurrentCell(0, 4)
+
+        self.assertEqual(table.property("screenReaderStateText"), row_text)
+
     def test_blockcheck_target_result_row_has_screen_reader_text(self) -> None:
         from blockcheck.models import DPIClassification, SingleTestResult, TargetResult, TestStatus, TestType
         from blockcheck.ui.page_results_workflow import update_target_result_table
@@ -286,6 +318,39 @@ class TableAccessibilityTests(unittest.TestCase):
         self.assertEqual(table.item(0, 1).data(Qt.ItemDataRole.AccessibleTextRole), text)
         self.assertEqual(table.item(0, 5).data(Qt.ItemDataRole.AccessibleTextRole), text)
         self.assertEqual(table.item(0, 7).data(Qt.ItemDataRole.AccessibleTextRole), text)
+
+    def test_blockcheck_target_result_table_reports_current_row_to_screen_reader(self) -> None:
+        from blockcheck.models import DPIClassification, SingleTestResult, TargetResult, TestStatus, TestType
+        from blockcheck.ui.page_results_workflow import update_target_result_table
+
+        table = QTableWidget(0, 8)
+        tcp_table = QTableWidget(0, 5)
+        target = TargetResult(
+            name="YouTube",
+            value="youtube.com",
+            classification=DPIClassification.HTTP_INJECT,
+            tests=[
+                SingleTestResult(
+                    target_name="youtube.com",
+                    test_type=TestType.HTTP,
+                    status=TestStatus.FAIL,
+                    error_code="HTTP_INJECT",
+                    detail="Провайдер подменил HTTP-ответ",
+                )
+            ],
+        )
+
+        update_target_result_table(
+            target_result=target,
+            table=table,
+            tcp_table=tcp_table,
+            tcp_section_label=None,
+        )
+        row_text = table.item(0, 0).data(Qt.ItemDataRole.AccessibleTextRole)
+
+        table.setCurrentCell(0, 7)
+
+        self.assertEqual(table.property("screenReaderStateText"), row_text)
 
 
 class _FakeSettingsCard:

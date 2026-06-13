@@ -13,7 +13,7 @@ from blockcheck.ui.helpers import (
     sort_results_by_family,
     truncate_detail,
 )
-from ui.accessibility import set_item_accessible_text
+from ui.accessibility import set_item_accessible_text, set_state_text
 from ui.widgets.fluent_item_tooltip import set_fluent_item_tooltip
 
 
@@ -29,6 +29,8 @@ DPI_BADGE_COLORS = {
     "stun_block": ("#e0a854", "#3a2e1a"),
     "full_block": ("#e05454", "#3a1a1a"),
 }
+
+_BLOCKCHECK_RESULT_TABLE_ACCESSIBILITY_INSTALLED = "blockcheckResultTableAccessibilityInstalled"
 
 DPI_LABELS_RU = {
     "none": "DPI не обнаружен",
@@ -167,6 +169,7 @@ def update_tcp_result_table(*, target_result, tcp_table, tcp_section_label) -> N
 
     if tcp_table is None:
         return
+    ensure_blockcheck_result_table_current_row_accessibility(tcp_table, fallback_column=0)
 
     tcp_tests = sorted(
         [test for test in target_result.tests if test.test_type == TestType.TCP_16_20],
@@ -222,6 +225,58 @@ def update_tcp_result_table(*, target_result, tcp_table, tcp_section_label) -> N
         set_fluent_item_tooltip(detail_item, detail_text)
         set_item_accessible_text(detail_item, row_accessible_text, description=detail_text)
         tcp_table.setItem(row, 4, detail_item)
+        if tcp_table.currentRow() == row:
+            _update_blockcheck_result_table_current_row_accessibility(tcp_table, row, tcp_table.currentColumn(), 0)
+
+
+def ensure_blockcheck_result_table_current_row_accessibility(table, *, fallback_column: int) -> None:
+    if table is None:
+        return
+    try:
+        if bool(table.property(_BLOCKCHECK_RESULT_TABLE_ACCESSIBILITY_INSTALLED)):
+            return
+    except Exception:
+        pass
+    try:
+        table.currentCellChanged.connect(
+            lambda current_row, current_column, _previous_row, _previous_column, current_table=table, fallback=fallback_column: (
+                _update_blockcheck_result_table_current_row_accessibility(
+                    current_table,
+                    current_row,
+                    current_column,
+                    fallback,
+                )
+            )
+        )
+        table.setProperty(_BLOCKCHECK_RESULT_TABLE_ACCESSIBILITY_INSTALLED, True)
+    except Exception:
+        pass
+
+
+def _update_blockcheck_result_table_current_row_accessibility(
+    table,
+    row: int,
+    column: int,
+    fallback_column: int,
+) -> None:
+    if table is None:
+        return
+    row_text = ""
+    try:
+        item = table.item(int(row), int(column))
+        if item is not None:
+            row_text = str(item.data(Qt.ItemDataRole.AccessibleTextRole) or "").strip()
+    except Exception:
+        row_text = ""
+    if not row_text:
+        try:
+            item = table.item(int(row), int(fallback_column))
+            if item is not None:
+                row_text = str(item.data(Qt.ItemDataRole.AccessibleTextRole) or "").strip()
+        except Exception:
+            row_text = ""
+    if row_text:
+        set_state_text(table, row_text)
 
 
 def _tcp_accessible_item(text: str, accessible_text: str) -> QTableWidgetItem:
@@ -253,6 +308,7 @@ def _tcp_row_accessible_text(
 def update_target_result_table(*, target_result, table, tcp_table, tcp_section_label) -> None:
     from blockcheck.models import DPIClassification, TestStatus, TestType
 
+    ensure_blockcheck_result_table_current_row_accessibility(table, fallback_column=0)
     tests = target_result.tests
 
     if str(target_result.value).startswith("TCP:"):
@@ -325,6 +381,8 @@ def update_target_result_table(*, target_result, table, tcp_table, tcp_section_l
     set_fluent_item_tooltip(detail_cell, detail_text)
     table.setItem(row, 7, detail_cell)
     _apply_target_row_accessibility(table, row, detail_text=detail_text)
+    if table.currentRow() == row:
+        _update_blockcheck_result_table_current_row_accessibility(table, row, table.currentColumn(), 0)
 
 
 _TARGET_TABLE_ACCESSIBLE_COLUMNS = {
