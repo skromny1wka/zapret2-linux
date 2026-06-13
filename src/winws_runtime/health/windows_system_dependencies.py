@@ -9,7 +9,6 @@ from log.log import log
 
 
 WINDOWS_SERVER_WLANAPI_MARKER = "[WINDOWS_SERVER_WLANAPI]"
-WIRELESS_NETWORKING_FEATURE_NAME = "Wireless-Networking"
 
 
 def is_windows_server() -> bool:
@@ -63,7 +62,7 @@ def run_windows_server_wlanapi_install() -> tuple[bool, str]:
         "$ErrorActionPreference = 'Stop'; "
         "$p = Start-Process -FilePath 'powershell.exe' "
         "-ArgumentList @('-NoProfile','-ExecutionPolicy','Bypass','-Command',"
-        f"'Install-WindowsFeature -Name {WIRELESS_NETWORKING_FEATURE_NAME}') "
+        "'Install-WindowsFeature -Name Wireless-Networking') "
         "-Verb RunAs -Wait -PassThru; "
         "exit $p.ExitCode"
     )
