@@ -81,6 +81,48 @@ class PresetLaunchServiceTests(unittest.TestCase):
         self.assertIn("нет включённых profile", result.error_message)
         shutdown.assert_not_called()
 
+    def test_service_prepares_lists_before_validating_preset_with_running_process(self) -> None:
+        from winws_runtime.runtime.preset_launch_service import PresetLaunchService
+
+        events: list[str] = []
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            preset_path = Path(tmp_dir) / "ready.txt"
+            preset_path.write_text(
+                "--new\n--wf-tcp-out=443\n--filter-tcp=443\n--hostlist=lists/tiktok.txt\n",
+                encoding="utf-8",
+            )
+            runtime_api = SimpleNamespace(
+                expected_exe_path="winws2.exe",
+                has_residual_processes=Mock(return_value=True),
+            )
+            runner = SimpleNamespace(
+                validate_preset_file=Mock(side_effect=lambda _path: events.append("validate") or (True, "")),
+                start_from_preset_file=Mock(return_value=True),
+            )
+            service = PresetLaunchService(
+                selected_mode={"is_preset_file": True, "preset_path": str(preset_path), "name": "Пресет"},
+                launch_method="zapret2_mode",
+                runtime_feature=SimpleNamespace(),
+                runtime_api=runtime_api,
+            )
+
+            with (
+                patch(
+                    "winws_runtime.runtime.preset_launch_service.ensure_required_files_fast",
+                    side_effect=lambda: events.append("prepare") or True,
+                ),
+                patch("winws_runtime.runners.runner_factory.get_strategy_runner", return_value=runner),
+                patch(
+                    "winws_runtime.runtime.preset_launch_service.shutdown_runtime_sync",
+                    return_value=SimpleNamespace(still_running=False),
+                ),
+            ):
+                result = service.run()
+
+        self.assertTrue(result.success)
+        self.assertEqual(events[:2], ["prepare", "validate"])
+
     def test_service_uses_short_stable_window_for_startup_autostart(self) -> None:
         from winws_runtime.runtime.preset_launch_service import (
             STARTUP_AUTOSTART_STABLE_WINDOW_SECONDS,

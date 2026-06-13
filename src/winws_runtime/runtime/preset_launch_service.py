@@ -389,6 +389,9 @@ class PresetLaunchService:
             skip_stop = False
             previous_process_running = self._has_previous_process()
 
+            if is_preset_file:
+                ensure_required_files_fast()
+
             if previous_process_running:
                 if not self._validate_preset_before_stop(
                     is_preset_file=is_preset_file,
@@ -401,9 +404,6 @@ class PresetLaunchService:
                 skip_stop=skip_stop,
                 process_running=previous_process_running,
             )
-
-            if is_preset_file:
-                ensure_required_files_fast()
 
             self._progress("Запуск DPI...")
 

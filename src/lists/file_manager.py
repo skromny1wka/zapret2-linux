@@ -22,6 +22,14 @@ def _log(message: str, level: str) -> None:
     log(message, level)
 
 
+def _rebuild_layered_final_lists() -> int:
+    from pathlib import Path
+
+    from lists.core.layered_files import rebuild_all_layered_list_files
+
+    return rebuild_all_layered_list_files(Path(LISTS_FOLDER))
+
+
 def ensure_required_files_fast():
     """Быстро проверяет готовность итоговых списков для обычного запуска."""
     try:
@@ -32,6 +40,8 @@ def ensure_required_files_fast():
             if not _runtime_required_file_ready(os.path.join(LISTS_FOLDER, name))
         ]
         if not missing_files:
+            rebuilt_count = _rebuild_layered_final_lists()
+            _log(f"Итоговые списки проверены и пересобраны: {rebuilt_count}", "DEBUG")
             _log("Обязательные итоговые списки уже готовы", "DEBUG")
             return True
 
