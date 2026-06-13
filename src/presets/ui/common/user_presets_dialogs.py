@@ -163,7 +163,14 @@ class CreatePresetDialog(PresetDialogTextMixin, MessageBoxBase):
             name=state_text,
         )
         set_state_text(self._source_seg, state_text)
-        set_segmented_items_accessibility(self._source_seg, name="Основа нового пресета")
+        set_segmented_items_accessibility(
+            self._source_seg,
+            name="Основа нового пресета",
+            labels={
+                "current": "Текущий пресет",
+                "standard": "Встроенный пресет",
+            },
+        )
 
     def _show_warning(self, text: str) -> None:
         self.warningLabel.setText(text)
