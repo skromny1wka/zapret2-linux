@@ -272,12 +272,12 @@ def enable_keyboard_click(widget) -> None:
 
 def _activate_keyboard_click_target(widget) -> bool:
     click = getattr(widget, "click", None)
-    if click is not None:
+    if callable(click):
         click()
         return True
     clicked = getattr(widget, "clicked", None)
     emit = getattr(clicked, "emit", None)
-    if emit is not None:
+    if callable(emit):
         try:
             emit()
             return True
@@ -286,10 +286,26 @@ def _activate_keyboard_click_target(widget) -> bool:
     for child_name in ("button", "linkButton"):
         child = getattr(widget, child_name, None)
         click = getattr(child, "click", None)
-        if click is None:
+        if not callable(click):
             continue
         click()
         return True
+    return False
+
+
+def _has_keyboard_click_target(widget) -> bool:
+    click = getattr(widget, "click", None)
+    if callable(click):
+        return True
+    clicked = getattr(widget, "clicked", None)
+    emit = getattr(clicked, "emit", None)
+    if callable(emit):
+        return True
+    for child_name in ("button", "linkButton"):
+        child = getattr(widget, child_name, None)
+        click = getattr(child, "click", None)
+        if callable(click):
+            return True
     return False
 
 
@@ -299,11 +315,7 @@ def _enable_keyboard_click_for_button(widget) -> None:
     if _is_checkable_widget(widget):
         enable_keyboard_toggle(widget)
         return
-    try:
-        clicked = getattr(widget, "clicked", None)
-    except Exception:
-        return
-    if clicked is None:
+    if not _has_keyboard_click_target(widget):
         return
     enable_keyboard_click(widget)
 

@@ -167,6 +167,33 @@ class AccessibilityHelpersTests(unittest.TestCase):
         self.assertTrue(event.isAccepted())
         self.assertEqual(clicked, [True])
 
+    def test_set_control_accessibility_enables_enter_for_widget_with_click_method(self) -> None:
+        from PyQt6.QtCore import QEvent, Qt
+        from PyQt6.QtGui import QKeyEvent
+        from PyQt6.QtWidgets import QWidget
+
+        from ui.accessibility import set_control_accessibility
+
+        class ClickMethodPanel(QWidget):
+            def __init__(self) -> None:
+                super().__init__()
+                self.click_count = 0
+
+            def click(self) -> None:
+                self.click_count += 1
+
+        panel = ClickMethodPanel()
+        self.addCleanup(panel.deleteLater)
+        panel.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
+
+        set_control_accessibility(panel, name="Открыть раздел: Настройки")
+        event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Return, Qt.KeyboardModifier.NoModifier)
+        panel.keyPressEvent(event)
+
+        self.assertEqual(panel.focusPolicy(), Qt.FocusPolicy.StrongFocus)
+        self.assertTrue(event.isAccepted())
+        self.assertEqual(panel.click_count, 1)
+
     def test_set_control_accessibility_names_spinbox_inner_field_and_skips_buttons(self) -> None:
         from PyQt6.QtCore import Qt
         from qfluentwidgets import SpinBox
