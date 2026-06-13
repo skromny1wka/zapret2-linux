@@ -88,6 +88,12 @@ def install_telegram_proxy_startup(*args, **kwargs):
     return install(*args, **kwargs)
 
 
+def install_telegram_proxy_page_warmup(*args, **kwargs):
+    from main.post_startup_telegram_proxy_warmup import install_telegram_proxy_page_warmup as install
+
+    return install(*args, **kwargs)
+
+
 def install_update_check(*args, **kwargs):
     from main.post_startup_update import install_update_check as install
 
@@ -138,6 +144,10 @@ def install_post_startup_tasks(deps: PostStartupDeps) -> None:
     install_telegram_proxy_startup(
         startup_host,
         start_proxy_if_enabled_async=deps.start_proxy_if_enabled_async,
+        log_startup_metric=deps.log_startup_metric,
+    )
+    install_telegram_proxy_page_warmup(
+        startup_host,
         log_startup_metric=deps.log_startup_metric,
     )
     install_lists_check(

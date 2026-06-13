@@ -125,6 +125,49 @@ class BackendPageDataWarmupTests(unittest.TestCase):
         metric.assert_any_call("StartupHostsPageWarmupStarted", "backend_cache")
         metric.assert_any_call("StartupHostsPageWarmupFinished", "backend_cache")
 
+    def test_telegram_proxy_page_is_prepared_after_interactive_without_opening_it(self) -> None:
+        from app.page_names import PageName
+        from main import post_startup_telegram_proxy_warmup
+        from main.post_startup_telegram_proxy_warmup import install_telegram_proxy_page_warmup
+
+        class Signal:
+            def __init__(self) -> None:
+                self._callback = None
+
+            def connect(self, callback) -> None:
+                self._callback = callback
+
+            def emit(self, value: str = "") -> None:
+                self._callback(value)
+
+        signal = Signal()
+        startup_host = SimpleNamespace(
+            startup_interactive_ready=signal,
+            startup_state=SimpleNamespace(interactive_logged=False),
+            is_alive=Mock(return_value=True),
+            ensure_page=Mock(return_value=object()),
+            show_page=Mock(),
+        )
+        metric = Mock()
+        delays: list[int] = []
+
+        with patch.object(
+            post_startup_telegram_proxy_warmup,
+            "schedule_after",
+            side_effect=lambda delay_ms, callback: delays.append(delay_ms) or callback(),
+        ):
+            install_telegram_proxy_page_warmup(
+                startup_host,
+                log_startup_metric=metric,
+            )
+            signal.emit("interactive")
+
+        self.assertEqual(delays, [3000])
+        startup_host.ensure_page.assert_called_once_with(PageName.TELEGRAM_PROXY)
+        startup_host.show_page.assert_not_called()
+        metric.assert_any_call("StartupTelegramProxyPageWarmupQueued", "3000ms after interactive")
+        metric.assert_any_call("StartupTelegramProxyPageWarmupFinished", "ui_page")
+
     def test_premium_page_uses_warmed_device_snapshot_before_worker(self) -> None:
         from app.feature_facades.premium import PremiumPageData
         from donater.ui.page import PremiumPage

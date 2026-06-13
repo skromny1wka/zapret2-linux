@@ -718,6 +718,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             patch.object(post_startup, "install_startup_checks"),
             patch.object(post_startup, "install_deferred_maintenance"),
             patch.object(post_startup, "install_telegram_proxy_startup"),
+            patch.object(post_startup, "install_telegram_proxy_page_warmup"),
             patch.object(post_startup, "install_lists_check"),
             patch.object(post_startup, "install_dns_startup"),
             patch.object(post_startup, "install_dns_page_data_warmup"),
@@ -2263,6 +2264,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             patch.object(post_startup, "install_startup_checks"),
             patch.object(post_startup, "install_deferred_maintenance"),
             patch.object(post_startup, "install_telegram_proxy_startup"),
+            patch.object(post_startup, "install_telegram_proxy_page_warmup"),
             patch.object(post_startup, "install_lists_check"),
             patch.object(post_startup, "install_dns_startup"),
             patch.object(post_startup, "install_dns_page_data_warmup"),
@@ -2281,6 +2283,50 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             log_startup_metric=log_startup_metric,
         )
         self.assertFalse(hasattr(post_startup, "install_page_warmup"))
+
+    def test_post_startup_tasks_install_telegram_proxy_page_warmup(self) -> None:
+        from main import post_startup
+        from main.post_startup import PostStartupDeps, install_post_startup_tasks
+
+        startup_host = object()
+        log_startup_metric = Mock()
+        deps = PostStartupDeps(
+            startup_host=startup_host,
+            profile_feature=object(),
+            dns_feature=object(),
+            notify=Mock(),
+            notify_many=Mock(),
+            set_status=Mock(),
+            log_startup_metric=log_startup_metric,
+            start_proxy_if_enabled_async=Mock(),
+            startup_lists_check=Mock(),
+            apply_dns_on_startup_async=Mock(),
+            install_tray_post_startup=Mock(),
+            updater_feature=Mock(),
+        )
+
+        with (
+            patch.object(post_startup, "install_startup_checks"),
+            patch.object(post_startup, "install_deferred_maintenance"),
+            patch.object(post_startup, "install_telegram_proxy_startup"),
+            patch.object(post_startup, "install_telegram_proxy_page_warmup") as install_telegram_proxy_page_warmup,
+            patch.object(post_startup, "install_lists_check"),
+            patch.object(post_startup, "install_dns_startup"),
+            patch.object(post_startup, "install_dns_page_data_warmup"),
+            patch.object(post_startup, "install_hosts_page_warmup"),
+            patch.object(post_startup, "install_profile_warmup"),
+            patch.object(post_startup, "install_update_check"),
+            patch.object(post_startup, "install_cpu_diagnostic"),
+            patch.object(post_startup, "install_qt_event_diagnostic_probe"),
+            patch.object(post_startup, "install_global_exception_handler"),
+            patch.object(post_startup, "install_startup_audit"),
+        ):
+            install_post_startup_tasks(deps)
+
+        install_telegram_proxy_page_warmup.assert_called_once_with(
+            startup_host,
+            log_startup_metric=log_startup_metric,
+        )
 
     def test_post_startup_tasks_install_profile_warmup(self) -> None:
         from main import post_startup
@@ -2308,6 +2354,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             patch.object(post_startup, "install_startup_checks"),
             patch.object(post_startup, "install_deferred_maintenance"),
             patch.object(post_startup, "install_telegram_proxy_startup"),
+            patch.object(post_startup, "install_telegram_proxy_page_warmup"),
             patch.object(post_startup, "install_lists_check"),
             patch.object(post_startup, "install_dns_startup"),
             patch.object(post_startup, "install_dns_page_data_warmup"),
@@ -2356,6 +2403,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             patch.object(post_startup, "install_startup_checks"),
             patch.object(post_startup, "install_deferred_maintenance"),
             patch.object(post_startup, "install_telegram_proxy_startup"),
+            patch.object(post_startup, "install_telegram_proxy_page_warmup"),
             patch.object(post_startup, "install_lists_check"),
             patch.object(post_startup, "install_dns_startup"),
             patch.object(post_startup, "install_dns_page_data_warmup"),
@@ -2407,6 +2455,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             patch.object(post_startup, "install_startup_checks"),
             patch.object(post_startup, "install_deferred_maintenance"),
             patch.object(post_startup, "install_telegram_proxy_startup"),
+            patch.object(post_startup, "install_telegram_proxy_page_warmup"),
             patch.object(post_startup, "install_lists_check"),
             patch.object(post_startup, "install_dns_startup"),
             patch.object(post_startup, "install_dns_page_data_warmup"),
@@ -2484,6 +2533,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             patch.object(post_startup, "install_startup_checks"),
             patch.object(post_startup, "install_deferred_maintenance"),
             patch.object(post_startup, "install_telegram_proxy_startup"),
+            patch.object(post_startup, "install_telegram_proxy_page_warmup"),
             patch.object(post_startup, "install_lists_check"),
             patch.object(post_startup, "install_dns_startup"),
             patch.object(post_startup, "install_dns_page_data_warmup") as install_dns_page_data_warmup,
@@ -2531,6 +2581,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
             patch.object(post_startup, "install_startup_checks"),
             patch.object(post_startup, "install_deferred_maintenance"),
             patch.object(post_startup, "install_telegram_proxy_startup"),
+            patch.object(post_startup, "install_telegram_proxy_page_warmup"),
             patch.object(post_startup, "install_lists_check"),
             patch.object(post_startup, "install_dns_startup"),
             patch.object(post_startup, "install_dns_page_data_warmup"),
