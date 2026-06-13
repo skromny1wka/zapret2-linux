@@ -569,6 +569,7 @@ class Win11NumberRow(FluentSettingCard):
             parent=parent,
         )
         self.setIconSize(18, 18)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._icon_label = getattr(self, "iconLabel", None)
         self._title_label = getattr(self, "titleLabel", None)
         self._desc_label = getattr(self, "contentLabel", None)
@@ -584,6 +585,10 @@ class Win11NumberRow(FluentSettingCard):
         self.spinbox.valueChanged.connect(self._on_spinbox_value_changed)
         layout.addWidget(self.spinbox)
         layout.addSpacing(16)
+        try:
+            self.setFocusProxy(self.spinbox)
+        except Exception:
+            pass
         self._apply_text_styles(initial_tokens)
         self._update_number_accessibility()
         self._theme_refresh = ThemeRefreshBinding(
@@ -686,6 +691,25 @@ class Win11NumberRow(FluentSettingCard):
         self._update_number_accessibility()
         self.valueChanged.emit(int(value))
 
+    def keyPressEvent(self, event):  # noqa: N802
+        try:
+            key = event.key()
+        except Exception:
+            key = None
+        if key == Qt.Key.Key_Up:
+            self.spinbox.stepUp()
+            event.accept()
+            return
+        if key == Qt.Key.Key_Down:
+            self.spinbox.stepDown()
+            event.accept()
+            return
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
+            self.spinbox.setFocus()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
     def _update_number_accessibility(self) -> None:
         title = str(self.__dict__.get("_accessible_title", "") or "").strip()
         description = str(self.__dict__.get("_accessible_description", "") or "")
@@ -734,6 +758,7 @@ class Win11ComboRow(FluentSettingCard):
             parent=parent,
         )
         self.setIconSize(18, 18)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._icon_label = getattr(self, "iconLabel", None)
         self._title_label = getattr(self, "titleLabel", None)
         self._desc_label = getattr(self, "contentLabel", None)
@@ -750,6 +775,10 @@ class Win11ComboRow(FluentSettingCard):
         self.combo.currentTextChanged.connect(self._on_combo_text_changed)
         layout.addWidget(self.combo)
         layout.addSpacing(16)
+        try:
+            self.setFocusProxy(self.combo)
+        except Exception:
+            pass
         self._apply_text_styles(initial_tokens)
         self._update_combo_accessibility()
         self._theme_refresh = ThemeRefreshBinding(
@@ -877,6 +906,28 @@ class Win11ComboRow(FluentSettingCard):
     def _on_combo_text_changed(self, text: str) -> None:
         self._update_combo_accessibility()
         self.currentTextChanged.emit(str(text))
+
+    def keyPressEvent(self, event):  # noqa: N802
+        try:
+            key = event.key()
+        except Exception:
+            key = None
+        if key in (Qt.Key.Key_Down, Qt.Key.Key_Right):
+            if self.combo.count() > 0:
+                self.setCurrentIndex(min(self.combo.currentIndex() + 1, self.combo.count() - 1))
+                event.accept()
+                return
+        if key in (Qt.Key.Key_Up, Qt.Key.Key_Left):
+            if self.combo.count() > 0:
+                self.setCurrentIndex(max(self.combo.currentIndex() - 1, 0))
+                event.accept()
+                return
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
+            self.combo.setFocus()
+            self.combo.showPopup()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     def _update_combo_accessibility(self) -> None:
         title = str(self.__dict__.get("_accessible_title", "") or "").strip()

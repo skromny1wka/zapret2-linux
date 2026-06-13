@@ -540,6 +540,37 @@ class Win11ToggleRowTests(unittest.TestCase):
         self.assertEqual(row.property("screenReaderStateText"), "Количество попыток, значение: 5")
         self.assertEqual(row.spinbox.accessibleName(), "Количество попыток, значение: 5")
 
+    def test_number_row_works_from_keyboard_when_row_has_focus(self) -> None:
+        from ui.widgets.win11_controls import Win11NumberRow
+
+        row = Win11NumberRow(
+            "fa5s.redo",
+            "Количество попыток",
+            "Сколько раз повторять проверку",
+            min_val=1,
+            max_val=10,
+            default_val=3,
+        )
+        events: list[int] = []
+        row.valueChanged.connect(events.append)
+
+        self.assertEqual(row.focusPolicy(), Qt.FocusPolicy.StrongFocus)
+
+        event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Up, Qt.KeyboardModifier.NoModifier)
+        QApplication.sendEvent(row, event)
+
+        self.assertTrue(event.isAccepted())
+        self.assertEqual(row.value(), 4)
+        self.assertEqual(events, [4])
+        self.assertEqual(row.accessibleName(), "Количество попыток, значение: 4")
+
+        event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, Qt.KeyboardModifier.NoModifier)
+        QApplication.sendEvent(row, event)
+
+        self.assertTrue(event.isAccepted())
+        self.assertEqual(row.value(), 3)
+        self.assertEqual(events, [4, 3])
+
     def test_number_row_set_texts_skips_duplicate_title_and_description(self) -> None:
         from ui.widgets.win11_controls import Win11NumberRow
 
@@ -685,6 +716,35 @@ class Win11ToggleRowTests(unittest.TestCase):
         self.assertEqual(row.accessibleName(), "Режим запуска, выбрано: Zapret 2")
         self.assertEqual(row.property("screenReaderStateText"), "Режим запуска, выбрано: Zapret 2")
         self.assertEqual(row.combo.accessibleName(), "Режим запуска, выбрано: Zapret 2")
+
+    def test_combo_row_works_from_keyboard_when_row_has_focus(self) -> None:
+        from ui.widgets.win11_controls import Win11ComboRow
+
+        row = Win11ComboRow(
+            "fa5s.list",
+            "Режим запуска",
+            "Выберите способ запуска",
+            items=[("Zapret 1", "zapret1"), ("Zapret 2", "zapret2")],
+        )
+        events: list[int] = []
+        row.currentIndexChanged.connect(events.append)
+
+        self.assertEqual(row.focusPolicy(), Qt.FocusPolicy.StrongFocus)
+
+        event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, Qt.KeyboardModifier.NoModifier)
+        QApplication.sendEvent(row, event)
+
+        self.assertTrue(event.isAccepted())
+        self.assertEqual(row.currentIndex(), 1)
+        self.assertEqual(events, [1])
+        self.assertEqual(row.accessibleName(), "Режим запуска, выбрано: Zapret 2")
+
+        event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Up, Qt.KeyboardModifier.NoModifier)
+        QApplication.sendEvent(row, event)
+
+        self.assertTrue(event.isAccepted())
+        self.assertEqual(row.currentIndex(), 0)
+        self.assertEqual(events, [1, 0])
 
     def test_combo_row_set_texts_skips_duplicate_title_and_description(self) -> None:
         from ui.widgets.win11_controls import Win11ComboRow
