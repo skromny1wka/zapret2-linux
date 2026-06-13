@@ -162,6 +162,15 @@ class ProfileIconTests(unittest.TestCase):
                 self.assertEqual(icon.icon_name, "simple:roblox:RB")
                 self.assertEqual(icon.color, "#E2231A")
 
+    def test_ytimg_preview_profile_uses_youtube_icon(self) -> None:
+        icon = resolve_profile_icon(
+            "i.ytimg.com (превью роликов)",
+            ("--filter-tcp=443", "--hostlist=lists/i-ytimg.txt"),
+        )
+
+        self.assertEqual(icon.icon_name, "simple:youtube:YT")
+        self.assertEqual(icon.color, "#FF0000")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -67,6 +67,8 @@ _ICON_ALIASES: dict[str, str] = {
     "youtube-v2": "youtube",
     "youtubeq": "youtube",
     "youtubegv": "youtube",
+    "ytimg": "youtube",
+    "i-ytimg": "youtube",
     "russia-youtubeq": "youtube",
     "russia-youtube-rtmps": "youtube",
     "russia-discord": "discord",
