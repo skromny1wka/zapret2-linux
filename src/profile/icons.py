@@ -33,6 +33,8 @@ _KNOWN_ICONS: dict[str, ProfileIconSpec] = {
     "itch": ProfileIconSpec("simple:itchdotio:IT", "#FA5C5C"),
     "google": ProfileIconSpec("simple:google:GO", "#4285F4"),
     "amazon": ProfileIconSpec("simple:amazon:AM", "#FF9900"),
+    "microsoft": ProfileIconSpec("fa5b.microsoft", "#00BCF2"),
+    "microsoft-store": ProfileIconSpec("fa5b.microsoft", "#00BCF2"),
     "anydesk": ProfileIconSpec("simple:anydesk:AD", "#EF443B"),
     "speedtest": ProfileIconSpec("simple:speedtest:ST", "#141526"),
     "cloudflare": ProfileIconSpec("simple:cloudflare:CF", "#F38020"),

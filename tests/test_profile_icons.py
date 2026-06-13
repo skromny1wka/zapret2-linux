@@ -140,6 +140,14 @@ class ProfileIconTests(unittest.TestCase):
 
         self.assertEqual(icon.icon_name, "fa5s.globe")
 
+    def test_microsoft_store_profile_uses_microsoft_icon(self) -> None:
+        icon = resolve_profile_icon(
+            "Microsoft Store",
+            ("--filter-tcp=443", "--hostlist=lists/microsoft-store.txt"),
+        )
+
+        self.assertEqual(icon.icon_name, "fa5b.microsoft")
+
 
 if __name__ == "__main__":
     unittest.main()
