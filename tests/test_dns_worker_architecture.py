@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import ast
 import inspect
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import ANY, Mock, patch
 
@@ -24,6 +26,27 @@ class _PlainTextResult:
 
 
 class DnsWorkerArchitectureTests(unittest.TestCase):
+    def test_force_dns_defaults_use_quad9_and_dns_sb(self) -> None:
+        source = Path("src/dns/dns_force.py").read_text(encoding="utf-8")
+        module = ast.parse(source)
+        class_body = next(
+            node.body
+            for node in module.body
+            if isinstance(node, ast.ClassDef) and node.name == "DNSForceManager"
+        )
+        constants = {
+            assign.targets[0].id: ast.literal_eval(assign.value)
+            for assign in class_body
+            if isinstance(assign, ast.Assign)
+            and len(assign.targets) == 1
+            and isinstance(assign.targets[0], ast.Name)
+        }
+
+        self.assertEqual(constants["DNS_PRIMARY"], "9.9.9.9")
+        self.assertEqual(constants["DNS_SECONDARY"], "185.222.222.222")
+        self.assertEqual(constants["DNS_PRIMARY_V6"], "2620:fe::fe")
+        self.assertEqual(constants["DNS_SECONDARY_V6"], "2a09::")
+
     def test_network_action_workers_receive_feature_action_callables(self) -> None:
         feature_source = inspect.getsource(build_dns_feature)
         worker_source = "\n".join(

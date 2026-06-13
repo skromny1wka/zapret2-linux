@@ -24,10 +24,10 @@ class DNSForceManager:
     FORCE_DNS_KEY = "ForceDNS"
     
     # DNS серверы
-    DNS_PRIMARY = "8.8.8.8"
-    DNS_SECONDARY = "208.67.222.222"
-    DNS_PRIMARY_V6 = "2001:4860:4860::8888"
-    DNS_SECONDARY_V6 = "2620:119:35::35"
+    DNS_PRIMARY = "9.9.9.9"
+    DNS_SECONDARY = "185.222.222.222"
+    DNS_PRIMARY_V6 = "2620:fe::fe"
+    DNS_SECONDARY_V6 = "2a09::"
     
     def __init__(self, status_callback=None):
         self.status_callback = status_callback
@@ -267,10 +267,15 @@ class DNSForceManager:
             )
             
             if success > 0:
+                ipv6_status = (
+                    f"{self.DNS_PRIMARY_V6} (Quad9) + {self.DNS_SECONDARY_V6} (DNS.SB)"
+                    if self.ipv6_available
+                    else "не применён"
+                )
                 msg = (
                     f"DNS успешно установлен на {success} из {total} адаптеров.\n\n"
-                    f"IPv4: {self.DNS_PRIMARY} (Google) + {self.DNS_SECONDARY} (OpenDNS)\n"
-                    f"IPv6: {self.DNS_PRIMARY_V6 if self.ipv6_available else 'не применён'}\n\n"
+                    f"IPv4: {self.DNS_PRIMARY} (Quad9) + {self.DNS_SECONDARY} (DNS.SB)\n"
+                    f"IPv6: {ipv6_status}\n\n"
                     "Изменения вступили в силу немедленно."
                 )
                 log(f"Принудительный DNS включен: {success}/{total} адаптеров", "INFO")
