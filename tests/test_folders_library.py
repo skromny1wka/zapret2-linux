@@ -29,7 +29,7 @@ class FolderDefaultsTests(unittest.TestCase):
 
         self.assertEqual(
             [folder["name"] for folder in state["folders"].values()],
-            ["YouTube", "Discord", "Мессенджеры", "Соцсети", "Игры", "Хостеры", "Сайты", "ZapretKVN", "Общие", "Все сайты"],
+            ["YouTube", "Discord", "Мессенджеры", "Соцсети", "Игры", "Roblox", "Хостеры", "Сайты", "ZapretKVN", "Общие", "Все сайты"],
         )
         self.assertEqual(state["folders"][COMMON_FOLDER_KEY]["system"], True)
 
@@ -47,7 +47,8 @@ class FolderDefaultsTests(unittest.TestCase):
         self.assertEqual(classify_profile_folder("Facebook --hostlist=facebook.txt"), "social")
         self.assertEqual(classify_profile_folder("Valorant game filter"), "games")
         self.assertEqual(classify_profile_folder("itch.io --hostlist=lists/itch.txt"), "games")
-        self.assertEqual(classify_profile_folder("roblox --ipset=lists/ipset-roblox.txt"), "games")
+        self.assertEqual(classify_profile_folder("roblox --ipset=lists/ipset-roblox.txt"), "roblox")
+        self.assertEqual(classify_profile_folder("tr.rbxcdn.com --hostlist=lists/tr-rbxcdn-com.txt"), "roblox")
         self.assertEqual(classify_profile_folder("Tanki X --hostlist=lists/tankix.txt"), "games")
         self.assertEqual(classify_profile_folder("lol-ru --ipset=lists/ipset-lol-ru.txt"), "games")
         self.assertEqual(classify_profile_folder("cloudflare --ipset=lists/ipset-cloudflare.txt"), "hosters")
@@ -81,7 +82,7 @@ class FolderDefaultsTests(unittest.TestCase):
 
         self.assertEqual(
             ordered_names,
-            ["YouTube", "Discord", "Мессенджеры", "Соцсети", "Игры", "Хостеры", "Сайты", "ZapretKVN", "Общие", "Все сайты"],
+            ["YouTube", "Discord", "Мессенджеры", "Соцсети", "Игры", "Roblox", "Хостеры", "Сайты", "ZapretKVN", "Общие", "Все сайты"],
         )
 
 
