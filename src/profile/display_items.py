@@ -117,6 +117,10 @@ def _logical_display_name(item: Any) -> str:
     if explicit_name:
         return explicit_name
 
+    display_name_override = str(getattr(item, "display_name_override", "") or "").strip()
+    if display_name_override:
+        return display_name_override
+
     list_type = str(getattr(item, "list_type", "") or "").strip().lower()
     identity = _resource_identity(tuple(getattr(item, "match_lines", ()) or ()), list_type)
     known = {

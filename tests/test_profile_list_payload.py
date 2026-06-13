@@ -693,7 +693,7 @@ class ProfileListPayloadTests(unittest.TestCase):
         self.assertTrue(payload.items[0].in_preset)
         self.assertIn("--hostlist=lists/googlevideo.txt", payload.items[0].match_lines)
 
-    def test_unnamed_preset_profile_keeps_preset_inferred_display_name(self) -> None:
+    def test_unnamed_preset_profile_uses_matching_template_display_name(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             templates_dir = root / "profile" / "templates"
@@ -731,8 +731,8 @@ class ProfileListPayloadTests(unittest.TestCase):
         self.assertEqual(len(payload.items), 1)
         self.assertTrue(payload.items[0].in_preset)
         self.assertEqual(payload.items[0].profile_name, "")
-        self.assertEqual(payload.items[0].display_name, "TCP 80,443 • hostlist facebook.txt")
-        self.assertNotEqual(payload.items[0].display_name, "Facebook")
+        self.assertEqual(payload.items[0].display_name, "Facebook")
+        self.assertEqual(payload.items[0].display_name_override, "Facebook")
 
     def test_lowercase_preset_profile_name_wins_over_template_case(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -773,6 +773,7 @@ class ProfileListPayloadTests(unittest.TestCase):
         self.assertEqual(len(payload.items), 1)
         self.assertEqual(payload.items[0].display_name, "facebook")
         self.assertEqual(payload.items[0].profile_name, "facebook")
+        self.assertEqual(payload.items[0].display_name_override, "")
         display_items = build_profile_display_items(payload.items)
         self.assertEqual(display_items[0].display_name, "facebook")
 
