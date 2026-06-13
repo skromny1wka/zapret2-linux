@@ -3487,6 +3487,44 @@ class WindowsSessionShutdownTests(unittest.TestCase):
         q_application.processEvents.assert_not_called()
         q_application.quit.assert_called_once()
 
+    def test_final_close_skips_second_dpi_shutdown_when_processes_are_already_stopped(self) -> None:
+        from main.application_lifecycle import ApplicationLifecycle
+
+        close_state = SimpleNamespace(
+            is_exiting=True,
+            stop_dpi_on_exit=True,
+            closing_completely=True,
+            windows_session_ending=False,
+        )
+        window_port = SimpleNamespace(
+            persist_geometry=Mock(),
+            cleanup_theme=Mock(),
+            cleanup_threaded_pages=Mock(),
+            cleanup_visual_and_proxy_resources=Mock(),
+        )
+        runtime_feature = SimpleNamespace(
+            cleanup_process_monitor=Mock(),
+            cleanup_threads=Mock(),
+            is_any_running=Mock(return_value=False),
+            shutdown_sync=Mock(),
+        )
+        premium_feature = SimpleNamespace(cleanup_subscription=Mock())
+        telegram_proxy_feature = SimpleNamespace(cleanup=Mock())
+        tray_feature = SimpleNamespace(cleanup=Mock())
+        lifecycle = ApplicationLifecycle(
+            window_port=window_port,
+            close_state=close_state,
+            runtime_feature=runtime_feature,
+            premium_feature=premium_feature,
+            telegram_proxy_feature=telegram_proxy_feature,
+            tray_feature=tray_feature,
+        )
+
+        lifecycle.run_final_close_cleanup()
+
+        runtime_feature.is_any_running.assert_called_once_with(silent=True)
+        runtime_feature.shutdown_sync.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

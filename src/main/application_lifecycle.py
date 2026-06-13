@@ -137,6 +137,13 @@ class ApplicationLifecycle:
             return
 
         try:
+            if not bool(self._runtime_feature.is_any_running(silent=True)):
+                log("DPI уже остановлен перед финальным закрытием: повторную остановку пропускаем", "DEBUG")
+                return
+        except Exception as e:
+            log(f"Не удалось проверить процессы winws перед финальным закрытием: {e}", "DEBUG")
+
+        try:
             result = self._runtime_feature.shutdown_sync(
                 reason="close_event exit_stop_dpi",
                 include_cleanup=True,

@@ -114,6 +114,23 @@ class WinwsRuntimeThreadRuntimeTests(unittest.TestCase):
         self.assertIs(owner._dpi_start_thread, start_thread)
         self.assertIs(owner._dpi_stop_thread, stop_thread)
 
+    def test_launch_runtime_cleanup_threads_quits_running_stop_exit_thread(self) -> None:
+        from winws_runtime.runtime.lifecycle_feedback import cleanup_threads
+
+        stop_exit_thread = _FakeThread(running=True)
+        owner = SimpleNamespace(
+            _dpi_start_thread=None,
+            _dpi_stop_thread=None,
+            _stop_exit_thread=stop_exit_thread,
+        )
+
+        cleanup_threads(owner)
+
+        self.assertTrue(stop_exit_thread.quit_called)
+        self.assertFalse(stop_exit_thread.wait_called)
+        self.assertFalse(stop_exit_thread.terminate_called)
+        self.assertIs(owner._stop_exit_thread, stop_exit_thread)
+
 
 if __name__ == "__main__":
     unittest.main()

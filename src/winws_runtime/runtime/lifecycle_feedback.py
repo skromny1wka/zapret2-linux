@@ -229,6 +229,7 @@ def cleanup_threads(runtime_owner):
         for thread_attr, log_message in (
             ("_dpi_start_thread", "Останавливаем поток запуска DPI..."),
             ("_dpi_stop_thread", "Останавливаем поток остановки DPI..."),
+            ("_stop_exit_thread", "Останавливаем поток stop-and-exit..."),
         ):
             thread = getattr(runtime_owner, thread_attr, None)
             if thread is None:
