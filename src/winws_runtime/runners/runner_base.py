@@ -32,6 +32,7 @@ from utils.args_resolver import resolve_args_paths
 
 _AGGRESSIVE_WINDIVERT_RETRY_COOLDOWN_SECONDS = 1.8
 _WINDIVERT_PRESPAWN_WAIT_SECONDS = 3.0
+_WINDOWS_SYSTEM_DLLS_REQUIRED_BY_WINWS = ("wlanapi.dll",)
 
 
 class StrategyRunnerBase(ABC):
@@ -154,6 +155,36 @@ class StrategyRunnerBase(ABC):
         startupinfo.dwFlags = STARTF_USESHOWWINDOW
         startupinfo.wShowWindow = SW_HIDE
         return startupinfo
+
+    def _get_missing_windows_system_dependencies(self) -> tuple[str, ...]:
+        if os.name != "nt":
+            return ()
+
+        windows_dir = os.environ.get("SystemRoot") or os.environ.get("WINDIR")
+        if not windows_dir:
+            return ()
+
+        search_dirs = (
+            os.path.join(windows_dir, "System32"),
+            os.path.join(windows_dir, "SysWOW64"),
+        )
+        missing: list[str] = []
+        for dll_name in _WINDOWS_SYSTEM_DLLS_REQUIRED_BY_WINWS:
+            if not any(os.path.exists(os.path.join(folder, dll_name)) for folder in search_dirs):
+                missing.append(dll_name)
+        return tuple(missing)
+
+    def _format_missing_windows_system_dependency_error(self, missing_dlls: tuple[str, ...]) -> str:
+        dll_text = ", ".join(str(name) for name in missing_dlls if str(name).strip())
+        if not dll_text:
+            dll_text = "системная DLL"
+        exe_name = os.path.basename(str(self.winws_exe or "")) or "winws"
+        return (
+            f"Windows урезана: не найден системный файл {dll_text}. "
+            f"Из-за этого {exe_name} не может запуститься. "
+            "Нужна обычная Windows или сборка, где есть компонент автонастройки WLAN "
+            "(беспроводная сеть)."
+        )
 
     def get_runner_state_snapshot(self):
         """Optional public state snapshot hook for newer preset runners."""

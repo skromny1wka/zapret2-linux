@@ -303,6 +303,15 @@ class Winws1StrategyRunner(StrategyRunnerBase):
         *,
         notify_failure: bool = True,
     ) -> bool:
+        missing_dlls = self._get_missing_windows_system_dependencies()
+        if missing_dlls:
+            message = self._format_missing_windows_system_dependency_error(missing_dlls)
+            self._last_spawn_exit_code = -1
+            self._last_spawn_stderr = message
+            self._set_last_error(message, notify=notify_failure)
+            log(message, "ERROR" if notify_failure else "WARNING")
+            return False
+
         try:
             dry_run_config_path = self._write_winws1_dry_run_at_config(artifact)
             completed = subprocess.run(
