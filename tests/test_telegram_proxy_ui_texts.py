@@ -117,6 +117,16 @@ class TelegramProxyUiTextsTests(unittest.TestCase):
 
         self.assertIn("_apply_advanced_settings_ui()", source)
 
+    def test_page_uses_settings_ui_state_plan_for_advanced_visibility(self) -> None:
+        import inspect
+        from telegram_proxy.ui import page
+
+        source = inspect.getsource(page)
+
+        self.assertIn("from telegram_proxy.ui.settings_ui_state import", source)
+        self.assertIn("build_advanced_settings_ui_plan", source)
+        self.assertIn("build_advanced_settings_auto_sections", source)
+
 
 if __name__ == "__main__":
     unittest.main()

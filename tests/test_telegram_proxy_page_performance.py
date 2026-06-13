@@ -30,9 +30,27 @@ class _FakeToggle:
 class _FakeVisibleWidget:
     def __init__(self) -> None:
         self.visible = True
+        self.enabled = True
 
     def setVisible(self, visible: bool) -> None:
         self.visible = bool(visible)
+
+    def setEnabled(self, enabled: bool) -> None:
+        self.enabled = bool(enabled)
+
+    def parentWidget(self):
+        return self
+
+
+class _FakeCombo:
+    def currentIndex(self) -> int:
+        return 0
+
+
+class _FakePresetRow(_FakeVisibleWidget):
+    def __init__(self) -> None:
+        super().__init__()
+        self.combo = _FakeCombo()
 
 
 def _default_state_without_upstream() -> telegram_proxy_settings.TelegramProxySettingsState:
@@ -114,8 +132,23 @@ class TelegramProxyPagePerformanceTests(unittest.TestCase):
         page._mtproxy_secret_row = _FakeVisibleWidget()
         page._fake_tls_domain_row = _FakeVisibleWidget()
         page._proxy_protocol_toggle = _FakeVisibleWidget()
+        page._upstream_toggle = _FakeVisibleWidget()
+        page._upstream_preset_row = _FakePresetRow()
+        page._upstream_catalog_hint = _FakeVisibleWidget()
+        page._upstream_manual_widget = _FakeVisibleWidget()
+        page._mtproxy_action_widget = _FakeVisibleWidget()
+        page._upstream_mode_toggle = _FakeVisibleWidget()
+        page._cloudflare_toggle = _FakeToggle(False)
+        page._cloudflare_worker_toggle = _FakeToggle(False)
+        page._cloudflare_domains_row = _FakeVisibleWidget()
+        page._cloudflare_worker_domains_row = _FakeVisibleWidget()
+        page._cloudflare_worker_domains_edit = _FakeVisibleWidget()
+        page._dc_ip_row = _FakeVisibleWidget()
+        page._performance_label = _FakeVisibleWidget()
+        page._pool_size_spin = _FakeVisibleWidget()
         page._ensure_advanced_settings_built = lambda: None
         page._update_manual_instructions = lambda: None
+        page._apply_upstream_preset_ui = lambda _index: None
         page._apply_cloudflare_ui = lambda: None
         page._apply_auto_advanced_section_visibility = lambda: None
 
