@@ -194,6 +194,33 @@ class AccessibilityHelpersTests(unittest.TestCase):
         self.assertTrue(event.isAccepted())
         self.assertEqual(panel.click_count, 1)
 
+    def test_keyboard_click_survives_late_key_handler_replacement(self) -> None:
+        from PyQt6.QtCore import Qt, pyqtSignal
+        from PyQt6.QtTest import QTest
+        from PyQt6.QtWidgets import QWidget
+
+        from ui.accessibility import set_control_accessibility
+
+        class ClickablePanel(QWidget):
+            clicked = pyqtSignal()
+
+        panel = ClickablePanel()
+        self.addCleanup(panel.deleteLater)
+        clicked: list[bool] = []
+        panel.clicked.connect(lambda: clicked.append(True))
+
+        set_control_accessibility(panel, name="Открыть раздел: Логи")
+        panel.keyPressEvent = lambda event: event.ignore()
+        panel.show()
+        self._app.processEvents()
+        panel.setFocus()
+        self._app.processEvents()
+
+        QTest.keyClick(panel, Qt.Key.Key_Return)
+        self._app.processEvents()
+
+        self.assertEqual(clicked, [True])
+
     def test_set_control_accessibility_names_spinbox_inner_field_and_skips_buttons(self) -> None:
         from PyQt6.QtCore import Qt
         from qfluentwidgets import SpinBox

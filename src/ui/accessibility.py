@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from types import MethodType
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QEvent, QObject, Qt
 
 
 _TOGGLE_ACCESSIBLE_BASE_PROPERTY = "_keyboardToggleAccessibleBaseName"
 _TOGGLE_ACCESSIBLE_TEXT_PROPERTY = "_keyboardToggleAccessibleText"
+_KEYBOARD_CLICK_FILTER_PROPERTY = "_keyboardClickFilterInstalled"
+_KEYBOARD_TOGGLE_FILTER_PROPERTY = "_keyboardToggleFilterInstalled"
 
 
 def _clean_text(text: object) -> str:
@@ -245,6 +247,11 @@ def enable_keyboard_click(widget) -> None:
         widget.setProperty("_keyboardClickEnabled", True)
     except Exception:
         pass
+    _install_keyboard_activation_filter(
+        widget,
+        property_name=_KEYBOARD_CLICK_FILTER_PROPERTY,
+        activate=lambda target: _activate_keyboard_click_target(target),
+    )
 
     original_key_press = getattr(widget, "keyPressEvent", None)
 
@@ -400,6 +407,11 @@ def enable_keyboard_toggle(widget) -> None:
         widget.setProperty("_keyboardToggleEnabled", True)
     except Exception:
         pass
+    _install_keyboard_activation_filter(
+        widget,
+        property_name=_KEYBOARD_TOGGLE_FILTER_PROPERTY,
+        activate=_toggle_keyboard_target,
+    )
 
     original_key_press = getattr(widget, "keyPressEvent", None)
 
@@ -424,6 +436,56 @@ def enable_keyboard_toggle(widget) -> None:
         widget.keyPressEvent = MethodType(_keyboard_toggle_key_press, widget)
     except Exception:
         pass
+
+
+class _KeyboardActivationFilter(QObject):
+    def __init__(self, widget, activate) -> None:
+        super().__init__(widget)
+        self._widget = widget
+        self._activate = activate
+
+    def eventFilter(self, watched, event):  # noqa: N802
+        if watched is self._widget and _is_keyboard_activation_event(event):
+            if self._activate(self._widget):
+                try:
+                    event.accept()
+                except Exception:
+                    pass
+                return True
+        return False
+
+
+def _is_keyboard_activation_event(event) -> bool:
+    try:
+        if event.type() != QEvent.Type.KeyPress:
+            return False
+        return event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space)
+    except Exception:
+        return False
+
+
+def _install_keyboard_activation_filter(widget, *, property_name: str, activate) -> None:
+    try:
+        if widget.property(property_name):
+            return
+    except Exception:
+        pass
+    try:
+        activation_filter = _KeyboardActivationFilter(widget, activate)
+        widget.installEventFilter(activation_filter)
+        setattr(widget, property_name, activation_filter)
+        widget.setProperty(property_name, True)
+    except Exception:
+        pass
+
+
+def _toggle_keyboard_target(widget) -> bool:
+    try:
+        widget.setChecked(not bool(widget.isChecked()))
+        _refresh_keyboard_toggle_accessibility(widget)
+        return True
+    except Exception:
+        return False
 
 
 __all__ = [
