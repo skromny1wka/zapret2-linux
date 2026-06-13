@@ -75,6 +75,7 @@ class CloseDialog(MessageBoxBase):
         )
         self.stopDpiButton.clicked.connect(self._on_stop_dpi)
         self.stopDpiButton.setEnabled(self._launch_running)
+        self.stopDpiButton.setVisible(self._launch_running)
         self.viewLayout.addWidget(self.stopDpiButton)
 
         # --- Кнопка "Отмена" (прозрачная, по центру) ---

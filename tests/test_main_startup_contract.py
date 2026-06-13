@@ -3326,7 +3326,7 @@ class WindowsSessionShutdownTests(unittest.TestCase):
                 closing_completely=False,
                 windows_session_ending=False,
             )
-            runtime = SimpleNamespace(snapshot=Mock(return_value=SimpleNamespace(launch_running=True)))
+            runtime = SimpleNamespace(snapshot=Mock(return_value=SimpleNamespace(running=True)))
             close_to_tray = Mock(return_value=True)
             flow = WindowCloseFlow(
                 parent=object(),

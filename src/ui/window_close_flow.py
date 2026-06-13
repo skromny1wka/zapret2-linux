@@ -87,7 +87,9 @@ class WindowCloseFlow:
             launch_running = False
             try:
                 snapshot = self._get_launch_state_snapshot()
-                launch_running = bool(getattr(snapshot, "launch_running", False))
+                launch_running = bool(
+                    getattr(snapshot, "running", getattr(snapshot, "launch_running", False))
+                )
             except Exception as snapshot_error:
                 log(f"Не удалось прочитать состояние запуска перед диалогом закрытия: {snapshot_error}", "DEBUG")
 

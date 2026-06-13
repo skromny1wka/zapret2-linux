@@ -49,13 +49,8 @@ class CloseDialogAccessibilityTests(unittest.TestCase):
         self.assertEqual(dialog.bodyLabel.property("screenReaderStateText"), "Описание закрытия: DPI не запущен")
         self.assertEqual(dialog.trayButton.property("screenReaderStateText"), "Свернуть ZapretGUI в трей")
         self.assertEqual(dialog.guiOnlyButton.property("screenReaderStateText"), "Закрыть только окно ZapretGUI")
-        self.assertEqual(dialog.stopDpiButton.accessibleName(), "Закрыть ZapretGUI и остановить DPI, недоступно")
-        self.assertEqual(
-            dialog.stopDpiButton.property("screenReaderStateText"),
-            "Закрыть ZapretGUI и остановить DPI, недоступно",
-        )
+        self.assertFalse(dialog.stopDpiButton.isVisibleTo(dialog))
         self.assertEqual(dialog.cancelLinkButton.property("screenReaderStateText"), "Отменить закрытие ZapretGUI")
-        self.assertIn("DPI сейчас не запущен", dialog.stopDpiButton.accessibleDescription())
 
 
 if __name__ == "__main__":
