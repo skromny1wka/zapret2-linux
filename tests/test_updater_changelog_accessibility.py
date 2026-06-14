@@ -23,6 +23,11 @@ class UpdaterChangelogAccessibilityTests(unittest.TestCase):
         self.assertEqual(card.accessibleName(), "Доступно обновление: версия 9.9.9")
         self.assertEqual(card.property("screenReaderStateText"), "Доступно обновление: версия 9.9.9")
         self.assertIn("список изменений", card.accessibleDescription().lower())
+        self.assertEqual(card.icon_label.accessibleName(), "Индикатор обновления: Доступно обновление: версия 9.9.9")
+        self.assertEqual(
+            card.icon_label.property("screenReaderStateText"),
+            "Индикатор обновления: Доступно обновление: версия 9.9.9",
+        )
         self.assertEqual(card.close_btn.accessibleName(), "Закрыть уведомление об обновлении")
         self.assertEqual(
             card.close_btn.property("screenReaderStateText"),
@@ -38,6 +43,12 @@ class UpdaterChangelogAccessibilityTests(unittest.TestCase):
         self.assertEqual(card.install_btn.accessibleName(), "Установить обновление 9.9.9")
         self.assertEqual(card.install_btn.property("screenReaderStateText"), "Установить обновление 9.9.9")
         self.assertIn("установку", card.install_btn.accessibleDescription().lower())
+        card._mode = "downloading"
+        download_icon_text = card._icon_state_text(
+            card_name="Загрузка v9.9.9: версия 9.9.9",
+            version="9.9.9",
+        )
+        self.assertEqual(download_icon_text, "Индикатор обновления: Скачивание обновления: версия 9.9.9")
 
     def test_install_button_has_initial_screen_reader_state_text(self) -> None:
         card = ChangelogCard(language="ru")

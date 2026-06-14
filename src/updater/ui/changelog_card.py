@@ -190,6 +190,8 @@ class ChangelogCard(CardWidget):
             description="Карточка обновления. Содержит версию, список изменений и кнопки действий.",
         )
         set_state_text(self, card_name)
+        icon_state = self._icon_state_text(card_name=card_name, version=version)
+        set_state_text(self.icon_label, icon_state)
         set_control_accessibility(
             self.install_btn,
             name=install_name,
@@ -209,6 +211,11 @@ class ChangelogCard(CardWidget):
         )
         set_state_text(self.changelog_text, changelog_name)
         self._update_progress_accessibility()
+
+    def _icon_state_text(self, *, card_name: str, version: str) -> str:
+        if self._mode == "downloading" and version:
+            return f"Индикатор обновления: Скачивание обновления: версия {version}"
+        return f"Индикатор обновления: {card_name or '—'}"
 
     def _update_progress_accessibility(self) -> None:
         self._set_label_state(self.progress_label, "Ход скачивания обновления")
