@@ -1,5 +1,7 @@
 import unittest
 import inspect
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -103,6 +105,30 @@ class SidebarIconStyleNavigationTests(unittest.TestCase):
         self.assertIn("resolve_windows11_sidebar_icon_path", source)
         self.assertNotIn("Path(", source)
         self.assertNotIn(".exists()", source)
+
+    def test_navigation_icon_resource_lookup_uses_src_ico_folder(self) -> None:
+        import app.navigation_icon_resources as resources
+
+        with TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            icon_path = root / "src" / "ico" / "windows11_fluent" / "sidebar" / "home.svg"
+            icon_path.parent.mkdir(parents=True)
+            icon_path.write_text("<svg />", encoding="utf-8")
+
+            with patch.object(resources, "_resource_roots", return_value=(root,)):
+                self.assertEqual(resources.resolve_windows11_sidebar_icon_path("home.svg"), str(icon_path))
+
+    def test_navigation_icon_resource_lookup_ignores_root_ico_folder(self) -> None:
+        import app.navigation_icon_resources as resources
+
+        with TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            icon_path = root / "ico" / "windows11_fluent" / "sidebar" / "home.svg"
+            icon_path.parent.mkdir(parents=True)
+            icon_path.write_text("<svg />", encoding="utf-8")
+
+            with patch.object(resources, "_resource_roots", return_value=(root,)):
+                self.assertEqual(resources.resolve_windows11_sidebar_icon_path("home.svg"), "")
 
     def test_current_sidebar_icon_style_uses_cache_without_settings_load(self) -> None:
         import settings.appearance as appearance_settings
