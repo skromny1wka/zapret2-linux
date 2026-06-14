@@ -194,6 +194,7 @@ def build_strategy_scan_control_section(
     actions_title_label = body_label_cls(
         tr_fn("page.strategy_scan.actions.title", "Действия")
     )
+    set_state_text(actions_title_label, f"Раздел подбора стратегии: {actions_title_label.text()}")
 
     actions_bar = QuickActionsBar(parent)
 

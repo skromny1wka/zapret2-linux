@@ -62,6 +62,10 @@ class StrategyScanPageAccessibilityTests(unittest.TestCase):
         self.assertIn("домен или STUN-цель", page._target_input.accessibleDescription())
         self.assertEqual(page._quick_domain_btn.accessibleName(), "Быстрый выбор цели")
         self.assertEqual(page._quick_domain_btn.property("screenReaderStateText"), "Быстрый выбор цели")
+        self.assertEqual(
+            page._actions_title_label.property("screenReaderStateText"),
+            "Раздел подбора стратегии: Действия",
+        )
         self.assertEqual(page._start_btn.accessibleName(), "Начать подбор стратегии")
         self.assertEqual(page._start_btn.property("screenReaderStateText"), "Начать подбор стратегии")
         self.assertEqual(page._stop_btn.accessibleName(), "Остановить подбор стратегии")
