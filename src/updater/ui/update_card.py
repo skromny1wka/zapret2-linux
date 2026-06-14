@@ -120,6 +120,7 @@ class UpdateStatusCard(CardWidget):
         self.check_btn.clicked.connect(self._on_check_clicked)
         content_layout.addWidget(self.check_btn)
 
+        self.clicked.connect(self._on_check_clicked)
         main_layout.addWidget(content)
 
         self._apply_theme(force=True)

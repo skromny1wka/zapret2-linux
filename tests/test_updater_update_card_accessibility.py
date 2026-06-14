@@ -5,6 +5,8 @@ import unittest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import QApplication
 
 from updater.ui.update_card import UpdateStatusCard
@@ -38,6 +40,18 @@ class UpdaterUpdateCardAccessibilityTests(unittest.TestCase):
             card.subtitle_label.accessibleName(),
             "Описание проверки обновлений: Нажмите для проверки доступных обновлений",
         )
+
+    def test_update_status_card_opens_check_from_keyboard(self) -> None:
+        card = UpdateStatusCard(language="ru")
+        self.addCleanup(card.deleteLater)
+        requested: list[bool] = []
+        card.check_clicked.connect(lambda: requested.append(True))
+
+        event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Return, Qt.KeyboardModifier.NoModifier)
+        QApplication.sendEvent(card, event)
+
+        self.assertTrue(event.isAccepted())
+        self.assertEqual(requested, [True])
 
     def test_update_status_card_reports_checking_state(self) -> None:
         card = UpdateStatusCard(language="ru")
