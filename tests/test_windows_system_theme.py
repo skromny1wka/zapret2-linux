@@ -113,6 +113,13 @@ class WindowsSystemThemeTests(unittest.TestCase):
         background_applier.assert_not_called()
         refresh_flusher.assert_not_called()
 
+    def test_native_event_filter_returns_pyqt6_result_pair(self) -> None:
+        import ui.windows_system_theme as system_theme
+
+        watcher = system_theme.WindowsSystemThemeWatcher(window=object())
+
+        self.assertEqual(watcher.nativeEventFilter(b"", None), (False, 0))
+
 
 if __name__ == "__main__":
     unittest.main()

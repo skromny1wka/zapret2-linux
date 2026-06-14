@@ -221,7 +221,7 @@ class WindowsSystemThemeWatcher(QAbstractNativeEventFilter):
         message_id, lparam = _native_message_id_and_lparam(message)
         if is_windows_theme_change_message(message_id, lparam):
             self._timer.start(self._debounce_ms)
-        return False
+        return False, 0
 
 
 def install_windows_system_theme_watcher(app, window) -> WindowsSystemThemeWatcher | None:
