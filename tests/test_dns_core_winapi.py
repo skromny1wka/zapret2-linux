@@ -44,22 +44,37 @@ class _FakeIpHelper:
         self.call = None
 
     def SetInterfaceDnsSettings(self, _guid, settings_ptr):  # noqa: N802
-        settings = ctypes.cast(
+        base_settings = ctypes.cast(
             settings_ptr,
-            ctypes.POINTER(self.dns_core.DNS_INTERFACE_SETTINGS3),
+            ctypes.POINTER(self.dns_core.DNS_INTERFACE_SETTINGS),
         ).contents
-        first_property = settings.ServerProperties[0]
-        self.call = {
+        if base_settings.Version == self.dns_core.DNS_INTERFACE_SETTINGS_VERSION3:
+            settings = ctypes.cast(
+                settings_ptr,
+                ctypes.POINTER(self.dns_core.DNS_INTERFACE_SETTINGS3),
+            ).contents
+        else:
+            settings = base_settings
+
+        call = {
             "version": settings.Version,
             "flags": settings.Flags,
             "name_server": settings.NameServer,
+        }
+        if settings.Version != self.dns_core.DNS_INTERFACE_SETTINGS_VERSION3:
+            self.call = call
+            return 0
+
+        first_property = settings.ServerProperties[0]
+        call.update({
             "property_count": settings.cServerProperties,
             "property_version": first_property.Version,
             "property_index": first_property.ServerIndex,
             "property_type": first_property.Type,
             "template": first_property.Property.DohSettings.contents.Template,
             "doh_flags": first_property.Property.DohSettings.contents.Flags,
-        }
+        })
+        self.call = call
         return 0
 
 
@@ -145,6 +160,25 @@ class DnsCoreWinApiTests(unittest.TestCase):
 
         dns_core.get_windows_version = lambda: (10, 0, 22000)
         self.assertTrue(dns_core.is_doh_supported())
+
+    def test_empty_dns_reset_does_not_set_doh_flag_without_name_server(self) -> None:
+        dns_core = _load_dns_core()
+        fake_iphlpapi = _FakeIpHelper(dns_core)
+        dns_core.iphlpapi = fake_iphlpapi
+        dns_core._guid_from_string = lambda _guid: dns_core.GUID()
+        dns_core.is_doh_supported = lambda: True
+
+        ok = dns_core.set_dns_via_winapi(
+            "{C78087CA-DCB3-4993-B9D1-7CC33D0A288B}",
+            [],
+            is_ipv6=False,
+            doh_templates={},
+        )
+
+        self.assertTrue(ok)
+        self.assertEqual(fake_iphlpapi.call["version"], 1)
+        self.assertEqual(fake_iphlpapi.call["flags"], dns_core.DNS_SETTING_NAMESERVER)
+        self.assertIsNone(fake_iphlpapi.call["name_server"])
 
 
 if __name__ == "__main__":

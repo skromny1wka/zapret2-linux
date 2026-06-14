@@ -12,6 +12,7 @@ from qfluentwidgets import BodyLabel, ComboBox, PushButton, StrongBodyLabel, Swi
 
 from hosts.page_plans import HostsServiceGroupPlan, HostsServiceRowPlan
 from hosts.ui.services_build import build_hosts_services_group
+from hosts.ui.services_build import build_hosts_services_section_title
 from hosts.ui.services_build import build_hosts_service_row
 
 
@@ -19,6 +20,30 @@ class HostsServicesAccessibilityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls._app = QApplication.instance() or QApplication([])
+
+    def test_services_section_title_reads_as_section_for_screen_reader(self) -> None:
+        title = build_hosts_services_section_title(text="Сервисы")
+
+        self.assertEqual(title.accessibleName(), "Раздел hosts: Сервисы")
+        self.assertEqual(title.property("screenReaderStateText"), "Раздел hosts: Сервисы")
+
+    def test_services_group_title_reads_as_group_for_screen_reader(self) -> None:
+        widgets = build_hosts_services_group(
+            HostsServiceGroupPlan(
+                title="Видео",
+                direct_only=False,
+                service_names=["YouTube", "Twitch"],
+                common_profiles=[("zapret_dns", "Zapret DNS")],
+                rows=[],
+            ),
+            off_label="Отключено",
+            strong_body_label_cls=StrongBodyLabel,
+            make_chip=lambda label: PushButton(label),
+            on_bulk_apply=lambda *_args: None,
+        )
+
+        self.assertEqual(widgets.title_label.accessibleName(), "Группа hosts: Видео")
+        self.assertEqual(widgets.title_label.property("screenReaderStateText"), "Группа hosts: Видео")
 
     def test_direct_toggle_reads_service_state(self) -> None:
         widgets = build_hosts_service_row(

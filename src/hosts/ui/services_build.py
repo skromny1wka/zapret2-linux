@@ -49,6 +49,9 @@ def build_hosts_services_container() -> HostsServicesContainerWidgets:
 
 def build_hosts_services_section_title(*, text: str) -> QLabel:
     label = QLabel(text)
+    clean_text = str(text or "").strip()
+    if clean_text:
+        set_state_text(label, f"Раздел hosts: {clean_text}")
     tokens = get_theme_tokens()
     label.setStyleSheet(
         f"color: {tokens.fg_muted}; font-size: 13px; font-weight: 600; padding-top: 8px; padding-bottom: 4px;"
@@ -71,6 +74,9 @@ def build_hosts_services_group(
     header.setSpacing(10)
 
     title_label = strong_body_label_cls(group_plan.title)
+    group_title = str(group_plan.title or "").strip()
+    if group_title:
+        set_state_text(title_label, f"Группа hosts: {group_title}")
     header.addWidget(title_label, 0, Qt.AlignmentFlag.AlignVCenter)
 
     chips_scroll = None

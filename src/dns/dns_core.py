@@ -390,6 +390,7 @@ def set_dns_via_winapi(
 
         use_doh_settings = (
             not is_ipv6
+            and bool(normalized_servers)
             and doh_templates is not None
             and is_doh_supported()
         )
