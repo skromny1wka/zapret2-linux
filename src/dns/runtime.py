@@ -12,6 +12,7 @@ class NetworkPageData:
     dns_info: dict[str, dict[str, list[str]]]
     ipv6_available: bool
     force_dns_active: bool
+    doh_supported: bool = False
 
 
 _dns_manager_instance = None
@@ -48,6 +49,16 @@ def detect_ipv6_availability() -> bool:
         return False
 
 
+def detect_doh_support() -> bool:
+    try:
+        from dns.dns_core import is_doh_supported
+
+        return bool(is_doh_supported())
+    except Exception as exc:
+        log(f"Ошибка проверки поддержки DoH: {exc}", "DEBUG")
+        return False
+
+
 def load_page_data() -> NetworkPageData:
     ipv6_available = detect_ipv6_availability()
 
@@ -69,6 +80,7 @@ def load_page_data() -> NetworkPageData:
         dns_info=dns_info,
         ipv6_available=ipv6_available,
         force_dns_active=force_dns_active,
+        doh_supported=detect_doh_support(),
     )
 
 

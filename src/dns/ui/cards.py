@@ -112,6 +112,7 @@ class DNSProviderCard(DNSChoiceCard):
         data: dict,
         is_current: bool = False,
         show_ipv6: bool = False,
+        show_doh: bool = True,
         parent=None,
     ):
         super().__init__(parent)
@@ -119,6 +120,7 @@ class DNSProviderCard(DNSChoiceCard):
         self.data = data
         self.is_current = is_current
         self.show_ipv6 = bool(show_ipv6)
+        self.show_doh = bool(show_doh)
         self._icon_label = None
         self._name_label = None
         self._desc_label = None
@@ -186,7 +188,7 @@ class DNSProviderCard(DNSChoiceCard):
         self._desc_label = desc_label
         layout.addWidget(desc_label)
 
-        if self.data.get("doh"):
+        if self.show_doh and self.data.get("doh"):
             doh_label = QLabel(tr_catalog(
                 "page.network.dns.doh_supported", default="DoH",
             ))

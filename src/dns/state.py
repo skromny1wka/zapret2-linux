@@ -15,6 +15,7 @@ class DnsState:
     dns_info: dict[str, dict[str, list[str]]] = field(default_factory=dict)
     ipv6_available: bool = False
     force_dns_enabled: bool = False
+    doh_supported: bool = False
     active_profile: str = ""
     last_message: str = ""
     error: str = ""

@@ -357,6 +357,7 @@ class DnsPageBuildContractTests(unittest.TestCase):
             on_auto_selected=lambda: None,
             on_provider_selected=lambda _name, _data: None,
             ipv6_available=True,
+            doh_supported=True,
             dns_cards_container=SimpleNamespace(show=lambda: None),
             custom_card=custom_card,
             dns_provider_card_cls=SimpleNamespace(indicator_off=lambda: ""),

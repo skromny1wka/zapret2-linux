@@ -16,7 +16,7 @@ class DnsChoiceListTests(unittest.TestCase):
         cls._app = QApplication.instance() or QApplication([])
 
     def test_choice_list_uses_delegate_rows_for_static_dns_choices(self) -> None:
-        from dns.ui.choice_list import DnsChoiceListWidget
+        from dns.ui.choice_list import DOH_ROLE, DnsChoiceListWidget
         from dns.ui.cards import DNSProviderCard
 
         view = DnsChoiceListWidget()
@@ -40,7 +40,24 @@ class DnsChoiceListTests(unittest.TestCase):
 
         self.assertTrue(provider.property("selected"))
         self.assertEqual(provider.accessibleName(), "DNS Google DNS, выбран")
+        self.assertTrue(provider.item.data(DOH_ROLE))
         self.assertGreater(view.sizeHintForRow(0), 0)
+
+    def test_choice_list_hides_doh_badge_when_windows_does_not_support_doh(self) -> None:
+        from dns.ui.choice_list import DOH_ROLE, DnsChoiceListWidget
+
+        view = DnsChoiceListWidget()
+        provider = view.add_provider(
+            "Google DNS",
+            {
+                "desc": "Надёжный",
+                "ipv4": ["8.8.8.8"],
+                "doh": "https://dns.google/dns-query",
+            },
+            show_doh=False,
+        )
+
+        self.assertFalse(provider.item.data(DOH_ROLE))
 
     def test_choice_list_emits_same_selection_signals_as_old_cards(self) -> None:
         from dns.ui.choice_list import DnsChoiceListWidget

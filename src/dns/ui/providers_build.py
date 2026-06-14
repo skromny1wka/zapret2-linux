@@ -19,6 +19,7 @@ def build_provider_cards(
     dns_cards_layout,
     show_ipv6: bool,
     on_selected,
+    show_doh: bool = True,
 ) -> ProviderCardsBuildResult:
     dns_cards: dict[str, object] = {}
     category_labels: list[object] = []
@@ -38,6 +39,7 @@ def build_provider_cards(
                     name,
                     data,
                     show_ipv6=show_ipv6,
+                    show_doh=show_doh,
                 )
         return ProviderCardsBuildResult(
             dns_cards=dns_cards,
@@ -49,7 +51,7 @@ def build_provider_cards(
         dns_cards_layout.addWidget(category_label)
 
         for name, data in providers.items():
-            card = dns_provider_card_cls(name, data, False, show_ipv6=show_ipv6)
+            card = dns_provider_card_cls(name, data, False, show_ipv6=show_ipv6, show_doh=show_doh)
             card.selected.connect(on_selected)
             dns_cards[name] = card
             dns_cards_layout.addWidget(card)

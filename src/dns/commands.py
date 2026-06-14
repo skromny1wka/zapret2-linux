@@ -9,6 +9,7 @@ def _to_dns_state(data) -> DnsState:
         dns_info=dict(data.dns_info),
         ipv6_available=bool(data.ipv6_available),
         force_dns_enabled=bool(data.force_dns_active),
+        doh_supported=bool(getattr(data, "doh_supported", False)),
     )
 
 

@@ -23,6 +23,7 @@ def apply_loaded_page_state(
     state,
     set_ipv6_available_fn,
     set_force_dns_active_fn,
+    set_doh_supported_fn,
     set_adapters_fn,
     set_dns_info_fn,
     emit_adapters_loaded_fn,
@@ -30,6 +31,7 @@ def apply_loaded_page_state(
 ) -> None:
     set_ipv6_available_fn(state.ipv6_available)
     set_force_dns_active_fn(state.force_dns_enabled)
+    set_doh_supported_fn(getattr(state, "doh_supported", False))
     set_adapters_fn(state.adapters)
     set_dns_info_fn(state.dns_info)
     emit_adapters_loaded_fn(state.adapters)

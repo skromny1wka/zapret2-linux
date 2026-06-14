@@ -161,7 +161,14 @@ class DnsChoiceListWidget(QListWidget):
     def custom_item(self) -> QListWidgetItem | None:
         return self._custom_item
 
-    def add_provider(self, name: str, data: dict, *, show_ipv6: bool = False) -> DnsChoiceHandle:
+    def add_provider(
+        self,
+        name: str,
+        data: dict,
+        *,
+        show_ipv6: bool = False,
+        show_doh: bool = True,
+    ) -> DnsChoiceHandle:
         item = QListWidgetItem()
         item.setData(KIND_ROLE, "provider")
         item.setData(KEY_ROLE, str(name or ""))
@@ -170,7 +177,7 @@ class DnsChoiceListWidget(QListWidget):
         item.setData(IP_TEXT_ROLE, _provider_ip_text(data, show_ipv6=show_ipv6))
         item.setData(ICON_ROLE, str(data.get("icon") or "fa5s.server"))
         item.setData(ICON_COLOR_ROLE, str(data.get("color") or ""))
-        item.setData(DOH_ROLE, bool(data.get("doh")))
+        item.setData(DOH_ROLE, bool(show_doh and data.get("doh")))
         item.setData(PROVIDER_DATA_ROLE, dict(data or {}))
         item.setData(SELECTED_ROLE, False)
         item.setData(Qt.ItemDataRole.AccessibleTextRole, f"DNS {name}")

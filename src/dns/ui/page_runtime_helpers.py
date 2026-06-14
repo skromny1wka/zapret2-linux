@@ -32,6 +32,7 @@ def build_dynamic_network_ui(
     on_adapter_state_changed,
     normalize_alias_fn,
     ipv6_available: bool,
+    doh_supported: bool,
     dns_cards_container,
     custom_card,
     adapters_container,
@@ -62,6 +63,7 @@ def build_dynamic_network_ui(
         on_auto_selected=on_auto_selected,
         on_provider_selected=on_provider_selected,
         ipv6_available=ipv6_available,
+        doh_supported=doh_supported,
         dns_cards_container=dns_cards_container,
         custom_card=custom_card,
         dns_provider_card_cls=dns_provider_card_cls,
@@ -110,6 +112,7 @@ def build_dns_choices_ui(
     on_auto_selected,
     on_provider_selected,
     ipv6_available: bool,
+    doh_supported: bool,
     dns_cards_container,
     custom_card,
     dns_provider_card_cls,
@@ -165,6 +168,7 @@ def build_dns_choices_ui(
         dns_provider_card_cls=dns_provider_card_cls,
         dns_cards_layout=dns_cards_layout,
         show_ipv6=ipv6_available,
+        show_doh=doh_supported,
         on_selected=on_provider_selected,
     )
 

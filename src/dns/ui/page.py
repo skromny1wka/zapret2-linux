@@ -121,6 +121,7 @@ class NetworkPage(BasePage):
         self._selected_provider = None
         self._force_dns_active = False
         self._ipv6_available = False
+        self._doh_supported = False
         self._test_in_progress = False
         self._force_dns_status_enabled = False
         self._force_dns_status_details_key: str | None = None
@@ -477,6 +478,7 @@ class NetworkPage(BasePage):
             on_auto_selected=self._select_auto_dns,
             on_provider_selected=self._on_dns_selected,
             ipv6_available=True,
+            doh_supported=self._doh_supported,
             dns_cards_container=self.dns_cards_container,
             custom_card=self.custom_card,
             dns_provider_card_cls=DNSProviderCard,
@@ -574,6 +576,7 @@ class NetworkPage(BasePage):
                 state=state,
                 set_ipv6_available_fn=lambda value: setattr(self, "_ipv6_available", value),
                 set_force_dns_active_fn=lambda value: setattr(self, "_force_dns_active", value),
+                set_doh_supported_fn=lambda value: setattr(self, "_doh_supported", value),
                 set_adapters_fn=lambda adapters: setattr(self, "_adapters", adapters),
                 set_dns_info_fn=lambda dns_info: setattr(self, "_dns_info", dns_info),
                 emit_adapters_loaded_fn=lambda adapters: (not self._cleanup_in_progress) and self.adapters_loaded.emit(adapters),
