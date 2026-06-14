@@ -370,6 +370,10 @@ def normalize_telegram_proxy(data: object) -> dict[str, Any]:
             schema.VALID_TG_PROXY_UPSTREAM_MODES,
             defaults["upstream_mode"],
         ),
+        "upstream_udp_enabled": as_bool(
+            raw.get("upstream_udp_enabled"),
+            defaults["upstream_udp_enabled"],
+        ),
         "upstream_user": as_clean_str(raw.get("upstream_user"), defaults["upstream_user"]),
         "upstream_pass": as_str(raw.get("upstream_pass"), defaults["upstream_pass"]),
         "cloudflare_enabled": as_bool(raw.get("cloudflare_enabled"), defaults["cloudflare_enabled"]),

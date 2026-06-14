@@ -412,6 +412,7 @@ class TelegramProxyPage(BasePage):
         self._mtproxy_action_widget = widgets.mtproxy_action_widget
         self._current_mtproxy_preset_id = ""
         self._upstream_mode_toggle = widgets.upstream_mode_toggle
+        self._upstream_udp_toggle = widgets.upstream_udp_toggle
         self._cloudflare_toggle = widgets.cloudflare_toggle
         self._cloudflare_domains_row = widgets.cloudflare_domains_row
         self._cloudflare_domains_label = widgets.cloudflare_domains_label
@@ -468,6 +469,7 @@ class TelegramProxyPage(BasePage):
         self._mtproxy_action_btn = widgets.mtproxy_action_btn
         self._mtproxy_action_widget = widgets.mtproxy_action_widget
         self._upstream_mode_toggle = widgets.upstream_mode_toggle
+        self._upstream_udp_toggle = widgets.upstream_udp_toggle
         self._cloudflare_toggle = widgets.cloudflare_toggle
         self._cloudflare_domains_row = widgets.cloudflare_domains_row
         self._cloudflare_domains_label = widgets.cloudflare_domains_label
@@ -683,6 +685,7 @@ class TelegramProxyPage(BasePage):
             upstream_preset_row=getattr(self, "_upstream_preset_row", None),
             upstream_catalog_hint=getattr(self, "_upstream_catalog_hint", None),
             upstream_mode_toggle=getattr(self, "_upstream_mode_toggle", None),
+            upstream_udp_toggle=getattr(self, "_upstream_udp_toggle", None),
             cloudflare_toggle=getattr(self, "_cloudflare_toggle", None),
             cloudflare_worker_toggle=getattr(self, "_cloudflare_worker_toggle", None),
             update_manual_instructions_callback=self._update_manual_instructions,
@@ -722,6 +725,7 @@ class TelegramProxyPage(BasePage):
             upstream_manual_widget=self._upstream_manual_widget,
             mtproxy_action_widget=self._mtproxy_action_widget,
             upstream_mode_toggle=self._upstream_mode_toggle,
+            upstream_udp_toggle=self._upstream_udp_toggle,
             index=index,
         )
         enable_setting_card_group_auto_height(self._upstream_card)
@@ -780,6 +784,7 @@ class TelegramProxyPage(BasePage):
         self._upstream_user_edit.editingFinished.connect(self._on_upstream_user_changed)
         self._upstream_pass_edit.editingFinished.connect(self._on_upstream_pass_changed)
         self._upstream_mode_toggle.toggled.connect(self._on_upstream_mode_changed)
+        self._upstream_udp_toggle.toggled.connect(self._on_upstream_udp_changed)
         self._cloudflare_toggle.toggled.connect(self._on_cloudflare_changed)
         self._cloudflare_domains_edit.editingFinished.connect(self._on_cloudflare_domains_changed)
         self._cloudflare_worker_toggle.toggled.connect(self._on_cloudflare_worker_changed)
@@ -855,6 +860,7 @@ class TelegramProxyPage(BasePage):
             self._apply_upstream_preset_ui(target_index)
 
         self._upstream_mode_toggle.setChecked(state.upstream_mode == "always", block_signals=True)
+        self._upstream_udp_toggle.setChecked(state.upstream_udp_enabled, block_signals=True)
         self._cloudflare_toggle.setChecked(state.cloudflare_enabled, block_signals=True)
         self._cloudflare_domains_edit.setText(", ".join(state.cloudflare_domains))
         self._cloudflare_worker_toggle.setChecked(state.cloudflare_worker_enabled, block_signals=True)
@@ -1749,6 +1755,7 @@ class TelegramProxyPage(BasePage):
             self._upstream_manual_widget.setVisible(False)
             self._mtproxy_action_widget.setVisible(False)
             self._upstream_mode_toggle.setVisible(False)
+            self._upstream_udp_toggle.setVisible(False)
 
         self._cloudflare_toggle.setVisible(plan.cloudflare_controls_visible)
         self._cloudflare_worker_toggle.setVisible(plan.cloudflare_controls_visible)
@@ -2127,6 +2134,9 @@ class TelegramProxyPage(BasePage):
 
     def _on_upstream_mode_changed(self, checked: bool):
         self._request_settings_save("upstream_mode", enabled=bool(checked), restart="now")
+
+    def _on_upstream_udp_changed(self, checked: bool):
+        self._request_settings_save("upstream_udp_enabled", enabled=bool(checked), restart="now")
 
     def _on_open_mtproxy(self):
         """Open MTProxy deep link in browser."""

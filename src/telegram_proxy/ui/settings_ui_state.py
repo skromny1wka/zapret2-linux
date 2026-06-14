@@ -32,6 +32,7 @@ def build_advanced_settings_auto_sections(
         or state.upstream_user
         or state.upstream_password
         or state.upstream_preset_id
+        or state.upstream_udp_enabled
     ):
         sections.add("upstream")
     if (

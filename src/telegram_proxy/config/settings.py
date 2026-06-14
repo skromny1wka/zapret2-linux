@@ -21,6 +21,7 @@ class TelegramProxySettingsState:
     upstream_user: str
     upstream_password: str
     upstream_mode: str
+    upstream_udp_enabled: bool
     upstream_preset_index: int
     cloudflare_enabled: bool
     cloudflare_domains: tuple[str, ...]
@@ -56,6 +57,7 @@ def default_state() -> TelegramProxySettingsState:
         upstream_user="",
         upstream_password="",
         upstream_mode="fallback",
+        upstream_udp_enabled=False,
         upstream_preset_index=0,
         cloudflare_enabled=False,
         cloudflare_domains=(),
@@ -180,6 +182,7 @@ def _settings_state_from_data(data: dict, upstream_catalog: UpstreamCatalog) -> 
         upstream_user=upstream_user,
         upstream_password=upstream_password,
         upstream_mode=upstream_mode,
+        upstream_udp_enabled=bool(raw.get("upstream_udp_enabled", False)),
         upstream_preset_index=upstream_catalog.find_choice_index(
             host=upstream_host,
             port=upstream_port,
@@ -345,6 +348,16 @@ def set_upstream_mode(always_enabled: bool) -> None:
         set_tg_proxy_upstream_mode("always" if always_enabled else "fallback")
     except Exception:
         pass
+
+
+def set_upstream_udp_enabled(enabled: bool) -> None:
+    try:
+        from settings.store import set_tg_proxy_upstream_udp_enabled
+
+        set_tg_proxy_upstream_udp_enabled(bool(enabled))
+    except Exception:
+        pass
+
 
 def set_upstream_preset(preset_id: str) -> None:
     try:
@@ -514,6 +527,7 @@ def build_upstream_config():
             get_tg_proxy_upstream_enabled,
             get_tg_proxy_upstream_host,
             get_tg_proxy_upstream_mode,
+            get_tg_proxy_upstream_udp_enabled,
             get_tg_proxy_upstream_pass,
             get_tg_proxy_upstream_preset_id,
             get_tg_proxy_upstream_port,
@@ -582,6 +596,7 @@ def build_upstream_config():
             host=host,
             port=port,
             mode=str(get_tg_proxy_upstream_mode() or "fallback"),
+            udp_enabled=bool(get_tg_proxy_upstream_udp_enabled()),
             username=username,
             password=password,
             tls=tls,

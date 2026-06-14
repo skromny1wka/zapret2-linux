@@ -98,6 +98,75 @@ _UPSTREAM_PENALTY_SECONDS = 60.0
 _UPSTREAM_CONNECT_FAILURE_PENALTIES = (60.0, 180.0, 300.0)
 _WSS_DOMAIN_PENALTY_SECONDS = 60.0
 
+
+class _Socks5UdpRelayProtocol(asyncio.DatagramProtocol):
+    def __init__(self, *, label: str, side: str, log_callback: Callable[[str], None]):
+        self.label = label
+        self.side = side
+        self.log_callback = log_callback
+        self.transport: asyncio.DatagramTransport | None = None
+        self.peer: "_Socks5UdpRelayProtocol | None" = None
+        self.fixed_target: tuple[str, int] | None = None
+        self.client_addr: tuple[str, int] | None = None
+
+    def connection_made(self, transport) -> None:
+        self.transport = transport
+
+    def datagram_received(self, data: bytes, addr) -> None:
+        peer = self.peer
+        if peer is None or peer.transport is None:
+            return
+        if self.side == "client":
+            self.client_addr = addr
+            try:
+                packet = socks5.parse_udp_packet(data)
+                self.log_callback(
+                    f"[{self.label}] UDP -> {packet.target_host}:{packet.target_port} via upstream SOCKS5"
+                )
+            except Exception as exc:
+                self.log_callback(f"[{self.label}] UDP packet rejected: {type(exc).__name__}: {exc}")
+                return
+            target = peer.fixed_target
+            if target is not None:
+                peer.transport.sendto(data, target)
+            return
+
+        client_addr = peer.client_addr
+        if client_addr is not None:
+            peer.transport.sendto(data, client_addr)
+
+
+class _Socks5UdpRelay:
+    def __init__(
+        self,
+        *,
+        local_transport,
+        upstream_transport,
+        upstream_session: socks5.UdpAssociateSession,
+        local_host: str,
+        local_port: int,
+    ):
+        self.local_transport = local_transport
+        self.upstream_transport = upstream_transport
+        self.upstream_session = upstream_session
+        self.local_host = local_host
+        self.local_port = local_port
+
+    def close(self) -> None:
+        try:
+            self.local_transport.close()
+        except Exception:
+            pass
+        try:
+            self.upstream_transport.close()
+        except Exception:
+            pass
+        try:
+            self.upstream_session.writer.close()
+        except Exception:
+            pass
+
+
 # ---- Main proxy class ----
 
 
@@ -556,6 +625,74 @@ class TelegramWSProxy:
             self._record_route(dc=dc, is_media=is_media, route="внешний SOCKS5", status="OK")
             return rr, rw, endpoint
 
+    async def _open_udp_relay(self, label: str) -> _Socks5UdpRelay:
+        if not self._upstream.enabled or not self._upstream.udp_enabled:
+            raise socks5.Socks5Error("SOCKS5 UDP relay is disabled")
+
+        endpoint = next(
+            (
+                item for item in self._upstream_proxy_candidates()
+                if str(item.host or "").strip() and int(item.port or 0) > 0
+            ),
+            None,
+        )
+        if endpoint is None:
+            raise socks5.Socks5Error("No upstream SOCKS5 proxy for UDP relay")
+
+        self._log(f"[{label}] UDP ASSOCIATE -> upstream proxy {endpoint.host}:{endpoint.port}")
+        upstream_session = await socks5.open_udp_associate_via_socks5(
+            endpoint.host,
+            endpoint.port,
+            username=endpoint.username,
+            password=endpoint.password,
+            timeout=UPSTREAM_CONNECT_TIMEOUT,
+            tls=endpoint.tls,
+            tls_server_name=endpoint.tls_server_name,
+            tls_verify=endpoint.tls_verify,
+        )
+
+        loop = asyncio.get_running_loop()
+        local_protocol = _Socks5UdpRelayProtocol(label=label, side="client", log_callback=self._log)
+        upstream_protocol = _Socks5UdpRelayProtocol(label=label, side="upstream", log_callback=self._log)
+        local_protocol.peer = upstream_protocol
+        upstream_protocol.peer = local_protocol
+        upstream_protocol.fixed_target = (upstream_session.relay_host, upstream_session.relay_port)
+
+        local_bind_host = self._host if self._host != "0.0.0.0" else "127.0.0.1"
+        local_transport = None
+        try:
+            local_transport, _ = await loop.create_datagram_endpoint(
+                lambda: local_protocol,
+                local_addr=(local_bind_host, 0),
+            )
+            upstream_transport, _ = await loop.create_datagram_endpoint(
+                lambda: upstream_protocol,
+                local_addr=("0.0.0.0", 0),
+            )
+        except Exception:
+            try:
+                upstream_session.writer.close()
+            except Exception:
+                pass
+            try:
+                if local_transport is not None:
+                    local_transport.close()
+            except Exception:
+                pass
+            raise
+        local_sock = local_transport.get_extra_info("sockname") or (local_bind_host, 0)
+        self._log(
+            f"[{label}] UDP relay ready: local {local_sock[0]}:{local_sock[1]} "
+            f"-> {upstream_session.relay_host}:{upstream_session.relay_port}"
+        )
+        return _Socks5UdpRelay(
+            local_transport=local_transport,
+            upstream_transport=upstream_transport,
+            upstream_session=upstream_session,
+            local_host=str(local_sock[0]),
+            local_port=int(local_sock[1]),
+        )
+
     @property
     def is_running(self) -> bool:
         return self._running
@@ -674,10 +811,37 @@ class TelegramWSProxy:
         self.stats.active_connections += 1
         peer = writer.get_extra_info("peername", ("?", 0))
         label = f"{peer[0]}:{peer[1]}"
+        udp_relay: _Socks5UdpRelay | None = None
 
         try:
-            result = await socks5.handshake(reader, writer)
+            async def create_udp_relay() -> tuple[str, int]:
+                nonlocal udp_relay
+                try:
+                    udp_relay = await self._open_udp_relay(label)
+                    return udp_relay.local_host, udp_relay.local_port
+                except Exception as exc:
+                    self._log(f"[{label}] UDP relay failed: {type(exc).__name__}: {exc}")
+                    raise
+
+            result = await socks5.handshake(
+                reader,
+                writer,
+                allow_udp_associate=bool(self._upstream.enabled and self._upstream.udp_enabled),
+                on_udp_associate=create_udp_relay,
+            )
             if result is None:
+                return
+
+            if isinstance(result, socks5.UdpAssociateRequest):
+                self._log(
+                    f"[{label}] UDP ASSOCIATE accepted; "
+                    f"client hint {result.client_host}:{result.client_port}"
+                )
+                try:
+                    await reader.read()
+                finally:
+                    if udp_relay is not None:
+                        udp_relay.close()
                 return
 
             target_host, target_port = result
@@ -721,7 +885,7 @@ class TelegramWSProxy:
                         is_media=False,
                         route="внешний SOCKS5",
                         status="пропуск",
-                        reason="HTTP transport, режим весь трафик",
+                        reason="HTTP transport, весь TCP через внешний SOCKS5",
                     )
                     await self._upstream_proxy_connect(
                         reader, writer, target_host, target_port,
@@ -824,8 +988,8 @@ class TelegramWSProxy:
             media_tag = " media" if is_media else ""
             self._log(f"[{label}] DC{dc}{media_tag} ({target_host}:{target_port})")
 
-            # "always" mode: route ALL Telegram traffic through upstream,
-            # skip WSS entirely. This is the "Весь трафик через прокси" toggle.
+            # "always" mode: route all Telegram TCP traffic through upstream,
+            # skip WSS entirely. UDP calls use the separate experimental toggle.
             if should_route_upstream(self._upstream, mode="always"):
                 self._log(f"[{label}] DC{dc} -> upstream (always mode)")
                 self._record_route(
@@ -833,7 +997,7 @@ class TelegramWSProxy:
                     is_media=is_media,
                     route="WSS",
                     status="пропуск",
-                    reason="весь трафик через внешний SOCKS5",
+                    reason="весь TCP через внешний SOCKS5",
                 )
                 await self._upstream_proxy_connect(
                     reader, writer, target_host, target_port,
@@ -875,6 +1039,8 @@ class TelegramWSProxy:
             self.stats.failed_connections += 1
             log.exception("[%s] SOCKS5 handler error", label)
         finally:
+            if udp_relay is not None:
+                udp_relay.close()
             self.stats.active_connections -= 1
             try:
                 writer.close()
@@ -1203,7 +1369,7 @@ class TelegramWSProxy:
                 is_media=is_media,
                 route="WSS",
                 status="пропуск",
-                reason="весь трафик через внешний SOCKS5",
+                reason="весь TCP через внешний SOCKS5",
             )
             await self._mtproxy_upstream_proxy_connect(
                 client_reader,

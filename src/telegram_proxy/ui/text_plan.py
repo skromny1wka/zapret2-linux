@@ -24,6 +24,8 @@ class TelegramProxySettingsText:
     upstream_catalog_missing: str
     upstream_mode_title: str
     upstream_mode_description: str
+    upstream_udp_title: str
+    upstream_udp_description: str
     cloudflare_toggle_title: str
     cloudflare_toggle_description: str
     cloudflare_worker_toggle_title: str
@@ -65,8 +67,10 @@ TELEGRAM_PROXY_SETTINGS_TEXT = TelegramProxySettingsText(
     upstream_preset_title="Сервер",
     upstream_preset_description="Выберите сервер из списка или переключитесь на ручной ввод",
     upstream_catalog_missing="В этой сборке список предустановленных прокси не загружен. Доступен только ручной ввод.",
-    upstream_mode_title="Весь трафик через прокси",
-    upstream_mode_description="Если выключено — только проблемные серверы Telegram. Если включено — весь трафик Telegram.",
+    upstream_mode_title="Весь TCP через SOCKS5",
+    upstream_mode_description="Если выключено — через SOCKS5 идут только проблемные серверы Telegram.",
+    upstream_udp_title="Пробовать звонки через SOCKS5 UDP",
+    upstream_udp_description="Экспериментально. Поможет только если Telegram и выбранный сервер поддерживают UDP через SOCKS5.",
     cloudflare_toggle_title="Cloudflare fallback",
     cloudflare_toggle_description="Пробовать запасные Cloudflare-домены. Если поле доменов пустое, используется авто-список.",
     cloudflare_worker_toggle_title="Cloudflare Worker fallback",

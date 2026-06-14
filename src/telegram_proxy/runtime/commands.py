@@ -192,6 +192,8 @@ def save_settings_action(
         return telegram_proxy_settings.set_manual_upstream(host, port, user, password)
     if action_name == "upstream_mode":
         return telegram_proxy_settings.set_upstream_mode(enabled)
+    if action_name == "upstream_udp_enabled":
+        return telegram_proxy_settings.set_upstream_udp_enabled(enabled)
     if action_name == "cloudflare_enabled":
         return telegram_proxy_settings.set_cloudflare_enabled(enabled)
     if action_name == "cloudflare_domains":

@@ -61,6 +61,7 @@ def apply_upstream_preset_ui(
     upstream_manual_widget,
     mtproxy_action_widget,
     upstream_mode_toggle,
+    upstream_udp_toggle,
     index: int,
 ) -> str:
     upstream_enabled = upstream_toggle.isChecked()
@@ -75,6 +76,8 @@ def apply_upstream_preset_ui(
     mtproxy_action_widget.setVisible(upstream_enabled and is_mtproxy)
     upstream_mode_toggle.setVisible(upstream_enabled)
     upstream_mode_toggle.setEnabled(upstream_enabled)
+    upstream_udp_toggle.setVisible(upstream_enabled)
+    upstream_udp_toggle.setEnabled(upstream_enabled)
 
     if preset is not None and is_mtproxy:
         return str(preset.get("id") or "").strip()
@@ -143,6 +146,7 @@ def apply_ui_texts(
     upstream_preset_row,
     upstream_catalog_hint,
     upstream_mode_toggle,
+    upstream_udp_toggle,
     cloudflare_toggle,
     cloudflare_worker_toggle,
     update_manual_instructions_callback,
@@ -315,6 +319,11 @@ def apply_ui_texts(
             upstream_mode_toggle.set_texts(
                 text.upstream_mode_title,
                 text.upstream_mode_description,
+            )
+        if upstream_udp_toggle is not None:
+            upstream_udp_toggle.set_texts(
+                text.upstream_udp_title,
+                text.upstream_udp_description,
             )
         if cloudflare_toggle is not None:
             cloudflare_toggle.set_texts(

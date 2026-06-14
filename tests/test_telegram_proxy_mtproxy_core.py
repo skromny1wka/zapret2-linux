@@ -156,8 +156,11 @@ class TelegramProxyMTProxyCoreTests(unittest.TestCase):
         self.assertEqual(defaults["pool_size"], 4)
         self.assertEqual(defaults["buffer_kb"], 256)
         self.assertEqual(defaults["mode"], "socks5")
+        self.assertFalse(defaults["upstream_udp_enabled"])
         self.assertEqual(normalize_telegram_proxy({})["mode"], "socks5")
+        self.assertFalse(normalize_telegram_proxy({})["upstream_udp_enabled"])
         self.assertEqual(default_state().mode, "socks5")
+        self.assertFalse(default_state().upstream_udp_enabled)
         self.assertEqual(normalize_proxy_mode("bad"), "socks5")
         self.assertEqual(normalize_telegram_proxy({"mode": "transparent"})["mode"], "socks5")
         self.assertEqual(normalize_telegram_proxy({"mode": "both"})["mode"], "socks5")
@@ -169,6 +172,7 @@ class TelegramProxyMTProxyCoreTests(unittest.TestCase):
                 "mtproxy_secret": "  AABBCCDDEEFF00112233445566778899  ",
                 "pool_size": 99,
                 "buffer_kb": 2,
+                "upstream_udp_enabled": True,
                 "dc_ip": [
                     "2:149.154.167.220",
                     "bad",
@@ -180,6 +184,7 @@ class TelegramProxyMTProxyCoreTests(unittest.TestCase):
         )
 
         self.assertEqual(normalized["mode"], "mtproxy")
+        self.assertTrue(normalized["upstream_udp_enabled"])
         self.assertEqual(normalized["mtproxy_secret"], "aabbccddeeff00112233445566778899")
         self.assertEqual(normalized["pool_size"], 32)
         self.assertEqual(normalized["buffer_kb"], 4)

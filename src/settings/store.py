@@ -960,6 +960,14 @@ def set_tg_proxy_upstream_mode(value: str) -> bool:
     return _set_str(("telegram_proxy", "upstream_mode"), value)
 
 
+def get_tg_proxy_upstream_udp_enabled() -> bool:
+    return _get_bool(("telegram_proxy", "upstream_udp_enabled"), False)
+
+
+def set_tg_proxy_upstream_udp_enabled(value: bool) -> bool:
+    return _set_bool(("telegram_proxy", "upstream_udp_enabled"), value)
+
+
 def get_tg_proxy_upstream_user() -> str:
     return _get_str(("telegram_proxy", "upstream_user"), "")
 
@@ -1376,6 +1384,7 @@ __all__ = [
     "get_tg_proxy_upstream_enabled",
     "get_tg_proxy_upstream_host",
     "get_tg_proxy_upstream_mode",
+    "get_tg_proxy_upstream_udp_enabled",
     "get_tg_proxy_upstream_pass",
     "get_tg_proxy_upstream_preset_id",
     "get_tg_proxy_upstream_port",
@@ -1473,6 +1482,7 @@ __all__ = [
     "set_tg_proxy_upstream_enabled",
     "set_tg_proxy_upstream_host",
     "set_tg_proxy_upstream_mode",
+    "set_tg_proxy_upstream_udp_enabled",
     "set_tg_proxy_upstream_pass",
     "set_tg_proxy_upstream_preset_id",
     "set_tg_proxy_upstream_port",

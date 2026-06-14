@@ -97,6 +97,87 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
         set_pool_size.assert_called_once_with(8)
         set_buffer_kb.assert_called_once_with(512)
 
+    def test_upstream_udp_setting_is_saved_and_passed_to_upstream_config(self) -> None:
+        import telegram_proxy.runtime.commands as commands
+        import telegram_proxy.config.settings as telegram_proxy_settings
+
+        with patch("telegram_proxy.config.settings.set_upstream_udp_enabled") as set_udp_enabled:
+            commands.save_settings_action("upstream_udp_enabled", enabled=True)
+
+        set_udp_enabled.assert_called_once_with(True)
+
+        with (
+            patch("settings.store.get_tg_proxy_upstream_enabled", return_value=True),
+            patch("settings.store.get_tg_proxy_upstream_host", return_value="127.0.0.1"),
+            patch("settings.store.get_tg_proxy_upstream_port", return_value=1080),
+            patch("settings.store.get_tg_proxy_upstream_user", return_value=""),
+            patch("settings.store.get_tg_proxy_upstream_pass", return_value=""),
+            patch("settings.store.get_tg_proxy_upstream_preset_id", return_value=""),
+            patch("settings.store.get_tg_proxy_upstream_mode", return_value="always"),
+            patch("settings.store.get_tg_proxy_upstream_udp_enabled", return_value=True),
+        ):
+            config = telegram_proxy_settings.build_upstream_config()
+
+        self.assertTrue(config.enabled)
+        self.assertEqual(config.mode, "always")
+        self.assertTrue(config.udp_enabled)
+
+    def test_socks5_handler_accepts_udp_associate_when_udp_relay_is_enabled(self) -> None:
+        from telegram_proxy.proxy import socks5
+        from telegram_proxy.proxy.routing import UpstreamProxyConfig
+        from telegram_proxy.wss_proxy import TelegramWSProxy
+
+        class _Reader:
+            async def read(self):
+                return b""
+
+        class _Writer:
+            def get_extra_info(self, name, default=None):
+                if name == "peername":
+                    return ("127.0.0.1", 50000)
+                return default
+
+        class _Relay:
+            local_host = "127.0.0.1"
+            local_port = 45678
+
+            def __init__(self):
+                self.closed = False
+
+            def close(self):
+                self.closed = True
+
+        relay = _Relay()
+        callback_bound: list[tuple[str, int]] = []
+
+        async def fake_handshake(_reader, _writer, *, allow_udp_associate, on_udp_associate):
+            self.assertTrue(allow_udp_associate)
+            callback_bound.append(await on_udp_associate())
+            return socks5.UdpAssociateRequest("0.0.0.0", 9)
+
+        proxy = TelegramWSProxy(
+            port=0,
+            upstream_config=UpstreamProxyConfig(
+                enabled=True,
+                host="127.0.0.1",
+                port=1080,
+                udp_enabled=True,
+            ),
+        )
+
+        async def run_check() -> None:
+            with (
+                patch("telegram_proxy.wss_proxy.socks5.handshake", side_effect=fake_handshake),
+                patch.object(proxy, "_open_udp_relay", return_value=relay) as open_udp_relay,
+            ):
+                await proxy._handle_socks5_client(_Reader(), _Writer())
+            open_udp_relay.assert_called_once()
+
+        asyncio.run(run_check())
+
+        self.assertEqual(callback_bound, [("127.0.0.1", 45678)])
+        self.assertTrue(relay.closed)
+
     def test_cloudflare_helpers_build_domain_and_worker_targets(self) -> None:
         from telegram_proxy.proxy.cloudflare import (
             CloudflareFallbackConfig,

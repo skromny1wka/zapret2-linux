@@ -67,6 +67,7 @@ class TelegramProxySettingsPanelWidgets:
     mtproxy_action_btn: object
     mtproxy_action_widget: object
     upstream_mode_toggle: object
+    upstream_udp_toggle: object
     cloudflare_toggle: object
     cloudflare_domains_row: object
     cloudflare_domains_label: object
@@ -124,6 +125,7 @@ class TelegramProxyAdvancedSettingsWidgets:
     mtproxy_action_btn: object
     mtproxy_action_widget: object
     upstream_mode_toggle: object
+    upstream_udp_toggle: object
     cloudflare_toggle: object
     cloudflare_domains_row: object
     cloudflare_domains_label: object
@@ -390,6 +392,7 @@ def build_telegram_proxy_settings_panel(
         mtproxy_action_btn=None,
         mtproxy_action_widget=None,
         upstream_mode_toggle=None,
+        upstream_udp_toggle=None,
         cloudflare_toggle=None,
         cloudflare_domains_row=None,
         cloudflare_domains_label=None,
@@ -634,6 +637,14 @@ def build_telegram_proxy_advanced_settings_panel(
     upstream_mode_toggle.setChecked(True)
     upstream_card.addSettingCard(upstream_mode_toggle)
 
+    upstream_udp_toggle = win11_toggle_row_cls(
+        "mdi.phone-in-talk",
+        text.upstream_udp_title,
+        text.upstream_udp_description,
+    )
+    upstream_udp_toggle.setChecked(False)
+    upstream_card.addSettingCard(upstream_udp_toggle)
+
     cloudflare_toggle = win11_toggle_row_cls(
         "mdi.cloud",
         text.cloudflare_toggle_title,
@@ -846,6 +857,7 @@ def build_telegram_proxy_advanced_settings_panel(
         mtproxy_action_btn=mtproxy_action_btn,
         mtproxy_action_widget=mtproxy_action_widget,
         upstream_mode_toggle=upstream_mode_toggle,
+        upstream_udp_toggle=upstream_udp_toggle,
         cloudflare_toggle=cloudflare_toggle,
         cloudflare_domains_row=cloudflare_domains_row,
         cloudflare_domains_label=cloudflare_domains_label,

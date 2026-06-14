@@ -23,11 +23,12 @@ class UpstreamProxyConfig(UpstreamProxyEndpoint):
 
     Modes:
       - "fallback": route through upstream only when WSS+TCP both fail
-      - "always":   route all traffic through upstream proxy
+      - "always":   route all TCP traffic through upstream proxy
     """
 
     enabled: bool = False
     mode: str = "always"
+    udp_enabled: bool = False
     fallback_proxies: tuple[UpstreamProxyEndpoint, ...] = ()
 
 
