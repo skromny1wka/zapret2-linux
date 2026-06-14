@@ -3210,8 +3210,30 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "What is this?",
     },
     "page.winws1_user_presets.info.body": {
-        "ru": "Здесь простой режим: выберите любой пресет, примените его, перезагрузите вкладку и проверьте, открывается ли ресурс. Если не открывается, попробуйте следующий пресет. Также здесь можно создавать, импортировать, экспортировать и переключать пользовательские пресеты.",
-        "en": "This section is for simple workflow: pick any preset, apply it, reload the tab and check if the resource opens. If not, try the next preset. You can also create, import, export and switch custom presets here.",
+        "ru": (
+            "Пресет, или конфиг, — это один или несколько .txt-файлов со списком флагов Zapret. "
+            "Формат такой же, как у winws2.exe или winws.exe, поэтому GUI может быстро читать и менять настройки.\n\n"
+            "Пресеты доступны с Zapret2 v20.3 для режимов Zapret 1 и Zapret 2. "
+            "Они нужны, чтобы быстрее делать новые настройки, проще обмениваться ими и держать GUI и консольный Zapret в одном формате.\n\n"
+            "При запуске активный пресет передаётся в winws2.exe для Zapret 2 или в winws.exe для Zapret 1 через @<config_file>. "
+            "Это значит: прочитать параметры командной строки из файла. Остальные параметры командной строки при таком запуске не используются.\n\n"
+            "Файл %AppData%\\ZapretTwoDev\\preset-zapret2.txt хранит только активный пресет. "
+            "Сам по себе он не считается пользовательским пресетом. Ваши пресеты лежат в папке presets. "
+            "По умолчанию используется Default, также есть встроенный Gaming.\n\n"
+            "Пресетами можно обмениваться напрямую: https://publish.obsidian.md/zapret/Privacy/Zapret2/preset\n\n"
+            "Почему пресеты иногда плохо подходят: в них стратегии часто заранее прописаны под разные фильтры и hostlist. "
+            "Из-за этого один сайт может заработать, а другой перестать. Для более точной настройки лучше использовать прямой запуск: "
+            "там стратегия подбирается отдельно для нужной категории и hostlist."
+        ),
+        "en": (
+            "A preset, or config, is one or more .txt files with Zapret flags. "
+            "It uses the same format as winws2.exe or winws.exe, so the GUI can read and edit these settings.\n\n"
+            "The active preset is passed to winws2.exe for Zapret 2 or winws.exe for Zapret 1 through @<config_file>, "
+            "which means: read command-line options from a file. Other command-line options are not used in this launch mode.\n\n"
+            "%AppData%\\ZapretTwoDev\\preset-zapret2.txt only stores the active preset copy. "
+            "User presets are stored in the presets folder. More details: "
+            "https://publish.obsidian.md/zapret/Privacy/Zapret2/preset"
+        ),
     },
     "page.winws1_profile_setup.title": {
         "ru": "Настройка профиля",
@@ -3670,8 +3692,30 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "What is this?",
     },
     "page.winws2_user_presets.info.body": {
-        "ru": "Здесь простой режим: выберите любой пресет, примените его, перезагрузите вкладку и проверьте, открывается ли ресурс. Если не открывается, попробуйте следующий пресет. Также здесь можно создавать, импортировать, экспортировать и переключать пользовательские пресеты.",
-        "en": "This section is for simple workflow: pick any preset, apply it, reload the tab and check if the resource opens. If not, try the next preset. You can also create, import, export and switch custom presets here.",
+        "ru": (
+            "Пресет, или конфиг, — это один или несколько .txt-файлов со списком флагов Zapret. "
+            "Формат такой же, как у winws2.exe или winws.exe, поэтому GUI может быстро читать и менять настройки.\n\n"
+            "Пресеты доступны с Zapret2 v20.3 для режимов Zapret 1 и Zapret 2. "
+            "Они нужны, чтобы быстрее делать новые настройки, проще обмениваться ими и держать GUI и консольный Zapret в одном формате.\n\n"
+            "При запуске активный пресет передаётся в winws2.exe для Zapret 2 или в winws.exe для Zapret 1 через @<config_file>. "
+            "Это значит: прочитать параметры командной строки из файла. Остальные параметры командной строки при таком запуске не используются.\n\n"
+            "Файл %AppData%\\ZapretTwoDev\\preset-zapret2.txt хранит только активный пресет. "
+            "Сам по себе он не считается пользовательским пресетом. Ваши пресеты лежат в папке presets. "
+            "По умолчанию используется Default, также есть встроенный Gaming.\n\n"
+            "Пресетами можно обмениваться напрямую: https://publish.obsidian.md/zapret/Privacy/Zapret2/preset\n\n"
+            "Почему пресеты иногда плохо подходят: в них стратегии часто заранее прописаны под разные фильтры и hostlist. "
+            "Из-за этого один сайт может заработать, а другой перестать. Для более точной настройки лучше использовать прямой запуск: "
+            "там стратегия подбирается отдельно для нужной категории и hostlist."
+        ),
+        "en": (
+            "A preset, or config, is one or more .txt files with Zapret flags. "
+            "It uses the same format as winws2.exe or winws.exe, so the GUI can read and edit these settings.\n\n"
+            "The active preset is passed to winws2.exe for Zapret 2 or winws.exe for Zapret 1 through @<config_file>, "
+            "which means: read command-line options from a file. Other command-line options are not used in this launch mode.\n\n"
+            "%AppData%\\ZapretTwoDev\\preset-zapret2.txt only stores the active preset copy. "
+            "User presets are stored in the presets folder. More details: "
+            "https://publish.obsidian.md/zapret/Privacy/Zapret2/preset"
+        ),
     },
     "page.winws2_profile_setup.title": {
         "ru": "Настройка профиля",

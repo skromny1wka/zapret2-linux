@@ -176,6 +176,7 @@ def build_user_presets_page_shell(
         FluentIcon.INFO,
     )
     presets_info_btn.clicked.connect(on_open_presets_info)
+    presets_info_btn.hide()
 
     info_btn = toolbar_layout.create_action_button(
         tr_fn(f"{tr_prefix}.button.what_is_this", "Что это такое?"),
@@ -209,7 +210,6 @@ def build_user_presets_page_shell(
         import_btn,
         open_folder_btn,
         reset_all_btn,
-        presets_info_btn,
         info_btn,
     ])
     toolbar_layout.set_trailing_widget(preset_search_input, minimum_width=280)

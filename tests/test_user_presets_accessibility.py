@@ -13,6 +13,7 @@ from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QVBoxLayout, QWidget
 from qfluentwidgets import FluentIcon, LineEdit, PrimaryToolButton, StrongBodyLabel
 
+from app.ui_texts import tr
 from presets.ui.common.user_presets_build import build_user_presets_page_shell
 from presets.ui.common.user_presets_dialogs import CreatePresetDialog, RenamePresetDialog, ResetAllPresetsDialog
 from presets.ui.common.user_presets_page import UserPresetsPageBase
@@ -494,6 +495,17 @@ class UserPresetsAccessibilityTests(unittest.TestCase):
             "Отменить возврат встроенных пресетов",
         )
 
+    def test_user_preset_help_text_explains_preset_file_and_wiki(self) -> None:
+        for prefix in ("page.winws1_user_presets", "page.winws2_user_presets"):
+            with self.subTest(prefix=prefix):
+                body = tr(f"{prefix}.info.body", language="ru")
+
+                self.assertIn(".txt", body)
+                self.assertIn("@<config_file>", body)
+                self.assertIn("%AppData%\\ZapretTwoDev\\preset-zapret2.txt", body)
+                self.assertIn("https://publish.obsidian.md/zapret/Privacy/Zapret2/preset", body)
+                self.assertIn("прямой запуск", body)
+
     def _assert_accessibility(self, widgets) -> None:
         expected = {
             widgets.get_configs_btn: ("Открыть GitHub Discussions с конфигами", "Обменивайтесь пресетами"),
@@ -501,7 +513,6 @@ class UserPresetsAccessibilityTests(unittest.TestCase):
             widgets.import_btn: ("Импортировать пресет из файла", "Импорт пресета из файла"),
             widgets.open_folder_btn: ("Открыть папку пресетов", "Открыть папку, где лежат ваши пресеты"),
             widgets.reset_all_btn: ("Вернуть встроенные пресеты", "изменения во встроенных пресетах будут потеряны"),
-            widgets.presets_info_btn: ("Открыть вики по пресетам", "Вики по пресетам"),
             widgets.info_btn: ("Показать справку о пресетах", "Что это такое"),
             widgets.preset_search_input: ("Поиск пресетов", "Поиск пресетов по имени"),
             widgets.presets_list: (
@@ -509,6 +520,7 @@ class UserPresetsAccessibilityTests(unittest.TestCase):
                 "Стрелки выбирают пресет или папку, Enter или Пробел активирует пресет или сворачивает и разворачивает папку, PageUp и PageDown перемещают пресет, клавиша меню открывает действия",
             ),
         }
+        self.assertTrue(widgets.presets_info_btn.isHidden())
         for widget, (name, description) in expected.items():
             with self.subTest(name=name):
                 self.assertEqual(widget.accessibleName(), name)
