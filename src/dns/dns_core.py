@@ -6,7 +6,19 @@
 from __future__ import annotations
 
 import ctypes, socket, struct, platform, sys, winreg
-from ctypes import wintypes, windll, POINTER, Structure, c_ulong, c_wchar_p
+from ctypes import (
+    Union,
+    byref,
+    c_ulong,
+    c_ulonglong,
+    c_ushort,
+    c_void_p,
+    c_wchar_p,
+    wintypes,
+    windll,
+    POINTER,
+    Structure,
+)
 from functools import lru_cache
 from typing import List, Tuple, Dict, Optional
 from log.log import log
@@ -29,6 +41,15 @@ MIB_IF_TYPE_ETHERNET = 6
 MIB_IF_TYPE_PPP = 23
 MIB_IF_TYPE_LOOPBACK = 24
 MIB_IF_TYPE_IEEE80211 = 71
+DNS_INTERFACE_SETTINGS_VERSION1 = 0x0001
+DNS_INTERFACE_SETTINGS_VERSION3 = 0x0003
+DNS_SETTING_IPV6 = 0x0001
+DNS_SETTING_NAMESERVER = 0x0002
+DNS_SETTING_DOH = 0x1000
+DNS_SERVER_PROPERTY_VERSION1 = 0x0001
+DNS_DOH_SERVER_SETTINGS_ENABLE = 0x0002
+DNS_DOH_SERVER_SETTINGS_FALLBACK_TO_UDP = 0x0004
+DnsServerDohProperty = 1
 
 class IP_ADDR_STRING(Structure):
     pass
@@ -63,6 +84,73 @@ IP_ADAPTER_INFO._fields_ = [
     ('LeaseObtained', ctypes.c_int64),
     ('LeaseExpires', ctypes.c_int64),
 ]
+
+class GUID(Structure):
+    _fields_ = [
+        ("Data1", wintypes.DWORD),
+        ("Data2", c_ushort),
+        ("Data3", c_ushort),
+        ("Data4", ctypes.c_ubyte * 8),
+    ]
+
+
+class DNS_DOH_SERVER_SETTINGS(Structure):
+    _fields_ = [
+        ("Template", c_wchar_p),
+        ("Flags", c_ulonglong),
+    ]
+
+
+class DNS_SERVER_PROPERTY_TYPES(Union):
+    _fields_ = [
+        ("DohSettings", POINTER(DNS_DOH_SERVER_SETTINGS)),
+        ("DotSettings", c_void_p),
+    ]
+
+
+class DNS_SERVER_PROPERTY(Structure):
+    _fields_ = [
+        ("Version", wintypes.ULONG),
+        ("ServerIndex", wintypes.ULONG),
+        ("Type", wintypes.ULONG),
+        ("Property", DNS_SERVER_PROPERTY_TYPES),
+    ]
+
+
+class DNS_INTERFACE_SETTINGS(Structure):
+    _fields_ = [
+        ("Version", wintypes.ULONG),
+        ("Flags", c_ulonglong),
+        ("Domain", c_wchar_p),
+        ("NameServer", c_wchar_p),
+        ("SearchList", c_wchar_p),
+        ("RegistrationEnabled", wintypes.ULONG),
+        ("RegisterAdapterName", wintypes.ULONG),
+        ("EnableLLMNR", wintypes.ULONG),
+        ("QueryAdapterName", wintypes.ULONG),
+        ("ProfileNameServer", c_wchar_p),
+    ]
+
+
+class DNS_INTERFACE_SETTINGS3(Structure):
+    _fields_ = [
+        ("Version", wintypes.ULONG),
+        ("Flags", c_ulonglong),
+        ("Domain", c_wchar_p),
+        ("NameServer", c_wchar_p),
+        ("SearchList", c_wchar_p),
+        ("RegistrationEnabled", wintypes.ULONG),
+        ("RegisterAdapterName", wintypes.ULONG),
+        ("EnableLLMNR", wintypes.ULONG),
+        ("QueryAdapterName", wintypes.ULONG),
+        ("ProfileNameServer", c_wchar_p),
+        ("DisableUnconstrainedQueries", wintypes.ULONG),
+        ("SupplementalSearchList", c_wchar_p),
+        ("cServerProperties", wintypes.ULONG),
+        ("ServerProperties", POINTER(DNS_SERVER_PROPERTY)),
+        ("cProfileServerProperties", wintypes.ULONG),
+        ("ProfileServerProperties", POINTER(DNS_SERVER_PROPERTY)),
+    ]
 
 # ──────────────────────────────────────────────────────────────────────
 #  Константы исключений
@@ -214,52 +302,129 @@ def get_interface_guid_from_name(adapter_name: str) -> Optional[str]:
     
     return None
 
-def set_dns_via_registry(guid: str, dns_servers: List[str], is_ipv6: bool = False) -> bool:
-    """Устанавливает DNS через реестр (быстрее чем netsh)"""
+
+def _guid_from_string(guid: str) -> GUID:
+    """Преобразует строковый GUID интерфейса в структуру WinAPI."""
+    clean_guid = (guid or "").strip()
+    if not clean_guid.startswith("{"):
+        clean_guid = "{" + clean_guid
+    if not clean_guid.endswith("}"):
+        clean_guid = clean_guid + "}"
+
+    result = GUID()
+    hr = windll.ole32.CLSIDFromString(c_wchar_p(clean_guid), byref(result))
+    if hr != 0:
+        raise OSError(f"Invalid interface GUID: {guid}")
+    return result
+
+
+def _normalize_dns_servers(dns_servers: List[str]) -> list[str]:
+    normalized: list[str] = []
+    for raw_dns in dns_servers:
+        dns = (raw_dns or "").strip()
+        if not dns or dns in normalized:
+            continue
+        normalized.append(dns)
+    return normalized
+
+
+def _format_dns_servers(dns_servers: list[str], is_ipv6: bool) -> str | None:
+    if not dns_servers:
+        return None
+    separator = " " if is_ipv6 else ","
+    return separator.join(dns_servers)
+
+
+def _build_doh_server_properties(
+    dns_servers: list[str],
+    doh_templates: dict[str, str],
+) -> tuple[
+    list[DNS_DOH_SERVER_SETTINGS],
+    ctypes.Array[DNS_SERVER_PROPERTY] | None,
+]:
+    doh_settings: list[DNS_DOH_SERVER_SETTINGS] = []
+    server_properties: list[DNS_SERVER_PROPERTY] = []
+
+    for server_index, dns_server in enumerate(dns_servers):
+        template = (doh_templates.get(dns_server) or "").strip()
+        if not template:
+            continue
+
+        doh_settings.append(
+            DNS_DOH_SERVER_SETTINGS(
+                template,
+                DNS_DOH_SERVER_SETTINGS_ENABLE
+                | DNS_DOH_SERVER_SETTINGS_FALLBACK_TO_UDP,
+            )
+        )
+        property_value = DNS_SERVER_PROPERTY_TYPES()
+        property_value.DohSettings = ctypes.pointer(doh_settings[-1])
+        server_properties.append(
+            DNS_SERVER_PROPERTY(
+                DNS_SERVER_PROPERTY_VERSION1,
+                server_index,
+                DnsServerDohProperty,
+                property_value,
+            )
+        )
+
+    if not server_properties:
+        return doh_settings, None
+
+    return doh_settings, (DNS_SERVER_PROPERTY * len(server_properties))(*server_properties)
+
+
+def set_dns_via_winapi(
+    guid: str,
+    dns_servers: List[str],
+    is_ipv6: bool = False,
+    doh_templates: Optional[dict[str, str]] = None,
+) -> bool:
+    """Устанавливает DNS через SetInterfaceDnsSettings."""
     try:
+        normalized_servers = _normalize_dns_servers(dns_servers)
+        name_server = _format_dns_servers(normalized_servers, is_ipv6)
+        flags = DNS_SETTING_NAMESERVER
         if is_ipv6:
-            reg_path = f"SYSTEM\\CurrentControlSet\\Services\\Tcpip6\\Parameters\\Interfaces\\{guid}"
+            flags |= DNS_SETTING_IPV6
+
+        use_doh_settings = (
+            not is_ipv6
+            and doh_templates is not None
+            and is_doh_supported()
+        )
+
+        if use_doh_settings:
+            flags |= DNS_SETTING_DOH
+            doh_settings, property_array = _build_doh_server_properties(
+                normalized_servers,
+                doh_templates,
+            )
+            settings = DNS_INTERFACE_SETTINGS3()
+            settings.Version = DNS_INTERFACE_SETTINGS_VERSION3
+            settings.Flags = flags
+            settings.NameServer = name_server
+            if property_array is not None:
+                settings.cServerProperties = len(property_array)
+                settings.ServerProperties = property_array
         else:
-            reg_path = f"SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters\\Interfaces\\{guid}"
-        
-        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path, 0, 
-                           winreg.KEY_SET_VALUE | winreg.KEY_WOW64_64KEY) as key:
-            
-            if dns_servers:
-                # Устанавливаем DNS
-                normalized_servers: list[str] = []
-                for raw_dns in dns_servers:
-                    dns = (raw_dns or "").strip()
-                    if not dns:
-                        continue
-                    if dns in normalized_servers:
-                        continue
-                    normalized_servers.append(dns)
+            settings = DNS_INTERFACE_SETTINGS()
+            settings.Version = DNS_INTERFACE_SETTINGS_VERSION1
+            settings.Flags = flags
+            settings.NameServer = name_server
 
-                if is_ipv6:
-                    # Для IPv6 в реестре надёжнее использовать разделение пробелом.
-                    dns_string = " ".join(normalized_servers)
-                else:
-                    dns_string = ",".join(normalized_servers)
+        result = iphlpapi.SetInterfaceDnsSettings(
+            _guid_from_string(guid),
+            byref(settings),
+        )
+        if result != ERROR_SUCCESS:
+            log(f"SetInterfaceDnsSettings failed: {result}", "ERROR")
+            return False
 
-                winreg.SetValueEx(key, "NameServer", 0, winreg.REG_SZ, dns_string)
-                
-                # Отключаем DHCP для DNS
-                try:
-                    winreg.SetValueEx(key, "RegisterAdapterName", 0, winreg.REG_DWORD, 0)
-                except:
-                    pass
-            else:
-                # Очищаем DNS (автоматический режим)
-                try:
-                    winreg.DeleteValue(key, "NameServer")
-                except:
-                    pass
-        
         return True
-        
+
     except Exception as e:
-        log(f"Error setting DNS via registry: {e}", "ERROR")
+        log(f"Error setting DNS via WinAPI: {e}", "ERROR")
         return False
 
 def notify_dns_change():
@@ -321,14 +486,6 @@ DOH_TEMPLATES = {
     "212.109.195.93": "https://dns.comss.one/dns-query",
 }
 
-# DoH настройки
-DOH_AUTO = 0  # Автоматический выбор
-DOH_DISABLED = 1  # Отключен
-DOH_ENABLED_AUTO_FALLBACK = 2  # Включен с fallback на обычный DNS
-DOH_ENABLED_ONLY = 3  # Только DoH, без fallback
-
-# Добавим функции проверки DoH:
-
 def get_windows_version() -> Tuple[int, int, int]:
     """Получает версию Windows"""
     try:
@@ -342,11 +499,12 @@ def is_doh_supported() -> bool:
     try:
         major, minor, build = get_windows_version()
         
-        # Windows 11 (build 22000+) или Windows 10 build 19628+
+        # DNS_INTERFACE_SETTINGS3 появился в Windows 10 build 19645.
+        # Windows 11 начинается с build 22000.
         if major == 10:
             if build >= 22000:  # Windows 11
                 return True
-            elif build >= 19628:  # Windows 10 Insider Preview с DoH
+            elif build >= 19645:  # Windows 10 Insider Preview с DoH API
                 return True
         
         return False
@@ -358,140 +516,32 @@ def get_doh_template_for_dns(dns_ip: str) -> Optional[str]:
     return DOH_TEMPLATES.get(dns_ip)
 
 def get_doh_settings_for_adapter(guid: str) -> Dict[str, any]:
-    """Получает настройки DoH для адаптера"""
-    try:
-        # Путь к настройкам DoH в реестре
-        reg_path = f"SYSTEM\\CurrentControlSet\\Services\\Dnscache\\InterfaceSpecificParameters\\{guid}\\DohInterfaceSettings\\Doh"
-        
-        result = {
-            'supported': is_doh_supported(),
-            'enabled': False,
-            'template': None,
-            'auto_upgrade': False
-        }
-        
-        if not result['supported']:
-            return result
-        
-        try:
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path, 0,
-                               winreg.KEY_READ | winreg.KEY_WOW64_64KEY) as key:
-                
-                # Проверяем DohFlags (0=авто, 1=выкл, 2=вкл с fallback, 3=только DoH)
-                try:
-                    flags, _ = winreg.QueryValueEx(key, "DohFlags")
-                    result['enabled'] = (flags in [DOH_ENABLED_AUTO_FALLBACK, DOH_ENABLED_ONLY])
-                except:
-                    pass
-                
-                # Получаем template
-                try:
-                    template, _ = winreg.QueryValueEx(key, "DohTemplate")
-                    result['template'] = template
-                except:
-                    pass
-                
-                # Auto upgrade (автоматическое обновление до DoH)
-                try:
-                    auto, _ = winreg.QueryValueEx(key, "DohAutoUpgrade")
-                    result['auto_upgrade'] = bool(auto)
-                except:
-                    pass
-                    
-        except FileNotFoundError:
-            # Настройки DoH не заданы для этого адаптера
-            pass
-        
-        return result
-        
-    except Exception as e:
-        log(f"Error getting DoH settings: {e}", "DEBUG")
-        return {
-            'supported': False,
-            'enabled': False,
-            'template': None,
-            'auto_upgrade': False
-        }
+    """Возвращает базовый статус DoH без чтения старых реестровых ключей."""
+    return {
+        "supported": is_doh_supported(),
+        "enabled": False,
+        "template": None,
+        "auto_upgrade": False,
+    }
 
 def set_doh_for_adapter(guid: str, dns_ip: str, enable: bool = True, 
                         auto_upgrade: bool = True) -> bool:
     """Устанавливает DoH для адаптера"""
-    try:
-        if not is_doh_supported():
-            log("DoH not supported on this Windows version", "WARNING")
-            return False
-        
-        # Получаем DoH template для DNS
-        template = get_doh_template_for_dns(dns_ip)
-        if not template and enable:
-            log(f"No DoH template for {dns_ip}", "WARNING")
-            return False
-        
-        # Путь к настройкам DoH
-        reg_path = f"SYSTEM\\CurrentControlSet\\Services\\Dnscache\\InterfaceSpecificParameters\\{guid}\\DohInterfaceSettings\\Doh"
-        
-        try:
-            # Создаем/открываем ключ
-            with winreg.CreateKeyEx(winreg.HKEY_LOCAL_MACHINE, reg_path, 0,
-                                   winreg.KEY_SET_VALUE | winreg.KEY_WOW64_64KEY) as key:
-                
-                if enable:
-                    # Включаем DoH
-                    # DohFlags: 2 = включен с fallback на обычный DNS
-                    winreg.SetValueEx(key, "DohFlags", 0, winreg.REG_DWORD, 
-                                     DOH_ENABLED_AUTO_FALLBACK)
-                    
-                    # Устанавливаем template
-                    winreg.SetValueEx(key, "DohTemplate", 0, winreg.REG_SZ, template)
-                    
-                    # Auto upgrade
-                    if auto_upgrade:
-                        winreg.SetValueEx(key, "DohAutoUpgrade", 0, winreg.REG_DWORD, 1)
-                    
-                    log(f"DoH enabled for GUID {guid}: {template}", "DNS")
-                else:
-                    # Отключаем DoH
-                    winreg.SetValueEx(key, "DohFlags", 0, winreg.REG_DWORD, DOH_DISABLED)
-                    log(f"DoH disabled for GUID {guid}", "DNS")
-                
-                # Уведомляем систему
-                notify_dns_change()
-                flush_dns_cache_native()
-                
-                return True
-                
-        except Exception as e:
-            log(f"Error setting DoH registry values: {e}", "ERROR")
-            return False
-            
-    except Exception as e:
-        log(f"Error in set_doh_for_adapter: {e}", "ERROR")
+    template = get_doh_template_for_dns(dns_ip) if enable else None
+    if enable and not template:
+        log(f"No DoH template for {dns_ip}", "WARNING")
         return False
+
+    return set_dns_via_winapi(
+        guid,
+        [dns_ip],
+        is_ipv6=False,
+        doh_templates={dns_ip: template} if template else {},
+    )
 
 def clear_doh_for_adapter(guid: str) -> bool:
     """Очищает настройки DoH для адаптера"""
-    try:
-        reg_path = f"SYSTEM\\CurrentControlSet\\Services\\Dnscache\\InterfaceSpecificParameters\\{guid}\\DohInterfaceSettings"
-        
-        try:
-            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, reg_path, 0,
-                               winreg.KEY_ALL_ACCESS | winreg.KEY_WOW64_64KEY) as key:
-                try:
-                    winreg.DeleteKey(key, "Doh")
-                    log(f"DoH settings cleared for GUID {guid}", "DNS")
-                    notify_dns_change()
-                    flush_dns_cache_native()
-                    return True
-                except:
-                    pass
-        except:
-            pass
-        
-        return False
-        
-    except Exception as e:
-        log(f"Error clearing DoH: {e}", "DEBUG")
-        return False
+    return set_dns_via_winapi(guid, [], is_ipv6=False, doh_templates={})
 
 class DNSManager:
     """Менеджер DNS на основе Win32 API"""
@@ -702,7 +752,7 @@ class DNSManager:
         secondary_dns: Optional[str] = None,
         address_family: str = "IPv4"
     ) -> Tuple[bool, str]:
-        """Устанавливает пользовательские DNS через реестр"""
+        """Устанавливает пользовательские DNS через WinAPI"""
         try:
             guid = self.get_adapter_guid(adapter_name)
             if not guid:
@@ -713,25 +763,27 @@ class DNSManager:
                 dns_list.append(secondary_dns)
             
             is_ipv6 = (address_family.lower() == "ipv6")
-            
-            success = set_dns_via_registry(guid, dns_list, is_ipv6)
+
+            doh_templates = None
+            if not is_ipv6:
+                doh_templates = {
+                    dns: template
+                    for dns in dns_list
+                    if (template := get_doh_template_for_dns((dns or "").strip()))
+                }
+
+            success = set_dns_via_winapi(
+                guid,
+                dns_list,
+                is_ipv6,
+                doh_templates=doh_templates if not is_ipv6 else None,
+            )
             
             if success:
-                if not is_ipv6:
-                    normalized_primary = (primary_dns or "").strip()
-                    if normalized_primary:
-                        template = get_doh_template_for_dns(normalized_primary)
-                        if template:
-                            doh_ok = set_doh_for_adapter(guid, normalized_primary, enable=True)
-                            if not doh_ok:
-                                log(f"DoH enable failed for {adapter_name}: {normalized_primary}", "WARNING")
-                        else:
-                            clear_doh_for_adapter(guid)
-                            log(f"DoH skipped (no template) for {adapter_name}: {normalized_primary}", "DEBUG")
                 notify_dns_change()
                 return True, "OK"
             else:
-                return False, "Registry update failed"
+                return False, "WinAPI update failed"
             
         except Exception as e:
             return False, str(e)
@@ -747,10 +799,12 @@ class DNSManager:
             
             for family in families:
                 is_ipv6 = (family.lower() == "ipv6")
-                set_dns_via_registry(guid, [], is_ipv6)
-
-            if address_family is None or address_family.lower() == "ipv4":
-                clear_doh_for_adapter(guid)
+                set_dns_via_winapi(
+                    guid,
+                    [],
+                    is_ipv6,
+                    doh_templates={} if not is_ipv6 else None,
+                )
             
             notify_dns_change()
             return True, "OK"
