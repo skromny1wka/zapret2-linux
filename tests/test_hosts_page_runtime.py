@@ -536,6 +536,103 @@ class HostsPageRuntimeTests(unittest.TestCase):
         page._rebuild_services_selectors.assert_not_called()
         self.assertFalse(page._services_restore_scheduled)
 
+    def test_hosts_page_builds_large_service_list_in_deferred_batches(self) -> None:
+        import hosts.ui.page as hosts_page
+        from PyQt6.QtWidgets import QApplication
+        from hosts.page_plans import HostsServiceGroupPlan, HostsServiceRowPlan, HostsServicesCatalogPlan
+        from hosts.ui.page import HostsPage
+
+        type(self)._qt_app = QApplication.instance() or QApplication([])
+        rows = [
+            HostsServiceRowPlan(
+                service_name=f"Service {idx}",
+                icon_name="fa5s.globe",
+                icon_color=None,
+                direct_only=False,
+                available_profiles=["zapret_dns"],
+                profile_items=[("zapret_dns", "Zapret DNS")],
+                selected_profile=None,
+                toggle_enabled=True,
+                toggle_checked=False,
+            )
+            for idx in range(25)
+        ]
+        catalog_plan = HostsServicesCatalogPlan(
+            groups=[
+                HostsServiceGroupPlan(
+                    title="Остальные",
+                    direct_only=False,
+                    service_names=[row.service_name for row in rows],
+                    common_profiles=[("zapret_dns", "Zapret DNS")],
+                    rows=rows,
+                )
+            ],
+            new_selection={},
+            selection_changed=False,
+        )
+
+        page = HostsPage.__new__(HostsPage)
+        page._ui_language = "ru"
+        page._services_layout = object()
+        page._service_dns_selection = {}
+        page.service_combos = {}
+        page.service_icon_labels = {}
+        page.service_icon_names = {}
+        page.service_name_labels = {}
+        page.service_icon_base_colors = {}
+        page._services_section_title_labels = []
+        page._service_group_title_labels = []
+        page._service_group_chips_scrolls = []
+        page._service_group_chip_buttons = []
+        page._clear_layout = Mock()
+        page._reset_services_runtime_bindings = Mock()
+        page._services_add_section_title = Mock()
+        page._services_add_widget = Mock()
+        page._tr = Mock(side_effect=lambda _key, default, **_kwargs: default)
+        page._make_fluent_chip = Mock()
+        page._bulk_apply_dns_profile = Mock()
+        page._request_user_selection_save = Mock()
+        page._service_row_plan_with_current_selection = Mock(side_effect=lambda row: row)
+        page._update_profile_row_visual = Mock()
+        page._log_ui_timing = Mock()
+        page.isVisible = Mock(return_value=True)
+        scheduled_callbacks: list[object] = []
+
+        card = SimpleNamespace(add_layout=Mock())
+        group_widgets = SimpleNamespace(
+            card=card,
+            title_label=object(),
+            chips_scroll=None,
+            chip_buttons=[],
+        )
+        row_widgets = SimpleNamespace(
+            row_layout=object(),
+            name_label=object(),
+            control=object(),
+            icon_label=object(),
+        )
+
+        with (
+            patch.object(hosts_page, "build_hosts_services_group", return_value=group_widgets),
+            patch.object(hosts_page, "build_hosts_service_row", return_value=row_widgets) as build_row,
+            patch.object(
+                hosts_page,
+                "QTimer",
+                SimpleNamespace(singleShot=Mock(side_effect=lambda _delay, callback: scheduled_callbacks.append(callback))),
+                create=True,
+            ),
+        ):
+            HostsPage._build_services_selectors(page, catalog_plan)
+
+            self.assertEqual(build_row.call_count, 16)
+            self.assertEqual(len(page.service_combos), 16)
+            self.assertEqual(len(scheduled_callbacks), 1)
+
+            scheduled_callbacks[0]()
+
+            self.assertEqual(build_row.call_count, 25)
+            self.assertEqual(len(page.service_combos), 25)
+
     def test_open_hosts_file_pending_restarts_after_event_loop_turn(self) -> None:
         import hosts.ui.page as hosts_page
         from hosts.ui.page import HostsPage

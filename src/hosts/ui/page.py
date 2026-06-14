@@ -114,6 +114,10 @@ def _is_fluent_combo(obj) -> bool:
     return False
 
 
+_SERVICES_INITIAL_ROW_BATCH_SIZE = 16
+_SERVICES_DEFERRED_ROW_BATCH_SIZE = 16
+
+
 class HostsPage(BasePage):
     """Страница управления Hosts файлом"""
 
@@ -140,6 +144,9 @@ class HostsPage(BasePage):
         self._services_catalog_plan = None
         self._services_ui_mounted = False
         self._services_restore_scheduled = False
+        self._services_build_generation = 0
+        self._services_pending_row_batches = []
+        self._services_rows_build_scheduled = False
         self.status_card = None
         self._open_hosts_button = None
         self._info_text_label = None
@@ -658,6 +665,7 @@ class HostsPage(BasePage):
             return
         if not self.__dict__.get("_services_ui_mounted", False):
             return
+        self._cancel_deferred_services_row_build()
         self._stop_services_catalog_worker(blocking=False)
         self._clear_layout(self._services_layout)
         self._reset_services_runtime_bindings()
@@ -689,10 +697,18 @@ class HostsPage(BasePage):
             return
         self._rebuild_services_selectors()
 
+    def _cancel_deferred_services_row_build(self) -> int:
+        generation = int(self.__dict__.get("_services_build_generation", 0)) + 1
+        self._services_build_generation = generation
+        self._services_pending_row_batches = []
+        self._services_rows_build_scheduled = False
+        return generation
+
     def _rebuild_services_selectors(self) -> None:
         if self._services_layout is None:
             return
         started_at = time.perf_counter()
+        self._cancel_deferred_services_row_build()
         self._clear_layout(self._services_layout)
         self._reset_services_runtime_bindings()
         self._services_ui_mounted = False
@@ -991,6 +1007,7 @@ class HostsPage(BasePage):
             if catalog_plan.selection_changed:
                 self._request_user_selection_save(self._service_dns_selection)
 
+        generation = self._cancel_deferred_services_row_build()
         self._clear_layout(self._services_layout)
         self._reset_services_runtime_bindings()
 
@@ -1001,6 +1018,8 @@ class HostsPage(BasePage):
         self._building_services_ui = True
         try:
             groups_started_at = time.perf_counter()
+            initial_rows_left = _SERVICES_INITIAL_ROW_BATCH_SIZE
+            pending_row_batches = []
             for group_plan in catalog_plan.groups:
                 group_widgets = build_hosts_services_group(
                     group_plan,
@@ -1015,32 +1034,109 @@ class HostsPage(BasePage):
                     self._service_group_chips_scrolls.append(group_widgets.chips_scroll)
                 self._service_group_chip_buttons.extend(group_widgets.chip_buttons)
 
-                for row_plan in group_plan.rows:
-                    row_plan = self._service_row_plan_with_current_selection(row_plan)
-                    row_widgets = build_hosts_service_row(
-                        row_plan,
-                        body_label_cls=BodyLabel,
-                        combo_cls=ComboBox,
-                        toggle_cls=SwitchButton,
+                rows = list(group_plan.rows)
+                built_count = 0
+                if initial_rows_left > 0:
+                    built_count = self._append_service_rows_slice(
+                        card=card,
+                        rows=rows,
+                        start_index=0,
+                        limit=initial_rows_left,
                         off_label=OFF_LABEL,
-                        on_direct_toggle=self._on_direct_toggle_changed,
-                        on_profile_changed=self._on_profile_changed,
                     )
-                    self.service_name_labels[row_plan.service_name] = row_widgets.name_label
-                    card.add_layout(row_widgets.row_layout)
-                    self.service_combos[row_plan.service_name] = row_widgets.control
-                    self.service_icon_labels[row_plan.service_name] = row_widgets.icon_label
-                    self.service_icon_names[row_plan.service_name] = row_plan.icon_name
-                    self.service_icon_base_colors[row_plan.service_name] = row_plan.icon_color
-
-                    self._update_profile_row_visual(row_plan.service_name)
+                    initial_rows_left -= built_count
+                if built_count < len(rows):
+                    pending_row_batches.append(
+                        {
+                            "card": card,
+                            "rows": rows,
+                            "index": built_count,
+                            "off_label": OFF_LABEL,
+                        }
+                    )
 
                 self._services_add_widget(card)
+            self._services_pending_row_batches = pending_row_batches
             self._log_ui_timing("hosts_ui.services.groups.build", groups_started_at)
         finally:
             self._building_services_ui = False
             self._services_ui_mounted = True
             self._log_ui_timing("hosts_ui.services.build", started_at)
+        if self.__dict__.get("_services_pending_row_batches"):
+            self._schedule_next_service_rows_batch(generation)
+
+    def _append_service_row_widgets(self, *, card, row_plan, off_label: str) -> None:
+        row_plan = self._service_row_plan_with_current_selection(row_plan)
+        row_widgets = build_hosts_service_row(
+            row_plan,
+            body_label_cls=BodyLabel,
+            combo_cls=ComboBox,
+            toggle_cls=SwitchButton,
+            off_label=off_label,
+            on_direct_toggle=self._on_direct_toggle_changed,
+            on_profile_changed=self._on_profile_changed,
+        )
+        self.service_name_labels[row_plan.service_name] = row_widgets.name_label
+        card.add_layout(row_widgets.row_layout)
+        self.service_combos[row_plan.service_name] = row_widgets.control
+        self.service_icon_labels[row_plan.service_name] = row_widgets.icon_label
+        self.service_icon_names[row_plan.service_name] = row_plan.icon_name
+        self.service_icon_base_colors[row_plan.service_name] = row_plan.icon_color
+        self._update_profile_row_visual(row_plan.service_name)
+
+    def _append_service_rows_slice(self, *, card, rows, start_index: int, limit: int, off_label: str) -> int:
+        row_count = len(rows)
+        end_index = min(row_count, int(start_index) + max(0, int(limit)))
+        for row_plan in rows[int(start_index):end_index]:
+            self._append_service_row_widgets(card=card, row_plan=row_plan, off_label=off_label)
+        return end_index
+
+    def _schedule_next_service_rows_batch(self, generation: int) -> None:
+        if self.__dict__.get("_services_rows_build_scheduled", False):
+            return
+        self._services_rows_build_scheduled = True
+        QTimer.singleShot(0, lambda g=int(generation): self._run_next_service_rows_batch(g))
+
+    def _run_next_service_rows_batch(self, generation: int) -> None:
+        self._services_rows_build_scheduled = False
+        if int(generation) != int(self.__dict__.get("_services_build_generation", 0)):
+            return
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if not self.isVisible():
+            return
+        pending = list(self.__dict__.get("_services_pending_row_batches", []) or [])
+        if not pending:
+            return
+
+        remaining_budget = _SERVICES_DEFERRED_ROW_BATCH_SIZE
+        next_pending = []
+        self._building_services_ui = True
+        try:
+            while pending and remaining_budget > 0:
+                item = pending.pop(0)
+                card = item["card"]
+                rows = item["rows"]
+                start_index = int(item["index"])
+                next_index = self._append_service_rows_slice(
+                    card=card,
+                    rows=rows,
+                    start_index=start_index,
+                    limit=remaining_budget,
+                    off_label=item["off_label"],
+                )
+                remaining_budget -= max(0, next_index - start_index)
+                if next_index < len(rows):
+                    item = dict(item)
+                    item["index"] = next_index
+                    next_pending.append(item)
+            next_pending.extend(pending)
+            self._services_pending_row_batches = next_pending
+        finally:
+            self._building_services_ui = False
+
+        if self._services_pending_row_batches:
+            self._schedule_next_service_rows_batch(generation)
 
     def _on_direct_toggle_changed(self, service_name: str, checked: bool) -> None:
         if getattr(self, "_building_services_ui", False):
