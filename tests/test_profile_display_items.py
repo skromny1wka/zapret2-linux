@@ -101,6 +101,44 @@ class ProfileDisplayItemsTests(unittest.TestCase):
 
         self.assertEqual(rows[0].display_name, "list-youtube")
 
+    def test_known_social_list_names_keep_human_case_without_profile_name(self) -> None:
+        rows = build_profile_display_items((
+            _item(
+                "hostlist-facebook",
+                name="TCP 80,443 • hostlist facebook.txt",
+                list_type="hostlist",
+                lines=("--filter-tcp=80,443", "--hostlist=lists/facebook.txt"),
+                in_preset=False,
+            ),
+            _item(
+                "hostlist-instagram",
+                name="TCP 80,443 • hostlist instagram.txt",
+                list_type="hostlist",
+                lines=("--filter-tcp=80,443", "--hostlist=lists/instagram.txt"),
+                in_preset=False,
+            ),
+            _item(
+                "hostlist-twitter",
+                name="TCP 80,443 • hostlist twitter.txt",
+                list_type="hostlist",
+                lines=("--filter-tcp=80,443", "--hostlist=lists/twitter.txt"),
+                in_preset=False,
+            ),
+            _item(
+                "hostlist-twimg",
+                name="TCP 80,443 • hostlist twimg.txt",
+                list_type="hostlist",
+                lines=("--filter-tcp=80,443", "--hostlist=lists/twimg.txt"),
+                in_preset=False,
+            ),
+        ))
+
+        names_by_key = {row.key: row.display_name for row in rows}
+        self.assertEqual(names_by_key["hostlist-facebook"], "Facebook")
+        self.assertEqual(names_by_key["hostlist-instagram"], "Instagram")
+        self.assertEqual(names_by_key["hostlist-twitter"], "Twitter/X")
+        self.assertEqual(names_by_key["hostlist-twimg"], "Twitter Images (twimg.com)")
+
     def test_explicit_profile_name_wins_over_technical_ipset_name(self) -> None:
         rows = build_profile_display_items((
             _item(

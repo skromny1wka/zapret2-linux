@@ -128,6 +128,10 @@ def _logical_display_name(item: Any) -> str:
         "googlevideo": "googlevideo.com",
         "discord": "Discord",
         "discord-updates": "Discord Updates",
+        "facebook": "Facebook",
+        "instagram": "Instagram",
+        "twitter": "Twitter/X",
+        "twimg": "Twitter Images (twimg.com)",
         "russia-youtube": "YouTube Russia CDN",
         "russia-youtube-rtmps": "YouTube Russia RTMPS",
     }
