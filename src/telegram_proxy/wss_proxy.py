@@ -96,6 +96,7 @@ _RECV_ZERO_TIMEOUT = 8.0
 _UPSTREAM_ZERO_RECV_FAILS = 2
 _UPSTREAM_PENALTY_SECONDS = 60.0
 _UPSTREAM_CONNECT_FAILURE_PENALTIES = (60.0, 180.0, 300.0)
+_WSS_DOMAIN_PENALTY_SECONDS = 60.0
 
 # ---- Main proxy class ----
 
@@ -144,6 +145,7 @@ class TelegramWSProxy:
         self._upstream_connect_failure_counts: dict[tuple[str, int, str, str, bool, str, bool], int] = {}
         self._upstream_penalty_until: dict[tuple[str, int, str, str, bool, str, bool], float] = {}
         self._upstream_active_counts: dict[tuple[str, int, str, str, bool, str, bool], int] = {}
+        self._wss_domain_penalty_until: dict[tuple[int, bool, str], float] = {}
         self._servers: list[asyncio.Server] = []
         self._tasks: set[asyncio.Task] = set()
         self._running = False
@@ -189,6 +191,31 @@ class TelegramWSProxy:
             route=route,
             status=status,
             reason=reason,
+        )
+
+    def _wss_domains_for(self, dc: int, is_media: bool) -> list[str]:
+        domains = ws_domains_for_dc(dc, is_media)
+        now = time.monotonic()
+        ready: list[str] = []
+        penalized: list[str] = []
+        for domain in domains:
+            key = (int(dc), bool(is_media), domain)
+            until = self._wss_domain_penalty_until.get(key, 0.0)
+            if until <= now:
+                self._wss_domain_penalty_until.pop(key, None)
+                ready.append(domain)
+            else:
+                penalized.append(domain)
+        return ready + penalized
+
+    def _mark_wss_domain_timeout(self, dc: int, is_media: bool, domain: str, label: str, exc: Exception) -> None:
+        if not isinstance(exc, TimeoutError):
+            return
+        key = (int(dc), bool(is_media), domain)
+        self._wss_domain_penalty_until[key] = time.monotonic() + _WSS_DOMAIN_PENALTY_SECONDS
+        self._log(
+            f"[{label}] WSS domain {domain} temporarily deprioritized after TimeoutError "
+            f"for {_WSS_DOMAIN_PENALTY_SECONDS:.0f}s"
         )
 
     @staticmethod
@@ -1001,7 +1028,7 @@ class TelegramWSProxy:
             return
 
         # Try WebSocket connection
-        domains = ws_domains_for_dc(dc, is_media)
+        domains = self._wss_domains_for(dc, is_media)
         ws = None
 
         # Try the connection pool first
@@ -1036,6 +1063,7 @@ class TelegramWSProxy:
                     target=f"{domain}{WSS_PATH} via {relay_ip}",
                     result="connected",
                 )
+                self._wss_domain_penalty_until.pop((int(dc), bool(is_media), domain), None)
                 break
             except WsHandshakeError as exc:
                 if exc.is_redirect:
@@ -1073,6 +1101,7 @@ class TelegramWSProxy:
             except Exception as exc:
                 all_redirects = False
                 ws_failure_reason = f"{domain}: {self._route_error(exc)}"
+                self._mark_wss_domain_timeout(dc, is_media, domain, label, exc)
                 log.warning("[%s] DC%d%s WS connect failed: %s",
                             label, dc, media_tag, exc)
                 self._log_route_detail(
@@ -1243,7 +1272,7 @@ class TelegramWSProxy:
             )
             return
 
-        domains = ws_domains_for_dc(dc, is_media)
+        domains = self._wss_domains_for(dc, is_media)
         ws = await self._ws_pool.get(dc, is_media, WSS_RELAY_IP, domains)
         if ws is not None:
             self._log(f"[{label}] MTProxy DC{dc}{media_tag} WSS from pool")
@@ -1273,6 +1302,7 @@ class TelegramWSProxy:
                     target=f"{domain}{WSS_PATH} via {relay_ip}",
                     result="connected",
                 )
+                self._wss_domain_penalty_until.pop((int(dc), bool(is_media), domain), None)
                 break
             except WsHandshakeError as exc:
                 if exc.is_redirect:
@@ -1301,9 +1331,10 @@ class TelegramWSProxy:
                     reason=exc.status_line,
                     next_step="try next WSS domain or fallback",
                 )
-            except Exception:
+            except Exception as exc:
                 all_redirects = False
-                ws_failure_reason = f"{domain}: WSS connect failed"
+                ws_failure_reason = f"{domain}: {self._route_error(exc)}"
+                self._mark_wss_domain_timeout(dc, is_media, domain, label, exc)
                 self._log_route_detail(
                     label,
                     route="WSS",
@@ -1311,7 +1342,7 @@ class TelegramWSProxy:
                     is_media=is_media,
                     target=f"{domain}{WSS_PATH} via {relay_ip}",
                     result="error",
-                    reason="WSS connect failed",
+                    reason=self._route_error(exc),
                     next_step="try next WSS domain or fallback",
                 )
 

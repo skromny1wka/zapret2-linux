@@ -953,6 +953,55 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
         self.assertEqual(seen_hosts, ["timeout.proxy", "fast.proxy", "fast.proxy"])
         self.assertIn("temporarily deprioritized after connect TimeoutError", "\n".join(logs))
 
+    def test_wss_timeout_domain_is_temporarily_deprioritized_next_time(self) -> None:
+        from telegram_proxy.wss_proxy import TelegramWSProxy
+
+        class _FakePool:
+            async def get(self, *_args, **_kwargs):
+                return None
+
+        class _FakeWebSocket:
+            async def send(self, _data):
+                return None
+
+        async def fake_connect(_relay_ip, domain, *_args, **_kwargs):
+            seen_domains.append(domain)
+            if domain == "kws2.web.telegram.org":
+                raise TimeoutError()
+            return _FakeWebSocket()
+
+        async def fake_relay(*_args, **_kwargs):
+            return None
+
+        async def run_two(proxy: TelegramWSProxy):
+            for index in range(2):
+                await proxy._tunnel_via_wss(
+                    object(),
+                    object(),
+                    2,
+                    False,
+                    b"x" * 64,
+                    False,
+                    "149.154.167.51",
+                    443,
+                    f"test-{index}",
+                )
+
+        seen_domains: list[str] = []
+        logs: list[str] = []
+        proxy = TelegramWSProxy(on_log=logs.append)
+        proxy._ws_pool = _FakePool()
+        proxy._relay_wss = fake_relay
+
+        with patch("telegram_proxy.wss_proxy.RawWebSocket.connect", side_effect=fake_connect):
+            asyncio.run(run_two(proxy))
+
+        self.assertEqual(
+            seen_domains,
+            ["kws2.web.telegram.org", "kws2-1.web.telegram.org", "kws2-1.web.telegram.org"],
+        )
+        self.assertIn("WSS domain kws2.web.telegram.org temporarily deprioritized after TimeoutError", "\n".join(logs))
+
     def test_repeated_upstream_connect_failures_extend_penalty(self) -> None:
         from telegram_proxy.proxy.routing import UpstreamProxyConfig, UpstreamProxyEndpoint
         from telegram_proxy.wss_proxy import TelegramWSProxy
