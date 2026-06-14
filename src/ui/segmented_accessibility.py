@@ -10,6 +10,7 @@ _TITLE_ATTR = "_zapretgui_segmented_accessible_title"
 _LABELS_ATTR = "_zapretgui_segmented_accessible_labels"
 _SELECTED_WORD_ATTR = "_zapretgui_segmented_selected_word"
 _UNSELECTED_WORD_ATTR = "_zapretgui_segmented_unselected_word"
+_ITEM_TAB_FOCUS_ATTR = "_zapretgui_segmented_item_tab_focus"
 
 
 def _clean_text(text: object) -> str:
@@ -88,6 +89,14 @@ def _set_segmented_focus(item: object) -> None:
                 set_focus()
             except Exception:
                 pass
+
+
+def _set_segmented_item_tab_focus(items: dict[str, object], *, enabled: bool) -> None:
+    for item in items.values():
+        try:
+            item.setFocusPolicy(Qt.FocusPolicy.StrongFocus if enabled else Qt.FocusPolicy.NoFocus)
+        except Exception:
+            pass
 
 
 def _refresh_segmented_items_accessibility(
@@ -186,13 +195,18 @@ class _SegmentedKeyboardFilter(QObject):
 
         if not _click_segmented_item(widget, target_key, items):
             return False
-        _set_segmented_focus(items[target_key])
+        if bool(getattr(widget, _ITEM_TAB_FOCUS_ATTR, True)):
+            _set_segmented_focus(items[target_key])
+        else:
+            _set_segmented_focus(widget)
         _refresh_segmented_items_accessibility_from_widget(widget)
+        if not bool(getattr(widget, _ITEM_TAB_FOCUS_ATTR, True)):
+            _set_segmented_item_tab_focus(items, enabled=False)
         event.accept()
         return True
 
 
-def _ensure_segmented_keyboard_access(widget, items: dict[str, object]) -> None:
+def _ensure_segmented_keyboard_access(widget, items: dict[str, object], *, item_tab_focus: bool) -> None:
     _set_strong_focus(widget)
     keyboard_filter = getattr(widget, _FILTER_ATTR, None)
     if keyboard_filter is None:
@@ -202,8 +216,8 @@ def _ensure_segmented_keyboard_access(widget, items: dict[str, object]) -> None:
             widget.installEventFilter(keyboard_filter)
         except Exception:
             pass
+    _set_segmented_item_tab_focus(items, enabled=item_tab_focus)
     for item in items.values():
-        _set_strong_focus(item)
         try:
             item.installEventFilter(keyboard_filter)
         except Exception:
@@ -217,6 +231,7 @@ def set_segmented_items_accessibility(
     labels: dict[str, object] | None = None,
     selected_word: str = "выбрано",
     unselected_word: str = "не выбрано",
+    item_tab_focus: bool = True,
 ) -> None:
     if widget is None:
         return
@@ -229,8 +244,11 @@ def set_segmented_items_accessibility(
     setattr(widget, _LABELS_ATTR, labels)
     setattr(widget, _SELECTED_WORD_ATTR, _clean_text(selected_word) or "выбрано")
     setattr(widget, _UNSELECTED_WORD_ATTR, _clean_text(unselected_word) or "не выбрано")
-    _ensure_segmented_keyboard_access(widget, items)
+    setattr(widget, _ITEM_TAB_FOCUS_ATTR, bool(item_tab_focus))
+    _ensure_segmented_keyboard_access(widget, items, item_tab_focus=bool(item_tab_focus))
     _refresh_segmented_items_accessibility_from_widget(widget)
+    if not item_tab_focus:
+        _set_segmented_item_tab_focus(items, enabled=False)
 
 
 __all__ = ["set_segmented_items_accessibility"]

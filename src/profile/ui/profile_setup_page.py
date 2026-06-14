@@ -2090,6 +2090,8 @@ class ProfileSetupPageBase(BasePage):
         self._strategy_stack.addWidget(self._match_tab_placeholder)
 
         self.layout.addWidget(self._strategy_stack, 1)
+        QWidget.setTabOrder(self._strategy_tabs, self._strategy_list._search)
+        QWidget.setTabOrder(self._strategy_list._search, self._strategy_list._list)
         self._update_profile_setup_accessibility()
 
     def _update_combo_accessibility(self, combo, *, name: str, description: str) -> None:
@@ -2180,6 +2182,7 @@ class ProfileSetupPageBase(BasePage):
             tabs,
             name="Разделы profile",
             labels=labels,
+            item_tab_focus=False,
         )
 
     def _switch_strategy_tab(self, index: int) -> None:

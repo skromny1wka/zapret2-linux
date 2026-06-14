@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication
 
 from profile.ui.preset_setup_page import PresetSetupPageBase
@@ -62,6 +63,10 @@ class ProfileSetupAccessibilityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
+
+    def tearDown(self) -> None:
+        self.app.closeAllWindows()
+        self.app.processEvents()
 
     def _make_page(self) -> ProfileSetupPageBase:
         return ProfileSetupPageBase(
@@ -186,6 +191,24 @@ class ProfileSetupAccessibilityTests(unittest.TestCase):
             page._strategy_tabs.property("screenReaderStateText"),
             "Разделы profile, выбрано: Когда применяется",
         )
+
+    def test_tab_from_profile_sections_moves_to_strategy_search_then_list(self) -> None:
+        page = self._make_page()
+        self.addCleanup(page.deleteLater)
+        page.show()
+        self.app.processEvents()
+        page._strategy_tabs.setFocus()
+        self.app.processEvents()
+
+        QTest.keyClick(page._strategy_tabs, Qt.Key.Key_Tab)
+        self.app.processEvents()
+
+        self.assertIs(self.app.focusWidget(), page._strategy_list._search)
+
+        QTest.keyClick(page._strategy_list._search, Qt.Key.Key_Tab)
+        self.app.processEvents()
+
+        self.assertIs(self.app.focusWidget(), page._strategy_list._list)
 
     def test_strategy_branch_combo_options_are_named_for_screen_reader(self) -> None:
         page = self._make_page()
