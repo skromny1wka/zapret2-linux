@@ -72,6 +72,11 @@ class StatusCard(QFrame):
             description="Показывает состояние Premium-подписки и срок действия.",
         )
         set_state_text(self, state_text)
+        title_text = str(text or "").strip() or "статус пока не загружен"
+        details_text = str(details or "").strip() or "—"
+        set_state_text(self._icon_lbl, f"Индикатор Premium: {spoken_text}")
+        set_state_text(self._title_lbl, f"Статус Premium: {title_text}")
+        set_state_text(self._detail_lbl, f"Детали Premium: {details_text}")
 
         self.setStyleSheet(f"""
             StatusCard {{

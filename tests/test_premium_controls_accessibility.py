@@ -391,6 +391,19 @@ class PremiumControlsAccessibilityTests(unittest.TestCase):
             "Статус Premium: Premium активен. Осталось 7 дней",
         )
 
+    def test_premium_status_card_inner_labels_expose_state_text(self) -> None:
+        card = StatusCard()
+        self.addCleanup(card.deleteLater)
+
+        card.set_status("Premium активен", "Осталось 7 дней", "active")
+
+        self.assertEqual(card._icon_lbl.accessibleName(), "Индикатор Premium: Premium активен. Осталось 7 дней")
+        self.assertEqual(card._icon_lbl.property("screenReaderStateText"), "Индикатор Premium: Premium активен. Осталось 7 дней")
+        self.assertEqual(card._title_lbl.accessibleName(), "Статус Premium: Premium активен")
+        self.assertEqual(card._title_lbl.property("screenReaderStateText"), "Статус Premium: Premium активен")
+        self.assertEqual(card._detail_lbl.accessibleName(), "Детали Premium: Осталось 7 дней")
+        self.assertEqual(card._detail_lbl.property("screenReaderStateText"), "Детали Premium: Осталось 7 дней")
+
     def test_premium_status_card_exposes_initial_empty_state(self) -> None:
         card = StatusCard()
         self.addCleanup(card.deleteLater)
