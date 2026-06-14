@@ -25,6 +25,14 @@ class UpdaterUpdateCardAccessibilityTests(unittest.TestCase):
             "Проверка обновлений. Нажмите для проверки доступных обновлений",
         )
         self.assertIn("текущий статус", card.accessibleDescription().lower())
+        self.assertEqual(
+            card._icon_label.accessibleName(),
+            "Индикатор проверки обновлений: Проверка обновлений. Нажмите для проверки доступных обновлений",
+        )
+        self.assertEqual(
+            card._icon_label.property("screenReaderStateText"),
+            "Индикатор проверки обновлений: Проверка обновлений. Нажмите для проверки доступных обновлений",
+        )
         self.assertEqual(card.check_btn.accessibleName(), "Проверить обновления")
         self.assertEqual(
             card.check_btn.property("screenReaderStateText"),
@@ -65,6 +73,14 @@ class UpdaterUpdateCardAccessibilityTests(unittest.TestCase):
         self.assertEqual(
             card.property("screenReaderStateText"),
             "Проверка обновлений... Подождите, идёт проверка серверов",
+        )
+        self.assertEqual(
+            card._icon_label.accessibleName(),
+            "Индикатор проверки обновлений: Проверка обновлений... Подождите, идёт проверка серверов",
+        )
+        self.assertEqual(
+            card._icon_label.property("screenReaderStateText"),
+            "Индикатор проверки обновлений: Проверка обновлений... Подождите, идёт проверка серверов",
         )
         self.assertEqual(card.check_btn.accessibleName(), "Проверка обновлений выполняется")
         self.assertEqual(
