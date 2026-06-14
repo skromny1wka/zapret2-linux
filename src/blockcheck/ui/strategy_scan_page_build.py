@@ -79,6 +79,7 @@ def build_strategy_scan_control_section(
     protocol_label = caption_label_cls(
         tr_fn("page.strategy_scan.protocol", "Протокол:")
     )
+    set_state_text(protocol_label, f"Поле подбора стратегии: {protocol_label.text()}")
     settings_row.addWidget(protocol_label)
 
     protocol_combo = combo_cls()
@@ -102,6 +103,7 @@ def build_strategy_scan_control_section(
     games_scope_label = caption_label_cls(
         tr_fn("page.strategy_scan.udp_scope", "Охват UDP:")
     )
+    set_state_text(games_scope_label, f"Поле подбора стратегии: {games_scope_label.text()}")
     settings_row.addWidget(games_scope_label)
 
     games_scope_combo = combo_cls()
@@ -123,6 +125,7 @@ def build_strategy_scan_control_section(
     mode_label = caption_label_cls(
         tr_fn("page.strategy_scan.mode", "Режим:")
     )
+    set_state_text(mode_label, f"Поле подбора стратегии: {mode_label.text()}")
     settings_row.addWidget(mode_label)
 
     mode_combo = combo_cls()
@@ -138,6 +141,7 @@ def build_strategy_scan_control_section(
     target_label = caption_label_cls(
         tr_fn("page.strategy_scan.target", "Цель:")
     )
+    set_state_text(target_label, f"Поле подбора стратегии: {target_label.text()}")
     settings_row.addWidget(target_label)
 
     target_input = line_edit_cls()
