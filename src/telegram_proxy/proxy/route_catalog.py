@@ -63,7 +63,11 @@ WSS_ROUTES: tuple[WssRoute, ...] = (
         relay_ip=WSS_RELAY_IP,
         status=RouteStatus.CANDIDATE,
         source="GhostWire 1.0.13 decrypted config",
-        note="Candidate only: HTTP 101 worked, but real Telegram SOCKS5/MTProxy traffic is not proven yet.",
+        note=(
+            "Candidate only: HTTP 101 worked, but a 2026-06-14 live SOCKS5 "
+            "probe made Telegram disable the proxy and produced recv=0/"
+            "IncompleteReadError signs."
+        ),
     ),
     WssRoute(
         dc=4,
@@ -72,7 +76,11 @@ WSS_ROUTES: tuple[WssRoute, ...] = (
         relay_ip=WSS_RELAY_IP,
         status=RouteStatus.CANDIDATE,
         source="GhostWire 1.0.13 decrypted config",
-        note="Candidate only: HTTP 101 worked, but real Telegram SOCKS5/MTProxy traffic is not proven yet.",
+        note=(
+            "Candidate only: HTTP 101 worked, but a 2026-06-14 live SOCKS5 "
+            "probe made Telegram disable the proxy and produced recv=0/"
+            "IncompleteReadError signs."
+        ),
     ),
 )
 
