@@ -797,7 +797,76 @@ class ProfileListPayloadTests(unittest.TestCase):
         self.assertTrue(payload.items[0].in_preset)
         self.assertEqual(payload.items[0].profile_name, "")
         self.assertEqual(payload.items[0].display_name, "Facebook")
-        self.assertEqual(payload.items[0].display_name_override, "Facebook")
+
+    def test_not_added_template_profile_keeps_all_profiles_display_name(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            lists_dir = root / "lists"
+            lists_dir.mkdir()
+            (lists_dir / "facebook.txt").write_text("facebook.com\n", encoding="utf-8")
+            templates_dir = root / "profile" / "templates"
+            templates_dir.mkdir(parents=True)
+            (templates_dir / "all_profiles.txt").write_text(
+                "\n".join(
+                    (
+                        "--name=Facebook",
+                        "--filter-tcp=80,443",
+                        "--hostlist=lists/facebook.txt",
+                        "",
+                    )
+                ),
+                encoding="utf-8",
+            )
+
+            store = _PresetStore("")
+            feature = SimpleNamespace(
+                _presets_feature=store,
+                _app_paths=AppPaths(user_root=root, local_root=root),
+            )
+
+            with patch("settings.store.MAIN_DIRECTORY", str(root)):
+                payload = ProfilePresetService(feature, "zapret2_mode").list_profiles()
+
+        self.assertEqual(len(payload.items), 1)
+        self.assertFalse(payload.items[0].in_preset)
+        self.assertEqual(payload.items[0].strategy_name, "Не добавлен")
+        self.assertEqual(payload.items[0].profile_name, "Facebook")
+        self.assertEqual(payload.items[0].display_name, "Facebook")
+        display_items = build_profile_display_items(payload.items)
+        self.assertEqual(display_items[0].display_name, "Facebook")
+
+    def test_template_profile_without_any_name_uses_technical_list_name(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            lists_dir = root / "lists"
+            lists_dir.mkdir()
+            (lists_dir / "facebook.txt").write_text("facebook.com\n", encoding="utf-8")
+            templates_dir = root / "profile" / "templates"
+            templates_dir.mkdir(parents=True)
+            (templates_dir / "all_profiles.txt").write_text(
+                "\n".join(
+                    (
+                        "--filter-tcp=80,443",
+                        "--hostlist=lists/facebook.txt",
+                        "",
+                    )
+                ),
+                encoding="utf-8",
+            )
+
+            store = _PresetStore("")
+            feature = SimpleNamespace(
+                _presets_feature=store,
+                _app_paths=AppPaths(user_root=root, local_root=root),
+            )
+
+            with patch("settings.store.MAIN_DIRECTORY", str(root)):
+                payload = ProfilePresetService(feature, "zapret2_mode").list_profiles()
+
+        self.assertEqual(len(payload.items), 1)
+        self.assertFalse(payload.items[0].in_preset)
+        self.assertEqual(payload.items[0].profile_name, "")
+        self.assertEqual(payload.items[0].display_name, "facebook")
 
     def test_lowercase_preset_profile_name_wins_over_template_case(self) -> None:
         with TemporaryDirectory() as temp_dir:
@@ -838,7 +907,6 @@ class ProfileListPayloadTests(unittest.TestCase):
         self.assertEqual(len(payload.items), 1)
         self.assertEqual(payload.items[0].display_name, "facebook")
         self.assertEqual(payload.items[0].profile_name, "facebook")
-        self.assertEqual(payload.items[0].display_name_override, "")
         display_items = build_profile_display_items(payload.items)
         self.assertEqual(display_items[0].display_name, "facebook")
 

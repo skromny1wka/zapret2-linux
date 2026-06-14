@@ -4,7 +4,7 @@ from collections import OrderedDict
 from copy import deepcopy
 from dataclasses import dataclass, replace
 from functools import lru_cache
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 import threading
 import time
@@ -307,7 +307,7 @@ class ProfilePresetService:
                 order=source.order,
                 folder_state=folder_state,
                 user_template_key=getattr(source, "user_template_key", ""),
-                display_name_override=getattr(source, "display_name_override", ""),
+                resolved_display_name=getattr(source, "resolved_display_name", ""),
             )
             items.append(item)
         self._log_timing("profile_feature.profile_list_item.build", items_started_at)
@@ -453,7 +453,7 @@ class ProfilePresetService:
             key=source.key,
             order=source.order,
             user_template_key=getattr(source, "user_template_key", ""),
-            display_name_override=getattr(source, "display_name_override", ""),
+            resolved_display_name=getattr(source, "resolved_display_name", ""),
         )
         strategy_entries = dict(_basic_strategy_entries(profile, catalogs))
         match_summary = _match_summary(profile, list_type=item.list_type)
@@ -852,13 +852,14 @@ class ProfilePresetService:
             return profile.key
         if filter_kind not in _available_filter_kinds(current, self._app_paths):
             return None
+        filter_value = _filter_value_for_kind_switch(current, filter_kind)
 
         preset = with_editable_profile_settings(
             preset,
             index,
             EditableProfileSettings(
                 filter_kind=filter_kind,
-                filter_value=current.filter_value,
+                filter_value=filter_value,
                 filter_role=current.filter_role,
                 in_range=current.in_range,
                 out_range=current.out_range,
@@ -1263,7 +1264,7 @@ class ProfilePresetService:
         order: int | None = None,
         folder_state: dict | None = None,
         user_template_key: str = "",
-        display_name_override: str = "",
+        resolved_display_name: str = "",
     ) -> ProfileListItem:
         strategy_entries = _basic_strategy_entries(profile, catalogs)
         strategy_branches = _strategy_branches_for_profile(profile, strategy_entries)
@@ -1281,12 +1282,12 @@ class ProfilePresetService:
             if effective_strategy_id not in {"", "none", "custom"}
             else ProfileStrategyState()
         )
-        visible_name = str(display_name_override or "").strip()
+        visible_name = str(resolved_display_name or profile.display_name or "").strip()
         return ProfileListItem(
             key=key or profile.key,
             persistent_key=profile.persistent_key,
             profile_index=profile.index if in_preset else -1,
-            display_name=visible_name or profile.display_name,
+            display_name=visible_name or "Профиль",
             enabled=profile.enabled if in_preset else False,
             in_preset=in_preset,
             strategy_id=effective_strategy_id,
@@ -1302,7 +1303,6 @@ class ProfilePresetService:
             group_collapsed=profile_folder_collapsed(folder_key, folder_state),
             user_profile_id=_user_profile_id_from_template_key(user_template_key),
             profile_name=profile.name,
-            display_name_override=visible_name,
             strategy_branches=strategy_branches,
         )
 
@@ -1721,10 +1721,61 @@ def _available_filter_kinds(settings: EditableProfileSettings, app_paths) -> tup
 
     result: list[str] = []
     for candidate in ("hostlist", "ipset"):
-        candidate_value = normalize_filter_value(settings.filter_value, candidate, filter_role=settings.filter_role)
+        candidate_value = _filter_value_for_kind_switch(settings, candidate)
         if candidate == current_kind or _filter_files_available(app_paths, candidate_value):
             result.append(candidate)
     return tuple(result) or (current_kind,)
+
+
+def _filter_value_for_kind_switch(settings: EditableProfileSettings, filter_kind: str) -> str:
+    current_kind = str(settings.filter_kind or "hostlist").strip().lower()
+    target_kind = str(filter_kind or "").strip().lower()
+    current_value = str(settings.filter_value or "").strip()
+    if target_kind == current_kind:
+        return normalize_filter_value(current_value, target_kind, filter_role=settings.filter_role)
+    if str(settings.filter_role or "").strip().lower() == "exclude":
+        return normalize_filter_value(current_value, target_kind, filter_role=settings.filter_role)
+    if "," in current_value:
+        return normalize_filter_value(current_value, target_kind, filter_role=settings.filter_role)
+    return _paired_primary_filter_value(current_value, current_kind, target_kind)
+
+
+def _paired_primary_filter_value(value: str, current_kind: str, target_kind: str) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+
+    path = PureWindowsPath(raw)
+    name = path.name
+    if not name:
+        return raw
+
+    lower_name = name.lower()
+    if target_kind == "ipset" and lower_name == "other.txt":
+        return _replace_filter_path_name(raw, path, "ipset-all.txt")
+    if target_kind == "hostlist" and lower_name == "ipset-all.txt":
+        return _replace_filter_path_name(raw, path, "other.txt")
+
+    suffix = "".join(path.suffixes)
+    stem = name[: -len(suffix)] if suffix else name
+    normalized_stem = stem.lower()
+    if current_kind == "hostlist" and target_kind == "ipset":
+        if normalized_stem.startswith(("ipset-", "ipset_")):
+            return raw
+        return _replace_filter_path_name(raw, path, f"ipset-{stem}{suffix}")
+    if current_kind == "ipset" and target_kind == "hostlist":
+        if normalized_stem.startswith(("ipset-", "ipset_")):
+            return _replace_filter_path_name(raw, path, f"{stem[6:]}{suffix}")
+        return raw
+    return normalize_filter_value(raw, target_kind)
+
+
+def _replace_filter_path_name(raw: str, path: PureWindowsPath, new_name: str) -> str:
+    parent = str(path.parent)
+    if not parent or parent == ".":
+        return new_name
+    separator = "\\" if "\\" in raw else "/"
+    return f"{parent}{separator}{new_name}"
 
 
 def _filter_files_available(app_paths, filter_value: str) -> bool:

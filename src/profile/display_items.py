@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import PurePosixPath, PureWindowsPath
-import re
 from typing import Any
 
 from profile.match_filters import filter_values
@@ -52,7 +50,7 @@ def _display_item_from_profile(item: Any) -> ProfileDisplayItem:
         key=str(getattr(item, "key", "") or ""),
         persistent_key=str(getattr(item, "persistent_key", "") or ""),
         profile_index=int(getattr(item, "profile_index", -1) or -1),
-        display_name=_logical_display_name(item),
+        display_name=str(getattr(item, "display_name", "") or "").strip() or "Профиль",
         enabled=bool(getattr(item, "enabled", False)),
         in_preset=bool(getattr(item, "in_preset", False)),
         strategy_id=str(getattr(item, "strategy_id", "") or "none"),
@@ -78,71 +76,6 @@ def _protocol_sort_rank(match_lines: tuple[str, ...]) -> int:
     if filter_values(match_lines, "--filter-l7"):
         return 2
     return 3
-
-
-def _resource_identity(match_lines: tuple[str, ...], list_type: str) -> str:
-    if list_type == "hostlist":
-        values = (
-            *filter_values(match_lines, "--hostlist"),
-            *filter_values(match_lines, "--hostlist-domains"),
-        )
-    elif list_type == "ipset":
-        values = (
-            *filter_values(match_lines, "--ipset"),
-            *filter_values(match_lines, "--ipset-ip"),
-        )
-    else:
-        values = ()
-    if not values:
-        return ""
-    return _normalize_resource_name(values[0])
-
-
-def _normalize_resource_name(value: str) -> str:
-    text = str(value or "").strip().replace("\\", "/")
-    if "/" in text:
-        text = PurePosixPath(text).name
-    else:
-        text = PureWindowsPath(text).name
-    text = re.sub(r"\.(txt|lst|list|json)$", "", text, flags=re.IGNORECASE).lower()
-    for prefix in ("ipset-", "hostlist-"):
-        if text.startswith(prefix):
-            text = text[len(prefix):]
-    text = re.sub(r"[^a-z0-9а-яё]+", "-", text, flags=re.IGNORECASE).strip("-")
-    return text
-
-
-def _logical_display_name(item: Any) -> str:
-    explicit_name = str(getattr(item, "profile_name", "") or "").strip()
-    if explicit_name:
-        return explicit_name
-
-    display_name_override = str(getattr(item, "display_name_override", "") or "").strip()
-    if display_name_override:
-        return display_name_override
-
-    list_type = str(getattr(item, "list_type", "") or "").strip().lower()
-    identity = _resource_identity(tuple(getattr(item, "match_lines", ()) or ()), list_type)
-    known = {
-        "youtube": "YouTube",
-        "googlevideo": "googlevideo.com",
-        "discord": "Discord",
-        "discord-updates": "Discord Updates",
-        "facebook": "Facebook",
-        "instagram": "Instagram",
-        "twitter": "Twitter/X",
-        "twimg": "Twitter Images (twimg.com)",
-        "russia-youtube": "YouTube Russia CDN",
-        "russia-youtube-rtmps": "YouTube Russia RTMPS",
-    }
-    if identity in known:
-        return known[identity]
-    if identity:
-        return identity
-    name = str(getattr(item, "display_name", "") or "").strip()
-    name = re.sub(r"\s*\((?:IPset|Hostlist)\)\s*", "", name, flags=re.IGNORECASE).strip()
-    name = re.sub(r"\s*[•|-]\s*(?:hostlist|ipset)\s+[^|]+", "", name, flags=re.IGNORECASE).strip()
-    return name or "Профиль"
 
 
 __all__ = ["ProfileDisplayItem", "build_profile_display_items", "profile_display_sort_key"]

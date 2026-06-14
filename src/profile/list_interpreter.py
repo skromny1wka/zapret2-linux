@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import PurePosixPath, PureWindowsPath
+import re
 
 from .models import Profile, build_profile_logical_key
 
@@ -12,7 +14,7 @@ class ProfileListSource:
     in_preset: bool
     order: int
     user_template_key: str = ""
-    display_name_override: str = ""
+    resolved_display_name: str = ""
 
 
 def build_profile_list_sources(
@@ -44,7 +46,7 @@ def build_profile_list_sources(
         _add_template_source_to_groups(source, groups, group_aliases, alias_to_groups)
 
     selected = [_select_source(candidates) for candidates in groups if candidates]
-    selected.sort(key=lambda source: (source.order, source.profile.display_name.lower(), source.key))
+    selected.sort(key=lambda source: (source.order, source.resolved_display_name.lower(), source.key))
     return tuple(selected)
 
 
@@ -149,38 +151,11 @@ def _select_source(candidates: list[ProfileListSource]) -> ProfileListSource:
     if preset_sources:
         preset_sources.sort(key=lambda source: (not source.profile.enabled, source.profile.index))
         selected = preset_sources[0]
-        display_name_override = _template_display_name_for_unnamed_preset_source(selected, candidates)
-        if user_template_key and not selected.user_template_key:
-            return ProfileListSource(
-                key=selected.key,
-                profile=selected.profile,
-                in_preset=selected.in_preset,
-                order=selected.order,
-                user_template_key=user_template_key,
-                display_name_override=display_name_override,
-            )
-        if display_name_override:
-            return ProfileListSource(
-                key=selected.key,
-                profile=selected.profile,
-                in_preset=selected.in_preset,
-                order=selected.order,
-                user_template_key=selected.user_template_key,
-                display_name_override=display_name_override,
-            )
-        return selected
+        return _source_with_resolved_display_name(selected, candidates, user_template_key=user_template_key)
 
     candidates.sort(key=lambda source: (_template_kind_rank(source.profile), source.order))
     selected = candidates[0]
-    if user_template_key and not selected.user_template_key:
-        return ProfileListSource(
-            key=selected.key,
-            profile=selected.profile,
-            in_preset=selected.in_preset,
-            order=selected.order,
-            user_template_key=user_template_key,
-        )
-    return selected
+    return _source_with_resolved_display_name(selected, candidates, user_template_key=user_template_key)
 
 
 def _template_kind_rank(profile: Profile) -> int:
@@ -191,18 +166,92 @@ def _template_kind_rank(profile: Profile) -> int:
     return 2
 
 
-def _template_display_name_for_unnamed_preset_source(
+def _source_with_resolved_display_name(
     selected: ProfileListSource,
     candidates: list[ProfileListSource],
-) -> str:
-    if str(getattr(selected.profile, "name", "") or "").strip():
-        return ""
+    *,
+    user_template_key: str = "",
+) -> ProfileListSource:
+    return ProfileListSource(
+        key=selected.key,
+        profile=selected.profile,
+        in_preset=selected.in_preset,
+        order=selected.order,
+        user_template_key=user_template_key or selected.user_template_key,
+        resolved_display_name=_resolved_display_name(selected, candidates),
+    )
+
+
+def _resolved_display_name(selected: ProfileListSource, candidates: list[ProfileListSource]) -> str:
+    profile_name = _profile_name(selected.profile)
+    if selected.in_preset and profile_name:
+        return profile_name
+    if selected.in_preset:
+        template_name = _first_template_profile_name(candidates)
+        if template_name:
+            return template_name
+        return _technical_display_name(selected.profile)
+    return profile_name or _technical_display_name(selected.profile)
+
+
+def _first_template_profile_name(candidates: list[ProfileListSource]) -> str:
     return next(
         (
-            str(getattr(source.profile, "name", "") or getattr(source.profile, "display_name", "") or "").strip()
+            _profile_name(source.profile)
             for source in candidates
-            if not source.in_preset
-            and str(getattr(source.profile, "name", "") or getattr(source.profile, "display_name", "") or "").strip()
+            if not source.in_preset and _profile_name(source.profile)
         ),
         "",
     )
+
+
+def _profile_name(profile: Profile) -> str:
+    return str(getattr(profile, "name", "") or "").strip()
+
+
+def _technical_display_name(profile: Profile) -> str:
+    identity = _resource_identity(profile)
+    if identity:
+        return identity
+    name = str(getattr(profile, "display_name", "") or "").strip()
+    name = re.sub(r"\s*\((?:IPset|Hostlist)\)\s*", "", name, flags=re.IGNORECASE).strip()
+    name = re.sub(r"\s*[•|-]\s*(?:hostlist|ipset)\s+[^|]+", "", name, flags=re.IGNORECASE).strip()
+    return name or "Профиль"
+
+
+def _resource_identity(profile: Profile) -> str:
+    match = getattr(profile, "match", None)
+    if match is None:
+        return ""
+    values = (
+        *_line_values(getattr(match, "hostlist_lines", ()) or ()),
+        *_line_values(getattr(match, "hostlist_domains_lines", ()) or ()),
+        *_line_values(getattr(match, "ipset_lines", ()) or ()),
+        *_line_values(getattr(match, "inline_ipset_lines", ()) or ()),
+    )
+    if not values:
+        return ""
+    return _normalize_resource_name(values[0])
+
+
+def _line_values(lines) -> tuple[str, ...]:
+    values: list[str] = []
+    for line in tuple(lines or ()):
+        text = str(line or "").strip()
+        if "=" not in text:
+            continue
+        values.append(text.split("=", 1)[1].strip())
+    return tuple(values)
+
+
+def _normalize_resource_name(value: str) -> str:
+    text = str(value or "").strip().replace("\\", "/")
+    if "/" in text:
+        text = PurePosixPath(text).name
+    else:
+        text = PureWindowsPath(text).name
+    text = re.sub(r"\.(txt|lst|list|json)$", "", text, flags=re.IGNORECASE).lower()
+    for prefix in ("ipset-", "hostlist-"):
+        if text.startswith(prefix):
+            text = text[len(prefix):]
+    return re.sub(r"[^a-z0-9а-яё]+", "-", text, flags=re.IGNORECASE).strip("-")

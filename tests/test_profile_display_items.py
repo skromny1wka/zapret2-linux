@@ -45,7 +45,7 @@ class ProfileDisplayItemsTests(unittest.TestCase):
         rows = build_profile_display_items((
             _item(
                 "hostlist-youtube",
-                name="youtube.com (Hostlist)",
+                name="YouTube",
                 list_type="hostlist",
                 lines=("--filter-tcp=80,443", "--hostlist=lists/youtube.txt"),
                 strategy_id="tls",
@@ -88,7 +88,7 @@ class ProfileDisplayItemsTests(unittest.TestCase):
 
         self.assertEqual(len(rows), 2)
 
-    def test_display_name_does_not_strip_non_zapret_list_prefix(self) -> None:
+    def test_display_items_use_ready_display_name_without_rewriting(self) -> None:
         rows = build_profile_display_items((
             _item(
                 "hostlist-list-youtube",
@@ -99,9 +99,9 @@ class ProfileDisplayItemsTests(unittest.TestCase):
             ),
         ))
 
-        self.assertEqual(rows[0].display_name, "list-youtube")
+        self.assertEqual(rows[0].display_name, "TCP 80,443 • hostlist list-youtube.txt")
 
-    def test_known_social_list_names_keep_human_case_without_profile_name(self) -> None:
+    def test_display_items_do_not_resolve_social_list_names(self) -> None:
         rows = build_profile_display_items((
             _item(
                 "hostlist-facebook",
@@ -134,17 +134,17 @@ class ProfileDisplayItemsTests(unittest.TestCase):
         ))
 
         names_by_key = {row.key: row.display_name for row in rows}
-        self.assertEqual(names_by_key["hostlist-facebook"], "Facebook")
-        self.assertEqual(names_by_key["hostlist-instagram"], "Instagram")
-        self.assertEqual(names_by_key["hostlist-twitter"], "Twitter/X")
-        self.assertEqual(names_by_key["hostlist-twimg"], "Twitter Images (twimg.com)")
+        self.assertEqual(names_by_key["hostlist-facebook"], "TCP 80,443 • hostlist facebook.txt")
+        self.assertEqual(names_by_key["hostlist-instagram"], "TCP 80,443 • hostlist instagram.txt")
+        self.assertEqual(names_by_key["hostlist-twitter"], "TCP 80,443 • hostlist twitter.txt")
+        self.assertEqual(names_by_key["hostlist-twimg"], "TCP 80,443 • hostlist twimg.txt")
 
-    def test_explicit_profile_name_wins_over_technical_ipset_name(self) -> None:
+    def test_display_items_do_not_override_ready_name_with_profile_name(self) -> None:
         rows = build_profile_display_items((
             _item(
                 "my-sites",
                 name="Мои сайты",
-                profile_name="Мои сайты",
+                profile_name="Другое имя",
                 list_type="ipset",
                 lines=("--filter-tcp=80,443-65535", "--ipset=lists/ipset-all.txt"),
                 order=1,
