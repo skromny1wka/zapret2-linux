@@ -488,6 +488,54 @@ class HostsPageRuntimeTests(unittest.TestCase):
 
         log_mock.assert_not_called()
 
+    def test_hosts_page_unmounts_services_rows_when_hidden_for_fast_next_open(self) -> None:
+        from hosts.ui.page import HostsPage
+
+        layout = Mock()
+        page = HostsPage.__new__(HostsPage)
+        page._services_layout = layout
+        page._clear_layout = Mock()
+        page._reset_services_runtime_bindings = Mock()
+        page._stop_services_catalog_worker = Mock()
+        page._services_ui_mounted = True
+        page._close_service_combo_popups = Mock()
+        page._stop_catalog_watcher = Mock()
+
+        HostsPage.on_page_hidden(page)
+
+        page._clear_layout.assert_called_once_with(layout)
+        page._reset_services_runtime_bindings.assert_called_once_with()
+        page._stop_services_catalog_worker.assert_called_once_with(blocking=False)
+        self.assertFalse(page._services_ui_mounted)
+
+    def test_hosts_page_restores_cached_services_after_activation_event_loop_turn(self) -> None:
+        import hosts.ui.page as hosts_page
+        from hosts.ui.page import HostsPage
+
+        page = HostsPage.__new__(HostsPage)
+        page._cleanup_in_progress = False
+        page._services_ui_mounted = False
+        page._services_restore_scheduled = False
+        page._services_catalog_plan = object()
+        page._services_catalog_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+        page._build_services_selectors = Mock()
+        page._rebuild_services_selectors = Mock()
+        page.isVisible = Mock(return_value=True)
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(hosts_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            HostsPage._schedule_services_restore_after_show(page)
+
+        single_shot.assert_called_once()
+        page._build_services_selectors.assert_not_called()
+        self.assertTrue(page._services_restore_scheduled)
+
+        single_shot.call_args.args[1]()
+
+        page._build_services_selectors.assert_called_once_with(page._services_catalog_plan, sync_selection=False)
+        page._rebuild_services_selectors.assert_not_called()
+        self.assertFalse(page._services_restore_scheduled)
+
     def test_open_hosts_file_pending_restarts_after_event_loop_turn(self) -> None:
         import hosts.ui.page as hosts_page
         from hosts.ui.page import HostsPage

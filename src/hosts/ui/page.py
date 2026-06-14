@@ -138,6 +138,8 @@ class HostsPage(BasePage):
         self._service_group_chips_scrolls = []
         self._service_group_chip_buttons = []
         self._services_catalog_plan = None
+        self._services_ui_mounted = False
+        self._services_restore_scheduled = False
         self.status_card = None
         self._open_hosts_button = None
         self._info_text_label = None
@@ -227,6 +229,8 @@ class HostsPage(BasePage):
             update_ui_fn=self._update_ui,
         )
         self._log_ui_timing("hosts_ui.activation_workflow", stage_started_at)
+        if self._runtime_initialized:
+            self._schedule_services_restore_after_show()
         self._log_ui_timing("hosts_ui.activation.total", total_started_at)
 
     def warmup_initial_load(self) -> bool:
@@ -387,6 +391,7 @@ class HostsPage(BasePage):
 
     def on_page_hidden(self) -> None:
         self._close_service_combo_popups()
+        self._unmount_services_selectors_for_fast_switch()
         self._stop_catalog_watcher()
 
     def _install_host_window_event_filter(self) -> None:
@@ -648,12 +653,49 @@ class HostsPage(BasePage):
         self._service_group_chips_scrolls = []
         self._service_group_chip_buttons = []
 
+    def _unmount_services_selectors_for_fast_switch(self) -> None:
+        if self._services_layout is None:
+            return
+        if not self.__dict__.get("_services_ui_mounted", False):
+            return
+        self._stop_services_catalog_worker(blocking=False)
+        self._clear_layout(self._services_layout)
+        self._reset_services_runtime_bindings()
+        self._services_ui_mounted = False
+
+    def _schedule_services_restore_after_show(self) -> None:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if self.__dict__.get("_services_ui_mounted", False):
+            return
+        if self.__dict__.get("_services_restore_scheduled", False):
+            return
+        self._services_restore_scheduled = True
+        QTimer.singleShot(0, self._run_deferred_services_restore)
+
+    def _run_deferred_services_restore(self) -> None:
+        self._services_restore_scheduled = False
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return
+        if not self.isVisible():
+            return
+        if self.__dict__.get("_services_ui_mounted", False):
+            return
+        if self._services_catalog_runtime.is_running():
+            return
+        catalog_plan = self.__dict__.get("_services_catalog_plan")
+        if catalog_plan is not None:
+            self._build_services_selectors(catalog_plan, sync_selection=False)
+            return
+        self._rebuild_services_selectors()
+
     def _rebuild_services_selectors(self) -> None:
         if self._services_layout is None:
             return
         started_at = time.perf_counter()
         self._clear_layout(self._services_layout)
         self._reset_services_runtime_bindings()
+        self._services_ui_mounted = False
         self._start_services_catalog_worker()
         self._log_ui_timing("hosts_ui.services.rebuild", started_at)
 
@@ -680,6 +722,13 @@ class HostsPage(BasePage):
         if not self._services_catalog_runtime.is_current(request_id, cleanup_in_progress=self._cleanup_in_progress):
             return
         self._catalog_sig = catalog_sig
+        self._services_catalog_plan = catalog_plan
+        if not self.isVisible():
+            if catalog_plan.selection_changed:
+                self._service_dns_selection = dict(catalog_plan.new_selection)
+                self._request_user_selection_save(self._service_dns_selection)
+            self._services_ui_mounted = False
+            return
         self._build_services_selectors(catalog_plan, sync_selection=True)
         self._update_ui()
 
@@ -990,6 +1039,7 @@ class HostsPage(BasePage):
             self._log_ui_timing("hosts_ui.services.groups.build", groups_started_at)
         finally:
             self._building_services_ui = False
+            self._services_ui_mounted = True
             self._log_ui_timing("hosts_ui.services.build", started_at)
 
     def _on_direct_toggle_changed(self, service_name: str, checked: bool) -> None:
