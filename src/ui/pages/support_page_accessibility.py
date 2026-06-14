@@ -19,6 +19,12 @@ def apply_support_page_accessibility(page) -> None:
     """Задаёт понятные имена карточкам страницы «Поддержка»."""
 
     tr_fn = page._tr
+    if page._support_group is not None:
+        support_title = tr_fn("page.support.section.discussions", "GitHub Discussions")
+        set_state_text(page._support_group, f"Раздел поддержки: {support_title}")
+    if page._community_group is not None:
+        community_title = tr_fn("page.support.section.community", "Каналы сообщества")
+        set_state_text(page._community_group, f"Раздел поддержки: {community_title}")
     if page._support_card is not None:
         _set_card_and_button_accessibility(
             page._support_card,

@@ -22,6 +22,16 @@ class SupportPageAccessibilityTests(unittest.TestCase):
             create_open_action_worker=lambda *_args, **_kwargs: None,
         )
 
+        self.assertEqual(page._support_group.accessibleName(), "Раздел поддержки: GitHub Discussions")
+        self.assertEqual(
+            page._support_group.property("screenReaderStateText"),
+            "Раздел поддержки: GitHub Discussions",
+        )
+        self.assertEqual(page._community_group.accessibleName(), "Раздел поддержки: Каналы сообщества")
+        self.assertEqual(
+            page._community_group.property("screenReaderStateText"),
+            "Раздел поддержки: Каналы сообщества",
+        )
         self.assertEqual(page._support_card.accessibleName(), "Открыть GitHub Discussions")
         self.assertEqual(page._support_card.property("screenReaderStateText"), "Открыть GitHub Discussions")
         self.assertIn("Основной канал поддержки", page._support_card.accessibleDescription())
@@ -72,6 +82,16 @@ class SupportPageAccessibilityTests(unittest.TestCase):
 
         page.set_ui_language("ru")
 
+        self.assertEqual(page._support_group.accessibleName(), "Раздел поддержки: GitHub Discussions")
+        self.assertEqual(
+            page._support_group.property("screenReaderStateText"),
+            "Раздел поддержки: GitHub Discussions",
+        )
+        self.assertEqual(page._community_group.accessibleName(), "Раздел поддержки: Каналы сообщества")
+        self.assertEqual(
+            page._community_group.property("screenReaderStateText"),
+            "Раздел поддержки: Каналы сообщества",
+        )
         self.assertEqual(page._support_card.accessibleName(), "Открыть GitHub Discussions")
         self.assertEqual(page._support_card.property("screenReaderStateText"), "Открыть GitHub Discussions")
         self.assertIn("Основной канал поддержки", page._support_card.accessibleDescription())
