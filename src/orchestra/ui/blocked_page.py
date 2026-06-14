@@ -218,11 +218,31 @@ class BlockedDomainRow(QFrame):
         if self.is_default:
             name = f"Системная заблокированная стратегия: {self.hostname}, {proto_text}, стратегия {selected_strategy}"
             description = "Системную блокировку нельзя изменить."
+            system_lock_state = (
+                f"Индикатор системной блокировки: {self.hostname} {proto_text}, стратегия {selected_strategy}"
+            )
+            system_strategy_state = (
+                f"Номер системной заблокированной стратегии для {self.hostname} {proto_text}: {selected_strategy}"
+            )
         else:
             name = f"Заблокированная стратегия: {self.hostname}, {proto_text}, стратегия {selected_strategy}"
             description = "Оркестратор не будет использовать эту стратегию для домена."
         set_control_accessibility(self, name=name, description=description)
         set_state_text(self, name)
+        if self.is_default and self._lock_icon_label is not None:
+            set_control_accessibility(
+                self._lock_icon_label,
+                name=system_lock_state,
+                description=description,
+            )
+            set_state_text(self._lock_icon_label, system_lock_state)
+        if self.is_default and self._default_strat_label is not None:
+            set_control_accessibility(
+                self._default_strat_label,
+                name=system_strategy_state,
+                description=description,
+            )
+            set_state_text(self._default_strat_label, system_strategy_state)
         if hasattr(self, "strat_spin"):
             strategy_state = f"Заблокированная стратегия для {self.hostname} {proto_text}, выбрано: {selected_strategy}"
             set_state_text(self.strat_spin, strategy_state)

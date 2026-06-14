@@ -729,9 +729,11 @@ class OrchestraAccessibilityTests(unittest.TestCase):
     def test_row_controls_include_domain_protocol_and_strategy(self) -> None:
         locked_row = LockedDomainRow("example.com", 3, "tcp")
         blocked_row = BlockedDomainRow("blocked.example", 5, "udp", is_default=False)
+        system_blocked_row = BlockedDomainRow("system.example", 1, "tcp", is_default=True)
         whitelist_row = WhitelistDomainRow("safe.example", is_default=False)
         self.addCleanup(locked_row.deleteLater)
         self.addCleanup(blocked_row.deleteLater)
+        self.addCleanup(system_blocked_row.deleteLater)
         self.addCleanup(whitelist_row.deleteLater)
 
         self.assertEqual(locked_row.accessibleName(), "Залоченная стратегия: example.com, TCP, стратегия 3")
@@ -775,6 +777,27 @@ class OrchestraAccessibilityTests(unittest.TestCase):
         self.assertEqual(
             blocked_row._delete_btn.property("screenReaderStateText"),
             "Разблокировать blocked.example UDP, стратегия 5",
+        )
+
+        self.assertEqual(
+            system_blocked_row.accessibleName(),
+            "Системная заблокированная стратегия: system.example, TCP, стратегия 1",
+        )
+        self.assertEqual(
+            system_blocked_row._lock_icon_label.accessibleName(),
+            "Индикатор системной блокировки: system.example TCP, стратегия 1",
+        )
+        self.assertEqual(
+            system_blocked_row._lock_icon_label.property("screenReaderStateText"),
+            "Индикатор системной блокировки: system.example TCP, стратегия 1",
+        )
+        self.assertEqual(
+            system_blocked_row._default_strat_label.accessibleName(),
+            "Номер системной заблокированной стратегии для system.example TCP: 1",
+        )
+        self.assertEqual(
+            system_blocked_row._default_strat_label.property("screenReaderStateText"),
+            "Номер системной заблокированной стратегии для system.example TCP: 1",
         )
 
         self.assertEqual(whitelist_row.accessibleName(), "Домен белого списка: safe.example")
