@@ -10,30 +10,28 @@ import socket as _socket
 import struct
 from ipaddress import IPv4Network, IPv4Address, IPv6Network, IPv6Address
 
+from telegram_proxy.proxy.route_catalog import (
+    WSS_PATH,
+    WSS_RELAY_IP,
+    stable_wss_domain_map,
+    stable_wss_domains_for_dc,
+    wss_enabled_dcs,
+)
+
 
 # ---- WebSocket relay configuration ----
-
-# The IP that hosts the proven working WebSocket relays.
-# Hardcoded by Flowseal reference implementation — do NOT change to DNS result.
-WSS_RELAY_IP = "149.154.167.220"
 
 # Per-domain IP overrides (empty = all use WSS_RELAY_IP).
 # Only add entries here after manually verifying that a domain works at a
 # specific IP.  Unverified IPs from DNS can break media downloads.
 WSS_RELAY_IPS: dict[str, str] = {}
 
-# WSS domains that accept WebSocket upgrades (return 101).
-# Only DC2 and DC4 relays are proven to work.  All DCs are routed through
-# them — the relay reads the real DC from the MTProto init packet.
-WSS_DOMAINS = {
-    2: ["kws2.web.telegram.org", "kws2-1.web.telegram.org"],
-    4: ["kws4.web.telegram.org", "kws4-1.web.telegram.org"],
-}
+# WSS domains that are allowed for automatic runtime routing.
+# See route_catalog.py for the full stable/candidate/fallback_only map.
+WSS_DOMAINS = stable_wss_domain_map()
 
 # For DCs without their own relay, try these (cross-DC routing via init).
-WSS_FALLBACK_ORDER = [2, 4]
-
-WSS_PATH = "/apiws"
+WSS_FALLBACK_ORDER = list(wss_enabled_dcs())
 
 # Mapping: IP -> (dc_id, is_media)
 # Used to determine DC when MTProto init packet parsing fails
@@ -248,16 +246,13 @@ def is_telegram_ip(ip: str) -> bool:
 def ws_domains_for_dc(dc: int, is_media: bool = False) -> list[str]:
     """Get WebSocket domain names to try for a datacenter.
 
-    Only DC2 and DC4 have proven working WSS relays.  For other DCs,
-    returns DC2/DC4 domains — the relay routes based on the DC id in the
-    MTProto init packet (cross-DC routing).
+    The stable route map lives in route_catalog.py.  Only stable routes are
+    returned here; candidate routes are documented but not used automatically.
 
     For media connections, tries the -1 variant first.
     """
-    if dc in WSS_DOMAINS:
-        domains = WSS_DOMAINS[dc]
-        if is_media:
-            return list(reversed(domains))  # -1 variant first for media
+    domains = stable_wss_domains_for_dc(dc, is_media=is_media)
+    if domains:
         return list(domains)
 
     # DC doesn't have its own relay -- use fallback DCs
