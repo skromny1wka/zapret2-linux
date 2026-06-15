@@ -422,6 +422,27 @@ class ControlStatusDotPulseTests(unittest.TestCase):
             "Индикатор последнего сообщения: Пресет успешно применён",
         )
 
+    def test_last_status_message_sets_screen_reader_label_context(self) -> None:
+        from presets.ui.control.control_page_runtime_shared import apply_last_status_message
+
+        message_label = _TextTarget()
+
+        apply_last_status_message(
+            "Пресет успешно применён",
+            message_label=message_label,
+            message_dot=_StatusDot(),
+            empty_text="Нет сообщений",
+        )
+
+        self.assertEqual(
+            message_label.accessible_name,
+            "Последнее сообщение Zapret: Пресет успешно применён",
+        )
+        self.assertEqual(
+            message_label.properties.get("screenReaderStateText"),
+            "Последнее сообщение Zapret: Пресет успешно применён",
+        )
+
     def test_set_toggle_checked_skips_duplicate_state(self) -> None:
         from presets.ui.control.control_page_runtime_shared import set_toggle_checked
 

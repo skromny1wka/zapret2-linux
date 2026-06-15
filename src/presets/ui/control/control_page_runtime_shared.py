@@ -217,7 +217,7 @@ def apply_last_status_message(
         return
     setattr(message_dot, "_last_control_status_message_key", message_key)
     message_label.setText(text)
-    set_state_text(message_label, text)
+    set_state_text(message_label, f"Последнее сообщение Zapret: {text}")
     set_state_text(message_dot, f"Индикатор последнего сообщения: {text}")
     message_dot.set_color(color)
     message_dot.stop_pulse()
