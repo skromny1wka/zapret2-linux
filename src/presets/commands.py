@@ -62,6 +62,7 @@ def connect_preset_signals(
     on_switched=None,
     on_identity_changed=None,
     on_content_changed=None,
+    on_content_changed_with_reason=None,
 ) -> None:
     store = _create_preset_file_service(launch_method, preset_services=preset_services)._ui_store()
     if callable(on_changed):
@@ -72,6 +73,8 @@ def connect_preset_signals(
         store.preset_identity_changed.connect(on_identity_changed)
     if callable(on_content_changed):
         store.preset_content_changed.connect(on_content_changed)
+    if callable(on_content_changed_with_reason):
+        store.preset_content_changed_with_reason.connect(on_content_changed_with_reason)
 
 
 def get_selection_state(
@@ -211,19 +214,27 @@ def save_preset_source_by_file_name(
     *,
     preset_services,
     publish_content_changed: bool = True,
+    content_change_kind: str = "",
 ):
     return _create_preset_file_service(launch_method, preset_services=preset_services).save_source_text_by_file_name(
         file_name,
         source_text,
         publish_content_changed=publish_content_changed,
+        content_change_kind=content_change_kind,
     )
 
 
-def publish_preset_content_changed(launch_method: str, file_name: str, *, preset_services):
+def publish_preset_content_changed(
+    launch_method: str,
+    file_name: str,
+    *,
+    preset_services,
+    content_change_kind: str = "",
+):
     return _create_preset_file_service(
         launch_method,
         preset_services=preset_services,
-    ).publish_preset_content_changed_by_file_name(file_name)
+    ).publish_preset_content_changed_by_file_name(file_name, content_change_kind=content_change_kind)
 
 
 def read_preset_source_by_file_name(launch_method: str, file_name: str, *, preset_services) -> str:
@@ -237,8 +248,17 @@ def read_selected_preset_source(launch_method: str, *, preset_services) -> tuple
     return source_text, manifest
 
 
-def save_selected_preset_source(launch_method: str, source_text: str, *, preset_services):
-    return _create_preset_file_service(launch_method, preset_services=preset_services).save_selected_source_text(source_text)
+def save_selected_preset_source(
+    launch_method: str,
+    source_text: str,
+    *,
+    preset_services,
+    content_change_kind: str = "",
+):
+    return _create_preset_file_service(launch_method, preset_services=preset_services).save_selected_source_text(
+        source_text,
+        content_change_kind=content_change_kind,
+    )
 
 
 def create_preset(launch_method: str, name: str, *, from_current: bool = True, preset_services):

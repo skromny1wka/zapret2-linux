@@ -23,9 +23,10 @@ def bind_preset_stores_to_runtime(*, presets_feature, preset_runtime) -> None:
                 m,
                 file_name,
             ),
-            on_content_changed=lambda file_name, m=method: preset_runtime.handle_preset_content_changed(
+            on_content_changed_with_reason=lambda file_name, reason, m=method: preset_runtime.handle_preset_content_changed(
                 m,
                 file_name,
+                reason=reason,
             ),
         )
 

@@ -15,6 +15,7 @@ class AppUiState:
     launch_last_error: str = ""
     last_status_message: str = ""
     current_strategy_summary: str = ""
+    preset_content_change_kind: str = ""
     subscription_is_premium: bool = False
     subscription_days_remaining: int | None = None
     garland_enabled: bool = False
@@ -127,9 +128,12 @@ class MainWindowStateStore:
         current = self.snapshot().active_preset_revision
         return self.update(active_preset_revision=int(current) + 1)
 
-    def bump_preset_content_revision(self) -> bool:
+    def bump_preset_content_revision(self, *, content_change_kind: str = "") -> bool:
         current = self.snapshot().preset_content_revision
-        return self.update(preset_content_revision=int(current) + 1)
+        return self.update(
+            preset_content_revision=int(current) + 1,
+            preset_content_change_kind=str(content_change_kind or "").strip(),
+        )
 
     def bump_preset_structure_revision(self) -> bool:
         current = self.snapshot().preset_structure_revision

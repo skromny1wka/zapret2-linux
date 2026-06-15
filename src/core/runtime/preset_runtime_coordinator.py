@@ -203,7 +203,13 @@ class PresetRuntimeCoordinator(QObject):
             pass
         self.schedule_refresh_after_preset_switch()
 
-    def handle_preset_content_changed(self, launch_method: str, preset_file_name: str) -> None:
+    def handle_preset_content_changed(
+        self,
+        launch_method: str,
+        preset_file_name: str,
+        *,
+        reason: str = "preset_content_changed",
+    ) -> None:
         """Обновляет watcher после сохранения активного source preset-а."""
         method = normalize_launch_method(launch_method, default="")
         current_method = normalize_launch_method(self._get_launch_method(), default="")
@@ -217,6 +223,7 @@ class PresetRuntimeCoordinator(QObject):
         self._schedule_preset_content_apply(
             launch_method=method,
             preset_file_name=updated_file_name,
+            reason=reason,
         )
 
     def _request_selected_source_preset_apply(
@@ -282,13 +289,15 @@ class PresetRuntimeCoordinator(QObject):
         *,
         launch_method: str,
         preset_file_name: str,
+        reason: str = "preset_content_changed",
         delay_ms: int = 0,
     ) -> None:
         method = normalize_launch_method(launch_method, default="")
         selected_file_name = str(preset_file_name or "").strip()
+        apply_reason = str(reason or "preset_content_changed").strip() or "preset_content_changed"
         self._pending_preset_content_apply = PendingPresetApply(
             launch_method=method,
-            reason="preset_content_changed",
+            reason=apply_reason,
             preset_file_name=selected_file_name,
         )
         try:
@@ -312,20 +321,27 @@ class PresetRuntimeCoordinator(QObject):
             launch_method=pending.launch_method,
             preset_file_name=pending.preset_file_name,
         )
-        self._publish_active_preset_content_changed(pending.preset_file_name)
+        self._publish_active_preset_content_changed(pending.preset_file_name, reason=pending.reason)
         self._request_preset_content_apply(
             pending.launch_method,
             pending.reason,
             pending.preset_file_name,
         )
 
-    def _publish_active_preset_content_changed(self, path: str) -> None:
+    def _publish_active_preset_content_changed(self, path: str, *, reason: str = "preset_content_changed") -> None:
         if not str(path or "").strip():
             return
         try:
             store = self._ui_state_store
             if store is not None:
-                store.bump_preset_content_revision()
+                try:
+                    store.bump_preset_content_revision(
+                        content_change_kind=str(reason or "preset_content_changed").strip()
+                    )
+                except TypeError as exc:
+                    if "content_change_kind" not in str(exc):
+                        raise
+                    store.bump_preset_content_revision()
         except Exception:
             pass
 

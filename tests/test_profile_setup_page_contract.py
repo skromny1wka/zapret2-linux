@@ -3573,6 +3573,23 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._schedule_profiles_payload_request.assert_called_once_with(force=True)
         page._request_profiles_payload.assert_not_called()
 
+    def test_preset_setup_strategy_only_content_state_change_skips_full_profile_refresh(self) -> None:
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._cleanup_in_progress = False
+        page._profile_payload_dirty = False
+        page.isVisible = Mock(return_value=True)
+        page._schedule_profiles_payload_request = Mock(
+            side_effect=AssertionError("strategy_only must not rebuild the full profile list")
+        )
+        page._request_profiles_payload = Mock(side_effect=AssertionError("state signal must not load immediately"))
+        state = SimpleNamespace(preset_content_change_kind="strategy_only")
+
+        PresetSetupPageBase._on_ui_state_changed(page, state, frozenset({"preset_content_revision"}))
+
+        self.assertFalse(page._profile_payload_dirty)
+        page._schedule_profiles_payload_request.assert_not_called()
+        page._request_profiles_payload.assert_not_called()
+
     def test_preset_setup_active_preset_state_change_coalesces_profile_refresh(self) -> None:
         page = PresetSetupPageBase.__new__(PresetSetupPageBase)
         page._cleanup_in_progress = False
@@ -6069,6 +6086,36 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertEqual(failed, [])
         self.assertEqual(len(applied), 1)
         self.assertEqual(applied[0][:4], (9, "profile:0", "", "tls_fake"))
+        self.assertIsNone(applied[0][4].payload)
+        self.assertIs(applied[0][4].apply_result, apply_result)
+
+    def test_strategy_apply_worker_skips_profile_load_when_result_says_payload_is_unchanged(self) -> None:
+        apply_result = SimpleNamespace(
+            status="already_applied",
+            profile_key="profile:0",
+            should_reload=False,
+            profile_payload_changed=False,
+        )
+        apply_strategy = Mock(return_value=apply_result)
+        load_profile = Mock(side_effect=AssertionError("unchanged strategy must not load profile payload"))
+        worker = ProfileStrategyApplyWorker(9, apply_strategy, load_profile, "profile:0", "tls_fake")
+        applied = []
+
+        worker.applied.connect(
+            lambda request_id, requested_profile_key, profile_key, strategy_id, emitted_payload: applied.append((
+                request_id,
+                requested_profile_key,
+                profile_key,
+                strategy_id,
+                emitted_payload,
+            ))
+        )
+
+        worker.run()
+
+        load_profile.assert_not_called()
+        self.assertEqual(len(applied), 1)
+        self.assertEqual(applied[0][:4], (9, "profile:0", "profile:0", "tls_fake"))
         self.assertIsNone(applied[0][4].payload)
         self.assertIs(applied[0][4].apply_result, apply_result)
 

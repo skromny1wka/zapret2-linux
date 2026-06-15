@@ -88,6 +88,51 @@ class _BlockingFileBackedPresetStore(_FileBackedPresetStore):
 
 
 class ProfileListPayloadTests(unittest.TestCase):
+    def test_strategy_only_apply_updates_cached_profile_list_item_without_dropping_snapshot(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            catalogs_dir = root / "profile" / "strategy_catalogs" / "winws2"
+            catalogs_dir.mkdir(parents=True)
+            (catalogs_dir / "tcp.txt").write_text(
+                "\n".join(
+                    (
+                        "[tcp_md5]",
+                        "name = TCP MD5",
+                        "--lua-desync=multidisorder:pos=4:repeats=10:tcp_md5",
+                        "",
+                    )
+                ),
+                encoding="utf-8",
+            )
+            store = _PresetStore(
+                "\n".join(
+                    (
+                        "--name=SpeedTest",
+                        "--filter-tcp=443,8080",
+                        "--hostlist=lists/speedtest.txt",
+                        "--lua-desync=pass",
+                        "",
+                    )
+                )
+            )
+            feature = SimpleNamespace(
+                _presets_feature=store,
+                _app_paths=AppPaths(user_root=root, local_root=root),
+            )
+
+            with patch("settings.store.MAIN_DIRECTORY", str(root)):
+                service = ProfilePresetService(feature, "zapret2_mode")
+                first_payload = service.list_profiles()
+                result = service.apply_strategy("profile:0", "tcp_md5")
+                cache_entry = service.get_cached_profile_list_entry()
+
+        self.assertEqual(result.status, "applied")
+        self.assertIsNotNone(cache_entry)
+        _revision, cached_payload = cache_entry
+        self.assertIsNot(cached_payload, first_payload)
+        self.assertEqual(tuple(item.strategy_id for item in cached_payload.items), ("tcp_md5",))
+        self.assertEqual(store.save_count, 1)
+
     def test_profile_folder_order_keeps_zero_order_first(self) -> None:
         grouped = {
             "discord": [object()],

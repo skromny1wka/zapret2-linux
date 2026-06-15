@@ -346,11 +346,17 @@ class PresetSetupPageBase(BasePage):
             return
         if not (changed & {"active_preset_revision", "preset_content_revision"}):
             return
+        if "preset_content_revision" in changed:
+            change_kind = str(getattr(_state, "preset_content_change_kind", "") or "").strip()
+            if change_kind == "strategy_only":
+                return
+            self._profile_payload_dirty = True
+            if not self.isVisible():
+                return
+            self._schedule_profiles_payload_request(force=True)
+            return
         self._profile_payload_dirty = True
         if not self.isVisible():
-            return
-        if "preset_content_revision" in changed:
-            self._schedule_profiles_payload_request(force=True)
             return
         self._schedule_profiles_payload_reload_after_preset_switch()
 

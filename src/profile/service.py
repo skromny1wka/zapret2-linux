@@ -165,13 +165,34 @@ class ProfilePresetService:
         self._selected_preset_snapshot = snapshot
         return snapshot.preset, snapshot.manifest
 
-    def save_selected_preset(self, preset: Preset) -> None:
+    def save_selected_preset(
+        self,
+        preset: Preset,
+        *,
+        content_change_kind: str = "",
+        changed_profile_key: str = "",
+    ) -> None:
         source_text = serialize_preset(preset)
         snapshot = self._selected_preset_snapshot
         if snapshot is not None and serialize_preset(snapshot.preset) == source_text:
             return
-        self._presets.save_selected_preset_source(self._launch_method, source_text)
+        self._save_selected_preset_source(source_text, content_change_kind=content_change_kind)
+        if str(content_change_kind or "").strip() == "strategy_only" and str(changed_profile_key or "").strip():
+            self._refresh_strategy_only_snapshots(str(changed_profile_key or "").strip())
+            return
         self._invalidate_selected_preset_snapshot()
+
+    def _save_selected_preset_source(self, source_text: str, *, content_change_kind: str = "") -> None:
+        save = self._presets.save_selected_preset_source
+        clean_kind = str(content_change_kind or "").strip()
+        if clean_kind:
+            try:
+                save(self._launch_method, source_text, content_change_kind=clean_kind)
+                return
+            except TypeError as exc:
+                if "content_change_kind" not in str(exc):
+                    raise
+        save(self._launch_method, source_text)
 
     def list_profiles(self) -> ProfileListPayload:
         with self._profile_list_lock:
@@ -647,9 +668,22 @@ class ProfilePresetService:
                 )
             preset = _with_profile_strategy_branch_lines(preset, index, branch_id, entry.args.splitlines())
             preset = with_profile_enabled(preset, index, True)
-            self.save_selected_preset(preset)
+            self.save_selected_preset(
+                preset,
+                content_change_kind="strategy_only",
+                changed_profile_key=profile_key,
+            )
             applied_key = preset.profiles[index].key if 0 <= index < len(preset.profiles) else ""
-            return _strategy_apply_result("applied", profile_key=applied_key, strategy_id=strategy_id)
+            return _strategy_apply_result(
+                "applied",
+                profile_key=applied_key,
+                strategy_id=strategy_id,
+                change_kind="strategy_only",
+                profile_payload_changed=True,
+                profile_list_item_changed=True,
+                summary_changed=True,
+                runtime_apply_needed=True,
+            )
         if setup.item.in_preset and strategy_branches and len(strategy_branches) > 1:
             return _strategy_apply_result(
                 "stale_reloaded",
@@ -671,6 +705,7 @@ class ProfilePresetService:
 
         preset, _manifest = self.load_selected_preset()
         resolved_key = profile_key
+        list_structure_changed = False
         if profile_key.startswith("template:"):
             preset, resolved_key = self._append_template_profile_to_preset(preset, profile_key)
             if not resolved_key:
@@ -680,6 +715,7 @@ class ProfilePresetService:
                     should_reload=True,
                     message="template_profile_missing",
                 )
+            list_structure_changed = True
 
         index = resolve_preset_profile_reference_index(preset, resolved_key)
         if index is None:
@@ -691,9 +727,23 @@ class ProfilePresetService:
             )
         preset = with_profile_strategy_lines(preset, index, entry.args.splitlines())
         preset = with_profile_enabled(preset, index, True)
-        self.save_selected_preset(preset)
+        self.save_selected_preset(
+            preset,
+            content_change_kind="preset_structure" if list_structure_changed else "strategy_only",
+            changed_profile_key="" if list_structure_changed else resolved_key,
+        )
         applied_key = preset.profiles[index].key if 0 <= index < len(preset.profiles) else ""
-        return _strategy_apply_result("applied", profile_key=applied_key, strategy_id=strategy_id)
+        return _strategy_apply_result(
+            "applied",
+            profile_key=applied_key,
+            strategy_id=strategy_id,
+            change_kind="preset_structure" if list_structure_changed else "strategy_only",
+            list_structure_changed=list_structure_changed,
+            profile_payload_changed=True,
+            profile_list_item_changed=True,
+            summary_changed=True,
+            runtime_apply_needed=True,
+        )
 
     def set_current_strategy_state(
         self,
@@ -1335,6 +1385,64 @@ class ProfilePresetService:
         self._profile_list_snapshots_by_revision.clear()
         self._profile_setup_payload_cache.clear()
 
+    def _refresh_strategy_only_snapshots(self, profile_key: str) -> None:
+        clean_profile_key = str(profile_key or "").strip()
+        if not clean_profile_key:
+            self._invalidate_selected_preset_snapshot()
+            return
+        self._selected_preset_snapshot = None
+        self._forget_profile_setup_payloads(clean_profile_key)
+        setup = self.get_profile_setup(clean_profile_key)
+        item = getattr(setup, "item", None)
+        if item is None:
+            self._invalidate_profile_list_snapshot()
+            return
+        if not self._replace_profile_list_snapshot_item(clean_profile_key, item):
+            self._invalidate_profile_list_snapshot()
+
+    def _forget_profile_setup_payloads(self, profile_key: str) -> None:
+        clean_profile_key = str(profile_key or "").strip()
+        if not clean_profile_key:
+            return
+        for cache_key in list(self._profile_setup_payload_cache):
+            if cache_key and cache_key[-1] == ("profile_setup", clean_profile_key):
+                self._profile_setup_payload_cache.pop(cache_key, None)
+
+    def _replace_profile_list_snapshot_item(self, profile_key: str, item: ProfileListItem) -> bool:
+        payload = self._profile_list_snapshot
+        if payload is None:
+            if not self._profile_list_snapshots_by_revision:
+                return True
+            payload = next(reversed(self._profile_list_snapshots_by_revision.values()))
+        clean_profile_key = str(profile_key or "").strip()
+        replacement_keys = {
+            clean_profile_key,
+            str(getattr(item, "key", "") or "").strip(),
+            str(getattr(item, "persistent_key", "") or "").strip(),
+        }
+        replacement_keys.discard("")
+        items: list[ProfileListItem] = []
+        replaced = False
+        for current in tuple(getattr(payload, "items", ()) or ()):
+            current_keys = {
+                str(getattr(current, "key", "") or "").strip(),
+                str(getattr(current, "persistent_key", "") or "").strip(),
+            }
+            current_keys.discard("")
+            if not replaced and replacement_keys & current_keys:
+                items.append(item)
+                replaced = True
+                continue
+            items.append(current)
+        if not replaced:
+            return False
+        list_revision = self._current_profile_list_revision()
+        updated_payload = replace(payload, items=tuple(items))
+        self._profile_list_snapshot = updated_payload
+        self._profile_list_snapshot_revision = list_revision
+        self._remember_profile_list_snapshot(list_revision, updated_payload)
+        return True
+
     def _current_selected_preset_file_name(self) -> str:
         file_name_getter = getattr(self._presets, "get_selected_source_preset_file_name", None)
         if callable(file_name_getter):
@@ -1388,13 +1496,29 @@ def _strategy_apply_result(
     strategy_id: str = "",
     should_reload: bool = False,
     message: str = "",
+    change_kind: str = "",
+    list_structure_changed: bool = False,
+    profile_payload_changed: bool = False,
+    profile_list_item_changed: bool = False,
+    summary_changed: bool = False,
+    runtime_apply_needed: bool = False,
 ) -> StrategyApplyResult:
+    clean_status = str(status or "").strip()
+    clean_change_kind = str(change_kind or "").strip()
+    if not clean_change_kind:
+        clean_change_kind = "reload" if should_reload else "unchanged"
     return StrategyApplyResult(
-        status=str(status or "").strip(),
+        status=clean_status,
         profile_key=str(profile_key or "").strip(),
         strategy_id=str(strategy_id or "").strip(),
         should_reload=bool(should_reload),
         message=str(message or "").strip(),
+        change_kind=clean_change_kind,
+        list_structure_changed=bool(list_structure_changed),
+        profile_payload_changed=bool(profile_payload_changed),
+        profile_list_item_changed=bool(profile_list_item_changed),
+        summary_changed=bool(summary_changed),
+        runtime_apply_needed=bool(runtime_apply_needed),
     )
 
 

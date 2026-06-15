@@ -95,6 +95,46 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
         self.assertEqual(switch_calls, [])
         self.assertEqual(ui_state.content_revision, 1)
 
+    def test_active_preset_content_change_publishes_reason_to_ui_state(self) -> None:
+        from core.runtime.preset_runtime_coordinator import PresetRuntimeCoordinator
+        from settings.mode import ZAPRET2_MODE
+
+        active_path = "C:/Zapret/Dev/presets/winws2/Default v5.txt"
+        presets_feature = SimpleNamespace(
+            is_selected_source_preset_file=lambda method, file_name: (
+                method == ZAPRET2_MODE and file_name == "Default v5.txt"
+            )
+        )
+        content_calls: list[tuple[str, str, str]] = []
+        ui_state = SimpleNamespace(content_revision=0, content_change_kind="")
+
+        def bump_preset_content_revision(*, content_change_kind: str = "") -> None:
+            ui_state.content_revision += 1
+            ui_state.content_change_kind = content_change_kind
+
+        ui_state.bump_preset_content_revision = bump_preset_content_revision
+        coordinator = PresetRuntimeCoordinator(
+            presets_feature=presets_feature,
+            ui_state_store=ui_state,
+            get_launch_method=lambda: ZAPRET2_MODE,
+            get_active_preset_path=lambda: active_path,
+            refresh_after_switch=lambda: None,
+            request_selected_source_preset_apply=lambda *_args: True,
+            request_preset_content_apply=lambda method, reason, file_name: content_calls.append(
+                (method, reason, file_name)
+            )
+            or True,
+        )
+        coordinator._active_preset_file_path = active_path
+        coordinator.setup_active_preset_file_watcher = lambda: None
+
+        coordinator.handle_preset_content_changed(ZAPRET2_MODE, "Default v5.txt", reason="strategy_only")
+        self._app.processEvents()
+
+        self.assertEqual(content_calls, [(ZAPRET2_MODE, "strategy_only", "Default v5.txt")])
+        self.assertEqual(ui_state.content_revision, 1)
+        self.assertEqual(ui_state.content_change_kind, "strategy_only")
+
     def test_rapid_active_preset_content_changes_coalesce_to_one_apply(self) -> None:
         from core.runtime.preset_runtime_coordinator import PresetRuntimeCoordinator
         from settings.mode import ZAPRET2_MODE
@@ -789,6 +829,55 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
         service.publish_preset_content_changed_by_file_name("Default v5.txt")
 
         self.assertEqual(events, [("refresh", True), ("notify", True)])
+
+    def test_preset_content_publish_passes_change_kind_to_signal(self) -> None:
+        from presets.file_service import PresetFileService
+        from presets.models import PresetManifest
+        from settings.mode import ENGINE_WINWS2, ZAPRET2_MODE
+
+        manifest = PresetManifest(
+            file_name="Default v5.txt",
+            name="Default v5",
+            updated_at="",
+        )
+        events: list[tuple[str, str]] = []
+
+        class _PresetModeCoordinator:
+            def get_selected_source_manifest(self, _launch_method):
+                return manifest
+
+            def refresh_selected_launch_preset(self, _launch_method):
+                return object()
+
+        class _PresetFileStore:
+            def get_manifest(self, _engine, _file_name):
+                return manifest
+
+            def resolve_file_name(self, _engine, file_name):
+                return file_name
+
+        class _PresetUiStore:
+            def notify_preset_content_changed(self, file_name, *, content_change_kind: str = ""):
+                events.append((file_name, content_change_kind))
+
+        store = _PresetUiStore()
+        service = PresetFileService(
+            engine=ENGINE_WINWS2,
+            launch_method=ZAPRET2_MODE,
+            app_paths=object(),
+            preset_mode_coordinator=_PresetModeCoordinator(),
+            preset_file_store=_PresetFileStore(),
+            preset_selection_service=object(),
+            preset_store_winws2=store,
+            preset_store_winws1=store,
+        )
+
+        service.publish_preset_content_changed_by_file_name(
+            "Default v5.txt",
+            content_change_kind="strategy_only",
+        )
+
+        self.assertEqual(events, [("Default v5.txt", "strategy_only")])
 
     def test_reset_selected_preset_refreshes_launch_snapshot_before_signal(self) -> None:
         from pathlib import Path

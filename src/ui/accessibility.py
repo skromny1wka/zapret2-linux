@@ -22,6 +22,19 @@ def _widget_text(widget) -> str:
         return ""
 
 
+def _iter_widget_children(widget) -> tuple[object, ...]:
+    try:
+        children = widget.findChildren(object)
+    except Exception:
+        return ()
+    if isinstance(children, (str, bytes)):
+        return ()
+    try:
+        return tuple(children)
+    except TypeError:
+        return ()
+
+
 def set_accessible_name(widget, text: object | None = None) -> bool:
     """Задаёт короткое имя элемента для экранного диктора."""
 
@@ -112,11 +125,7 @@ def _sync_spinbox_children_accessibility(
     value = _clean_text(name)
     if widget is None or not value:
         return
-    try:
-        children = widget.findChildren(object)
-    except Exception:
-        return
-    for child in children:
+    for child in _iter_widget_children(widget):
         try:
             object_name = str(child.objectName() or "")
         except Exception:
@@ -160,11 +169,7 @@ def remove_line_edit_buttons_from_tab_order(line_edit) -> None:
 
     if line_edit is None:
         return
-    try:
-        children = line_edit.findChildren(object)
-    except Exception:
-        return
-    for child in children:
+    for child in _iter_widget_children(line_edit):
         try:
             object_name = str(child.objectName() or "")
         except Exception:
@@ -182,11 +187,7 @@ def remove_scrollbar_arrow_buttons_from_tab_order(widget) -> None:
 
     if widget is None:
         return
-    try:
-        children = widget.findChildren(object)
-    except Exception:
-        return
-    for child in children:
+    for child in _iter_widget_children(widget):
         if type(child).__name__ != "ArrowButton":
             continue
         try:
@@ -200,11 +201,7 @@ def remove_switch_indicators_from_tab_order(widget) -> None:
 
     if widget is None:
         return
-    try:
-        children = widget.findChildren(object)
-    except Exception:
-        return
-    for child in children:
+    for child in _iter_widget_children(widget):
         if type(child).__name__ != "Indicator":
             continue
         try:

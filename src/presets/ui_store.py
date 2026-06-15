@@ -21,6 +21,7 @@ class PresetUiStore(QObject):
     preset_switched = pyqtSignal(str)
     preset_identity_changed = pyqtSignal(str)
     preset_content_changed = pyqtSignal(str)
+    preset_content_changed_with_reason = pyqtSignal(str, str)
 
     def __init__(
         self,
@@ -64,12 +65,14 @@ class PresetUiStore(QObject):
             return
         self.presets_changed.emit()
 
-    def notify_preset_content_changed(self, file_name: str) -> None:
+    def notify_preset_content_changed(self, file_name: str, *, content_change_kind: str = "") -> None:
         candidate = str(file_name or "").strip()
         if not candidate:
             return
+        clean_kind = str(content_change_kind or "").strip()
         self._invalidate_metadata_cache()
         self.preset_content_changed.emit(candidate)
+        self.preset_content_changed_with_reason.emit(candidate, clean_kind)
 
     def notify_presets_changed(self) -> None:
         self._invalidate_metadata_cache()

@@ -95,3 +95,9 @@ class StrategyApplyResult:
     strategy_id: str = ""
     should_reload: bool = False
     message: str = ""
+    change_kind: str = "unchanged"
+    list_structure_changed: bool = False
+    profile_payload_changed: bool = False
+    profile_list_item_changed: bool = False
+    summary_changed: bool = False
+    runtime_apply_needed: bool = False

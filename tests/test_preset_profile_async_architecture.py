@@ -195,6 +195,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("bind_ui_state_store", init_source)
         self.assertIn("preset_content_revision", bind_source)
         self.assertIn("active_preset_revision", bind_source)
+        self.assertIn("preset_content_change_kind", handler_source)
+        self.assertIn('"strategy_only"', handler_source)
         self.assertIn("_profile_payload_dirty = True", handler_source)
         self.assertIn("_schedule_profiles_payload_request(force=True)", handler_source)
         self.assertNotIn("_request_profiles_payload(force=True)", handler_source)
@@ -4950,7 +4952,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
         choices_pos = build_source.index("self._build_dns_choices_ui()")
         dns_container_pos = build_source.index("self.add_widget(self.dns_cards_container)")
-        custom_card_pos = build_source.index("self.add_widget(self.custom_card)")
+        custom_card_pos = build_source.index("self.custom_card = shell.custom_card")
 
         self.assertLess(dns_container_pos, choices_pos)
         self.assertLess(custom_card_pos, choices_pos)

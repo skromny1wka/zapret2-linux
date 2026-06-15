@@ -652,7 +652,9 @@ class ProfileStrategyApplyWorker(QThread):
             return
         profile_key = str(getattr(result, "profile_key", "") or "").strip()
         payload = None
-        if profile_key:
+        profile_payload_changed = getattr(result, "profile_payload_changed", None)
+        should_load_profile = profile_payload_changed is None or bool(profile_payload_changed)
+        if profile_key and should_load_profile:
             try:
                 payload = self._load_profile(profile_key)
             except Exception as exc:

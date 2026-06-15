@@ -973,6 +973,7 @@ class PresetsFeature:
         source_text: str,
         *,
         publish_content_changed: bool = True,
+        content_change_kind: str = "",
     ):
         return self._commands().save_preset_source_by_file_name(
             launch_method,
@@ -980,13 +981,15 @@ class PresetsFeature:
             source_text,
             preset_services=self._preset_services(),
             publish_content_changed=publish_content_changed,
+            content_change_kind=content_change_kind,
         )
 
-    def publish_preset_content_changed(self, launch_method: str, file_name: str):
+    def publish_preset_content_changed(self, launch_method: str, file_name: str, *, content_change_kind: str = ""):
         return self._commands().publish_preset_content_changed(
             launch_method,
             file_name,
             preset_services=self._preset_services(),
+            content_change_kind=content_change_kind,
         )
 
     def read_preset_source_by_file_name(self, launch_method: str, file_name: str) -> str:
@@ -995,8 +998,13 @@ class PresetsFeature:
     def read_selected_preset_source(self, launch_method: str):
         return self._commands().read_selected_preset_source(launch_method, preset_services=self._preset_services())
 
-    def save_selected_preset_source(self, launch_method: str, source_text: str):
-        return self._commands().save_selected_preset_source(launch_method, source_text, preset_services=self._preset_services())
+    def save_selected_preset_source(self, launch_method: str, source_text: str, *, content_change_kind: str = ""):
+        return self._commands().save_selected_preset_source(
+            launch_method,
+            source_text,
+            preset_services=self._preset_services(),
+            content_change_kind=content_change_kind,
+        )
 
     def get_launch_snapshot(self, launch_method: str, **kwargs):
         return self._commands().get_launch_snapshot(launch_method, preset_services=self._preset_services(), **kwargs)

@@ -127,10 +127,19 @@ class PresetFileService:
     def list_manifests(self) -> list[PresetManifest]:
         return self.preset_file_store.list_manifests(self.engine)
 
-    def notify_preset_content_changed(self, file_name: str) -> None:
+    def notify_preset_content_changed(self, file_name: str, *, content_change_kind: str = "") -> None:
         candidate = str(file_name or "").strip()
         if candidate:
-            self._ui_store().notify_preset_content_changed(candidate)
+            notify = self._ui_store().notify_preset_content_changed
+            clean_kind = str(content_change_kind or "").strip()
+            if clean_kind:
+                try:
+                    notify(candidate, content_change_kind=clean_kind)
+                    return
+                except TypeError as exc:
+                    if "content_change_kind" not in str(exc):
+                        raise
+            notify(candidate)
 
     def notify_preset_switched(self, file_name: str) -> None:
         candidate = str(file_name or "").strip()
@@ -193,13 +202,21 @@ class PresetFileService:
     def normalize_source_text(self, source_text: str) -> str:
         return normalize_preset_source_text_for_engine(source_text, self.engine)
 
-    def publish_preset_content_changed_by_file_name(self, file_name: str) -> PresetManifest:
+    def publish_preset_content_changed_by_file_name(
+        self,
+        file_name: str,
+        *,
+        content_change_kind: str = "",
+    ) -> PresetManifest:
         manifest = self.get_manifest_by_file_name(file_name)
         if manifest is None:
             raise ValueError(f"Preset not found: {file_name}")
         if self.is_selected_file_name(manifest.file_name):
             self.preset_mode_coordinator.refresh_selected_launch_preset(self.launch_method)
-        self.notify_preset_content_changed(manifest.file_name)
+        self.notify_preset_content_changed(
+            manifest.file_name,
+            content_change_kind=content_change_kind,
+        )
         return manifest
 
     def save_source_text_by_file_name(
@@ -208,6 +225,7 @@ class PresetFileService:
         source_text: str,
         *,
         publish_content_changed: bool = True,
+        content_change_kind: str = "",
     ) -> PresetManifest:
         manifest = self.get_manifest_by_file_name(file_name)
         if manifest is None:
@@ -218,14 +236,21 @@ class PresetFileService:
             return manifest
         updated = self.preset_file_store.update_preset(self.engine, manifest.file_name, normalized, None)
         if publish_content_changed:
-            self.publish_preset_content_changed_by_file_name(updated.file_name)
+            self.publish_preset_content_changed_by_file_name(
+                updated.file_name,
+                content_change_kind=content_change_kind,
+            )
         return updated
 
-    def save_selected_source_text(self, source_text: str) -> PresetManifest:
+    def save_selected_source_text(self, source_text: str, *, content_change_kind: str = "") -> PresetManifest:
         selected_file_name = self.get_selected_file_name()
         if not selected_file_name:
             raise ValueError("Selected preset is required")
-        return self.save_source_text_by_file_name(selected_file_name, source_text)
+        return self.save_source_text_by_file_name(
+            selected_file_name,
+            source_text,
+            content_change_kind=content_change_kind,
+        )
 
     def rename_by_file_name(self, file_name: str, new_name: str) -> PresetManifest:
         return _rename_by_file_name(self, file_name, new_name)
