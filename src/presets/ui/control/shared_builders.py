@@ -53,6 +53,15 @@ def build_mode_status_section_common(
 
     status_title = strong_body_label_cls(tr_fn(checking_key, checking_default))
     status_desc = caption_label_cls(tr_fn(detecting_key, detecting_default))
+    title_text = str(status_title.text() or "").strip()
+    desc_text = str(status_desc.text() or "").strip()
+    state_text = f"{title_text}: {desc_text}".strip(": ")
+    if state_text:
+        set_state_text(status_card, state_text)
+    if title_text:
+        set_state_text(status_title, f"Статус Zapret: {title_text}")
+    if desc_text:
+        set_state_text(status_desc, f"Описание состояния Zapret: {desc_text}")
 
     status_text.addWidget(status_title)
     status_text.addWidget(status_desc)
