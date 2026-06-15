@@ -465,13 +465,29 @@ class SemanticNotice(QWidget):
         layout.addWidget(self._text_label, 1)
 
         self._theme_refresh = ThemeRefreshBinding(self, self._apply_theme_refresh)
+        self._sync_accessibility()
 
     def setText(self, text: str) -> None:  # noqa: N802
         self._text = str(text or "")
         self._text_label.setText(self._text)
+        self._sync_accessibility()
 
     def text(self) -> str:
         return self._text
+
+    def _sync_accessibility(self) -> None:
+        text = " ".join(str(self._text or "").strip().split())
+        if not text:
+            return
+        prefix_by_tone = {
+            "error": "Ошибка",
+            "info": "Информация",
+            "warning": "Предупреждение",
+        }
+        prefix = prefix_by_tone.get(str(self._tone or "").strip().lower(), "Предупреждение")
+        state_text = f"{prefix}: {text}"
+        set_state_text(self, state_text)
+        set_state_text(self._text_label, state_text)
 
     def _apply_theme_refresh(self, tokens=None, force: bool = False) -> None:
         _ = force

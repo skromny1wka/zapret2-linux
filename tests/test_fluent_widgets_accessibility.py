@@ -69,6 +69,24 @@ class FluentWidgetsAccessibilityTests(unittest.TestCase):
         self.assertEqual(row._title_label.property("screenReaderStateText"), "Настройка: Интенсивность")
         self.assertEqual(row._desc_label.property("screenReaderStateText"), "Описание настройки: Меняет силу эффекта")
 
+    def test_semantic_notice_reads_warning_text_for_screen_reader(self) -> None:
+        from ui.fluent_widgets import SemanticNotice
+
+        notice = SemanticNotice("Проверьте параметры перед запуском", tone="warning")
+        self.addCleanup(notice.deleteLater)
+
+        expected = "Предупреждение: Проверьте параметры перед запуском"
+        self.assertEqual(notice.accessibleName(), expected)
+        self.assertEqual(notice.property("screenReaderStateText"), expected)
+        self.assertEqual(notice._text_label.property("screenReaderStateText"), expected)
+
+        notice.setText("Изменения применятся после перезапуска")
+
+        expected = "Предупреждение: Изменения применятся после перезапуска"
+        self.assertEqual(notice.accessibleName(), expected)
+        self.assertEqual(notice.property("screenReaderStateText"), expected)
+        self.assertEqual(notice._text_label.property("screenReaderStateText"), expected)
+
 
 if __name__ == "__main__":
     unittest.main()
