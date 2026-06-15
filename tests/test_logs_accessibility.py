@@ -283,6 +283,22 @@ class LogsAccessibilityTests(unittest.TestCase):
                 "Шаблон обращения автоматически попадёт в буфер обмена."
             ),
         )
+        self.assertEqual(
+            widgets.orchestra_icon_label.accessibleName(),
+            "Индикатор режима оркестратора: проверьте основной лог и файл orchestra",
+        )
+        self.assertEqual(
+            widgets.orchestra_icon_label.property("screenReaderStateText"),
+            "Индикатор режима оркестратора: проверьте основной лог и файл orchestra",
+        )
+        self.assertEqual(
+            widgets.info_icon_label.accessibleName(),
+            "Индикатор подготовки обращения: будет создан архив и скопирован шаблон",
+        )
+        self.assertEqual(
+            widgets.info_icon_label.property("screenReaderStateText"),
+            "Индикатор подготовки обращения: будет создан архив и скопирован шаблон",
+        )
         self.assertEqual(widgets.send_log_btn.accessibleName(), "Подготовить обращение в поддержку")
         self.assertEqual(
             widgets.send_log_btn.property("screenReaderStateText"),

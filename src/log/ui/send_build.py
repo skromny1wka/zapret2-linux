@@ -43,6 +43,44 @@ def apply_logs_send_text_accessibility(*, desc_label, info_label, tr_catalog_fn,
             set_state_text(info_label, f"{info_name}: {info_text}")
 
 
+def apply_logs_send_icon_accessibility(*, orchestra_icon_label, info_icon_label, tr_catalog_fn, ui_language: str) -> None:
+    """Обновляет текст для диктора у смысловых иконок вкладки поддержки."""
+
+    if orchestra_icon_label is not None:
+        orchestra_icon_state = tr_catalog_fn(
+            "page.logs.send.accessibility.orchestra.icon",
+            language=ui_language,
+            default="Индикатор режима оркестратора: проверьте основной лог и файл orchestra",
+        )
+        set_control_accessibility(
+            orchestra_icon_label,
+            name=orchestra_icon_state,
+            description=tr_catalog_fn(
+                "page.logs.send.accessibility.orchestra.icon.description",
+                language=ui_language,
+                default="Напоминает, что в режиме оркестратора важно приложить основной лог и файл orchestra.",
+            ),
+        )
+        set_state_text(orchestra_icon_label, orchestra_icon_state)
+
+    if info_icon_label is not None:
+        info_icon_state = tr_catalog_fn(
+            "page.logs.send.accessibility.info.icon",
+            language=ui_language,
+            default="Индикатор подготовки обращения: будет создан архив и скопирован шаблон",
+        )
+        set_control_accessibility(
+            info_icon_label,
+            name=info_icon_state,
+            description=tr_catalog_fn(
+                "page.logs.send.accessibility.info.icon.description",
+                language=ui_language,
+                default="Поясняет, что программа подготовит архив логов и шаблон обращения.",
+            ),
+        )
+        set_state_text(info_icon_label, info_icon_state)
+
+
 @dataclass(slots=True)
 class LogsSendTabWidgets:
     send_card: object
@@ -166,6 +204,12 @@ def build_logs_send_tab(
     apply_logs_send_text_accessibility(
         desc_label=send_desc_label,
         info_label=send_info_label,
+        tr_catalog_fn=tr_catalog_fn,
+        ui_language=ui_language,
+    )
+    apply_logs_send_icon_accessibility(
+        orchestra_icon_label=orchestra_icon,
+        info_icon_label=info_icon,
         tr_catalog_fn=tr_catalog_fn,
         ui_language=ui_language,
     )

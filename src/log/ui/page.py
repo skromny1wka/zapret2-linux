@@ -39,7 +39,11 @@ from log.ui.runtime_helpers import (
     compute_errors_text_height,
     render_send_status_label,
 )
-from log.ui.send_build import apply_logs_send_text_accessibility, build_logs_send_tab
+from log.ui.send_build import (
+    apply_logs_send_icon_accessibility,
+    apply_logs_send_text_accessibility,
+    build_logs_send_tab,
+)
 from log.ui.support_workflow import (
     apply_support_feedback,
     update_orchestra_indicator,
@@ -588,6 +592,12 @@ class LogsPage(BasePage):
             apply_logs_send_text_accessibility(
                 desc_label=self.send_desc_label,
                 info_label=self.send_info_label,
+                tr_catalog_fn=tr_catalog,
+                ui_language=self._ui_language,
+            )
+            apply_logs_send_icon_accessibility(
+                orchestra_icon_label=self.__dict__.get("_orchestra_icon_label"),
+                info_icon_label=self.__dict__.get("_info_icon_label"),
                 tr_catalog_fn=tr_catalog,
                 ui_language=self._ui_language,
             )
