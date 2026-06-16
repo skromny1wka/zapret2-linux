@@ -275,6 +275,9 @@ class ProfileListView(ListView):
         super().mouseReleaseEvent(event)
 
     def keyPressEvent(self, event):  # noqa: N802
+        if self._move_current_index_from_keyboard(event.key()):
+            event.accept()
+            return
         if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
             if self._activate_current_index_from_keyboard():
                 event.accept()
@@ -286,6 +289,45 @@ class ProfileListView(ListView):
                 event.accept()
                 return
         super().keyPressEvent(event)
+
+    def _move_current_index_from_keyboard(self, key: int) -> bool:
+        if key not in (
+            Qt.Key.Key_Down,
+            Qt.Key.Key_Up,
+            Qt.Key.Key_Home,
+            Qt.Key.Key_End,
+            Qt.Key.Key_PageDown,
+            Qt.Key.Key_PageUp,
+        ):
+            return False
+        model = self.model()
+        if model is None:
+            return False
+        count = model.rowCount()
+        if count <= 0:
+            return False
+
+        index = self.currentIndex()
+        row = index.row() if index.isValid() else -1
+        if key == Qt.Key.Key_Home or row < 0:
+            row = 0
+        elif key == Qt.Key.Key_End:
+            row = count - 1
+        elif key == Qt.Key.Key_Down:
+            row = min(count - 1, row + 1)
+        elif key == Qt.Key.Key_Up:
+            row = max(0, row - 1)
+        elif key == Qt.Key.Key_PageDown:
+            row = min(count - 1, row + 10)
+        else:
+            row = max(0, row - 10)
+
+        next_index = model.index(row, 0)
+        if not next_index.isValid():
+            return False
+        set_current_index_if_changed(self, next_index)
+        self.scrollTo(next_index)
+        return True
 
     def _activate_current_index_from_keyboard(self) -> bool:
         index = self.currentIndex()

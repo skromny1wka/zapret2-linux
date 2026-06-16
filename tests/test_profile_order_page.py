@@ -338,6 +338,28 @@ class ProfileOrderPageTests(unittest.TestCase):
         self.assertIn("Порядок profile: Позиция 2", order_list._view.property("screenReaderStateText"))
         self.assertIn("B", order_list._view.property("screenReaderStateText"))
 
+    def test_order_inner_view_arrow_keys_move_current_row_without_native_selection(self) -> None:
+        from profile.ui.profile_order_list import ProfileOrderList
+
+        order_list = ProfileOrderList()
+        self.addCleanup(order_list.deleteLater)
+        order_list._model.set_profiles(
+            (
+                _item("A", key="profile:a", profile_index=0),
+                _item("B", key="profile:b", profile_index=1),
+            )
+        )
+        order_list._view.setCurrentIndex(order_list._model.index(0, 0))
+
+        event = QKeyEvent(QKeyEvent.Type.KeyPress, int(Qt.Key.Key_Down), Qt.KeyboardModifier.NoModifier)
+        order_list._view.keyPressEvent(event)
+
+        self.assertTrue(event.isAccepted())
+        self.assertEqual(order_list._view.currentIndex().row(), 1)
+        self.assertEqual(order_list._view.selectedIndexes(), [])
+        self.assertIn("Порядок profile: Позиция 2", order_list._view.property("screenReaderStateText"))
+        self.assertIn("B", order_list._view.property("screenReaderStateText"))
+
     def test_order_page_explains_priority_and_uses_order_workers(self) -> None:
         from profile.ui.profile_order_page import ProfileOrderPageBase
 

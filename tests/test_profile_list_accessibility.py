@@ -123,6 +123,33 @@ class ProfileListAccessibilityTests(unittest.TestCase):
         self.assertEqual(widget._view.selectedIndexes(), [])
         self.assertIn("Список профилей: B", widget._view.property("screenReaderStateText"))
 
+    def test_profile_inner_view_arrow_keys_move_current_row_without_native_selection(self) -> None:
+        from profile.ui.profiles_list import ProfilesList
+
+        widget = ProfilesList()
+        self.addCleanup(widget.deleteLater)
+        widget._model._rows = [
+            {
+                "kind": "profile",
+                "key": "profile-a",
+                "display_name": "A",
+            },
+            {
+                "kind": "profile",
+                "key": "profile-b",
+                "display_name": "B",
+            },
+        ]
+        widget._view.setCurrentIndex(widget._model.index(0, 0))
+
+        event = QKeyEvent(QKeyEvent.Type.KeyPress, int(Qt.Key.Key_Down), Qt.KeyboardModifier.NoModifier)
+        widget._view.keyPressEvent(event)
+
+        self.assertTrue(event.isAccepted())
+        self.assertEqual(widget._view.currentIndex().row(), 1)
+        self.assertEqual(widget._view.selectedIndexes(), [])
+        self.assertIn("Список профилей: B", widget._view.property("screenReaderStateText"))
+
     def test_profile_search_enter_activates_current_profile(self) -> None:
         from qfluentwidgets import SearchLineEdit
 

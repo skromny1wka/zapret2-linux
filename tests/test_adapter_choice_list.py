@@ -114,6 +114,30 @@ class AdapterChoiceListTests(unittest.TestCase):
             "Нажмите Enter или Пробел, чтобы включить или исключить этот адаптер.",
         )
 
+    def test_adapter_list_arrow_keys_move_current_adapter_without_native_selection(self) -> None:
+        from dns.ui.adapter_list import AdapterChoiceListWidget
+
+        view = AdapterChoiceListWidget()
+        cards = build_adapter_cards(
+            adapters=[("Ethernet", "Intel"), ("Wi-Fi", "Intel")],
+            dns_info={
+                "Ethernet": {"ipv4": ["8.8.8.8"], "ipv6": []},
+                "Wi-Fi": {"ipv4": ["1.1.1.1"], "ipv6": []},
+            },
+            adapters_layout=view,
+            normalize_alias_fn=lambda value: value,
+            on_state_changed=lambda _state: None,
+        )
+        view.setCurrentItem(cards[0].item)
+
+        event = QKeyEvent(QEvent.Type.KeyPress, int(Qt.Key.Key_Down), Qt.KeyboardModifier.NoModifier)
+        view.keyPressEvent(event)
+
+        self.assertTrue(event.isAccepted())
+        self.assertIs(view.currentItem(), cards[1].item)
+        self.assertEqual(view.selectedItems(), [])
+        self.assertIn("Сетевой адаптер Wi-Fi", view.property("screenReaderStateText"))
+
     def test_adapter_checked_row_does_not_paint_active_background(self) -> None:
         import dns.ui.adapter_list as adapter_list
         from dns.ui.adapter_list import CHECKED_ROLE, AdapterChoiceListDelegate, AdapterChoiceListWidget

@@ -412,6 +412,9 @@ class ProfileStrategyListView(QListWidget):
     """Список стратегий, который выбирается клавиатурой так же, как DNS."""
 
     def keyPressEvent(self, event):  # noqa: N802
+        if self._move_current_row_from_keyboard(event.key()):
+            event.accept()
+            return
         navigation_keys = (
             Qt.Key.Key_Down,
             Qt.Key.Key_Up,
@@ -447,6 +450,40 @@ class ProfileStrategyListView(QListWidget):
             if item is not None and item.flags() & Qt.ItemFlag.ItemIsSelectable:
                 return item
         return None
+
+    def _move_current_row_from_keyboard(self, key: int) -> bool:
+        if key not in (
+            Qt.Key.Key_Down,
+            Qt.Key.Key_Up,
+            Qt.Key.Key_Home,
+            Qt.Key.Key_End,
+            Qt.Key.Key_PageDown,
+            Qt.Key.Key_PageUp,
+        ):
+            return False
+        count = self.count()
+        if count <= 0:
+            return False
+
+        row = self.currentRow()
+        if key == Qt.Key.Key_Home or row < 0:
+            row = 0
+        elif key == Qt.Key.Key_End:
+            row = count - 1
+        elif key == Qt.Key.Key_Down:
+            row = min(count - 1, row + 1)
+        elif key == Qt.Key.Key_Up:
+            row = max(0, row - 1)
+        elif key == Qt.Key.Key_PageDown:
+            row = min(count - 1, row + 10)
+        else:
+            row = max(0, row - 10)
+
+        self.setCurrentRow(row)
+        item = self.currentItem()
+        if item is not None:
+            self.scrollToItem(item)
+        return True
 
 
 class ProfileStrategySearchLineEdit(SearchLineEdit):

@@ -121,6 +121,27 @@ class DnsChoiceListTests(unittest.TestCase):
         self.assertTrue(event.isAccepted())
         self.assertEqual(selected, ["auto"])
 
+    def test_choice_list_arrow_keys_move_current_choice_without_native_selection(self) -> None:
+        from dns.ui.choice_list import DnsChoiceListWidget
+
+        view = DnsChoiceListWidget()
+        view.add_section("Популярные")
+        auto = view.add_auto_choice("Автоматически (DHCP)")
+        provider = view.add_provider(
+            "Cloudflare",
+            {"desc": "Быстрый", "ipv4": ["1.1.1.1"], "ipv6": []},
+            show_ipv6=False,
+        )
+        view.setCurrentItem(auto.item)
+
+        event = QKeyEvent(QEvent.Type.KeyPress, int(Qt.Key.Key_Down), Qt.KeyboardModifier.NoModifier)
+        view.keyPressEvent(event)
+
+        self.assertTrue(event.isAccepted())
+        self.assertIs(view.currentItem(), provider.item)
+        self.assertEqual(view.selectedItems(), [])
+        self.assertIn("DNS Cloudflare", view.property("screenReaderStateText"))
+
     def test_choice_focused_row_paints_keyboard_current_state(self) -> None:
         import dns.ui.choice_list as choice_list
         from dns.ui.choice_list import DnsChoiceListDelegate, DnsChoiceListWidget

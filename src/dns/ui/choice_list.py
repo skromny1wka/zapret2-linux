@@ -215,6 +215,9 @@ class DnsChoiceListWidget(QListWidget):
             self.provider_selected.emit(name, dict(data or {}))
 
     def keyPressEvent(self, event):  # noqa: N802
+        if self._move_current_choice_from_keyboard(event.key()):
+            event.accept()
+            return
         if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
             self.activate_item(self.currentItem())
             event.accept()
@@ -281,6 +284,49 @@ class DnsChoiceListWidget(QListWidget):
             if item is not None and item.flags() & Qt.ItemFlag.ItemIsSelectable:
                 self.setCurrentItem(item)
                 return
+
+    def _move_current_choice_from_keyboard(self, key: int) -> bool:
+        if key not in (
+            Qt.Key.Key_Down,
+            Qt.Key.Key_Up,
+            Qt.Key.Key_Home,
+            Qt.Key.Key_End,
+            Qt.Key.Key_PageDown,
+            Qt.Key.Key_PageUp,
+        ):
+            return False
+        if self.count() <= 0:
+            return False
+
+        current_row = self.currentRow()
+        if key == Qt.Key.Key_Home or current_row < 0:
+            step = 1
+            row = 0
+        elif key == Qt.Key.Key_End:
+            step = -1
+            row = self.count() - 1
+        elif key == Qt.Key.Key_Down:
+            step = 1
+            row = current_row + 1
+        elif key == Qt.Key.Key_Up:
+            step = -1
+            row = current_row - 1
+        elif key == Qt.Key.Key_PageDown:
+            step = 1
+            row = min(self.count() - 1, current_row + 10)
+        else:
+            step = -1
+            row = max(0, current_row - 10)
+
+        while 0 <= row < self.count():
+            item = self.item(row)
+            if item is not None and item.flags() & Qt.ItemFlag.ItemIsSelectable:
+                self.setCurrentItem(item)
+                self.scrollToItem(item)
+                self._update_current_dns_accessibility(item)
+                return True
+            row += step
+        return False
 
     def _update_current_dns_accessibility(self, item: QListWidgetItem | None) -> None:
         text = str(item.data(Qt.ItemDataRole.AccessibleTextRole) or "").strip() if item is not None else ""
