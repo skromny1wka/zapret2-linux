@@ -1,0 +1,71 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def _source(path: str) -> str:
+    return (ROOT / path).read_text(encoding="utf-8")
+
+
+def test_profile_shell_keeps_toolbar_accessibility_helper() -> None:
+    source = _source("src/profile/ui/shell.py")
+
+    assert "from profile.ui.shell_accessibility import apply_profile_shell_accessibility" in source
+    assert "apply_profile_shell_accessibility(" in source
+    for control_name in (
+        "add_profile_btn",
+        "request_btn",
+        "view_menu_btn",
+        "order_btn",
+        "info_btn",
+        "profile_search_input",
+    ):
+        assert f"{control_name}={control_name}" in source
+
+
+def test_user_presets_build_keeps_accessibility_helper_for_toolbar_and_list() -> None:
+    source = _source("src/presets/ui/common/user_presets_build.py")
+
+    assert (
+        "from presets.ui.common.user_presets_accessibility import apply_user_presets_accessibility"
+        in source
+    )
+    assert source.count("apply_user_presets_accessibility(") >= 2
+    for control_name in (
+        "get_configs_btn",
+        "create_btn",
+        "import_btn",
+        "open_folder_btn",
+        "reset_all_btn",
+        "presets_info_btn",
+        "info_btn",
+        "preset_search_input",
+        "presets_list",
+    ):
+        assert f"{control_name}={control_name}" in source
+
+
+def test_premium_build_keeps_button_accessibility_helper() -> None:
+    source = _source("src/donater/ui/build.py")
+
+    assert "apply_premium_button_accessibility" in source
+    for keyword in (
+        "activate_btn=activate_btn",
+        "open_bot_btn=open_bot_btn",
+        "refresh_btn=refresh_btn",
+        "change_key_btn=change_key_btn",
+        "test_btn=test_btn",
+        "extend_btn=extend_btn",
+    ):
+        assert keyword in source
+
+
+def test_notification_infobar_keeps_accessibility_for_dynamic_actions() -> None:
+    source = _source("src/ui/window_notification_center.py")
+
+    assert "self._set_infobar_accessibility(bar" in source
+    assert "self._set_infobar_action_button_accessibility(btn, action, button_text)" in source
+    assert 'name = f"Действие уведомления: {button_text}"' in source
