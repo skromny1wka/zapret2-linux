@@ -5,9 +5,52 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+IMPORTANT_CONTROL_MARKERS = (
+    "PushButton(",
+    "PrimaryPushButton(",
+    "ToolButton(",
+    "PrimaryToolButton(",
+    "TransparentToolButton(",
+    "LineEdit(",
+    "SearchLineEdit(",
+    "ComboBox(",
+    "CheckBox(",
+    "SwitchButton(",
+    "PlainTextEdit(",
+    "TextEdit(",
+    "QListWidget(",
+    "QTableWidget(",
+)
+
+ACCESSIBILITY_MARKERS = (
+    "set_control_accessibility",
+    "set_state_text",
+    "set_item_accessible_text",
+    "set_segmented_items_accessibility",
+    "enable_keyboard_click",
+    "enable_keyboard_toggle",
+    "accessibility",
+)
+
 
 def _source(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
+
+
+def test_ui_files_with_important_controls_keep_accessibility_wiring() -> None:
+    missing: list[str] = []
+    for path in sorted((ROOT / "src").rglob("*.py")):
+        rel_path = path.relative_to(ROOT).as_posix()
+        if rel_path.startswith("src/themes/cache/"):
+            continue
+        source = path.read_text(encoding="utf-8", errors="ignore")
+        if not any(marker in source for marker in IMPORTANT_CONTROL_MARKERS):
+            continue
+        if any(marker in source for marker in ACCESSIBILITY_MARKERS):
+            continue
+        missing.append(rel_path)
+
+    assert missing == []
 
 
 def test_profile_shell_keeps_toolbar_accessibility_helper() -> None:
