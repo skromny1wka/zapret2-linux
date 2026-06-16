@@ -8,7 +8,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtTest import QTest
-from PyQt6.QtWidgets import QApplication, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QApplication, QAbstractItemView, QVBoxLayout, QWidget
 
 
 def _profile_item(name: str, *, key: str = "profile-youtube"):
@@ -94,6 +94,34 @@ class ProfileListAccessibilityTests(unittest.TestCase):
 
         self.assertTrue(enter_event.isAccepted())
         self.assertEqual(opened, ["profile-b"])
+
+    def test_profile_list_navigation_does_not_use_native_selection_state(self) -> None:
+        from profile.ui.profiles_list import ProfilesList
+
+        widget = ProfilesList()
+        self.addCleanup(widget.deleteLater)
+        widget._model._rows = [
+            {
+                "kind": "profile",
+                "key": "profile-a",
+                "display_name": "A",
+            },
+            {
+                "kind": "profile",
+                "key": "profile-b",
+                "display_name": "B",
+            },
+        ]
+        widget._view.setCurrentIndex(widget._model.index(0, 0))
+
+        down_event = QKeyEvent(QKeyEvent.Type.KeyPress, int(Qt.Key.Key_Down), Qt.KeyboardModifier.NoModifier)
+        widget.keyPressEvent(down_event)
+
+        self.assertTrue(down_event.isAccepted())
+        self.assertEqual(widget._view.selectionMode(), QAbstractItemView.SelectionMode.NoSelection)
+        self.assertEqual(widget._view.currentIndex().row(), 1)
+        self.assertEqual(widget._view.selectedIndexes(), [])
+        self.assertIn("Список профилей: B", widget._view.property("screenReaderStateText"))
 
     def test_profile_search_enter_activates_current_profile(self) -> None:
         from qfluentwidgets import SearchLineEdit

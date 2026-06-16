@@ -177,7 +177,9 @@ class ProfileListDelegate(QStyledItemDelegate):
         hovered = _profile_row_is_interactive(
             index.row(),
             hovered=bool(option.state & QStyle.StateFlag.State_MouseOver),
-            selected=bool(option.state & QStyle.StateFlag.State_Selected),
+            selected=bool(option.state & QStyle.StateFlag.State_Selected) or bool(
+                option.state & QStyle.StateFlag.State_HasFocus
+            ),
             hover_row=self._hover_row,
             pressed_row=self._pressed_row,
             selected_rows=self._selected_rows,
