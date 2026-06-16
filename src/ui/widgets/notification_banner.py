@@ -219,6 +219,7 @@ class NotificationBanner(QWidget):
         set_state_text(self, accessible_text)
         set_state_text(self.message_label, accessible_text)
         set_control_accessibility(self.message_label, name=accessible_text)
+        set_state_text(self.icon_label, f"Иконка уведомления: {type_name}")
 
         # Показываем с анимацией
         self.opacity_effect.setOpacity(0.0)

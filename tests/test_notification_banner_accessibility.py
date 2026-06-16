@@ -35,6 +35,26 @@ class NotificationBannerAccessibilityTests(unittest.TestCase):
         self.assertEqual(close_buttons[0].property("screenReaderStateText"), "Закрыть уведомление")
         self.assertIn("скрывает", close_buttons[0].accessibleDescription().lower())
 
+    def test_notification_icon_reads_type_not_only_color(self) -> None:
+        banner = NotificationBanner()
+        self.addCleanup(banner.deleteLater)
+
+        banner.show_error("Не удалось запустить Zapret", auto_hide_ms=0)
+
+        self.assertEqual(banner.icon_label.accessibleName(), "Иконка уведомления: Ошибка")
+        self.assertEqual(
+            banner.icon_label.property("screenReaderStateText"),
+            "Иконка уведомления: Ошибка",
+        )
+
+        banner.show_success("Zapret запущен", auto_hide_ms=0)
+
+        self.assertEqual(banner.icon_label.accessibleName(), "Иконка уведомления: Успешно")
+        self.assertEqual(
+            banner.icon_label.property("screenReaderStateText"),
+            "Иконка уведомления: Успешно",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
