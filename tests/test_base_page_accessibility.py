@@ -7,7 +7,7 @@ from unittest.mock import patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QLabel, QPushButton
 
 from ui.pages.base_page import BasePage
 
@@ -49,6 +49,55 @@ class BasePageAccessibilityTests(unittest.TestCase):
             section.property("screenReaderStateText"),
             "Раздел страницы: Основные настройки",
         )
+
+    def test_page_finds_first_keyboard_control_for_tab_navigation(self) -> None:
+        page = BasePage("Тестовая страница")
+        self.addCleanup(page.deleteLater)
+
+        label = QLabel("Только текст", page.content)
+        page.layout.addWidget(label)
+        first_button = QPushButton("Первая кнопка", page.content)
+        second_button = QPushButton("Вторая кнопка", page.content)
+        page.layout.addWidget(first_button)
+        page.layout.addWidget(second_button)
+        page.show()
+        self._app.processEvents()
+
+        self.assertIs(page._first_keyboard_focus_control(), first_button)
+
+    def test_page_focuses_first_keyboard_control_when_focus_is_outside(self) -> None:
+        outside_button = QPushButton("Снаружи")
+        self.addCleanup(outside_button.deleteLater)
+        outside_button.show()
+
+        page = BasePage("Тестовая страница")
+        self.addCleanup(page.deleteLater)
+        first_button = QPushButton("Первая кнопка", page.content)
+        page.layout.addWidget(first_button)
+        page.show()
+        self._app.processEvents()
+
+        outside_button.setFocus()
+        self._app.processEvents()
+        page._focus_first_keyboard_control_if_needed()
+
+        self.assertIs(self._app.focusWidget(), first_button)
+
+    def test_page_keeps_existing_focus_inside_page(self) -> None:
+        page = BasePage("Тестовая страница")
+        self.addCleanup(page.deleteLater)
+        first_button = QPushButton("Первая кнопка", page.content)
+        second_button = QPushButton("Вторая кнопка", page.content)
+        page.layout.addWidget(first_button)
+        page.layout.addWidget(second_button)
+        page.show()
+        self._app.processEvents()
+
+        second_button.setFocus()
+        self._app.processEvents()
+        page._focus_first_keyboard_control_if_needed()
+
+        self.assertIs(self._app.focusWidget(), second_button)
 
     def test_page_title_screen_reader_text_updates_with_language(self) -> None:
         def _tr(key: str, *, language: str, default: str) -> str:

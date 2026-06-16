@@ -4,7 +4,7 @@
 import time as _time
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QFrame, QSizePolicy,
+    QApplication, QWidget, QVBoxLayout, QFrame, QSizePolicy,
 )
 from qfluentwidgets import (
     BodyLabel,
@@ -306,6 +306,73 @@ class BasePage(_FluentScrollArea):
         step_started_at = _time.perf_counter()
         self._schedule_page_theme_refresh_flush()
         self._log_show_step_timing("show.event.schedule_theme_flush", step_started_at)
+        self._schedule_first_keyboard_focus()
+
+    def _schedule_first_keyboard_focus(self) -> None:
+        QTimer.singleShot(0, self._focus_first_keyboard_control_if_needed)
+
+    def _focus_first_keyboard_control_if_needed(self) -> None:
+        """Ставит фокус на первый управляемый с клавиатуры элемент страницы."""
+
+        if not self.isVisible():
+            return
+        if self._has_focus_inside_page():
+            return
+        target = self._first_keyboard_focus_control()
+        if target is None:
+            return
+        try:
+            target.setFocus(Qt.FocusReason.OtherFocusReason)
+        except Exception:
+            pass
+
+    def _has_focus_inside_page(self) -> bool:
+        focus_widget = QApplication.focusWidget()
+        if focus_widget is None:
+            return False
+        if focus_widget is self or focus_widget is self.content:
+            return True
+        try:
+            return bool(self.isAncestorOf(focus_widget))
+        except Exception:
+            return False
+
+    def _first_keyboard_focus_control(self):
+        for widget in self._iter_keyboard_focus_candidates():
+            if self._is_keyboard_focus_control(widget):
+                return widget
+        return None
+
+    def _iter_keyboard_focus_candidates(self):
+        try:
+            return tuple(self.content.findChildren(QWidget))
+        except Exception:
+            return ()
+
+    @staticmethod
+    def _is_keyboard_focus_control(widget) -> bool:
+        try:
+            if not widget.isEnabled() or not widget.isVisible():
+                return False
+        except Exception:
+            return False
+        try:
+            object_name = str(widget.objectName() or "")
+        except Exception:
+            object_name = ""
+        if object_name in {"lineEditButton"}:
+            return False
+        if type(widget).__name__ in {"ArrowButton", "Indicator"}:
+            return False
+        try:
+            policy = widget.focusPolicy()
+        except Exception:
+            return False
+        return policy in (
+            Qt.FocusPolicy.TabFocus,
+            Qt.FocusPolicy.StrongFocus,
+            Qt.FocusPolicy.WheelFocus,
+        )
 
     def resizeEvent(self, event):  # noqa: N802 (Qt override)
         super().resizeEvent(event)
