@@ -60,6 +60,10 @@ def start_blockcheck_page_run(
     stop_button.setEnabled(True)
     mode_combo.setEnabled(False)
     skip_failed_checkbox.setEnabled(False)
+    set_state_text(start_button, "Запустить BlockCheck, недоступно")
+    set_state_text(stop_button, "Остановить BlockCheck, доступно")
+    set_state_text(mode_combo, "Режим BlockCheck, недоступно во время проверки")
+    set_state_text(skip_failed_checkbox, "Пропускать проблемные домены, недоступно во время проверки")
     progress_bar.setVisible(True)
     set_state_text(progress_bar, "Ход BlockCheck: выполняется")
     if hasattr(progress_bar, "start"):
@@ -105,6 +109,7 @@ def request_blockcheck_stop(
         expected_worker = worker
 
     stop_button.setEnabled(False)
+    set_state_text(stop_button, "Остановить BlockCheck, недоступно")
     status_label.setText(
         tr_fn("page.blockcheck.stopping", default="Остановка...")
     )
@@ -124,6 +129,10 @@ def reset_blockcheck_running_ui(
     stop_button.setEnabled(False)
     mode_combo.setEnabled(True)
     skip_failed_checkbox.setEnabled(True)
+    set_state_text(start_button, "Запустить BlockCheck, доступно")
+    set_state_text(stop_button, "Остановить BlockCheck, недоступно")
+    set_state_text(mode_combo, "Режим BlockCheck, доступно")
+    set_state_text(skip_failed_checkbox, "Пропускать проблемные домены, доступно")
     progress_bar.setVisible(False)
     set_state_text(progress_bar, "Ход BlockCheck: не выполняется")
     if hasattr(progress_bar, "stop"):

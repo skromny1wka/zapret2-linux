@@ -186,6 +186,10 @@ class BlockcheckPageAccessibilityTests(unittest.TestCase):
 
     def test_run_progress_bar_reads_running_state_for_screen_reader(self) -> None:
         progress_bar = _FakeProgressBar()
+        start_button = _ButtonStub("Запустить BlockCheck")
+        stop_button = _ButtonStub("Остановить BlockCheck")
+        mode_combo = _ButtonStub("Режим BlockCheck")
+        skip_failed_checkbox = _ButtonStub("Пропускать проблемные домены")
 
         start_blockcheck_page_run(
             blockcheck_feature=_RunFeatureStub(),
@@ -199,10 +203,10 @@ class BlockcheckPageAccessibilityTests(unittest.TestCase):
             tcp_section_label=None,
             dpi_card=_WidgetStub(),
             log_edit=_LogEditStub(),
-            start_button=_ButtonStub(),
-            stop_button=_ButtonStub(),
-            mode_combo=_ButtonStub(),
-            skip_failed_checkbox=_ButtonStub(),
+            start_button=start_button,
+            stop_button=stop_button,
+            mode_combo=mode_combo,
+            skip_failed_checkbox=skip_failed_checkbox,
             progress_bar=progress_bar,
             status_label=_TextStub(),
             runtime_warnings_seen=set(),
@@ -218,17 +222,28 @@ class BlockcheckPageAccessibilityTests(unittest.TestCase):
 
         self.assertEqual(progress_bar.accessibleName(), "Ход BlockCheck: выполняется")
         self.assertEqual(progress_bar.property("screenReaderStateText"), "Ход BlockCheck: выполняется")
+        self.assertEqual(start_button.accessibleName(), "Запустить BlockCheck, недоступно")
+        self.assertEqual(stop_button.accessibleName(), "Остановить BlockCheck, доступно")
+        self.assertEqual(mode_combo.accessibleName(), "Режим BlockCheck, недоступно во время проверки")
+        self.assertEqual(
+            skip_failed_checkbox.accessibleName(),
+            "Пропускать проблемные домены, недоступно во время проверки",
+        )
 
         reset_blockcheck_running_ui(
-            start_button=_ButtonStub(),
-            stop_button=_ButtonStub(),
-            mode_combo=_ButtonStub(),
-            skip_failed_checkbox=_ButtonStub(),
+            start_button=start_button,
+            stop_button=stop_button,
+            mode_combo=mode_combo,
+            skip_failed_checkbox=skip_failed_checkbox,
             progress_bar=progress_bar,
         )
 
         self.assertEqual(progress_bar.accessibleName(), "Ход BlockCheck: не выполняется")
         self.assertEqual(progress_bar.property("screenReaderStateText"), "Ход BlockCheck: не выполняется")
+        self.assertEqual(start_button.accessibleName(), "Запустить BlockCheck, доступно")
+        self.assertEqual(stop_button.accessibleName(), "Остановить BlockCheck, недоступно")
+        self.assertEqual(mode_combo.accessibleName(), "Режим BlockCheck, доступно")
+        self.assertEqual(skip_failed_checkbox.accessibleName(), "Пропускать проблемные домены, доступно")
 
     def test_run_start_restores_empty_result_table_screen_reader_states(self) -> None:
         results_table = _AccessibleTableStub()
@@ -369,8 +384,39 @@ class _LogEditStub:
 
 
 class _ButtonStub:
-    def setEnabled(self, _enabled: bool) -> None:  # noqa: N802
-        pass
+    def __init__(self, text: str = "") -> None:
+        self._enabled = True
+        self._text = str(text)
+        self.properties = {}
+        self.accessible_name = ""
+        self.accessible_description = ""
+
+    def text(self) -> str:
+        return self._text
+
+    def isEnabled(self) -> bool:  # noqa: N802
+        return self._enabled
+
+    def setEnabled(self, enabled: bool) -> None:  # noqa: N802
+        self._enabled = bool(enabled)
+
+    def accessibleName(self) -> str:  # noqa: N802
+        return self.accessible_name
+
+    def setAccessibleName(self, text: str) -> None:  # noqa: N802
+        self.accessible_name = str(text)
+
+    def accessibleDescription(self) -> str:  # noqa: N802
+        return self.accessible_description
+
+    def setAccessibleDescription(self, text: str) -> None:  # noqa: N802
+        self.accessible_description = str(text)
+
+    def property(self, name: str) -> object:
+        return self.properties.get(name)
+
+    def setProperty(self, name: str, value: object) -> None:  # noqa: N802
+        self.properties[name] = value
 
 
 class _TextStub:
