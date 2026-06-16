@@ -5,6 +5,7 @@ from settings.mode import is_preset_launch_method, normalize_launch_method
 
 
 PRESET_CONTENT_APPLY_DEBOUNCE_MS = 900
+PRESET_STRATEGY_ONLY_APPLY_DEBOUNCE_MS = 2200
 
 
 def _is_launch_running(runtime_feature) -> bool:
@@ -44,5 +45,15 @@ def request_preset_runtime_content_apply(
         f"Preset runtime apply{profile_info} ({method}, reason={reason}) -> preset mode switch pipeline",
         "INFO",
     )
-    launch_runtime.switch_presets_async(method, delay_ms=PRESET_CONTENT_APPLY_DEBOUNCE_MS)
+    launch_runtime.switch_presets_async(
+        method,
+        delay_ms=_preset_content_apply_debounce_ms(reason),
+    )
     return True
+
+
+def _preset_content_apply_debounce_ms(reason: str) -> int:
+    clean_reason = str(reason or "").strip()
+    if clean_reason == "strategy_only":
+        return PRESET_STRATEGY_ONLY_APPLY_DEBOUNCE_MS
+    return PRESET_CONTENT_APPLY_DEBOUNCE_MS

@@ -677,7 +677,10 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
         import tempfile
         from unittest.mock import Mock
 
-        from winws_runtime.flow.apply_policy import request_preset_runtime_content_apply
+        from winws_runtime.flow.apply_policy import (
+            PRESET_CONTENT_APPLY_DEBOUNCE_MS,
+            request_preset_runtime_content_apply,
+        )
         from settings.mode import ZAPRET2_MODE
 
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -708,7 +711,57 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
                 )
             )
 
-            launch_runtime.switch_presets_async.assert_called_once_with(ZAPRET2_MODE, delay_ms=900)
+            launch_runtime.switch_presets_async.assert_called_once_with(
+                ZAPRET2_MODE,
+                delay_ms=PRESET_CONTENT_APPLY_DEBOUNCE_MS,
+            )
+            launch_runtime.stop_dpi_async.assert_not_called()
+
+    def test_strategy_only_preset_content_apply_uses_longer_debounce(self) -> None:
+        from pathlib import Path
+        import tempfile
+        from unittest.mock import Mock
+
+        from winws_runtime.flow.apply_policy import (
+            PRESET_CONTENT_APPLY_DEBOUNCE_MS,
+            PRESET_STRATEGY_ONLY_APPLY_DEBOUNCE_MS,
+            request_preset_runtime_content_apply,
+        )
+        from settings.mode import ZAPRET2_MODE
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            preset_path = Path(tmp_dir) / "selected.txt"
+            preset_path.write_text(
+                "--wf-tcp-out=80,443\n--filter-tcp=80\n--hostlist=list.txt\n--lua-desync=fake\n",
+                encoding="utf-8",
+            )
+
+            launch_runtime = SimpleNamespace(
+                is_running=Mock(return_value=True),
+                switch_presets_async=Mock(),
+                stop_dpi_async=Mock(),
+            )
+            presets_feature = SimpleNamespace(
+                get_launch_snapshot=Mock(return_value=SimpleNamespace(preset_path=str(preset_path)))
+            )
+            runtime_feature = SimpleNamespace(
+                objects=SimpleNamespace(launch_runtime=launch_runtime),
+                dependencies=SimpleNamespace(presets_feature=presets_feature),
+            )
+
+            self.assertGreater(PRESET_STRATEGY_ONLY_APPLY_DEBOUNCE_MS, PRESET_CONTENT_APPLY_DEBOUNCE_MS)
+            self.assertTrue(
+                request_preset_runtime_content_apply(
+                    runtime_feature=runtime_feature,
+                    launch_method=ZAPRET2_MODE,
+                    reason="strategy_only",
+                )
+            )
+
+            launch_runtime.switch_presets_async.assert_called_once_with(
+                ZAPRET2_MODE,
+                delay_ms=PRESET_STRATEGY_ONLY_APPLY_DEBOUNCE_MS,
+            )
             launch_runtime.stop_dpi_async.assert_not_called()
 
     def test_selected_source_preset_apply_is_debounced_before_runtime_switch(self) -> None:
@@ -749,7 +802,10 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
         import tempfile
         from unittest.mock import Mock
 
-        from winws_runtime.flow.apply_policy import request_preset_runtime_content_apply
+        from winws_runtime.flow.apply_policy import (
+            PRESET_CONTENT_APPLY_DEBOUNCE_MS,
+            request_preset_runtime_content_apply,
+        )
         from settings.mode import ZAPRET2_MODE
 
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -785,7 +841,10 @@ class PresetRuntimeCoordinatorTests(unittest.TestCase):
                     )
                 )
 
-            launch_runtime.switch_presets_async.assert_called_once_with(ZAPRET2_MODE, delay_ms=900)
+            launch_runtime.switch_presets_async.assert_called_once_with(
+                ZAPRET2_MODE,
+                delay_ms=PRESET_CONTENT_APPLY_DEBOUNCE_MS,
+            )
             launch_runtime.stop_dpi_async.assert_not_called()
 
     def test_preset_content_publish_refreshes_launch_snapshot_before_signal(self) -> None:
