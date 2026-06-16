@@ -11,7 +11,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeyEvent
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QAbstractItemView
 
 from profile.state import ProfileListItem
 
@@ -314,6 +314,29 @@ class ProfileOrderPageTests(unittest.TestCase):
 
         self.assertTrue(page_up_event.isAccepted())
         self.assertEqual(requested, [("profile:b", "profile:a")])
+
+    def test_order_list_navigation_does_not_use_native_selection_state(self) -> None:
+        from profile.ui.profile_order_list import ProfileOrderList
+
+        order_list = ProfileOrderList()
+        self.addCleanup(order_list.deleteLater)
+        order_list._model.set_profiles(
+            (
+                _item("A", key="profile:a", profile_index=0),
+                _item("B", key="profile:b", profile_index=1),
+            )
+        )
+        order_list._view.setCurrentIndex(order_list._model.index(0, 0))
+
+        down_event = QKeyEvent(QKeyEvent.Type.KeyPress, int(Qt.Key.Key_Down), Qt.KeyboardModifier.NoModifier)
+        order_list.keyPressEvent(down_event)
+
+        self.assertTrue(down_event.isAccepted())
+        self.assertEqual(order_list._view.selectionMode(), QAbstractItemView.SelectionMode.NoSelection)
+        self.assertEqual(order_list._view.currentIndex().row(), 1)
+        self.assertEqual(order_list._view.selectedIndexes(), [])
+        self.assertIn("Порядок profile: Позиция 2", order_list._view.property("screenReaderStateText"))
+        self.assertIn("B", order_list._view.property("screenReaderStateText"))
 
     def test_order_page_explains_priority_and_uses_order_workers(self) -> None:
         from profile.ui.profile_order_page import ProfileOrderPageBase
