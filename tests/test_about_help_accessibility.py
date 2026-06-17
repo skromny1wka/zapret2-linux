@@ -35,12 +35,12 @@ class AboutHelpAccessibilityTests(unittest.TestCase):
             setting_card_group_cls=SettingCardGroup,
             fluent_icon=FluentIcon,
             on_open_forum=lambda: None,
-            on_open_help_folder=lambda: None,
             on_open_telegram_news=lambda: None,
         )
 
         self.assertFalse(hasattr(widgets, "youtube_card"))
         self.assertFalse(hasattr(widgets, "youtube_playlist_card"))
+        self.assertFalse(hasattr(widgets, "folder_card"))
 
         self.assertEqual(widgets.docs_group.accessibleName(), "Раздел справки: Документация")
         self.assertEqual(
@@ -56,7 +56,6 @@ class AboutHelpAccessibilityTests(unittest.TestCase):
         expected = {
             widgets.forum_card: ("Открыть вики-сайт", "Документация и инструкции"),
             widgets.info_card: ("Открыть руководство и ответы", "Руководство и ответы на вопросы"),
-            widgets.folder_card: ("Открыть папку с инструкциями", "Открыть локальную папку help"),
             widgets.android_card: ("Открыть инструкцию для Android", "Открыть инструкцию на сайте"),
             widgets.github_card: ("Открыть GitHub", "Исходный код и документация"),
             widgets.telegram_card: ("Открыть Telegram канал", "Новости и обновления"),

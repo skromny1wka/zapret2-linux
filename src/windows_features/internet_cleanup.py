@@ -153,6 +153,7 @@ def run_internet_cleanup(
     command_runner: Callable[..., Any] | None = None,
     flush_dns_cache: Callable[[], bool] | None = None,
     status_callback: Callable[[str], None] | None = None,
+    should_stop: Callable[[], bool] | None = None,
     resolve_system_exe: Callable[[str], str] = get_system_exe,
 ) -> InternetCleanupActionResult:
     runner = command_runner or _default_command_runner
@@ -162,6 +163,8 @@ def run_internet_cleanup(
     failed: list[str] = []
     completed_count = 0
     for command in commands:
+        if should_stop is not None and should_stop():
+            return build_internet_cleanup_error_result("Сброс сети Windows остановлен.")
         if status_callback is not None:
             status_callback(f"{command.label}...")
         try:
@@ -177,6 +180,8 @@ def run_internet_cleanup(
         detail = _short_error_from_completed(completed)
         failed.append(f"{command.label}: код {return_code}" + (f", {detail}" if detail else ""))
 
+    if should_stop is not None and should_stop():
+        return build_internet_cleanup_error_result("Сброс сети Windows остановлен.")
     if status_callback is not None:
         status_callback("Очистка DNS-кэша...")
     dns_ok = bool(flush_dns())
@@ -221,11 +226,16 @@ class InternetCleanupWorker(QThread):
     def __init__(self, request_id: int, *, parent=None):
         super().__init__(parent)
         self._request_id = int(request_id)
+        self._stop_requested = False
+
+    def stop(self) -> None:
+        self._stop_requested = True
 
     def run(self) -> None:
         try:
             result = run_internet_cleanup(
                 status_callback=lambda message: self.status.emit(self._request_id, message),
+                should_stop=lambda: bool(self._stop_requested),
             )
         except Exception as exc:
             log(f"InternetCleanupWorker: не удалось выполнить сброс сети: {exc}", "WARNING")

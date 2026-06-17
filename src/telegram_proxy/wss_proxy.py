@@ -537,21 +537,20 @@ class TelegramWSProxy:
         prefix = "MTProxy " if mtproxy else ""
         attempted: set[tuple[str, int, str, str, bool, str, bool]] = set()
         attempt_index = 0
-        start_candidates = self._upstream_proxy_candidates()
-        skip_penalized_backups = any(
-            not self._upstream_penalty_active(endpoint)
-            for endpoint in start_candidates
-        )
         while True:
-            candidates = tuple(
+            remaining_candidates = tuple(
                 endpoint
                 for endpoint in self._upstream_proxy_candidates()
                 if self._upstream_endpoint_key(endpoint) not in attempted
-                and (
-                    not skip_penalized_backups
-                    or not self._upstream_penalty_active(endpoint)
-                )
             )
+            if not remaining_candidates:
+                return None
+
+            healthy_candidates = tuple(
+                endpoint for endpoint in remaining_candidates
+                if not self._upstream_penalty_active(endpoint)
+            )
+            candidates = healthy_candidates or remaining_candidates
             if not candidates:
                 return None
             endpoint = candidates[0]
@@ -567,17 +566,20 @@ class TelegramWSProxy:
             t_connect = time.monotonic()
             self._mark_upstream_active(endpoint)
             try:
-                rr, rw = await socks5.connect_via_socks5(
-                    endpoint.host,
-                    endpoint.port,
-                    upstream_host,
-                    upstream_port,
-                    username=endpoint.username,
-                    password=endpoint.password,
+                rr, rw = await asyncio.wait_for(
+                    socks5.connect_via_socks5(
+                        endpoint.host,
+                        endpoint.port,
+                        upstream_host,
+                        upstream_port,
+                        username=endpoint.username,
+                        password=endpoint.password,
+                        timeout=UPSTREAM_CONNECT_TIMEOUT,
+                        tls=endpoint.tls,
+                        tls_server_name=endpoint.tls_server_name,
+                        tls_verify=endpoint.tls_verify,
+                    ),
                     timeout=UPSTREAM_CONNECT_TIMEOUT,
-                    tls=endpoint.tls,
-                    tls_server_name=endpoint.tls_server_name,
-                    tls_verify=endpoint.tls_verify,
                 )
                 apply_socket_options(rw.transport, self._buffer_size)
             except Exception as exc:
@@ -2081,7 +2083,7 @@ class TelegramWSProxy:
                 recv_total, watchdog_fired = await self._relay_tcp(client_reader, client_writer, rr, rw, label, dc=dc)
                 if recv_total > 0:
                     self._mark_upstream_recv_ok(endpoint)
-                elif watchdog_fired:
+                else:
                     self._mark_upstream_zero_recv(endpoint, label)
             finally:
                 self._unmark_upstream_active(endpoint)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from PyQt6.QtWidgets import QSizePolicy
 from qfluentwidgets import FluentIcon
 from ui.accessibility import set_control_accessibility, set_state_text
 from ui.log_limits import (
@@ -13,8 +14,15 @@ from ui.log_limits import (
 
 @dataclass(slots=True)
 class LogsPrimaryTabWidgets:
+    log_card: object
+    log_text: object
+    stats_label: object
+
+
+@dataclass(slots=True)
+class LogsManagementTabWidgets:
     controls_card: object
-    log_combo: object
+    logs_table: object
     refresh_btn: object
     info_label: object
     controls_actions_title: object
@@ -22,9 +30,6 @@ class LogsPrimaryTabWidgets:
     copy_btn: object
     clear_btn: object
     folder_btn: object
-    log_card: object
-    log_text: object
-    stats_label: object
 
 
 @dataclass(slots=True)
@@ -48,12 +53,90 @@ def build_logs_primary_tab_ui(
     qhbox_layout_cls,
     caption_label_cls,
     strong_body_label_cls,
-    combo_box_cls,
+    text_edit_cls,
+    qfont_cls,
+    get_theme_tokens_fn,
+) -> LogsPrimaryTabWidgets:
+    _ = get_theme_tokens_fn()
+
+    log_card = settings_card_cls()
+    log_card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    log_layout = qvbox_layout_cls()
+    log_layout.setContentsMargins(0, 0, 0, 0)
+    log_layout.setSpacing(8)
+
+    log_text = text_edit_cls()
+    log_text.setReadOnly(True)
+    log_text.setLineWrapMode(text_edit_cls.LineWrapMode.NoWrap)
+    log_text.setFont(qfont_cls("Consolas", 9))
+    log_text.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    log_text.setMinimumHeight(380)
+    apply_text_line_limit(log_text, MAIN_LOG_VIEW_MAX_LINES)
+    set_control_accessibility(
+        log_text,
+        name=tr_catalog_fn("page.logs.accessibility.log_text.name", language=ui_language, default="Содержимое текущего лога"),
+        description=tr_catalog_fn(
+            "page.logs.accessibility.log_text.description",
+            language=ui_language,
+            default="Текст выбранного файла лога. Поле только для чтения.",
+        ),
+    )
+    set_state_text(
+        log_text,
+        tr_catalog_fn(
+            "page.logs.accessibility.log_text.initial_state",
+            language=ui_language,
+            default="Содержимое текущего лога: лог пока не загружен",
+        ),
+    )
+    log_layout.addWidget(log_text, 1)
+
+    stats_label = caption_label_cls()
+    set_control_accessibility(
+        stats_label,
+        name=tr_catalog_fn("page.logs.accessibility.stats.name", language=ui_language, default="Статистика логов"),
+        description=tr_catalog_fn(
+            "page.logs.accessibility.stats.description",
+            language=ui_language,
+            default="Краткая статистика по файлам логов.",
+        ),
+    )
+    set_state_text(
+        stats_label,
+        tr_catalog_fn(
+            "page.logs.accessibility.stats.initial_state",
+            language=ui_language,
+            default="Статистика логов: пока нет данных",
+        ),
+    )
+    log_layout.addWidget(stats_label)
+
+    log_card.add_layout(log_layout)
+    parent_layout.addWidget(log_card, 1)
+
+    return LogsPrimaryTabWidgets(
+        log_card=log_card,
+        log_text=log_text,
+        stats_label=stats_label,
+    )
+
+
+def build_logs_management_tab_ui(
+    *,
+    parent_layout,
+    content_parent,
+    ui_language: str,
+    tr_catalog_fn,
+    settings_card_cls,
+    qvbox_layout_cls,
+    qhbox_layout_cls,
+    caption_label_cls,
     tool_button_cls,
     push_button_cls,
-    text_edit_cls,
+    table_widget_cls,
+    table_item_cls,
+    header_view_cls,
     quick_actions_bar_cls,
-    qfont_cls,
     get_theme_tokens_fn,
     on_log_selected,
     on_refresh,
@@ -62,31 +145,34 @@ def build_logs_primary_tab_ui(
     on_clear_view,
     on_open_folder,
     refresh_timer_parent,
-) -> LogsPrimaryTabWidgets:
-    _ = get_theme_tokens_fn()
+) -> LogsManagementTabWidgets:
+    _ = (get_theme_tokens_fn(), table_item_cls)
 
-    controls_card = settings_card_cls(
-        tr_catalog_fn("page.logs.card.controls", language=ui_language, default="Управление логами")
-    )
+    controls_card = settings_card_cls()
     controls_main = qvbox_layout_cls()
     controls_main.setSpacing(12)
 
-    row1 = qhbox_layout_cls()
-    row1.setSpacing(8)
-
-    log_combo = combo_box_cls()
-    log_combo.setMinimumWidth(350)
+    top_row = qhbox_layout_cls()
+    top_row.setSpacing(8)
+    info_label = caption_label_cls()
     set_control_accessibility(
-        log_combo,
-        name=tr_catalog_fn("page.logs.accessibility.log_combo.name", language=ui_language, default="Выбор файла лога"),
+        info_label,
+        name=tr_catalog_fn("page.logs.accessibility.info.name", language=ui_language, default="Сообщение страницы логов"),
         description=tr_catalog_fn(
-            "page.logs.accessibility.log_combo.description",
+            "page.logs.accessibility.info.description",
             language=ui_language,
-            default="Выберите файл лога для просмотра: выберите файл стрелками вверх и вниз.",
+            default="Здесь показывается результат последнего действия с логами.",
         ),
     )
-    log_combo.currentIndexChanged.connect(on_log_selected)
-    row1.addWidget(log_combo, 1)
+    set_state_text(
+        info_label,
+        tr_catalog_fn(
+            "page.logs.accessibility.info.initial_state",
+            language=ui_language,
+            default="Сообщение страницы логов: пока нет сообщений",
+        ),
+    )
+    top_row.addWidget(info_label, 1)
 
     refresh_btn = tool_button_cls()
     refresh_icon_normal = FluentIcon.SYNC
@@ -114,41 +200,43 @@ def build_logs_primary_tab_ui(
     )
     set_state_text(refresh_btn, refresh_name)
     refresh_btn.clicked.connect(on_refresh)
-    row1.addWidget(refresh_btn)
-    controls_main.addLayout(row1)
+    top_row.addWidget(refresh_btn)
+    controls_main.addLayout(top_row)
 
-    info_row = qhbox_layout_cls()
-    info_row.setSpacing(8)
-    info_row.addStretch()
-    info_label = caption_label_cls()
+    logs_table = table_widget_cls()
+    logs_table.setColumnCount(4)
+    logs_table.setRowCount(0)
+    logs_table.setHorizontalHeaderLabels(["Файл", "Статус", "Размер", "Путь"])
+    try:
+        logs_table.setBorderVisible(True)
+        logs_table.setBorderRadius(8)
+    except Exception:
+        pass
+    header = logs_table.horizontalHeader()
+    header.setSectionResizeMode(0, header_view_cls.ResizeMode.Stretch)
+    header.setSectionResizeMode(1, header_view_cls.ResizeMode.ResizeToContents)
+    header.setSectionResizeMode(2, header_view_cls.ResizeMode.ResizeToContents)
+    header.setSectionResizeMode(3, header_view_cls.ResizeMode.Stretch)
+    logs_table.verticalHeader().setVisible(False)
+    logs_table.verticalHeader().setDefaultSectionSize(34)
+    logs_table.setEditTriggers(table_widget_cls.EditTrigger.NoEditTriggers)
+    logs_table.setSelectionBehavior(table_widget_cls.SelectionBehavior.SelectRows)
+    logs_table.setSelectionMode(table_widget_cls.SelectionMode.SingleSelection)
+    logs_table.cellClicked.connect(on_log_selected)
+    logs_table.setMinimumHeight(260)
+    logs_table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
     set_control_accessibility(
-        info_label,
-        name=tr_catalog_fn("page.logs.accessibility.info.name", language=ui_language, default="Сообщение страницы логов"),
-        description=tr_catalog_fn(
-            "page.logs.accessibility.info.description",
-            language=ui_language,
-            default="Здесь показывается результат последнего действия с логами.",
-        ),
+        logs_table,
+        name="Таблица файлов логов",
+        description="Выберите строку, чтобы открыть файл лога для просмотра.",
     )
-    set_state_text(
-        info_label,
-        tr_catalog_fn(
-            "page.logs.accessibility.info.initial_state",
-            language=ui_language,
-            default="Сообщение страницы логов: пока нет сообщений",
-        ),
-    )
-    info_row.addWidget(info_label)
-    controls_main.addLayout(info_row)
+    set_state_text(logs_table, "Таблица файлов логов: строки пока не загружены")
+    controls_main.addWidget(logs_table, 1)
 
     controls_card.add_layout(controls_main)
-    parent_layout.addWidget(controls_card)
+    parent_layout.addWidget(controls_card, 1)
 
-    controls_actions_title = strong_body_label_cls(
-        tr_catalog_fn("page.logs.actions.title", language=ui_language, default="Действия")
-    )
-    parent_layout.addWidget(controls_actions_title)
-
+    controls_actions_title = None
     controls_actions_bar = quick_actions_bar_cls(content_parent)
 
     copy_btn = push_button_cls(
@@ -207,62 +295,9 @@ def build_logs_primary_tab_ui(
 
     parent_layout.addWidget(controls_actions_bar)
 
-    log_card = settings_card_cls(
-        tr_catalog_fn("page.logs.card.content", language=ui_language, default="Содержимое")
-    )
-    log_layout = qvbox_layout_cls()
-
-    log_text = text_edit_cls()
-    log_text.setReadOnly(True)
-    log_text.setLineWrapMode(text_edit_cls.LineWrapMode.NoWrap)
-    log_text.setFont(qfont_cls("Consolas", 9))
-    log_text.setMinimumHeight(260)
-    apply_text_line_limit(log_text, MAIN_LOG_VIEW_MAX_LINES)
-    set_control_accessibility(
-        log_text,
-        name=tr_catalog_fn("page.logs.accessibility.log_text.name", language=ui_language, default="Содержимое текущего лога"),
-        description=tr_catalog_fn(
-            "page.logs.accessibility.log_text.description",
-            language=ui_language,
-            default="Текст выбранного файла лога. Поле только для чтения.",
-        ),
-    )
-    set_state_text(
-        log_text,
-        tr_catalog_fn(
-            "page.logs.accessibility.log_text.initial_state",
-            language=ui_language,
-            default="Содержимое текущего лога: лог пока не загружен",
-        ),
-    )
-    log_layout.addWidget(log_text)
-
-    stats_label = caption_label_cls()
-    set_control_accessibility(
-        stats_label,
-        name=tr_catalog_fn("page.logs.accessibility.stats.name", language=ui_language, default="Статистика логов"),
-        description=tr_catalog_fn(
-            "page.logs.accessibility.stats.description",
-            language=ui_language,
-            default="Краткая статистика по файлам логов.",
-        ),
-    )
-    set_state_text(
-        stats_label,
-        tr_catalog_fn(
-            "page.logs.accessibility.stats.initial_state",
-            language=ui_language,
-            default="Статистика логов: пока нет данных",
-        ),
-    )
-    log_layout.addWidget(stats_label)
-
-    log_card.add_layout(log_layout)
-    parent_layout.addWidget(log_card)
-
-    return LogsPrimaryTabWidgets(
+    return LogsManagementTabWidgets(
         controls_card=controls_card,
-        log_combo=log_combo,
+        logs_table=logs_table,
         refresh_btn=refresh_btn,
         info_label=info_label,
         controls_actions_title=controls_actions_title,
@@ -270,9 +305,6 @@ def build_logs_primary_tab_ui(
         copy_btn=copy_btn,
         clear_btn=clear_btn,
         folder_btn=folder_btn,
-        log_card=log_card,
-        log_text=log_text,
-        stats_label=stats_label,
     )
 
 

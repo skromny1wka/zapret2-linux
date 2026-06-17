@@ -784,7 +784,7 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
         self.assertTrue(ok)
         self.assertEqual(seen_hosts, ["bad.proxy", "good.proxy"])
 
-    def test_upstream_zero_recv_without_watchdog_keeps_current_bundled_proxy(self) -> None:
+    def test_upstream_zero_recv_deprioritizes_current_bundled_proxy(self) -> None:
         from telegram_proxy.proxy.routing import UpstreamProxyConfig, UpstreamProxyEndpoint
         from telegram_proxy.wss_proxy import TelegramWSProxy
 
@@ -837,10 +837,10 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
         with patch("telegram_proxy.wss_proxy.socks5.connect_via_socks5", side_effect=fake_connect):
             asyncio.run(run_three(proxy))
 
-        self.assertEqual(seen_hosts, ["slow.proxy", "slow.proxy", "slow.proxy"])
-        self.assertNotIn("temporarily deprioritized after recv=0", "\n".join(logs))
+        self.assertEqual(seen_hosts, ["slow.proxy", "slow.proxy", "fast.proxy"])
+        self.assertIn("temporarily deprioritized after recv=0", "\n".join(logs))
 
-    def test_upstream_tls_primary_stays_before_plain_legacy_without_zero_recv_penalty(self) -> None:
+    def test_upstream_tls_primary_penalty_keeps_plain_legacy_skipped(self) -> None:
         from telegram_proxy.proxy.routing import UpstreamProxyConfig, UpstreamProxyEndpoint
         from telegram_proxy.wss_proxy import TelegramWSProxy
 
@@ -893,9 +893,9 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
         with patch("telegram_proxy.wss_proxy.socks5.connect_via_socks5", side_effect=fake_connect):
             asyncio.run(run_three(proxy))
 
-        self.assertEqual(seen_hosts, ["slow.tls", "slow.tls", "slow.tls"])
+        self.assertEqual(seen_hosts, ["slow.tls", "slow.tls", "fast.tls"])
 
-    def test_upstream_http80_zero_recv_without_watchdog_keeps_current_bundled_proxy(self) -> None:
+    def test_upstream_http80_zero_recv_deprioritizes_current_bundled_proxy(self) -> None:
         from telegram_proxy.proxy.routing import UpstreamProxyConfig, UpstreamProxyEndpoint
         from telegram_proxy.wss_proxy import TelegramWSProxy
 
@@ -949,8 +949,8 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
         with patch("telegram_proxy.wss_proxy.socks5.connect_via_socks5", side_effect=fake_connect):
             asyncio.run(run_three(proxy))
 
-        self.assertEqual(seen_hosts, ["primary.tls", "primary.tls", "primary.tls"])
-        self.assertNotIn("temporarily deprioritized after recv=0", "\n".join(logs))
+        self.assertEqual(seen_hosts, ["primary.tls", "primary.tls", "backup.tls"])
+        self.assertIn("temporarily deprioritized after recv=0", "\n".join(logs))
 
     def test_upstream_plain_legacy_is_skipped_when_tls_candidates_exist(self) -> None:
         from telegram_proxy.proxy.routing import UpstreamProxyConfig, UpstreamProxyEndpoint
@@ -1186,7 +1186,7 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertEqual(seen_hosts, ["primary.tls", "fresh.tls"])
 
-    def test_upstream_connect_does_not_retry_previously_penalized_backup_after_fresh_failure(self) -> None:
+    def test_upstream_connect_tries_penalized_backup_before_giving_up(self) -> None:
         from telegram_proxy.proxy.routing import UpstreamProxyConfig, UpstreamProxyEndpoint
         from telegram_proxy.wss_proxy import TelegramWSProxy
 
@@ -1207,9 +1207,15 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
 
         seen_hosts: list[str] = []
 
+        class _RemoteWriter:
+            def __init__(self):
+                self.transport = None
+
         async def fake_connect(proxy_host, *_args, **_kwargs):
             seen_hosts.append(proxy_host)
-            raise TimeoutError()
+            if proxy_host == "fresh.tls":
+                raise TimeoutError()
+            return object(), _RemoteWriter()
 
         with patch("telegram_proxy.wss_proxy.socks5.connect_via_socks5", side_effect=fake_connect):
             result = asyncio.run(
@@ -1222,8 +1228,8 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
                 )
             )
 
-        self.assertIsNone(result)
-        self.assertEqual(seen_hosts, ["fresh.tls"])
+        self.assertIsNotNone(result)
+        self.assertEqual(seen_hosts, ["fresh.tls", "stale.tls"])
 
     def test_upstream_connect_uses_bounded_failover_timeout(self) -> None:
         from telegram_proxy.proxy.routing import UpstreamProxyConfig, UpstreamProxyEndpoint
@@ -1279,6 +1285,54 @@ class TelegramProxyCloudflareRuntimeTests(unittest.TestCase):
 
         self.assertGreaterEqual(timeouts[0], 5.0)
         self.assertLessEqual(timeouts[0], 6.0)
+
+    def test_upstream_connect_total_attempt_is_bounded(self) -> None:
+        from telegram_proxy.proxy.routing import UpstreamProxyConfig, UpstreamProxyEndpoint
+        from telegram_proxy.wss_proxy import TelegramWSProxy
+
+        class _RemoteWriter:
+            def __init__(self):
+                self.transport = None
+
+        async def fake_connect(proxy_host, *_args, **_kwargs):
+            seen_hosts.append(proxy_host)
+            if proxy_host == "slow.tls":
+                await asyncio.sleep(1.0)
+            return object(), _RemoteWriter()
+
+        seen_hosts: list[str] = []
+        logs: list[str] = []
+        proxy = TelegramWSProxy(
+            on_log=logs.append,
+            upstream_config=UpstreamProxyConfig(
+                enabled=True,
+                host="slow.tls",
+                port=443,
+                tls=True,
+                mode="always",
+                fallback_proxies=(
+                    UpstreamProxyEndpoint(host="fast.tls", port=443, tls=True),
+                ),
+            ),
+        )
+
+        with (
+            patch("telegram_proxy.wss_proxy.UPSTREAM_CONNECT_TIMEOUT", 0.01),
+            patch("telegram_proxy.wss_proxy.socks5.connect_via_socks5", side_effect=fake_connect),
+        ):
+            result = asyncio.run(
+                proxy._open_upstream_proxy(
+                    upstream_host="149.154.175.50",
+                    upstream_port=443,
+                    label="test",
+                    dc=1,
+                    is_media=False,
+                )
+            )
+
+        self.assertIsNotNone(result)
+        self.assertEqual(seen_hosts, ["slow.tls", "fast.tls"])
+        self.assertIn("upstream connect failed", "\n".join(logs))
 
     def test_no_wss_dc_tries_direct_tcp_before_upstream_fallback(self) -> None:
         from telegram_proxy.proxy.routing import UpstreamProxyConfig

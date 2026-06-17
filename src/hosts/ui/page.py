@@ -398,7 +398,7 @@ class HostsPage(BasePage):
 
     def on_page_hidden(self) -> None:
         self._close_service_combo_popups()
-        self._unmount_services_selectors_for_fast_switch()
+        self._pause_services_selectors_for_hidden_page()
         self._stop_catalog_watcher()
 
     def _install_host_window_event_filter(self) -> None:
@@ -660,21 +660,16 @@ class HostsPage(BasePage):
         self._service_group_chips_scrolls = []
         self._service_group_chip_buttons = []
 
-    def _unmount_services_selectors_for_fast_switch(self) -> None:
-        if self._services_layout is None:
-            return
-        if not self.__dict__.get("_services_ui_mounted", False):
-            return
-        self._cancel_deferred_services_row_build()
+    def _pause_services_selectors_for_hidden_page(self) -> None:
         self._stop_services_catalog_worker(blocking=False)
-        self._clear_layout(self._services_layout)
-        self._reset_services_runtime_bindings()
-        self._services_ui_mounted = False
 
     def _schedule_services_restore_after_show(self) -> None:
         if self.__dict__.get("_cleanup_in_progress", False):
             return
-        if self.__dict__.get("_services_ui_mounted", False):
+        if (
+            self.__dict__.get("_services_ui_mounted", False)
+            and not self.__dict__.get("_services_pending_row_batches")
+        ):
             return
         if self.__dict__.get("_services_restore_scheduled", False):
             return
@@ -687,7 +682,12 @@ class HostsPage(BasePage):
             return
         if not self.isVisible():
             return
+        pending_batches = self.__dict__.get("_services_pending_row_batches")
         if self.__dict__.get("_services_ui_mounted", False):
+            if pending_batches:
+                self._schedule_next_service_rows_batch(
+                    int(self.__dict__.get("_services_build_generation", 0))
+                )
             return
         if self._services_catalog_runtime.is_running():
             return
@@ -696,6 +696,25 @@ class HostsPage(BasePage):
             self._build_services_selectors(catalog_plan, sync_selection=False)
             return
         self._rebuild_services_selectors()
+
+    def _try_build_warmed_services_catalog(self) -> bool:
+        if not self.isVisible():
+            return False
+        consumer = getattr(self._hosts, "consume_warmed_services_catalog_plan", None)
+        if not callable(consumer):
+            return False
+        warmed = consumer(
+            current_selection=dict(self._service_dns_selection),
+            direct_title=self._tr("page.hosts.group.direct", "Напрямую из hosts"),
+            ai_title=self._tr("page.hosts.group.ai", "ИИ"),
+            other_title=self._tr("page.hosts.group.other", "Остальные"),
+        )
+        if warmed is None:
+            return False
+        self._catalog_sig = warmed.catalog_signature
+        self._build_services_selectors(warmed.plan, sync_selection=True)
+        self._update_ui()
+        return True
 
     def _cancel_deferred_services_row_build(self) -> int:
         generation = int(self.__dict__.get("_services_build_generation", 0)) + 1
@@ -708,6 +727,9 @@ class HostsPage(BasePage):
         if self._services_layout is None:
             return
         started_at = time.perf_counter()
+        if self._try_build_warmed_services_catalog():
+            self._log_ui_timing("hosts_ui.services.rebuild", started_at)
+            return
         self._cancel_deferred_services_row_build()
         self._clear_layout(self._services_layout)
         self._reset_services_runtime_bindings()

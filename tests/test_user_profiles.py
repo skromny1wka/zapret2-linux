@@ -103,6 +103,36 @@ class UserProfilesTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "уже есть"):
                     create_user_profile(paths, name="my site", protocol="udp", ports="443")
 
+    def test_user_profile_tcp_ports_must_be_real_ports(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            paths = AppPaths(user_root=root, local_root=root)
+            with patch("settings.store.MAIN_DIRECTORY", str(root)):
+                with self.assertRaisesRegex(ValueError, "от 1 до 65535"):
+                    create_user_profile(paths, name="Bad ports", protocol="tcp", ports="0,443-65536")
+
+    def test_user_profile_udp_ports_allow_valid_ranges_and_lists(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            paths = AppPaths(user_root=root, local_root=root)
+            with patch("settings.store.MAIN_DIRECTORY", str(root)):
+                profile_id = create_user_profile(paths, name="Voice", protocol="udp", ports="443,50000-50100")
+                settings = read_settings()
+
+        self.assertEqual(settings["user_profiles"]["profiles"][profile_id]["ports"], "443,50000-50100")
+
+    def test_user_profile_ports_allow_negated_ranges_but_not_negated_star(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            paths = AppPaths(user_root=root, local_root=root)
+            with patch("settings.store.MAIN_DIRECTORY", str(root)):
+                profile_id = create_user_profile(paths, name="Except web", protocol="tcp", ports="~80-90")
+                settings = read_settings()
+                with self.assertRaisesRegex(ValueError, "Порты можно указать"):
+                    create_user_profile(paths, name="Bad star", protocol="tcp", ports="~*")
+
+        self.assertEqual(settings["user_profiles"]["profiles"][profile_id]["ports"], "~80-90")
+
     def test_user_profile_name_must_not_intersect_with_system_profile_names(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
@@ -401,7 +431,7 @@ class UserProfilesTests(unittest.TestCase):
             templates_dir.joinpath("all_profiles.txt").write_text(
                 "\n".join(
                     (
-                        "--name=Speedtest",
+                        "--name=SpeedTest",
                         "--filter-tcp=443,8080",
                         "--hostlist=lists/speedtest.txt",
                         "",
@@ -459,7 +489,7 @@ class UserProfilesTests(unittest.TestCase):
             templates_dir.joinpath("all_profiles.txt").write_text(
                 "\n".join(
                     (
-                        "--name=Speedtest",
+                        "--name=SpeedTest",
                         "--filter-tcp=443,8080",
                         "--hostlist=lists/speedtest.txt",
                         "",

@@ -19,10 +19,11 @@ class ControlInternetCleanupButtonTests(unittest.TestCase):
             self.assertIn("internet_cleanup_card", source)
             self.assertIn("addSettingCard(internet_cleanup_card)", source)
 
-    def test_windows_feature_mixin_stops_internet_cleanup_worker_without_blocking(self) -> None:
+    def test_windows_feature_mixin_waits_for_internet_cleanup_worker_on_cleanup(self) -> None:
         source = inspect.getsource(ControlPageWindowsFeatureMixin._stop_internet_cleanup_worker)
 
-        self.assertIn("blocking=False", source)
+        self.assertIn("blocking=True", source)
+        self.assertIn("wait_timeout_ms=45000", source)
         self.assertIn("Internet cleanup worker", source)
 
 

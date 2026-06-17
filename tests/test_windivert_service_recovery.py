@@ -271,6 +271,172 @@ class WinDivertServiceRecoveryTests(unittest.TestCase):
         self.assertEqual(diagnosis.win32_error, 1058)
         self.assertEqual(diagnosis.cause, "WinDivert service disabled")
 
+    def test_runner_runs_safe_windivert_autofix_once_after_failed_spawn(self) -> None:
+        from winws_runtime.health.process_health_check import WinDivertDiagnosis
+        from winws_runtime.runners import runner_base
+
+        class DummyRunner(runner_base.StrategyRunnerBase):
+            def start_from_preset_file(self, preset_path: str, strategy_name: str = "Preset") -> bool:
+                return True
+
+            def switch_preset_file_fast(self, preset_path: str, strategy_name: str = "Preset", *, is_current=None) -> bool:
+                return True
+
+        diagnosis = WinDivertDiagnosis(
+            cause="Служба Base Filtering Engine (BFE) отключена",
+            solution="Включите BFE",
+            auto_fix="enable_bfe",
+            exit_code=1068,
+            win32_error=1068,
+        )
+
+        with (
+            patch.object(runner_base.os.path, "exists", return_value=True),
+            patch.object(runner_base, "diagnose_winws_exit", return_value=diagnosis),
+            patch.object(runner_base, "execute_windivert_auto_fix", return_value=(True, "BFE запущена")) as auto_fix,
+        ):
+            runner = DummyRunner(r"C:\Zapret\Dev\exe\winws2.exe")
+            recovered = runner._maybe_run_windivert_auto_fix_after_failed_spawn(
+                "dependency service failed",
+                1068,
+                retry_count=0,
+            )
+
+        self.assertTrue(recovered)
+        auto_fix.assert_called_once_with("enable_bfe")
+
+    def test_runner_does_not_autofix_same_failure_twice(self) -> None:
+        from winws_runtime.health.process_health_check import WinDivertDiagnosis
+        from winws_runtime.runners import runner_base
+
+        class DummyRunner(runner_base.StrategyRunnerBase):
+            def start_from_preset_file(self, preset_path: str, strategy_name: str = "Preset") -> bool:
+                return True
+
+            def switch_preset_file_fast(self, preset_path: str, strategy_name: str = "Preset", *, is_current=None) -> bool:
+                return True
+
+        diagnosis = WinDivertDiagnosis(
+            cause="Служба Base Filtering Engine (BFE) отключена",
+            solution="Включите BFE",
+            auto_fix="enable_bfe",
+            exit_code=1068,
+            win32_error=1068,
+        )
+
+        with (
+            patch.object(runner_base.os.path, "exists", return_value=True),
+            patch.object(runner_base, "diagnose_winws_exit", return_value=diagnosis),
+            patch.object(runner_base, "execute_windivert_auto_fix", return_value=(True, "BFE запущена")) as auto_fix,
+        ):
+            runner = DummyRunner(r"C:\Zapret\Dev\exe\winws2.exe")
+            recovered = runner._maybe_run_windivert_auto_fix_after_failed_spawn(
+                "dependency service failed",
+                1068,
+                retry_count=1,
+            )
+
+        self.assertFalse(recovered)
+        auto_fix.assert_not_called()
+
+    def test_winws2_retries_after_successful_windivert_autofix(self) -> None:
+        from winws_runtime.runners.zapret2_runner import Winws2StrategyRunner
+        import winws_runtime.runners.zapret2_runner as zapret2_runner
+
+        runner = object.__new__(Winws2StrategyRunner)
+        runner._last_spawn_exit_code = 1068
+        runner._last_spawn_stderr = "dependency service failed"
+        runner._should_retry_transient_windivert_service_error = Mock(return_value=False)
+        runner._is_windivert_system_error = Mock(return_value=True)
+        runner._is_windivert_conflict_error = Mock(return_value=False)
+        runner._maybe_run_windivert_auto_fix_after_failed_spawn = Mock(return_value=True)
+        runner._start_from_preset_file_locked = Mock(return_value=True)
+
+        with patch.object(
+            zapret2_runner,
+            "find_stale_windivert_delete_pending_services_runtime",
+            return_value=[],
+        ):
+            retried = runner._maybe_retry_after_failed_spawn_locked(
+                "preset.txt",
+                "Preset",
+                cleanup_required=False,
+                retry_count=0,
+                stable_start_window_seconds=0.35,
+            )
+
+        self.assertTrue(retried)
+        runner._maybe_run_windivert_auto_fix_after_failed_spawn.assert_called_once_with(
+            "dependency service failed",
+            1068,
+            retry_count=0,
+        )
+        runner._start_from_preset_file_locked.assert_called_once_with(
+            "preset.txt",
+            "Preset",
+            force_cleanup=True,
+            retry_count=1,
+            stable_start_window_seconds=0.35,
+        )
+
+    def test_winws1_retries_after_successful_windivert_autofix(self) -> None:
+        from winws_runtime.runners.zapret1_runner import Winws1StrategyRunner
+
+        runner = object.__new__(Winws1StrategyRunner)
+        runner._last_spawn_exit_code = 1068
+        runner._last_spawn_stderr = "dependency service failed"
+        runner._should_retry_transient_windivert_service_error = Mock(return_value=False)
+        runner._should_retry_unclassified_code_one = Mock(return_value=False)
+        runner._is_windivert_system_error = Mock(return_value=True)
+        runner._is_windivert_conflict_error = Mock(return_value=False)
+        runner._maybe_run_windivert_auto_fix_after_failed_spawn = Mock(return_value=True)
+        runner._start_from_preset_file_locked = Mock(return_value=True)
+
+        retried = runner._maybe_retry_after_failed_spawn_locked(
+            "preset.txt",
+            "Preset",
+            retry_count=0,
+            max_retries=2,
+            stable_start_window_seconds=0.35,
+        )
+
+        self.assertTrue(retried)
+        runner._maybe_run_windivert_auto_fix_after_failed_spawn.assert_called_once_with(
+            "dependency service failed",
+            1068,
+            retry_count=0,
+        )
+        runner._start_from_preset_file_locked.assert_called_once_with(
+            "preset.txt",
+            "Preset",
+            retry_count=1,
+            max_retries=2,
+            stable_start_window_seconds=0.35,
+        )
+
+    def test_generic_service_disabled_does_not_blame_secure_boot_without_signature_error(self) -> None:
+        from winws_runtime.health import process_health_check
+
+        stderr = (
+            "windivert: error opening filter: The service cannot be started, "
+            "either because it is disabled or because it has no enabled devices associated with it."
+        )
+
+        with (
+            patch.object(process_health_check, "_check_windivert_files", return_value=[]),
+            patch.object(process_health_check, "_check_bfe_service", return_value=True),
+            patch.object(process_health_check, "_check_secure_boot", return_value=True),
+            patch.object(process_health_check, "_find_disabled_windivert_driver_service", return_value=None),
+            patch.object(process_health_check, "_detect_active_antivirus", return_value=None),
+            patch.object(process_health_check, "_check_network_adapters", return_value=True),
+        ):
+            diagnosis = process_health_check.diagnose_winws_exit(34, stderr)
+
+        self.assertIsNotNone(diagnosis)
+        self.assertEqual(diagnosis.win32_error, 1058)
+        self.assertNotIn("Secure Boot блокирует", diagnosis.cause)
+        self.assertIn("WinDivert не может запустить службу драйвера", diagnosis.cause)
+
     def test_lua_compat_mismatch_is_reported_as_version_mismatch(self) -> None:
         from winws_runtime.health import process_health_check
 

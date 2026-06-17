@@ -741,14 +741,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Руководство и ответы на вопросы",
         "en": "Guide and FAQ",
     },
-    "page.about.help.docs.folder.title": {
-        "ru": "Папка с инструкциями",
-        "en": "Help folder",
-    },
-    "page.about.help.docs.folder.desc": {
-        "ru": "Открыть локальную папку help",
-        "en": "Open local help folder",
-    },
     "page.about.help.docs.android.title": {
         "ru": "На Android (Magisk Zapret, ByeByeDPI и др.)",
         "en": "On Android (Magisk Zapret, ByeByeDPI, etc.)",
@@ -918,8 +910,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Starts the main application window on Windows logon. The app launches in the tray and applies the current settings from there.",
     },
     "page.autostart.tip.recommendation": {
-        "ru": "Используется один тип автозапуска: запуск самого ZapretGUI в трей через Планировщик заданий Windows.",
-        "en": "Only one autostart type is used: launching ZapretGUI itself in the tray through Windows Task Scheduler.",
+        "ru": "Используется один тип автозапуска: ярлык ZapretGUI в папке автозагрузки Windows.",
+        "en": "Only one autostart type is used: a ZapretGUI shortcut in the Windows Startup folder.",
     },
     "page.connection.title": {
         "ru": "Диагностика соединения",
@@ -1504,6 +1496,10 @@ TEXTS: dict[str, dict[str, str]] = {
     "page.logs.tab.send": {
         "ru": "ПОДДЕРЖКА",
         "en": "SUPPORT",
+    },
+    "page.logs.tab.manage": {
+        "ru": "УПРАВЛЕНИЕ",
+        "en": "MANAGE",
     },
     "page.logs.card.controls": {
         "ru": "Управление логами",
@@ -3220,7 +3216,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "Файл %AppData%\\ZapretTwoDev\\preset-zapret2.txt хранит только активный пресет. "
             "Сам по себе он не считается пользовательским пресетом. Ваши пресеты лежат в папке presets. "
             "По умолчанию используется Default, также есть встроенный Gaming.\n\n"
-            "Пресетами можно обмениваться напрямую: https://publish.obsidian.md/zapret/Privacy/Zapret2/preset\n\n"
+            "Пресетами можно обмениваться напрямую.\n\n"
             "Почему пресеты иногда плохо подходят: в них стратегии часто заранее прописаны под разные фильтры и hostlist. "
             "Из-за этого один сайт может заработать, а другой перестать. Для более точной настройки лучше использовать прямой запуск: "
             "там стратегия подбирается отдельно для нужной категории и hostlist."
@@ -3231,9 +3227,16 @@ TEXTS: dict[str, dict[str, str]] = {
             "The active preset is passed to winws2.exe for Zapret 2 or winws.exe for Zapret 1 through @<config_file>, "
             "which means: read command-line options from a file. Other command-line options are not used in this launch mode.\n\n"
             "%AppData%\\ZapretTwoDev\\preset-zapret2.txt only stores the active preset copy. "
-            "User presets are stored in the presets folder. More details: "
-            "https://publish.obsidian.md/zapret/Privacy/Zapret2/preset"
+            "User presets are stored in the presets folder. More details are available from the button below."
         ),
+    },
+    "page.winws1_user_presets.info.open_site.button": {
+        "ru": "Открыть сайт с пресетами",
+        "en": "Open preset site",
+    },
+    "page.winws1_user_presets.info.open_site.description": {
+        "ru": "Открывает сайт, где можно посмотреть и скачать пресеты.",
+        "en": "Opens the site where presets can be viewed and downloaded.",
     },
     "page.winws1_profile_setup.title": {
         "ru": "Настройка профиля",
@@ -3702,7 +3705,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "Файл %AppData%\\ZapretTwoDev\\preset-zapret2.txt хранит только активный пресет. "
             "Сам по себе он не считается пользовательским пресетом. Ваши пресеты лежат в папке presets. "
             "По умолчанию используется Default, также есть встроенный Gaming.\n\n"
-            "Пресетами можно обмениваться напрямую: https://publish.obsidian.md/zapret/Privacy/Zapret2/preset\n\n"
+            "Пресетами можно обмениваться напрямую.\n\n"
             "Почему пресеты иногда плохо подходят: в них стратегии часто заранее прописаны под разные фильтры и hostlist. "
             "Из-за этого один сайт может заработать, а другой перестать. Для более точной настройки лучше использовать прямой запуск: "
             "там стратегия подбирается отдельно для нужной категории и hostlist."
@@ -3713,9 +3716,16 @@ TEXTS: dict[str, dict[str, str]] = {
             "The active preset is passed to winws2.exe for Zapret 2 or winws.exe for Zapret 1 through @<config_file>, "
             "which means: read command-line options from a file. Other command-line options are not used in this launch mode.\n\n"
             "%AppData%\\ZapretTwoDev\\preset-zapret2.txt only stores the active preset copy. "
-            "User presets are stored in the presets folder. More details: "
-            "https://publish.obsidian.md/zapret/Privacy/Zapret2/preset"
+            "User presets are stored in the presets folder. More details are available from the button below."
         ),
+    },
+    "page.winws2_user_presets.info.open_site.button": {
+        "ru": "Открыть сайт с пресетами",
+        "en": "Open preset site",
+    },
+    "page.winws2_user_presets.info.open_site.description": {
+        "ru": "Открывает сайт, где можно посмотреть и скачать пресеты.",
+        "en": "Opens the site where presets can be viewed and downloaded.",
     },
     "page.winws2_profile_setup.title": {
         "ru": "Настройка профиля",

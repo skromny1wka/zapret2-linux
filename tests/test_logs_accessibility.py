@@ -9,8 +9,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QApplication, QHBoxLayout, QLabel, QTextEdit, QVBoxLayout, QWidget
-from qfluentwidgets import BodyLabel, CaptionLabel, ComboBox, PushButton, StrongBodyLabel, TransparentToolButton
+from PyQt6.QtWidgets import QApplication, QHBoxLayout, QLabel, QSizePolicy, QTextEdit, QVBoxLayout, QWidget
+from qfluentwidgets import BodyLabel, CaptionLabel, PushButton, StrongBodyLabel, TransparentToolButton
 
 import log.ui.logs_build as logs_build
 import log.ui.page as logs_page
@@ -45,55 +45,6 @@ class _FakeLabel:
         return self.properties.get(name)
 
 
-class _FakeLogCombo:
-    def __init__(self) -> None:
-        self.items: list[tuple[str, str]] = []
-        self.current_index = -1
-        self.accessible_name = ""
-        self.accessible_description = ""
-        self.properties = {}
-
-    def blockSignals(self, _blocked: bool) -> None:  # noqa: N802
-        pass
-
-    def clear(self) -> None:
-        self.items.clear()
-        self.current_index = -1
-
-    def addItem(self, display: str, userData: str = "") -> None:  # noqa: N802
-        self.items.append((display, userData))
-
-    def count(self) -> int:
-        return len(self.items)
-
-    def itemData(self, index: int) -> str:  # noqa: N802
-        return self.items[index][1]
-
-    def itemText(self, index: int) -> str:  # noqa: N802
-        return self.items[index][0]
-
-    def setCurrentIndex(self, index: int) -> None:  # noqa: N802
-        self.current_index = int(index)
-
-    def accessibleName(self) -> str:  # noqa: N802
-        return self.accessible_name
-
-    def setAccessibleName(self, text: str) -> None:  # noqa: N802
-        self.accessible_name = str(text)
-
-    def accessibleDescription(self) -> str:  # noqa: N802
-        return self.accessible_description
-
-    def setAccessibleDescription(self, text: str) -> None:  # noqa: N802
-        self.accessible_description = str(text)
-
-    def property(self, name: str) -> object:
-        return self.properties.get(name)
-
-    def setProperty(self, name: str, value: object) -> None:  # noqa: N802
-        self.properties[name] = value
-
-
 class LogsAccessibilityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -107,7 +58,7 @@ class LogsAccessibilityTests(unittest.TestCase):
         self.addCleanup(page.deleteLater)
 
         self.assertEqual(page.tabs_pivot.accessibleName(), "Вкладки страницы логов, выбрано: Логи")
-        self.assertIn("Логи или Поддержка", page.tabs_pivot.accessibleDescription())
+        self.assertIn("Логи, Поддержка или Управление", page.tabs_pivot.accessibleDescription())
 
         page.tabs_pivot.setCurrentItem("send")
 
@@ -132,6 +83,10 @@ class LogsAccessibilityTests(unittest.TestCase):
             page.tabs_pivot.items["send"].accessibleName(),
             "Вкладки страницы логов: Поддержка, не выбрано",
         )
+        self.assertEqual(
+            page.tabs_pivot.items["manage"].accessibleName(),
+            "Вкладки страницы логов: Управление, не выбрано",
+        )
 
         page.tabs_pivot.setCurrentItem("send")
 
@@ -143,21 +98,76 @@ class LogsAccessibilityTests(unittest.TestCase):
             page.tabs_pivot.items["send"].accessibleName(),
             "Вкладки страницы логов: Поддержка, выбрано",
         )
+        self.assertEqual(
+            page.tabs_pivot.items["manage"].accessibleName(),
+            "Вкладки страницы логов: Управление, не выбрано",
+        )
 
     def test_logs_build_assigns_screen_reader_names_to_core_controls(self) -> None:
         source = inspect.getsource(logs_build.build_logs_primary_tab_ui)
+        manage_source = inspect.getsource(logs_build.build_logs_management_tab_ui)
         secondary_source = inspect.getsource(logs_build.build_logs_secondary_panels_ui)
 
         self.assertIn("set_control_accessibility", source)
-        self.assertIn("log_combo,", source)
-        self.assertIn("refresh_btn,", source)
         self.assertIn("log_text,", source)
         self.assertIn("stats_label,", source)
+        self.assertIn("set_control_accessibility", manage_source)
+        self.assertIn("logs_table,", manage_source)
+        self.assertIn("refresh_btn,", manage_source)
         self.assertIn("set_control_accessibility", secondary_source)
         self.assertIn("clear_errors_btn,", secondary_source)
         self.assertIn("errors_text,", secondary_source)
 
-    def test_log_combo_initial_description_explains_keyboard_selection(self) -> None:
+    def test_logs_management_tab_exposes_table_and_actions(self) -> None:
+        parent = QWidget()
+        self.addCleanup(parent.deleteLater)
+        layout = QVBoxLayout(parent)
+
+        widgets = logs_build.build_logs_management_tab_ui(
+            parent_layout=layout,
+            content_parent=parent,
+            ui_language="ru",
+            tr_catalog_fn=lambda _key, language, default, **_kwargs: default,
+            settings_card_cls=SettingsCard,
+            qvbox_layout_cls=QVBoxLayout,
+            qhbox_layout_cls=QHBoxLayout,
+            caption_label_cls=CaptionLabel,
+            tool_button_cls=TransparentToolButton,
+            push_button_cls=PushButton,
+            table_widget_cls=logs_page.TableWidget,
+            table_item_cls=logs_page.QTableWidgetItem,
+            header_view_cls=logs_page.QHeaderView,
+            quick_actions_bar_cls=QuickActionsBar,
+            get_theme_tokens_fn=lambda: {},
+            on_log_selected=lambda *_args: None,
+            on_refresh=lambda: None,
+            on_spin_tick=lambda: None,
+            on_copy=lambda: None,
+            on_clear_view=lambda: None,
+            on_open_folder=lambda: None,
+            refresh_timer_parent=parent,
+        )
+
+        self.assertEqual(widgets.logs_table.accessibleName(), "Таблица файлов логов: строки пока не загружены")
+        self.assertIn("Выберите строку", widgets.logs_table.accessibleDescription())
+        self.assertEqual(widgets.refresh_btn.accessibleName(), "Обновить список логов")
+        self.assertEqual(widgets.refresh_btn.property("screenReaderStateText"), "Обновить список логов")
+        self.assertIn("список файлов логов", widgets.refresh_btn.accessibleDescription())
+        self.assertEqual(widgets.copy_btn.accessibleName(), "Копировать текущий лог")
+        self.assertEqual(widgets.copy_btn.property("screenReaderStateText"), "Копировать текущий лог")
+        self.assertEqual(widgets.clear_btn.accessibleName(), "Очистить окно просмотра лога")
+        self.assertEqual(
+            widgets.clear_btn.property("screenReaderStateText"),
+            "Очистить окно просмотра лога",
+        )
+        self.assertEqual(widgets.folder_btn.accessibleName(), "Открыть папку логов")
+        self.assertEqual(widgets.folder_btn.property("screenReaderStateText"), "Открыть папку логов")
+        self.assertEqual(
+            widgets.info_label.property("screenReaderStateText"),
+            "Сообщение страницы логов: пока нет сообщений",
+        )
+
+    def test_logs_content_area_has_no_extra_header_and_more_room(self) -> None:
         parent = QWidget()
         self.addCleanup(parent.deleteLater)
         layout = QVBoxLayout(parent)
@@ -172,48 +182,32 @@ class LogsAccessibilityTests(unittest.TestCase):
             qhbox_layout_cls=QHBoxLayout,
             caption_label_cls=CaptionLabel,
             strong_body_label_cls=StrongBodyLabel,
-            combo_box_cls=ComboBox,
-            tool_button_cls=TransparentToolButton,
-            push_button_cls=PushButton,
             text_edit_cls=QTextEdit,
-            quick_actions_bar_cls=QuickActionsBar,
             qfont_cls=QFont,
             get_theme_tokens_fn=lambda: {},
-            on_log_selected=lambda *_args: None,
-            on_refresh=lambda: None,
-            on_spin_tick=lambda: None,
-            on_copy=lambda: None,
-            on_clear_view=lambda: None,
-            on_open_folder=lambda: None,
-            refresh_timer_parent=parent,
         )
 
-        self.assertEqual(widgets.log_combo.accessibleName(), "Выбор файла лога")
-        self.assertIn("выберите файл стрелками вверх и вниз", widgets.log_combo.accessibleDescription())
-        self.assertEqual(widgets.refresh_btn.accessibleName(), "Обновить список логов")
-        self.assertEqual(widgets.refresh_btn.property("screenReaderStateText"), "Обновить список логов")
-        self.assertIn("список файлов логов", widgets.refresh_btn.accessibleDescription())
-        self.assertEqual(widgets.copy_btn.accessibleName(), "Копировать текущий лог")
-        self.assertEqual(widgets.copy_btn.property("screenReaderStateText"), "Копировать текущий лог")
-        self.assertEqual(widgets.clear_btn.accessibleName(), "Очистить окно просмотра лога")
-        self.assertEqual(
-            widgets.clear_btn.property("screenReaderStateText"),
-            "Очистить окно просмотра лога",
-        )
-        self.assertEqual(widgets.folder_btn.accessibleName(), "Открыть папку логов")
-        self.assertEqual(widgets.folder_btn.property("screenReaderStateText"), "Открыть папку логов")
-        self.assertEqual(
-            widgets.log_text.property("screenReaderStateText"),
-            "Содержимое текущего лога: лог пока не загружен",
-        )
-        self.assertEqual(
-            widgets.info_label.property("screenReaderStateText"),
-            "Сообщение страницы логов: пока нет сообщений",
-        )
-        self.assertEqual(
-            widgets.stats_label.property("screenReaderStateText"),
-            "Статистика логов: пока нет данных",
-        )
+        self.assertIsNone(getattr(widgets.log_card, "_title_label", None))
+        self.assertGreaterEqual(widgets.log_text.minimumHeight(), 360)
+        log_layout_item = widgets.log_card.main_layout.itemAt(0)
+        self.assertIsNotNone(log_layout_item)
+        log_layout = log_layout_item.layout()
+        self.assertIsNotNone(log_layout)
+        margins = log_layout.contentsMargins()
+        self.assertEqual((margins.left(), margins.top(), margins.right(), margins.bottom()), (0, 0, 0, 0))
+        self.assertEqual(widgets.log_card.sizePolicy().verticalPolicy(), QSizePolicy.Policy.Expanding)
+        self.assertEqual(widgets.log_text.sizePolicy().verticalPolicy(), QSizePolicy.Policy.Expanding)
+        self.assertEqual(layout.stretch(layout.indexOf(widgets.log_card)), 1)
+
+        page = logs_page.LogsPage.__new__(logs_page.LogsPage)
+        page._ui_language = "ru"
+        page.log_card = widgets.log_card
+        page._controls_actions_title = None
+        page._logs_secondary_initialized = False
+
+        logs_page.LogsPage._retranslate_logs_tab(page)
+
+        self.assertIsNone(getattr(widgets.log_card, "_title_label", None))
 
     def test_logs_action_buttons_keep_screen_reader_state_after_language_refresh(self) -> None:
         page = logs_page.LogsPage.__new__(logs_page.LogsPage)
@@ -427,10 +421,13 @@ class LogsAccessibilityTests(unittest.TestCase):
             "Статистика логов: Ошибок: 2",
         )
 
-    def test_log_combo_accessible_name_includes_selected_file(self) -> None:
+    def test_logs_list_state_populates_management_table(self) -> None:
         page = logs_page.LogsPage.__new__(logs_page.LogsPage)
         page._ui_language = "ru"
-        page.log_combo = _FakeLogCombo()
+        page.logs_table = logs_page.TableWidget()
+        page.info_label = _FakeLabel()
+        page.current_log_file = ""
+        self.addCleanup(page.logs_table.deleteLater)
 
         logs_page.LogsPage._apply_logs_list_state(
             page,
@@ -439,22 +436,33 @@ class LogsAccessibilityTests(unittest.TestCase):
                     {"display": "old.log", "path": "C:/Zapret/Dev/logs/old.log", "is_current": False, "index": 0},
                     {"display": "current.log", "path": "C:/Zapret/Dev/logs/current.log", "is_current": True, "index": 1},
                 ],
+                cleanup_deleted=0,
+                cleanup_total=0,
+                cleanup_errors=[],
             ),
             run_cleanup=False,
         )
 
-        self.assertEqual(page.log_combo.accessible_name, "Выбор файла лога, выбрано: current.log")
-        self.assertIn("Доступных файлов логов: 2.", page.log_combo.accessible_description)
-        self.assertIn("выберите файл стрелками вверх и вниз", page.log_combo.accessible_description)
+        self.assertEqual(page.logs_table.rowCount(), 2)
+        self.assertEqual(page.logs_table.item(0, 0).text(), "old.log")
+        self.assertEqual(page.logs_table.item(0, 1).text(), "Старый")
+        self.assertEqual(page.logs_table.item(1, 1).text(), "Текущий")
+        self.assertEqual(page.logs_table.item(1, 0).data(Qt.ItemDataRole.UserRole), "C:/Zapret/Dev/logs/current.log")
+        self.assertEqual(page.logs_table.currentRow(), 1)
+        self.assertEqual(page.logs_table.accessibleName(), "Таблица файлов логов, выбрано: current.log")
+        self.assertIn("Доступных файлов логов: 2.", page.logs_table.accessibleDescription())
+        self.assertIn("Выберите строку", page.logs_table.accessibleDescription())
         self.assertEqual(
-            page.log_combo.property("screenReaderStateText"),
-            "Выбор файла лога, выбрано: current.log",
+            page.logs_table.property("screenReaderStateText"),
+            "Таблица файлов логов, выбрано: current.log",
         )
 
-    def test_log_combo_menu_items_are_named_for_screen_reader(self) -> None:
+    def test_log_table_items_are_named_for_screen_reader(self) -> None:
         page = logs_page.LogsPage.__new__(logs_page.LogsPage)
         page._ui_language = "ru"
-        page.log_combo = ComboBox()
+        page.logs_table = logs_page.TableWidget()
+        page.info_label = _FakeLabel()
+        self.addCleanup(page.logs_table.deleteLater)
 
         logs_page.LogsPage._apply_logs_list_state(
             page,
@@ -463,41 +471,54 @@ class LogsAccessibilityTests(unittest.TestCase):
                     {"display": "old.log", "path": "C:/Zapret/Dev/logs/old.log", "is_current": False, "index": 0},
                     {"display": "current.log", "path": "C:/Zapret/Dev/logs/current.log", "is_current": True, "index": 1},
                 ],
+                cleanup_deleted=0,
+                cleanup_total=0,
+                cleanup_errors=[],
             ),
             run_cleanup=False,
         )
-        create_menu = getattr(page.log_combo, "_create_accessible_combo_menu", None)
-        self.assertIsNotNone(create_menu)
-
-        menu = create_menu()
 
         self.assertEqual(
-            menu.view.item(0).data(Qt.ItemDataRole.AccessibleTextRole),
-            "Выбор файла лога: old.log, не выбран",
+            page.logs_table.item(0, 0).data(Qt.ItemDataRole.AccessibleTextRole),
+            "Файл лога: old.log, Старый",
         )
         self.assertEqual(
-            menu.view.item(1).data(Qt.ItemDataRole.AccessibleTextRole),
-            "Выбор файла лога: current.log, выбран",
+            page.logs_table.item(1, 0).data(Qt.ItemDataRole.AccessibleTextRole),
+            "Файл лога: current.log, Текущий",
         )
 
-    def test_log_combo_accessible_name_updates_after_keyboard_selection(self) -> None:
+    def test_log_table_selection_updates_current_file(self) -> None:
         page = logs_page.LogsPage.__new__(logs_page.LogsPage)
         page._ui_language = "ru"
         page.current_log_file = "C:/Zapret/Dev/logs/old.log"
-        page.log_combo = _FakeLogCombo()
-        page.log_combo.addItem("old.log", "C:/Zapret/Dev/logs/old.log")
-        page.log_combo.addItem("new.log", "C:/Zapret/Dev/logs/new.log")
+        page.logs_table = logs_page.TableWidget()
+        page.info_label = _FakeLabel()
         page._start_tail_worker = lambda: None
+        self.addCleanup(page.logs_table.deleteLater)
 
-        logs_page.LogsPage._on_log_selected(page, 1)
+        logs_page.LogsPage._apply_logs_list_state(
+            page,
+            SimpleNamespace(
+                entries=[
+                    {"display": "old.log", "path": "C:/Zapret/Dev/logs/old.log", "is_current": True, "index": 0},
+                    {"display": "new.log", "path": "C:/Zapret/Dev/logs/new.log", "is_current": False, "index": 1},
+                ],
+                cleanup_deleted=0,
+                cleanup_total=0,
+                cleanup_errors=[],
+            ),
+            run_cleanup=False,
+        )
+
+        logs_page.LogsPage._on_log_table_cell_clicked(page, 1, 0)
 
         self.assertEqual(page.current_log_file, "C:/Zapret/Dev/logs/new.log")
-        self.assertEqual(page.log_combo.accessible_name, "Выбор файла лога, выбрано: new.log")
-        self.assertIn("Доступных файлов логов: 2.", page.log_combo.accessible_description)
-        self.assertIn("выберите файл стрелками вверх и вниз", page.log_combo.accessible_description)
+        self.assertEqual(page.logs_table.accessibleName(), "Таблица файлов логов, выбрано: new.log")
+        self.assertIn("Доступных файлов логов: 2.", page.logs_table.accessibleDescription())
+        self.assertIn("Выберите строку", page.logs_table.accessibleDescription())
         self.assertEqual(
-            page.log_combo.property("screenReaderStateText"),
-            "Выбор файла лога, выбрано: new.log",
+            page.logs_table.property("screenReaderStateText"),
+            "Таблица файлов логов, выбрано: new.log",
         )
 
     def test_send_status_label_updates_screen_reader_state(self) -> None:

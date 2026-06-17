@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from qfluentwidgets import BodyLabel, CaptionLabel, ComboBox, LineEdit, MessageBoxBase, SubtitleLabel
 
+from profile.user_profiles import validate_user_profile_filter
 from ui.accessibility import (
     remove_line_edit_buttons_from_tab_order,
     set_accessible_description,
@@ -170,12 +171,16 @@ class CreateUserProfileDialog(MessageBoxBase):
         set_state_text(self.portsHintLabel, hint["hint"])
 
     def validate(self) -> bool:
-        name, _protocol, ports = self.values()
+        name, protocol, ports = self.values()
         if not name:
             self._show_warning("Введите название profile.")
             return False
         if not ports:
             self._show_warning("Введите порты или L7.")
+            return False
+        filter_error = validate_user_profile_filter(protocol, ports)
+        if filter_error:
+            self._show_warning(filter_error)
             return False
         self.warningLabel.hide()
         return True

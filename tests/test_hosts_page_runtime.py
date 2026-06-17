@@ -488,7 +488,7 @@ class HostsPageRuntimeTests(unittest.TestCase):
 
         log_mock.assert_not_called()
 
-    def test_hosts_page_unmounts_services_rows_when_hidden_for_fast_next_open(self) -> None:
+    def test_hosts_page_keeps_services_rows_mounted_when_hidden_for_fast_repeat_open(self) -> None:
         from hosts.ui.page import HostsPage
 
         layout = Mock()
@@ -503,10 +503,10 @@ class HostsPageRuntimeTests(unittest.TestCase):
 
         HostsPage.on_page_hidden(page)
 
-        page._clear_layout.assert_called_once_with(layout)
-        page._reset_services_runtime_bindings.assert_called_once_with()
+        page._clear_layout.assert_not_called()
+        page._reset_services_runtime_bindings.assert_not_called()
         page._stop_services_catalog_worker.assert_called_once_with(blocking=False)
-        self.assertFalse(page._services_ui_mounted)
+        self.assertTrue(page._services_ui_mounted)
 
     def test_hosts_page_restores_cached_services_after_activation_event_loop_turn(self) -> None:
         import hosts.ui.page as hosts_page
@@ -535,6 +535,68 @@ class HostsPageRuntimeTests(unittest.TestCase):
         page._build_services_selectors.assert_called_once_with(page._services_catalog_plan, sync_selection=False)
         page._rebuild_services_selectors.assert_not_called()
         self.assertFalse(page._services_restore_scheduled)
+
+    def test_hosts_page_resumes_pending_service_rows_after_return(self) -> None:
+        import hosts.ui.page as hosts_page
+        from hosts.ui.page import HostsPage
+
+        page = HostsPage.__new__(HostsPage)
+        page._cleanup_in_progress = False
+        page._services_ui_mounted = True
+        page._services_restore_scheduled = False
+        page._services_pending_row_batches = [{"rows": [object()], "index": 0}]
+        page._services_build_generation = 7
+        page._services_catalog_runtime = SimpleNamespace(is_running=Mock(return_value=False))
+        page._build_services_selectors = Mock()
+        page._rebuild_services_selectors = Mock()
+        page._schedule_next_service_rows_batch = Mock()
+        page.isVisible = Mock(return_value=True)
+        single_shot = Mock(side_effect=lambda _delay, _callback: None)
+
+        with patch.object(hosts_page, "QTimer", SimpleNamespace(singleShot=single_shot), create=True):
+            HostsPage._schedule_services_restore_after_show(page)
+
+        single_shot.assert_called_once()
+        single_shot.call_args.args[1]()
+
+        page._schedule_next_service_rows_batch.assert_called_once_with(7)
+        page._build_services_selectors.assert_not_called()
+        page._rebuild_services_selectors.assert_not_called()
+
+    def test_hosts_page_uses_warmed_services_catalog_before_worker(self) -> None:
+        from hosts.ui.page import HostsPage
+
+        catalog_plan = object()
+        warmed = SimpleNamespace(
+            plan=catalog_plan,
+            catalog_signature=("hosts_catalog", 1, 2),
+        )
+        page = HostsPage.__new__(HostsPage)
+        page._services_layout = object()
+        page._service_dns_selection = {"Claude": "xbox_dns"}
+        page._hosts = SimpleNamespace(
+            consume_warmed_services_catalog_plan=Mock(return_value=warmed),
+        )
+        page._tr = Mock(side_effect=lambda _key, default, **_kwargs: default)
+        page.isVisible = Mock(return_value=True)
+        page._build_services_selectors = Mock()
+        page._update_ui = Mock()
+        page._start_services_catalog_worker = Mock()
+        page._log_ui_timing = Mock()
+        page._catalog_sig = None
+
+        HostsPage._rebuild_services_selectors(page)
+
+        page._hosts.consume_warmed_services_catalog_plan.assert_called_once_with(
+            current_selection={"Claude": "xbox_dns"},
+            direct_title="Напрямую из hosts",
+            ai_title="ИИ",
+            other_title="Остальные",
+        )
+        page._build_services_selectors.assert_called_once_with(catalog_plan, sync_selection=True)
+        page._update_ui.assert_called_once_with()
+        page._start_services_catalog_worker.assert_not_called()
+        self.assertEqual(page._catalog_sig, ("hosts_catalog", 1, 2))
 
     def test_hosts_page_builds_large_service_list_in_deferred_batches(self) -> None:
         import hosts.ui.page as hosts_page

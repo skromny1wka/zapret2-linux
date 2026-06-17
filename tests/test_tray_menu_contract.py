@@ -1,11 +1,20 @@
 from __future__ import annotations
 
+import os
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
 
 class TrayMenuContractTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        from PyQt6.QtWidgets import QApplication
+
+        cls._app = QApplication.instance() or QApplication([])
+
     def test_tray_launch_state_reads_runtime_snapshot_contract(self) -> None:
         from app.feature_facades.tray import TrayFeature
 
@@ -39,6 +48,24 @@ class TrayMenuContractTests(unittest.TestCase):
 
         manager.show_context_menu.assert_called_once_with(anchor_x=None, anchor_y=None)
         manager._schedule_visibility_toggle.assert_not_called()
+
+    def test_round_tray_menu_keeps_fluent_style_and_suppresses_hairline(self) -> None:
+        import tray
+        from qfluentwidgets import Action, RoundMenu
+
+        manager = tray.SystemTrayManager.__new__(tray.SystemTrayManager)
+        menu = RoundMenu(parent=None)
+        self.addCleanup(menu.deleteLater)
+        menu.addAction(Action("Скрыть в трей", menu))
+
+        with patch("ui.popup_menu_style._is_windows_11_or_newer", return_value=True):
+            tray.SystemTrayManager._apply_menu_style(manager, menu)
+
+        self.assertIn("MenuActionListWidget", menu.styleSheet())
+        self.assertIn("border-color", menu.styleSheet())
+        self.assertIn("MenuActionListWidget", menu.view.styleSheet())
+        self.assertIn("border-color", menu.view.styleSheet())
+        self.assertNotIn("border-left", menu.view.styleSheet())
 
 
 if __name__ == "__main__":

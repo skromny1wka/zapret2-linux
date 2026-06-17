@@ -26,9 +26,9 @@ class AboutActionsArchitectureTests(unittest.TestCase):
         self.assertNotIn("open_help_folder", plans_source)
         self.assertNotIn("subprocess", plans_source)
         self.assertNotIn("webbrowser.open", plans_source)
-        self.assertIn("open_help_folder", commands_source)
+        self.assertNotIn("open_help_folder", commands_source)
         self.assertIn("webbrowser.open", commands_source)
-        self.assertIn("subprocess.Popen", commands_source)
+        self.assertNotIn("subprocess.Popen", commands_source)
 
 
 if __name__ == "__main__":

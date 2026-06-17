@@ -2,6 +2,37 @@
 
 from __future__ import annotations
 
+import re
+from textwrap import fill
+
+
+def _wrap_infobar_content(content: str, *, width: int = 86) -> str:
+    paragraphs = str(content or "").split("\n\n")
+    wrapped = []
+    for paragraph in paragraphs:
+        lines = paragraph.splitlines() or [""]
+        wrapped_lines = [
+            _wrap_infobar_line(line, width=width)
+            for line in lines
+        ]
+        wrapped.append("\n".join(wrapped_lines))
+    return "\n\n".join(wrapped)
+
+
+def _wrap_infobar_line(line: str, *, width: int) -> str:
+    text = line.strip()
+    if not text:
+        return ""
+
+    sentences = [part for part in re.split(r"(?<=[.!?])\s+", text) if part]
+    if len(sentences) > 1:
+        return "\n".join(_fill_infobar_line(sentence, width=width) for sentence in sentences)
+    return _fill_infobar_line(text, width=width)
+
+
+def _fill_infobar_line(text: str, *, width: int) -> str:
+    return fill(text, width=width, break_long_words=False, break_on_hyphens=False)
+
 
 def prepare_connectivity_test(
     *,
@@ -72,7 +103,8 @@ def show_isp_dns_warning(
 
         bar = info_bar_cls.warning(
             title=plan.title,
-            content=plan.content,
+            content=_wrap_infobar_content(plan.content),
+            orient=qt_namespace.Orientation.Vertical,
             isClosable=True,
             position=info_bar_position_cls.TOP_RIGHT,
             duration=10000,

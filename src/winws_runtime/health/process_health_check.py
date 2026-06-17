@@ -978,15 +978,7 @@ def _probe_service_disabled_cause() -> Tuple[str, str, Optional[str]]:
             "enable_bfe",
         )
 
-    # Check 3: Secure Boot
-    if _check_secure_boot():
-        return (
-            "Secure Boot блокирует загрузку неподписанного драйвера WinDivert",
-            "Отключите Secure Boot в BIOS/UEFI",
-            None,
-        )
-
-    # Check 4: WinDivert/Monkey service explicitly disabled
+    # Check 3: WinDivert/Monkey service explicitly disabled
     disabled_driver = _find_disabled_windivert_driver_service()
     if disabled_driver:
         return (
@@ -995,7 +987,7 @@ def _probe_service_disabled_cause() -> Tuple[str, str, Optional[str]]:
             "cleanup_driver",
         )
 
-    # Check 5: Driver installed but not yet ready after cleanup/restart.
+    # Check 4: Driver installed but not yet ready after cleanup/restart.
     try:
         from winws_runtime.runtime.system_ops import probe_windivert_state_runtime
 
@@ -1015,7 +1007,7 @@ def _probe_service_disabled_cause() -> Tuple[str, str, Optional[str]]:
     except Exception:
         pass
 
-    # Check 6: Kaspersky after a real WinDivert start failure.
+    # Check 5: Kaspersky after a real WinDivert start failure.
     try:
         from winws_runtime.health.launch_conflicts import build_launch_conflict_advice
 
@@ -1026,7 +1018,7 @@ def _probe_service_disabled_cause() -> Tuple[str, str, Optional[str]]:
     except Exception:
         pass
 
-    # Check 7: Antivirus
+    # Check 6: Antivirus
     av = _detect_active_antivirus()
     if av:
         return (
@@ -1035,7 +1027,7 @@ def _probe_service_disabled_cause() -> Tuple[str, str, Optional[str]]:
             None,
         )
 
-    # Check 8: Network adapters. This check must be late because Win32 1058
+    # Check 7: Network adapters. This check must be late because Win32 1058
     # is a generic service-disabled error and otherwise easily turns into a
     # ложный диагноз про адаптеры.
     if not _check_network_adapters():

@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import QApplication, QHBoxLayout, QSizePolicy, QVBoxLayout,
 
 from ui.pages.base_page import BasePage
 from ui.fluent_widgets import set_tooltip, style_semantic_caption_label
+from ui.theme import get_themed_qta_icon
 from ui.accessibility import (
     remove_line_edit_buttons_from_tab_order,
     set_breadcrumb_accessibility,
@@ -47,6 +48,8 @@ from qfluentwidgets import (
 
 
 def _fluent_icon(name: str):
+    if name == "STOP":
+        return get_themed_qta_icon("fa5s.stop")
     return getattr(FluentIcon, name, None)
 
 
@@ -115,7 +118,7 @@ def build_runtime_toggle_button_plan(
     if should_stop:
         return RuntimeToggleButtonPlan(
             text="Остановить",
-            icon_name="CANCEL",
+            icon_name="STOP",
             should_stop=True,
             enabled=not transition,
         )

@@ -51,6 +51,8 @@ _AFTER_INTERACTIVE_MARKERS: frozenset[str] = frozenset(
         "StartupProfileWarmupStarted",
         "StartupPresetSetupUiWarmupQueued",
         "StartupPresetSetupUiWarmupFinished",
+        "StartupProfileSetupUiWarmupQueued",
+        "StartupProfileSetupUiWarmupFinished",
         "StartupUserPresetsWarmupQueued",
         "StartupUserPresetsWarmupStarted",
         "StartupSidebarSearchQueued",

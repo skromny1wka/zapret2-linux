@@ -14,7 +14,7 @@ from .constants import SW_HIDE, CREATE_NO_WINDOW, STARTF_USESHOWWINDOW
 from .preset_runner_support import launch_args_from_preset_text, wait_for_process_exit
 from winws_runtime.health.process_health_check import (
     check_process_health, get_last_crash_info, check_common_crash_causes,
-    diagnose_startup_error, diagnose_winws_exit,
+    diagnose_startup_error, diagnose_winws_exit, execute_windivert_auto_fix,
 )
 from winws_runtime.health.windows_system_dependencies import (
     mark_windows_server_wlanapi_message,
@@ -37,6 +37,12 @@ from utils.args_resolver import resolve_args_paths
 _AGGRESSIVE_WINDIVERT_RETRY_COOLDOWN_SECONDS = 1.8
 _WINDIVERT_PRESPAWN_WAIT_SECONDS = 3.0
 _WINDOWS_SYSTEM_DLLS_REQUIRED_BY_WINWS = ("wlanapi.dll",)
+_SAFE_WINDIVERT_AUTOFIX_ACTIONS = {
+    "cleanup_driver",
+    "enable_bfe",
+    "enable_driver",
+    "enable_adapters",
+}
 
 
 class StrategyRunnerBase(ABC):
@@ -323,6 +329,49 @@ class StrategyRunnerBase(ABC):
             return
         log(f"Waiting {cooldown:.1f}s for WinDivert cleanup to settle", "DEBUG")
         time.sleep(cooldown)
+
+    def _maybe_run_windivert_auto_fix_after_failed_spawn(
+        self,
+        stderr: str,
+        exit_code: int,
+        *,
+        retry_count: int,
+        max_retry_count: int = 1,
+    ) -> bool:
+        """Выполняет безопасное автолечение WinDivert перед одним повтором запуска."""
+        if retry_count >= max_retry_count:
+            return False
+
+        try:
+            diag = diagnose_winws_exit(exit_code, stderr)
+        except Exception as exc:
+            log(f"WinDivert auto-fix diagnosis failed: {exc}", "DEBUG")
+            return False
+
+        action = str(getattr(diag, "auto_fix", "") or "").strip()
+        if action not in _SAFE_WINDIVERT_AUTOFIX_ACTIONS:
+            return False
+
+        cause = str(getattr(diag, "cause", "") or "").strip()
+        log(
+            f"WinDivert auto-fix '{action}' selected"
+            + (f" after failure: {cause}" if cause else ""),
+            "WARNING",
+        )
+        try:
+            ok, message = execute_windivert_auto_fix(action)
+        except Exception as exc:
+            log(f"WinDivert auto-fix '{action}' failed: {exc}", "WARNING")
+            return False
+
+        if message:
+            log(f"WinDivert auto-fix '{action}': {message}", "SUCCESS" if ok else "WARNING")
+        if not ok:
+            return False
+
+        if action in {"cleanup_driver", "enable_driver"}:
+            self._wait_after_aggressive_windivert_cleanup()
+        return True
 
     def _ensure_windivert_ready_before_spawn(self, *, max_wait_seconds: float = _WINDIVERT_PRESPAWN_WAIT_SECONDS) -> bool:
         """Проверяет готовность WinDivert прямо перед новым spawn."""

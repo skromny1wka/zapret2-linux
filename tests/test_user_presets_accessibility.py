@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QUrl
 from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QAbstractItemView, QVBoxLayout, QWidget
@@ -32,13 +32,26 @@ class _PageHost(QWidget):
 
 
 class _DialogButton:
-    def __init__(self) -> None:
+    def __init__(self, text: str = "", parent=None) -> None:
+        self._text = text
+        self.parent = parent
         self._accessible_name = ""
         self._accessible_description = ""
+        self._properties: dict[str, object] = {}
         self.hidden = False
+        self.clicked = _Signal()
 
     def hide(self) -> None:
         self.hidden = True
+
+    def text(self) -> str:
+        return self._text
+
+    def setText(self, text: str) -> None:  # noqa: N802
+        self._text = str(text)
+
+    def click(self) -> None:
+        self.clicked.emit()
 
     def accessibleName(self) -> str:  # noqa: N802
         return self._accessible_name
@@ -52,6 +65,32 @@ class _DialogButton:
     def setAccessibleDescription(self, text: str) -> None:  # noqa: N802
         self._accessible_description = str(text)
 
+    def property(self, name: str):  # noqa: A003
+        return self._properties.get(name)
+
+    def setProperty(self, name: str, value) -> None:  # noqa: N802
+        self._properties[name] = value
+
+
+class _Signal:
+    def __init__(self) -> None:
+        self._callbacks = []
+
+    def connect(self, callback) -> None:
+        self._callbacks.append(callback)
+
+    def emit(self) -> None:
+        for callback in list(self._callbacks):
+            callback()
+
+
+class _ButtonLayout:
+    def __init__(self) -> None:
+        self.widgets = []
+
+    def insertWidget(self, index: int, widget) -> None:  # noqa: N802
+        self.widgets.insert(index, widget)
+
 
 class _MessageBox:
     instances: list["_MessageBox"] = []
@@ -62,6 +101,7 @@ class _MessageBox:
         self.parent = parent
         self.yesButton = _DialogButton()
         self.cancelButton = _DialogButton()
+        self.buttonLayout = _ButtonLayout()
         self.exec_called = False
         _MessageBox.instances.append(self)
 
@@ -431,6 +471,34 @@ class UserPresetsAccessibilityTests(unittest.TestCase):
         self.assertTrue(dialog.cancelButton.hidden)
         self.assertTrue(dialog.exec_called)
 
+    def test_info_dialog_has_preset_site_button_instead_of_plain_link(self) -> None:
+        page = UserPresetsPageBase.__new__(UserPresetsPageBase)
+        page._config = SimpleNamespace(tr_prefix="page.user_presets")
+        page._tr = lambda _key, default, **kwargs: default.format(**kwargs) if kwargs else default
+        page.window = lambda: None
+        _MessageBox.instances = []
+        opened_urls = []
+
+        with (
+            patch("presets.ui.common.user_presets_page.MessageBox", _MessageBox),
+            patch("presets.ui.common.user_presets_page.PushButton", _DialogButton, create=True),
+            patch(
+                "presets.ui.common.user_presets_page.QDesktopServices.openUrl",
+                side_effect=lambda url: opened_urls.append(url),
+            ),
+        ):
+            UserPresetsPageBase._on_info_clicked(page)
+            _MessageBox.instances[0].buttonLayout.widgets[0].click()
+
+        dialog = _MessageBox.instances[0]
+        self.assertNotIn("https://publish.obsidian.md/zapret/Privacy/Zapret2/preset", dialog.body)
+        self.assertEqual(len(dialog.buttonLayout.widgets), 1)
+        site_button = dialog.buttonLayout.widgets[0]
+        self.assertEqual(site_button.text(), "Открыть сайт с пресетами")
+        self.assertEqual(site_button.accessibleName(), "Открыть сайт с пресетами")
+
+        self.assertEqual(opened_urls, [QUrl("https://publish.obsidian.md/zapret/Privacy/Zapret2/preset")])
+
     def test_create_preset_dialog_has_screen_reader_text(self) -> None:
         dialog = CreatePresetDialog([], self._dialog_parent())
         self.addCleanup(dialog.deleteLater)
@@ -534,7 +602,8 @@ class UserPresetsAccessibilityTests(unittest.TestCase):
                 self.assertIn(".txt", body)
                 self.assertIn("@<config_file>", body)
                 self.assertIn("%AppData%\\ZapretTwoDev\\preset-zapret2.txt", body)
-                self.assertIn("https://publish.obsidian.md/zapret/Privacy/Zapret2/preset", body)
+                self.assertIn("Пресетами можно обмениваться напрямую.", body)
+                self.assertNotIn("https://publish.obsidian.md/zapret/Privacy/Zapret2/preset", body)
                 self.assertIn("прямой запуск", body)
 
     def _assert_accessibility(self, widgets) -> None:

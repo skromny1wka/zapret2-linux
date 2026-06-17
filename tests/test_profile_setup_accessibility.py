@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QUrl
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication
 
@@ -18,16 +18,28 @@ def _worker_stub(*_args, **_kwargs):
 
 
 class _DialogButton:
-    def __init__(self) -> None:
+    def __init__(self, text: str = "", parent=None) -> None:
         self._text = ""
+        if text:
+            self._text = str(text)
+        self.parent = parent
         self._accessible_name = ""
         self._accessible_description = ""
+        self._properties: dict[str, object] = {}
+        self.hidden = False
+        self.clicked = _Signal()
+
+    def hide(self) -> None:
+        self.hidden = True
 
     def setText(self, text: str) -> None:  # noqa: N802
         self._text = str(text)
 
     def text(self) -> str:
         return self._text
+
+    def click(self) -> None:
+        self.clicked.emit()
 
     def accessibleName(self) -> str:  # noqa: N802
         return self._accessible_name
@@ -41,6 +53,32 @@ class _DialogButton:
     def setAccessibleDescription(self, text: str) -> None:  # noqa: N802
         self._accessible_description = str(text)
 
+    def property(self, name: str):  # noqa: A003
+        return self._properties.get(name)
+
+    def setProperty(self, name: str, value) -> None:  # noqa: N802
+        self._properties[name] = value
+
+
+class _Signal:
+    def __init__(self) -> None:
+        self._callbacks = []
+
+    def connect(self, callback) -> None:
+        self._callbacks.append(callback)
+
+    def emit(self) -> None:
+        for callback in list(self._callbacks):
+            callback()
+
+
+class _ButtonLayout:
+    def __init__(self) -> None:
+        self.widgets = []
+
+    def insertWidget(self, index: int, widget) -> None:  # noqa: N802
+        self.widgets.insert(index, widget)
+
 
 class _MessageBox:
     instances: list["_MessageBox"] = []
@@ -51,6 +89,7 @@ class _MessageBox:
         self.parent = parent
         self.yesButton = _DialogButton()
         self.cancelButton = _DialogButton()
+        self.buttonLayout = _ButtonLayout()
         self.exec_called = False
         _MessageBox.instances.append(self)
 
@@ -339,7 +378,31 @@ class ProfileSetupAccessibilityTests(unittest.TestCase):
         dialog = _MessageBox.instances[0]
         self.assertEqual(dialog.yesButton.accessibleName(), "Закрыть справку о настройке пресета")
         self.assertIn("Закрывает справку", dialog.yesButton.accessibleDescription())
+        self.assertTrue(dialog.cancelButton.hidden)
         self.assertTrue(dialog.exec_called)
+
+    def test_preset_profile_info_dialog_has_profile_site_button(self) -> None:
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        _MessageBox.instances = []
+        opened_urls = []
+
+        with (
+            patch("profile.ui.preset_setup_page.MessageBox", _MessageBox),
+            patch("profile.ui.preset_setup_page.PushButton", _DialogButton, create=True),
+            patch(
+                "profile.ui.preset_setup_page.QDesktopServices.openUrl",
+                side_effect=lambda url: opened_urls.append(url),
+            ),
+        ):
+            PresetSetupPageBase._show_profile_info(page)
+            _MessageBox.instances[0].buttonLayout.widgets[0].click()
+
+        dialog = _MessageBox.instances[0]
+        self.assertEqual(len(dialog.buttonLayout.widgets), 1)
+        site_button = dialog.buttonLayout.widgets[0]
+        self.assertEqual(site_button.text(), "Открыть сайт с профилями")
+        self.assertEqual(site_button.accessibleName(), "Открыть сайт с профилями")
+        self.assertEqual(opened_urls, [QUrl("https://publish.obsidian.md/zapret/Privacy/Zapret2/filter")])
 
 
 if __name__ == "__main__":

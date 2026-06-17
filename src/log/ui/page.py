@@ -5,7 +5,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel,
     QApplication,
-    QStackedWidget
+    QStackedWidget, QHeaderView, QTableWidgetItem
 )
 from qfluentwidgets import (
     BodyLabel,
@@ -14,10 +14,10 @@ from qfluentwidgets import (
     StrongBodyLabel,
     PushButton,
     PushButton as FluentPushButton,
-    ComboBox,
     SegmentedWidget,
     ToolButton,
     InfoBar,
+    TableWidget,
 )
 from PyQt6.QtGui import QFont, QPixmap, QPainter, QTransform, QIcon
 import qtawesome as qta
@@ -25,14 +25,13 @@ import re
 import time
 
 from ui.accessibility import set_control_accessibility, set_state_text
-from ui.combo_accessibility import set_combo_items_accessibility
 from ui.segmented_accessibility import set_segmented_items_accessibility
 from ui.pages.base_page import BasePage, ScrollBlockingTextEdit
 from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.fluent_widgets import QuickActionsBar, SettingsCard, set_tooltip
 from ui.log_limits import MAIN_LOG_VIEW_MAX_LINES
-from log.ui.logs_build import build_logs_primary_tab_ui, build_logs_secondary_panels_ui
+from log.ui.logs_build import build_logs_management_tab_ui, build_logs_primary_tab_ui, build_logs_secondary_panels_ui
 from log.ui.runtime_helpers import (
     append_error,
     clear_errors,
@@ -103,6 +102,7 @@ def update_logs_tabs_accessibility(pivot, *, current: object | None = None, lang
     labels = {
         "logs": tr_catalog("page.logs.tab.logs", language=language, default="ЛОГИ").strip().title(),
         "send": tr_catalog("page.logs.tab.send", language=language, default="ОТПРАВКА").strip().title(),
+        "manage": tr_catalog("page.logs.tab.manage", language=language, default="УПРАВЛЕНИЕ").strip().title(),
     }
     key = str(current or "").strip() if isinstance(current, str) else ""
     if not key:
@@ -116,7 +116,7 @@ def update_logs_tabs_accessibility(pivot, *, current: object | None = None, lang
     set_control_accessibility(
         pivot,
         name=state,
-        description="Выберите раздел страницы логов: Логи или Поддержка.",
+        description="Выберите раздел страницы логов: Логи, Поддержка или Управление.",
     )
     set_segmented_items_accessibility(
         pivot,
@@ -159,6 +159,7 @@ class LogsPage(BasePage):
         self._send_status_tone = "neutral"
         self._controls_actions_title = None
         self._controls_actions_bar = None
+        self._manage_tab_initialized = False
         self._send_actions_title = None
         self._send_actions_bar = None
 
@@ -242,7 +243,7 @@ class LogsPage(BasePage):
         tokens = tokens or get_theme_tokens()
         self._tokens = tokens
 
-        # Controls — log_combo is now a Fluent ComboBox; no manual stylesheet needed
+        # Controls — TableWidget handles its own base theme
         # Tabs — Pivot handles its own theme
 
         if hasattr(self, "refresh_btn"):
@@ -368,6 +369,11 @@ class LogsPage(BasePage):
             text=" " + tr_catalog("page.logs.tab.send", default="ОТПРАВКА"),
             onClick=lambda: self._switch_tab(1),
         )
+        self.tabs_pivot.addItem(
+            routeKey="manage",
+            text=" " + tr_catalog("page.logs.tab.manage", default="УПРАВЛЕНИЕ"),
+            onClick=lambda: self._switch_tab(2),
+        )
         self.tabs_pivot.setCurrentItem("logs")
         self.tabs_pivot.setItemFontSize(13)
         self._update_tabs_accessibility("logs")
@@ -395,8 +401,17 @@ class LogsPage(BasePage):
         send_layout.setSpacing(16)
         self._send_layout = send_layout
 
+        # Страница 3: Управление логами
+        self._manage_page = QWidget()
+        manage_layout = QVBoxLayout(self._manage_page)
+        manage_layout.setContentsMargins(0, 0, 0, 0)
+        manage_layout.setSpacing(16)
+        self._manage_layout = manage_layout
+        self._build_manage_tab(manage_layout)
+
         self.stacked_widget.addWidget(self._logs_page)
         self.stacked_widget.addWidget(self._send_page)
+        self.stacked_widget.addWidget(self._manage_page)
 
         self.add_widget(self.stacked_widget)
 
@@ -415,7 +430,7 @@ class LogsPage(BasePage):
         self.stacked_widget.setCurrentIndex(index)
 
         # Sync Pivot indicator
-        key = "send" if index == 1 else "logs"
+        key = "send" if index == 1 else ("manage" if index == 2 else "logs")
         try:
             self.tabs_pivot.setCurrentItem(key)
         except Exception:
@@ -438,10 +453,12 @@ class LogsPage(BasePage):
 
         logs_text = " " + tr_catalog("page.logs.tab.logs", language=language, default="ЛОГИ")
         send_text = " " + tr_catalog("page.logs.tab.send", language=language, default="ОТПРАВКА")
+        manage_text = " " + tr_catalog("page.logs.tab.manage", language=language, default="УПРАВЛЕНИЕ")
 
         try:
             self.tabs_pivot.setItemText("logs", logs_text)
             self.tabs_pivot.setItemText("send", send_text)
+            self.tabs_pivot.setItemText("manage", manage_text)
             self._update_tabs_accessibility()
         except Exception:
             pass
@@ -458,18 +475,6 @@ class LogsPage(BasePage):
             pass
 
     def _retranslate_logs_tab(self) -> None:
-        try:
-            self._set_card_title(
-                self.controls_card,
-                tr_catalog("page.logs.card.controls", language=self._ui_language, default="Управление логами"),
-            )
-            self._set_card_title(
-                self.log_card,
-                tr_catalog("page.logs.card.content", language=self._ui_language, default="Содержимое"),
-            )
-        except Exception:
-            pass
-
         if self._controls_actions_title is not None:
             self._controls_actions_title.setText(
                 tr_catalog("page.logs.actions.title", language=self._ui_language, default="Действия")
@@ -666,30 +671,10 @@ class LogsPage(BasePage):
             qhbox_layout_cls=QHBoxLayout,
             caption_label_cls=CaptionLabel,
             strong_body_label_cls=StrongBodyLabel,
-            combo_box_cls=ComboBox,
-            tool_button_cls=ToolButton,
-            push_button_cls=PushButton,
             text_edit_cls=ScrollBlockingTextEdit,
-            quick_actions_bar_cls=QuickActionsBar,
             qfont_cls=QFont,
             get_theme_tokens_fn=get_theme_tokens,
-            on_log_selected=self._on_log_selected,
-            on_refresh=self._refresh_logs_list,
-            on_spin_tick=self._on_spin_tick,
-            on_copy=self._copy_log,
-            on_clear_view=self._clear_view,
-            on_open_folder=self._open_folder,
-            refresh_timer_parent=self,
         )
-        self.controls_card = logs_widgets.controls_card
-        self.log_combo = logs_widgets.log_combo
-        self.refresh_btn = logs_widgets.refresh_btn
-        self.info_label = logs_widgets.info_label
-        self._controls_actions_title = logs_widgets.controls_actions_title
-        self._controls_actions_bar = logs_widgets.controls_actions_bar
-        self.copy_btn = logs_widgets.copy_btn
-        self.clear_btn = logs_widgets.clear_btn
-        self.folder_btn = logs_widgets.folder_btn
         self.log_card = logs_widgets.log_card
         self.log_text = logs_widgets.log_text
         self.stats_label = logs_widgets.stats_label
@@ -713,6 +698,43 @@ class LogsPage(BasePage):
             )
         except Exception:
             pass
+
+    def _build_manage_tab(self, parent_layout):
+        """Строит вкладку управления файлами логов."""
+        manage_widgets = build_logs_management_tab_ui(
+            parent_layout=parent_layout,
+            content_parent=self.content,
+            ui_language=self._ui_language,
+            tr_catalog_fn=tr_catalog,
+            settings_card_cls=SettingsCard,
+            qvbox_layout_cls=QVBoxLayout,
+            qhbox_layout_cls=QHBoxLayout,
+            caption_label_cls=CaptionLabel,
+            tool_button_cls=ToolButton,
+            push_button_cls=PushButton,
+            table_widget_cls=TableWidget,
+            table_item_cls=QTableWidgetItem,
+            header_view_cls=QHeaderView,
+            quick_actions_bar_cls=QuickActionsBar,
+            get_theme_tokens_fn=get_theme_tokens,
+            on_log_selected=self._on_log_table_cell_clicked,
+            on_refresh=self._refresh_logs_list,
+            on_spin_tick=self._on_spin_tick,
+            on_copy=self._copy_log,
+            on_clear_view=self._clear_view,
+            on_open_folder=self._open_folder,
+            refresh_timer_parent=self,
+        )
+        self.controls_card = manage_widgets.controls_card
+        self.logs_table = manage_widgets.logs_table
+        self.refresh_btn = manage_widgets.refresh_btn
+        self.info_label = manage_widgets.info_label
+        self._controls_actions_title = manage_widgets.controls_actions_title
+        self._controls_actions_bar = manage_widgets.controls_actions_bar
+        self.copy_btn = manage_widgets.copy_btn
+        self.clear_btn = manage_widgets.clear_btn
+        self.folder_btn = manage_widgets.folder_btn
+        self._manage_tab_initialized = True
 
     def _schedule_logs_secondary_panels(self) -> None:
         if self._logs_secondary_initialized or self._logs_secondary_build_scheduled:
@@ -1035,8 +1057,14 @@ class LogsPage(BasePage):
         self._refresh_logs_list(run_cleanup=True)
 
     def _apply_logs_list_state(self, state, *, run_cleanup: bool) -> None:
-        self.log_combo.blockSignals(True)
-        self.log_combo.clear()
+        table = getattr(self, "logs_table", None)
+        if table is None:
+            return
+        if table.columnCount() < 4:
+            table.setColumnCount(4)
+            table.setHorizontalHeaderLabels(["Файл", "Статус", "Размер", "Путь"])
+        table.blockSignals(True)
+        table.setRowCount(0)
         try:
             if run_cleanup and state.cleanup_deleted > 0:
                 log(f"🗑️ Удалено старых логов: {state.cleanup_deleted} из {state.cleanup_total}", "INFO")
@@ -1046,38 +1074,53 @@ class LogsPage(BasePage):
             current_index = 0
             current_display = ""
             for entry in state.entries:
+                row = table.rowCount()
+                table.insertRow(row)
                 if entry["is_current"]:
-                    current_index = entry["index"]
+                    current_index = row
                     current_display = str(entry.get("display") or "")
-                self.log_combo.addItem(entry["display"], userData=entry["path"])
-            self.log_combo.setCurrentIndex(current_index)
-            self._update_log_combo_accessibility(current_display, count=len(state.entries))
+                self._set_log_table_row(table, row, entry)
+            if state.entries:
+                table.setCurrentCell(current_index, 0)
+            self._update_logs_table_accessibility(current_display, count=len(state.entries))
         finally:
-            self.log_combo.blockSignals(False)
+            table.blockSignals(False)
 
-    def _update_log_combo_accessibility(self, selected_display: str, *, count: int) -> None:
-        combo_name = tr_catalog(
-            "page.logs.accessibility.log_combo.name",
-            language=self._ui_language,
-            default="Выбор файла лога",
-        )
+    def _set_log_table_row(self, table, row: int, entry: dict) -> None:
+        path = str(entry.get("path") or "")
+        display = str(entry.get("display") or "")
+        status = "Текущий" if bool(entry.get("is_current")) else "Старый"
+        size = ""
+        try:
+            size = f"{float(entry.get('size_kb') or 0):.1f} KB"
+        except (TypeError, ValueError):
+            size = ""
+        values = [display, status, size, path]
+        for col, value in enumerate(values):
+            item = QTableWidgetItem(str(value))
+            item.setData(Qt.ItemDataRole.UserRole, path)
+            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            if col == 0:
+                item.setData(Qt.ItemDataRole.AccessibleTextRole, f"Файл лога: {display}, {status}")
+            table.setItem(row, col, item)
+
+    def _update_logs_table_accessibility(self, selected_display: str, *, count: int) -> None:
+        table = getattr(self, "logs_table", None)
+        if table is None:
+            return
+        table_name = "Таблица файлов логов"
         selected_display = str(selected_display or "").strip()
         if selected_display:
-            combo_name = f"{combo_name}, выбрано: {selected_display}"
-        set_state_text(self.log_combo, combo_name)
+            table_name = f"{table_name}, выбрано: {selected_display}"
+        set_state_text(table, table_name)
         set_control_accessibility(
-            self.log_combo,
-            name=combo_name,
-            description=tr_catalog(
-                "page.logs.accessibility.log_combo.count_description",
-                language=self._ui_language,
-                default=(
-                    "Доступных файлов логов: {count}. "
-                    "Откройте список и выберите файл стрелками вверх и вниз."
-                ),
-            ).format(count=max(0, int(count))),
+            table,
+            name=table_name,
+            description=(
+                f"Доступных файлов логов: {max(0, int(count))}. "
+                "Выберите строку, чтобы открыть файл лога для просмотра."
+            ),
         )
-        set_combo_items_accessibility(self.log_combo, name="Выбор файла лога")
 
     def _apply_logs_stats_state(self, stats) -> None:
         plan = self._logs.build_stats_text_plan(stats, language=self._ui_language)
@@ -1158,18 +1201,20 @@ class LogsPage(BasePage):
         except Exception:
             pass
             
-    def _on_log_selected(self, index):
-        """Обработчик выбора лог-файла"""
-        if index < 0:
+    def _on_log_table_cell_clicked(self, row: int, column: int = 0) -> None:
+        """Открывает лог по выбранной строке таблицы."""
+        _ = column
+        table = getattr(self, "logs_table", None)
+        if table is None or row < 0:
             return
-            
-        log_path = self.log_combo.itemData(index)
+        item = table.item(row, 0)
+        if item is None:
+            return
+        log_path = item.data(Qt.ItemDataRole.UserRole)
+        display = item.text()
         if log_path and log_path != self.current_log_file:
-            self.current_log_file = log_path
-            self._update_log_combo_accessibility(
-                self.log_combo.itemText(index),
-                count=self.log_combo.count(),
-            )
+            self.current_log_file = str(log_path)
+            self._update_logs_table_accessibility(display, count=table.rowCount())
             self._start_tail_worker()
             
     def _start_tail_worker(self):

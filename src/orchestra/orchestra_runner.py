@@ -2,16 +2,11 @@
 """
 Circular Orchestra Runner - автоматическое обучение стратегий DPI bypass.
 
-Использует circular orchestrator из F:\\doc\\zapret2\\lua\\zapret-auto.lua (файл менять этот нельзя) с:
+Использует circular orchestrator:
 - combined_failure_detector (RST injection + silent drop)
 - strategy_stats (LOCK механизм после 3 успехов, UNLOCK после 2 failures)
 - domain_grouping (группировка субдоменов)
 
-При этом сам оркестратор (его исходный код) всегда хранится /home/privacy/zapret/lua/
-
-Копировать в Program Data не нужно -  приложение берёт файлы напрямую из /home/privacy/zapret/lua/.
-
-Можешь посмотреть исходный код логов в исходном коде запрета F:\\doc\\zapret2\\nfq2\\desync.c
 Логи - только Python - компактные для гуи чтобы не было огромных winws2 debug логов.
 """
 

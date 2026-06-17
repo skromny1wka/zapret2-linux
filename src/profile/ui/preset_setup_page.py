@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import time
 
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import QTimer, QUrl
+from PyQt6.QtGui import QDesktopServices
 
 from log.log import log
 from profile.match_filters import filter_values
@@ -12,10 +13,12 @@ from profile.ui.profile_folder_menu import show_profile_folder_menu
 from profile.ui.profiles_list import ProfilesList
 from profile.ui.shell import build_profile_shell, wire_profile_search_keyboard_activation
 from profile.ui.user_profile_dialog import CreateUserProfileDialog
-from qfluentwidgets import BodyLabel, InfoBar, MessageBox
+from qfluentwidgets import BodyLabel, InfoBar, MessageBox, PushButton
 from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE
 from ui.pages.base_page import BasePage
 from app.ui_texts import tr as tr_catalog
+from config.urls import PROFILE_INFO_URL
+from ui.accessibility import set_control_accessibility, set_state_text
 from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.message_box_accessibility import set_message_box_button_accessibility
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
@@ -155,6 +158,7 @@ class PresetSetupPageBase(BasePage):
         self._profile_payload_reload_after_preset_switch_scheduled = False
         self._profile_payload_apply_scheduled = False
         self._pending_profile_payload_apply = None
+        self._deferred_profile_payload_apply = None
         self._profiles_list_show_scheduled = False
         self._profile_context_action_enabled_by_request: dict[int, bool] = {}
         self._cleanup_in_progress = False
@@ -164,6 +168,12 @@ class PresetSetupPageBase(BasePage):
         self.bind_ui_state_store(ui_state_store)
 
     def on_page_activated(self) -> None:
+        has_deferred_payload = self.__dict__.get("_deferred_profile_payload_apply") is not None
+        if self._apply_deferred_profile_payload_after_show():
+            self._schedule_profiles_list_show_after_page_switch()
+            return
+        if has_deferred_payload and self._profile_payload_refresh_is_blocked():
+            return
         if self.__dict__.get("_profile_payload_loaded_once", False) and not self.__dict__.get(
             "_profile_payload_dirty",
             True,
@@ -171,6 +181,21 @@ class PresetSetupPageBase(BasePage):
             self._schedule_profiles_list_show_after_page_switch()
             return
         self._schedule_profiles_payload_request()
+
+    def warmup_initial_load(self) -> bool:
+        if self.__dict__.get("_cleanup_in_progress", False):
+            return False
+        if self.__dict__.get("_deferred_profile_payload_apply") is not None:
+            return False
+        if self.__dict__.get("_profile_payload_loaded_once", False) and not self.__dict__.get(
+            "_profile_payload_dirty",
+            True,
+        ):
+            return False
+        if self._profile_load_refresh_state_obj().is_busy():
+            return False
+        self._request_profiles_payload()
+        return True
 
     def on_page_hidden(self) -> None:
         self._hide_profiles_list_for_next_switch()
@@ -235,6 +260,8 @@ class PresetSetupPageBase(BasePage):
     def _schedule_profiles_payload_request(self, *, force: bool = False) -> None:
         if bool(force) and self._profile_load_refresh_state_obj().has_pending():
             if self._worker_runtime_is_running("_profile_load_runtime"):
+                self._deferred_profile_payload_apply = None
+                self._pending_profile_payload_apply = None
                 self._profile_payload_dirty = True
                 return
         self._profile_payload_request_force = (
@@ -297,6 +324,7 @@ class PresetSetupPageBase(BasePage):
             pass
 
     def refresh_from_preset_switch(self) -> None:
+        self._deferred_profile_payload_apply = None
         self._schedule_profiles_payload_request(force=True)
 
     def _schedule_profiles_payload_reload_after_preset_switch(self) -> None:
@@ -317,8 +345,6 @@ class PresetSetupPageBase(BasePage):
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         if not self.__dict__.get("_profile_payload_dirty", False):
-            return
-        if not self.isVisible():
             return
         self._schedule_profiles_payload_request(force=True)
 
@@ -350,14 +376,12 @@ class PresetSetupPageBase(BasePage):
             change_kind = str(getattr(_state, "preset_content_change_kind", "") or "").strip()
             if change_kind == "strategy_only":
                 return
+            self._deferred_profile_payload_apply = None
             self._profile_payload_dirty = True
-            if not self.isVisible():
-                return
             self._schedule_profiles_payload_request(force=True)
             return
+        self._deferred_profile_payload_apply = None
         self._profile_payload_dirty = True
-        if not self.isVisible():
-            return
         self._schedule_profiles_payload_reload_after_preset_switch()
 
     def _request_profiles_payload(self, *, force: bool = False) -> None:
@@ -365,6 +389,9 @@ class PresetSetupPageBase(BasePage):
             return
         if not force and self._profile_payload_loaded_once and not self._profile_payload_dirty:
             return
+        if force:
+            self._deferred_profile_payload_apply = None
+            self._pending_profile_payload_apply = None
         self._profile_payload_dirty = True
         runtime = self._worker_runtime("_profile_load_runtime")
         refresh_state = self._profile_load_refresh_state_obj()
@@ -455,11 +482,39 @@ class PresetSetupPageBase(BasePage):
             except RuntimeError:
                 is_page_hidden = False
         if is_page_hidden:
-            self._profile_payload_dirty = True
+            self._deferred_profile_payload_apply = None
+            payload, view_state, apply_signature_base = pending
+            self._apply_payload(payload, view_state=view_state, apply_signature_base=apply_signature_base)
+            self._profile_payload_dirty = False
+            self._hide_profiles_list_for_next_switch()
             return
+        self._deferred_profile_payload_apply = None
         payload, view_state, apply_signature_base = pending
         self._apply_payload(payload, view_state=view_state, apply_signature_base=apply_signature_base)
         self._schedule_profiles_list_show_after_page_switch()
+
+    def _apply_deferred_profile_payload_after_show(self) -> bool:
+        pending = self.__dict__.get("_deferred_profile_payload_apply")
+        if pending is None or self.__dict__.get("_cleanup_in_progress", False):
+            return False
+        if self._profile_payload_refresh_is_blocked():
+            return False
+        self._deferred_profile_payload_apply = None
+        payload, view_state, apply_signature_base = pending
+        self._apply_payload(payload, view_state=view_state, apply_signature_base=apply_signature_base)
+        self._profile_payload_loaded_once = True
+        self._profile_payload_dirty = False
+        return True
+
+    def _profile_payload_refresh_is_blocked(self) -> bool:
+        refresh_state = self._profile_load_refresh_state_obj()
+        return (
+            refresh_state.is_busy()
+            or refresh_state.has_pending()
+            or self.__dict__.get("_profile_payload_request_scheduled", False)
+            or self.__dict__.get("_profile_payload_apply_scheduled", False)
+            or self.__dict__.get("_pending_profile_payload_apply") is not None
+        )
 
     def _on_profile_payload_failed(self, request_id: int, error: str) -> None:
         if request_id != self._profile_load_request_id or self._cleanup_in_progress:
@@ -490,6 +545,17 @@ class PresetSetupPageBase(BasePage):
             run_scheduled=self._run_scheduled_profile_load_refresh_start,
             cleanup_in_progress=bool(self.__dict__.get("_cleanup_in_progress", False)),
         )
+        if state.has_pending() or state.start_scheduled:
+            return
+        is_visible = getattr(self, "isVisible", None)
+        if callable(is_visible):
+            try:
+                if not bool(is_visible()):
+                    return
+            except RuntimeError:
+                return
+        if self._apply_deferred_profile_payload_after_show():
+            self._schedule_profiles_list_show_after_page_switch()
 
     def _schedule_profile_load_refresh_start(self) -> None:
         self._profile_load_refresh_state_obj().schedule_start(
@@ -551,6 +617,8 @@ class PresetSetupPageBase(BasePage):
             started_at = time.perf_counter()
             if view_state is not None:
                 profiles_list.apply_view_state(view_state)
+                profiles_list.set_search_query(self._profile_search_query)
+                self._apply_profile_visibility_filter(profiles_list)
             else:
                 profiles_list.update_profiles(tuple(payload.items))
                 profiles_list.set_search_query(self._profile_search_query)
@@ -577,6 +645,8 @@ class PresetSetupPageBase(BasePage):
         started_at = time.perf_counter()
         if view_state is not None:
             profiles_list.apply_view_state(view_state)
+            profiles_list.set_search_query(self._profile_search_query)
+            self._apply_profile_visibility_filter(profiles_list)
         else:
             profiles_list.build_profiles(tuple(payload.items or ()))
             profiles_list.set_search_query(self._profile_search_query)
@@ -637,6 +707,13 @@ class PresetSetupPageBase(BasePage):
         created_count = int(getattr(payload, "normalized_created_profiles", 0) or 0)
         if split_count <= 0 or created_count <= 0:
             return
+        is_visible = getattr(self, "isVisible", None)
+        if callable(is_visible):
+            try:
+                if not bool(is_visible()):
+                    return
+            except RuntimeError:
+                return
         try:
             InfoBar.info(
                 title="Profile-ы разделены",
@@ -1312,12 +1389,14 @@ class PresetSetupPageBase(BasePage):
 
     def _sync_profile_list_locally(self) -> None:
         self._profile_payload_dirty = True
+        self._clear_deferred_profile_payload_apply()
         self._schedule_profiles_payload_request(force=True)
 
     def _refresh_profile_item_locally(self, old_profile_key: str, profile_key: str) -> None:
         old_key = str(old_profile_key or "").strip()
         clean_profile_key = str(profile_key or "").strip()
         self._profile_payload_dirty = True
+        self._clear_deferred_profile_payload_apply()
         if self.__dict__.get("_cleanup_in_progress", False):
             return
         if not clean_profile_key:
@@ -1374,13 +1453,17 @@ class PresetSetupPageBase(BasePage):
         if not profiles_list.replace_profile_item(old_profile_key, item):
             return False
         self._profile_payload_dirty = True
+        self._clear_deferred_profile_payload_apply()
         return True
 
     def _apply_profile_enabled_locally(self, profile_key: str, enabled: bool) -> bool:
         profiles_list = self.__dict__.get("_profiles_list")
         if profiles_list is None:
             return False
-        return profiles_list.set_profile_enabled(profile_key, bool(enabled))
+        if not profiles_list.set_profile_enabled(profile_key, bool(enabled)):
+            return False
+        self._clear_deferred_profile_payload_apply()
+        return True
 
     def _add_profile_item_locally(self, profile_key: str | None, new_profile_key: str | None = None) -> None:
         source_key = str(profile_key or "").strip()
@@ -1393,16 +1476,22 @@ class PresetSetupPageBase(BasePage):
             and profiles_list.duplicate_profile_item(source_key, duplicate_key)
         ):
             self._profile_payload_dirty = True
+            self._clear_deferred_profile_payload_apply()
             return
         self._profile_payload_dirty = True
+        self._clear_deferred_profile_payload_apply()
         self._schedule_profiles_payload_request(force=True)
 
     def _remove_profile_item_locally(self, profile_key: str) -> None:
         profiles_list = self.__dict__.get("_profiles_list")
         if profiles_list is not None and profiles_list.remove_profile_item(profile_key):
             self._profile_payload_dirty = True
+            self._clear_deferred_profile_payload_apply()
             return
         self.refresh_from_preset_switch()
+
+    def _clear_deferred_profile_payload_apply(self) -> None:
+        self._deferred_profile_payload_apply = None
 
     def _edit_user_profile_from_menu(self, profile_key: str) -> None:
         if self._profiles_list is None:
@@ -1572,6 +1661,7 @@ class PresetSetupPageBase(BasePage):
         if not profiles_list.add_profile_item(profile_item):
             return False
         self._profile_payload_dirty = True
+        self._clear_deferred_profile_payload_apply()
         return True
 
     def _on_user_profile_create_failed(self, request_id: int, error: str) -> None:
@@ -1656,6 +1746,7 @@ class PresetSetupPageBase(BasePage):
         if not profiles_list.replace_user_profile_items(profile_id, tuple(profile_items or ())):
             return False
         self._profile_payload_dirty = True
+        self._clear_deferred_profile_payload_apply()
         return True
 
     def _on_user_profile_update_failed(self, request_id: int, error: str) -> None:
@@ -1728,6 +1819,7 @@ class PresetSetupPageBase(BasePage):
         if not profiles_list.remove_user_profile_items(profile_id):
             return False
         self._profile_payload_dirty = True
+        self._clear_deferred_profile_payload_apply()
         return True
 
     def _on_user_profile_delete_failed(self, request_id: int, error: str) -> None:
@@ -1900,12 +1992,15 @@ class PresetSetupPageBase(BasePage):
         destination_kind = destination_kind_by_action.get(str(action or "").strip())
         if not destination_kind:
             return False
-        return profiles_list.move_profile_item(
+        if not profiles_list.move_profile_item(
             source_profile_key,
             destination_kind,
             destination_profile_key,
             destination_group_key,
-        )
+        ):
+            return False
+        self._clear_deferred_profile_payload_apply()
+        return True
 
     def _create_profile_move_worker(
         self,
@@ -2125,6 +2220,7 @@ class PresetSetupPageBase(BasePage):
         if not apply_state(folder_state):
             return False
         self._profile_payload_dirty = True
+        self._clear_deferred_profile_payload_apply()
         return True
 
     def _on_profile_folder_action_failed(self, request_id: int, action: str, error: str, _context) -> None:
@@ -2220,6 +2316,7 @@ class PresetSetupPageBase(BasePage):
         kind = str(change_kind or "").strip()
         if profile_item is not None and clean_profile_key:
             if self._replace_profile_item_locally(clean_profile_key, profile_item):
+                self._clear_deferred_profile_payload_apply()
                 return
         if (
             kind in {"strategy", "feedback", "settings", "raw_profile", "list_file", "user_profile_updated"}
@@ -2233,6 +2330,7 @@ class PresetSetupPageBase(BasePage):
         if kind in {"enabled", "disabled"} and clean_profile_key:
             if self._apply_profile_enabled_locally(clean_profile_key, kind == "enabled"):
                 self._profile_payload_dirty = True
+                self._clear_deferred_profile_payload_apply()
                 return
         self.refresh_from_preset_switch()
 
@@ -2258,6 +2356,7 @@ class PresetSetupPageBase(BasePage):
         self._ui_state_store = None
         self._profile_preset_write_state_obj().reset()
         self._pending_profile_payload_apply = None
+        self._deferred_profile_payload_apply = None
         self._profile_payload_apply_scheduled = False
         self._profiles_list_show_scheduled = False
         self._profile_load_refresh_state_obj().reset()
@@ -2407,6 +2506,17 @@ class PresetSetupPageBase(BasePage):
             "чтобы движок пропустил этот профиль при запуске.",
             self,
         )
+        site_button_text = "Открыть сайт с профилями"
+        site_button = PushButton(site_button_text)
+        site_button.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(PROFILE_INFO_URL)))
+        set_state_text(site_button, site_button_text)
+        set_control_accessibility(
+            site_button,
+            name=site_button_text,
+            description="Открывает сайт, где можно посмотреть и скачать профили для пресетов.",
+        )
+        box.buttonLayout.insertWidget(0, site_button)
+        box.cancelButton.hide()
         set_message_box_button_accessibility(
             box,
             yes_name="Закрыть справку о настройке пресета",

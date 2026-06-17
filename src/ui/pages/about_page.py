@@ -417,7 +417,6 @@ class AboutPage(BasePage):
             setting_card_group_cls=SettingCardGroup,
             fluent_icon=FluentIcon,
             on_open_forum=self._open_forum_for_beginners,
-            on_open_help_folder=self._open_help_folder,
             on_open_telegram_news=self._open_telegram_news,
         )
 
@@ -494,13 +493,6 @@ class AboutPage(BasePage):
         self._request_about_open_action(
             "forum_for_beginners",
             error_default="Не удалось открыть вики-сайт:\n{error}",
-        )
-
-    def _open_help_folder(self):
-        self._request_about_open_action(
-            "help_folder",
-            error_default="Не удалось открыть папку:\n{error}",
-            raw_error_message="Папка с инструкциями не найдена",
         )
 
     def _open_telegram_news(self):

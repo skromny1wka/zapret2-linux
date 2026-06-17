@@ -252,6 +252,43 @@ class ProfileFilterKindSwitchTests(unittest.TestCase):
         self.assertIn("--out-range=-d8", store.text)
         self.assertIn("--lua-desync=pass", store.text)
 
+    def test_udp_exclusion_ipsets_do_not_offer_hostlist_pair(self) -> None:
+        from tempfile import TemporaryDirectory
+
+        with TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            lists_dir = root / "lists"
+            (lists_dir / "base").mkdir(parents=True)
+            for name in ("ipset-ru.txt", "ipset-dns.txt", "ipset-exclude.txt", "netrogat.txt"):
+                (lists_dir / "base" / name).write_text("1.1.1.1\n", encoding="utf-8")
+            service, store = self._service(
+                "\n".join(
+                    (
+                        "--name=Все сайты UDP (исключение)",
+                        "--filter-udp=443-65535",
+                        "--ipset-exclude=lists/ipset-ru.txt",
+                        "--ipset-exclude=lists/ipset-dns.txt",
+                        "--ipset-exclude=lists/ipset-exclude.txt",
+                        "--out-range=-d8",
+                        "--lua-desync=pass",
+                        "",
+                    )
+                ),
+                root=root,
+            )
+
+            setup = service.get_profile_setup("profile:0")
+            new_key = service.set_profile_filter_kind("profile:0", "hostlist")
+
+        self.assertIsNotNone(setup)
+        self.assertEqual(setup.editable_filter_kind, "ipset")
+        self.assertEqual(setup.editable_filter_kinds, ("ipset",))
+        self.assertIsNone(new_key)
+        self.assertNotIn("--hostlist-exclude=lists/netrogat.txt", store.text)
+        self.assertIn("--ipset-exclude=lists/ipset-ru.txt", store.text)
+        self.assertIn("--ipset-exclude=lists/ipset-dns.txt", store.text)
+        self.assertIn("--ipset-exclude=lists/ipset-exclude.txt", store.text)
+
     def test_switch_exclusion_hostlist_to_ipset_uses_service_ipsets(self) -> None:
         from tempfile import TemporaryDirectory
 

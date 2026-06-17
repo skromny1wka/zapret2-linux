@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import sys
 from typing import Callable
 
 
@@ -25,36 +26,34 @@ def save_gui_autostart_enabled(enabled: bool) -> bool:
 
 
 def disable_gui_autostart() -> GuiAutostartResult:
-    from autostart.autostart_remove import clear_autostart_task
+    from autostart.startup_shortcut_api import delete_startup_shortcut
 
-    removed_count = int(clear_autostart_task() or 0)
+    removed_count = 1 if delete_startup_shortcut() else 0
     return GuiAutostartResult(success=True, removed_count=removed_count)
 
 
 def enable_gui_autostart(*, status_cb: Callable[[str], None] | None = None) -> GuiAutostartResult:
-    from autostart.autostart_exe import request_admin_for_autostart, setup_autostart_for_exe
-    from startup.admin_check import is_admin
+    from autostart.startup_shortcut_api import create_or_update_startup_shortcut, delete_startup_shortcut
 
-    if not is_admin():
-        restart_requested = bool(request_admin_for_autostart())
-        message = (
-            "ZapretGUI нужно запустить с правами администратора, "
-            "чтобы создать системную задачу автозапуска."
-        )
-        return GuiAutostartResult(
-            success=False,
-            restart_requested=restart_requested,
-            message=message,
-        )
+    def _status(message: str) -> None:
+        if status_cb is not None:
+            status_cb(message)
 
-    ok = bool(setup_autostart_for_exe(status_cb=status_cb))
+    try:
+        _status("Удаление старого ярлыка автозапуска...")
+        delete_startup_shortcut()
+        _status("Создание ярлыка автозапуска...")
+        ok = bool(create_or_update_startup_shortcut(sys.executable))
+    except Exception:
+        ok = False
     if ok:
+        _status("Автозапуск программы включён")
         return GuiAutostartResult(success=True)
     return GuiAutostartResult(
         success=False,
         message=(
-            "Не удалось включить автозапуск. Windows не принял задачу "
-            "Планировщика заданий."
+            "Не удалось включить автозапуск. Windows не дал создать ярлык "
+            "в папке автозагрузки."
         ),
     )
 

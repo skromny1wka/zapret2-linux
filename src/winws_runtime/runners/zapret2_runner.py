@@ -45,6 +45,7 @@ from winws_runtime.runtime.system_ops import (
 _WINDOWS_ABS_RE = re.compile(r"^(?:[A-Za-z]:[\\/]|\\\\)")
 _STATUS_DLL_INIT_FAILED = 0xC0000142
 _TRANSIENT_DRY_RUN_RETRY_DELAY_SEC = 0.75
+_PRESET_SWITCH_AFTER_DRY_RUN_SETTLE_SEC = 0.15
 
 
 def _is_windows_abs(path: str) -> bool:
@@ -631,6 +632,32 @@ class Winws2StrategyRunner(StrategyRunnerBase):
     def _should_retry_dry_run_exit_code(exit_code: int) -> bool:
         return int(exit_code) == _STATUS_DLL_INIT_FAILED
 
+    @staticmethod
+    def _should_retry_fast_switch_spawn_exit_code(exit_code: int) -> bool:
+        return int(exit_code) == _STATUS_DLL_INIT_FAILED
+
+    @staticmethod
+    def _format_exit_code(exit_code: int | None) -> str:
+        try:
+            code = int(exit_code)
+        except Exception:
+            return "unknown"
+        if code == _STATUS_DLL_INIT_FAILED:
+            return f"{code} / 0x{code:08X}"
+        return str(code)
+
+    @classmethod
+    def _format_windows_process_init_failure(cls, exit_code: int | None) -> str:
+        return (
+            f"{ENGINE_WINWS2} не запустился: Windows не смогла инициализировать DLL "
+            f"(код {cls._format_exit_code(exit_code)})"
+        )
+
+    def _wait_after_successful_dry_run_before_spawn(self, *, preset_switch: bool) -> None:
+        if not preset_switch:
+            return
+        time.sleep(_PRESET_SWITCH_AFTER_DRY_RUN_SETTLE_SEC)
+
     def _run_preset_dry_run_locked(
         self,
         artifact: PreparedPresetArtifact,
@@ -838,6 +865,7 @@ class Winws2StrategyRunner(StrategyRunnerBase):
             notify_failure=notify_failure,
         ):
             return False
+        self._wait_after_successful_dry_run_before_spawn(preset_switch=preset_switch)
 
         try:
             startup_output_path = self._startup_output_path_for_artifact(artifact)
@@ -903,7 +931,14 @@ class Winws2StrategyRunner(StrategyRunnerBase):
             exit_code = self.running_process.returncode
             failure_log_level = "ERROR" if notify_failure else "WARNING"
             if preset_switch:
-                log(f"Preset switch failed: process exited (code: {exit_code})", failure_log_level)
+                if self._should_retry_fast_switch_spawn_exit_code(int(exit_code or -1)):
+                    log(
+                        f"{self._format_windows_process_init_failure(exit_code)}. "
+                        "Процесс завершился сразу после старта",
+                        failure_log_level,
+                    )
+                else:
+                    log(f"Preset switch failed: process exited (code: {exit_code})", failure_log_level)
             else:
                 log(f"Strategy '{strategy_name}' exited immediately (code: {exit_code})", failure_log_level)
 
@@ -941,6 +976,8 @@ class Winws2StrategyRunner(StrategyRunnerBase):
                         first_line = ""
                     if first_line:
                         self._set_last_error(f"{ENGINE_WINWS2} завершился сразу (код {exit_code}): {first_line[:200]}")
+                    elif self._should_retry_fast_switch_spawn_exit_code(int(exit_code or -1)):
+                        self._set_last_error(self._format_windows_process_init_failure(exit_code))
                     else:
                         self._set_last_error(f"{ENGINE_WINWS2} завершился сразу (код {exit_code})")
             else:
@@ -951,6 +988,11 @@ class Winws2StrategyRunner(StrategyRunnerBase):
                     first_line = ""
                 if first_line:
                     self._set_last_error(f"Preset switch failed: {first_line[:200]}", notify=notify_failure)
+                elif self._should_retry_fast_switch_spawn_exit_code(int(exit_code or -1)):
+                    self._set_last_error(
+                        self._format_windows_process_init_failure(exit_code),
+                        notify=notify_failure,
+                    )
                 else:
                     self._set_last_error(f"Preset switch failed (код {exit_code})", notify=notify_failure)
 
@@ -1064,7 +1106,46 @@ class Winws2StrategyRunner(StrategyRunnerBase):
                         strategy_name=old_strategy_name,
                         strategy_args=old_strategy_args,
                     )
-                    return False
+                    if not self._should_retry_fast_switch_spawn_exit_code(
+                        int(self._last_spawn_exit_code or -1)
+                    ):
+                        return False
+                    if callable(is_current) and not bool(is_current()):
+                        log("Fast preset switch retry skipped: request is stale", "DEBUG")
+                        return True
+                    log(
+                        f"{self._format_windows_process_init_failure(self._last_spawn_exit_code)}. "
+                        "Повторяем запуск перед остановкой старого процесса",
+                        "WARNING",
+                    )
+                    time.sleep(_TRANSIENT_DRY_RUN_RETRY_DELAY_SEC)
+                    if callable(is_current) and not bool(is_current()):
+                        log("Fast preset switch retry skipped after wait: request is stale", "DEBUG")
+                        return True
+                    self._preset_file_path = preset_path
+                    retry_artifact = self._artifact_for_handoff_locked(
+                        self._refresh_artifact_if_source_changed_locked(artifact)
+                    )
+                    success = self._spawn_process_locked(
+                        retry_artifact,
+                        strategy_name,
+                        preset_switch=True,
+                        notify_failure=False,
+                    )
+                    if success:
+                        self._stop_previous_process_after_handoff_locked(
+                            old_process,
+                            str(old_strategy_name or "unknown"),
+                            old_preset_path,
+                        )
+                    else:
+                        self._restore_process_state_locked(
+                            process=old_process,
+                            preset_path=old_preset_path,
+                            strategy_name=old_strategy_name,
+                            strategy_args=old_strategy_args,
+                        )
+                        return False
             if not success:
                 success = self._retry_fast_switch_after_failed_spawn_locked(
                     artifact,
@@ -1083,16 +1164,24 @@ class Winws2StrategyRunner(StrategyRunnerBase):
             retry_count=0,
             max_retry_count=1,
         )
+        retry_allowed = retry_allowed or self._should_retry_fast_switch_spawn_exit_code(exit_code)
         if not retry_allowed:
             return False
         if self._is_windivert_system_error(stderr_output, exit_code):
             log("Fast preset switch hit WinDivert system error; retry will not help", "WARNING")
             return False
 
-        log(
-            "Fast preset switch hit WinDivert conflict, retrying inside switch after cleanup",
-            "WARNING",
-        )
+        if self._should_retry_fast_switch_spawn_exit_code(exit_code):
+            log(
+                f"{self._format_windows_process_init_failure(exit_code)}. "
+                "Повторяем запуск после очистки состояния WinDivert",
+                "WARNING",
+            )
+        else:
+            log(
+                "Fast preset switch hit WinDivert conflict, retrying inside switch after cleanup",
+                "WARNING",
+            )
         self._aggressive_windivert_cleanup()
         self._wait_after_aggressive_windivert_cleanup()
         if not self._ensure_windivert_ready_before_spawn():
@@ -1230,6 +1319,20 @@ class Winws2StrategyRunner(StrategyRunnerBase):
                 "Transient WinDivert service error detected, retrying with aggressive cleanup",
                 "WARNING",
             )
+            return self._start_from_preset_file_locked(
+                preset_path,
+                strategy_name,
+                force_cleanup=True,
+                retry_count=retry_count + 1,
+                stable_start_window_seconds=stable_start_window_seconds,
+            )
+
+        if self._maybe_run_windivert_auto_fix_after_failed_spawn(
+            stderr_output,
+            exit_code,
+            retry_count=retry_count,
+        ):
+            log("WinDivert auto-fix succeeded, retrying preset start once", "WARNING")
             return self._start_from_preset_file_locked(
                 preset_path,
                 strategy_name,

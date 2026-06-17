@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from threading import Lock
 from typing import Callable
 
 
 @dataclass(frozen=True, slots=True)
 class HostsFeature:
     warm_page_data_cache: Callable
+    consume_warmed_services_catalog_plan: Callable
     create_hosts_runtime: Callable
     get_hosts_path_str: Callable
     invalidate_catalog_cache: Callable
@@ -20,17 +22,68 @@ class HostsFeature:
     create_catalog_refresh_worker: Callable
 
 
+@dataclass(frozen=True, slots=True)
+class HostsWarmedServicesCatalog:
+    plan: object
+    catalog_signature: object
+    selection: dict[str, str]
+    titles: tuple[str, str, str]
+
+
 def build_hosts_feature() -> HostsFeature:
+    warmed_lock = Lock()
+    warmed_services_catalog: HostsWarmedServicesCatalog | None = None
+
     def _public():
         from hosts import public as hosts_public
 
         return hosts_public
 
     def _warm_page_data_cache() -> bool:
+        nonlocal warmed_services_catalog
         public = _public()
-        public.load_user_selection()
-        public.get_catalog_signature()
+        selection = dict(public.load_user_selection() or {})
+        before_signature = public.get_catalog_signature()
+        runtime = public.create_hosts_runtime()
+        titles = ("Напрямую из hosts", "ИИ", "Остальные")
+        plan = public.build_services_catalog_plan(
+            hosts_runtime=runtime,
+            current_selection=selection,
+            direct_title=titles[0],
+            ai_title=titles[1],
+            other_title=titles[2],
+        )
+        after_signature = public.get_catalog_signature()
+        with warmed_lock:
+            warmed_services_catalog = HostsWarmedServicesCatalog(
+                plan=plan,
+                catalog_signature=after_signature,
+                selection=selection,
+                titles=titles,
+            ) if before_signature == after_signature else None
         return True
+
+    def _consume_warmed_services_catalog_plan(
+        *,
+        current_selection: dict[str, str],
+        direct_title: str,
+        ai_title: str,
+        other_title: str,
+    ) -> HostsWarmedServicesCatalog | None:
+        nonlocal warmed_services_catalog
+        titles = (str(direct_title or ""), str(ai_title or ""), str(other_title or ""))
+        with warmed_lock:
+            warmed = warmed_services_catalog
+            warmed_services_catalog = None
+        if warmed is None:
+            return None
+        if dict(current_selection or {}) != dict(warmed.selection):
+            return None
+        if titles != warmed.titles:
+            return None
+        if get_catalog_signature() != warmed.catalog_signature:
+            return None
+        return warmed
 
     load_user_selection = lambda *args, **kwargs: _public().load_user_selection(*args, **kwargs)
     save_user_selection = lambda *args, **kwargs: _public().save_user_selection(*args, **kwargs)
@@ -119,6 +172,7 @@ def build_hosts_feature() -> HostsFeature:
 
     return HostsFeature(
         warm_page_data_cache=_warm_page_data_cache,
+        consume_warmed_services_catalog_plan=_consume_warmed_services_catalog_plan,
         create_hosts_runtime=lambda *args, **kwargs: _public().create_hosts_runtime(*args, **kwargs),
         get_hosts_path_str=lambda *args, **kwargs: _public().get_hosts_path_str(*args, **kwargs),
         invalidate_catalog_cache=lambda *args, **kwargs: _public().invalidate_catalog_cache(*args, **kwargs),

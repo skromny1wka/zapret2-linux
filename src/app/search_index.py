@@ -90,7 +90,6 @@ SEARCH_ENTRIES: tuple[SearchEntry, ...] = (
     SearchEntry("about.support.discord", PageName.ABOUT, "page.about.support.discord.title", section_key="page.about.support", tab_key="about"),
     SearchEntry("about.help.docs.forum", PageName.ABOUT, "page.about.help.docs.forum.title", section_key="page.about.tab.help", tab_key="help"),
     SearchEntry("about.help.docs.info", PageName.ABOUT, "page.about.help.docs.info.title", section_key="page.about.tab.help", tab_key="help"),
-    SearchEntry("about.help.docs.folder", PageName.ABOUT, "page.about.help.docs.folder.title", section_key="page.about.tab.help", tab_key="help"),
     SearchEntry("about.help.docs.android", PageName.ABOUT, "page.about.help.docs.android.title", section_key="page.about.tab.help", tab_key="help"),
     SearchEntry("about.help.news.telegram", PageName.ABOUT, "page.about.help.news.telegram.title", section_key="page.about.tab.help", tab_key="help"),
     SearchEntry("about.course.youtube", PageName.ABOUT, "page.about.course.youtube.title", section_key="page.about.title", tab_key="about"),

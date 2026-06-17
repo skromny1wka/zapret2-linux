@@ -10,13 +10,14 @@ from main.post_startup_gate import bind_startup_gate, is_startup_host_alive
 from main.post_startup_threading import enqueue_subsystem_task, schedule_after
 from settings.dpi.strategy_settings import get_strategy_launch_method
 from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE, is_preset_launch_method, normalize_launch_method
-from ui.navigation_pages import resolve_preset_setup_page_for_method
+from ui.navigation_pages import resolve_preset_setup_page_for_method, resolve_profile_setup_page_for_method
 
 
 DEFAULT_PROFILE_WARMUP_METHODS: tuple[str, ...] = (ZAPRET2_MODE, ZAPRET1_MODE)
 PROFILE_WARMUP_DELAY_MS = 0
 PROFILE_SECONDARY_WARMUP_DELAY_MS = 1_800
 PRESET_SETUP_PAGE_WARMUP_DELAY_MS = 2_200
+PROFILE_SETUP_PAGE_WARMUP_DELAY_MS = 1_000
 
 
 class _ProfileWarmupBridge(QObject):
@@ -38,6 +39,7 @@ def install_profile_warmup(
     delay_ms: int = PROFILE_WARMUP_DELAY_MS,
     secondary_delay_ms: int = PROFILE_SECONDARY_WARMUP_DELAY_MS,
     preset_setup_page_delay_ms: int = PRESET_SETUP_PAGE_WARMUP_DELAY_MS,
+    profile_setup_page_delay_ms: int = PROFILE_SETUP_PAGE_WARMUP_DELAY_MS,
     on_profile_warmup_ready: Callable[[str], None] | None = None,
 ) -> None:
     warmup_bridge = _ProfileWarmupBridge()
@@ -75,12 +77,34 @@ def install_profile_warmup(
             page = startup_host.ensure_page(page_name)
             if page is None:
                 return
+            warmup_initial_load = getattr(page, "warmup_initial_load", None)
+            if callable(warmup_initial_load):
+                warmup_initial_load()
             log_startup_metric("StartupPresetSetupUiWarmupFinished", page_name.name)
         except Exception as exc:
             log(f"Фоновая подготовка страницы профилей preset-а не выполнена: {exc}", "DEBUG")
             return
         elapsed_ms = (time.perf_counter() - started_at) * 1000.0
         log(f"Фоновая подготовка страницы профилей preset-а {page_name.name}: {elapsed_ms:.1f}ms", "DEBUG")
+
+    def _run_profile_setup_page_warmup() -> None:
+        if not is_startup_host_alive(startup_host):
+            return
+        method = get_strategy_launch_method()
+        page_name = resolve_profile_setup_page_for_method(method)
+        if page_name is None:
+            return
+        started_at = time.perf_counter()
+        try:
+            page = startup_host.ensure_page(page_name)
+            if page is None:
+                return
+            log_startup_metric("StartupProfileSetupUiWarmupFinished", page_name.name)
+        except Exception as exc:
+            log(f"Фоновая подготовка страницы настройки profile-а не выполнена: {exc}", "DEBUG")
+            return
+        elapsed_ms = (time.perf_counter() - started_at) * 1000.0
+        log(f"Фоновая подготовка страницы настройки profile-а {page_name.name}: {elapsed_ms:.1f}ms", "DEBUG")
 
     def _start_profile_warmup(methods: tuple[str, ...]) -> None:
         log_startup_metric("StartupProfileWarmupStarted", ", ".join(methods))
@@ -113,6 +137,12 @@ def install_profile_warmup(
                 secondary_delay,
                 lambda: is_startup_host_alive(startup_host) and _start_profile_warmup(secondary_methods),
             )
+        profile_page_delay = max(delay, int(profile_setup_page_delay_ms))
+        log_startup_metric("StartupProfileSetupUiWarmupQueued", f"{profile_page_delay}ms after interactive")
+        schedule_after(
+            profile_page_delay,
+            lambda: is_startup_host_alive(startup_host) and _run_profile_setup_page_warmup(),
+        )
         page_delay = max(delay, int(preset_setup_page_delay_ms))
         log_startup_metric("StartupPresetSetupUiWarmupQueued", f"{page_delay}ms after interactive")
         schedule_after(
@@ -130,6 +160,7 @@ def install_profile_warmup(
 __all__ = [
     "DEFAULT_PROFILE_WARMUP_METHODS",
     "PRESET_SETUP_PAGE_WARMUP_DELAY_MS",
+    "PROFILE_SETUP_PAGE_WARMUP_DELAY_MS",
     "PROFILE_SECONDARY_WARMUP_DELAY_MS",
     "PROFILE_WARMUP_DELAY_MS",
     "install_profile_warmup",

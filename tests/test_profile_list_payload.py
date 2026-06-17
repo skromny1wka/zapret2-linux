@@ -234,23 +234,24 @@ class ProfileListPayloadTests(unittest.TestCase):
         self.assertTrue(any("--hostlist=lists/discord.txt" in item.match_lines for item in payload.items))
         self.assertTrue(any("--hostlist=lists/other.txt" in item.match_lines for item in payload.items))
 
-    def test_service_exceptions_profile_from_all_profiles_is_hidden_and_not_split(self) -> None:
+    def test_catalog_profile_with_multiple_ipsets_is_visible_and_not_split(self) -> None:
         with TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             lists_dir = root / "lists"
             lists_dir.mkdir()
-            for name in ("ipset-ru.txt", "ipset-dns.txt", "ipset-exclude.txt", "youtube.txt"):
+            for name in ("ipset-one.txt", "ipset-two.txt", "ipset-three.txt", "ipset-four.txt", "youtube.txt"):
                 (lists_dir / name).write_text("127.0.0.1\n", encoding="utf-8")
             templates_dir = root / "profile" / "templates"
             templates_dir.mkdir(parents=True)
             (templates_dir / "all_profiles.txt").write_text(
                 "\n".join(
                     (
-                        "--name=Исключения (RU сайты)",
+                        "--name=Каталожный набор IP",
                         "--filter-tcp=80,443-65535",
-                        "--ipset=lists/ipset-ru.txt",
-                        "--ipset=lists/ipset-dns.txt",
-                        "--ipset=lists/ipset-exclude.txt",
+                        "--ipset=lists/ipset-one.txt",
+                        "--ipset=lists/ipset-two.txt",
+                        "--ipset=lists/ipset-three.txt",
+                        "--ipset=lists/ipset-four.txt",
                         "",
                         "--new",
                         "--name=YouTube",
@@ -264,11 +265,12 @@ class ProfileListPayloadTests(unittest.TestCase):
             store = _PresetStore(
                 "\n".join(
                     (
-                        "--name=Исключения (RU сайты)",
+                        "--name=Каталожный набор IP",
                         "--filter-tcp=80,443-65535",
-                        "--ipset=lists/ipset-ru.txt",
-                        "--ipset=lists/ipset-dns.txt",
-                        "--ipset=lists/ipset-exclude.txt",
+                        "--ipset=lists/ipset-one.txt",
+                        "--ipset=lists/ipset-two.txt",
+                        "--ipset=lists/ipset-three.txt",
+                        "--ipset=lists/ipset-four.txt",
                         "--payload=tls_client_hello",
                         "--out-range=-d8",
                         "--lua-desync=pass",
@@ -293,9 +295,33 @@ class ProfileListPayloadTests(unittest.TestCase):
                 order_payload = service.list_preset_order_profiles()
 
         self.assertEqual(payload.normalized_split_profiles, 0)
-        self.assertEqual([item.profile_name for item in payload.items], ["YouTube"])
-        self.assertEqual([item.profile_name for item in order_payload.items], ["YouTube"])
-        self.assertIn("--ipset=lists/ipset-ru.txt\n--ipset=lists/ipset-dns.txt\n--ipset=lists/ipset-exclude.txt", store.text)
+        self.assertEqual([item.profile_name for item in payload.items], ["Каталожный набор IP", "YouTube"])
+        self.assertEqual([item.profile_name for item in order_payload.items], ["Каталожный набор IP", "YouTube"])
+        catalog_item = payload.items[0]
+        self.assertEqual(
+            [
+                line
+                for line in catalog_item.match_lines
+                if line.startswith("--ipset=")
+            ],
+            [
+                "--ipset=lists/ipset-one.txt",
+                "--ipset=lists/ipset-two.txt",
+                "--ipset=lists/ipset-three.txt",
+                "--ipset=lists/ipset-four.txt",
+            ],
+        )
+        self.assertIn(
+            "\n".join(
+                (
+                    "--ipset=lists/ipset-one.txt",
+                    "--ipset=lists/ipset-two.txt",
+                    "--ipset=lists/ipset-three.txt",
+                    "--ipset=lists/ipset-four.txt",
+                )
+            ),
+            store.text,
+        )
         self.assertIn("--payload=tls_client_hello\n--out-range=-d8\n--lua-desync=pass", store.text)
 
     def test_selected_preset_snapshot_reuses_parsed_preset_for_summary_calls(self) -> None:

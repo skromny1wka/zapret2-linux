@@ -616,6 +616,28 @@ class AccessibilityHelpersTests(unittest.TestCase):
             "Режим запуска: Ручной, выбран",
         )
 
+    def test_accessible_combo_menu_keeps_fluent_style_and_suppresses_hairline(self) -> None:
+        from unittest.mock import patch
+
+        from qfluentwidgets import ComboBox
+
+        from ui.combo_accessibility import set_combo_items_accessibility
+
+        combo = ComboBox()
+        self.addCleanup(combo.deleteLater)
+        combo.addItem("Авто")
+        combo.addItem("Ручной")
+
+        with patch("ui.popup_menu_style._is_windows_11_or_newer", return_value=True):
+            set_combo_items_accessibility(combo, name="Режим запуска")
+            menu = combo._create_accessible_combo_menu()
+
+        self.assertIn("MenuActionListWidget", menu.styleSheet())
+        self.assertIn("border-color", menu.styleSheet())
+        self.assertIn("MenuActionListWidget", menu.view.styleSheet())
+        self.assertIn("border-color", menu.view.styleSheet())
+        self.assertNotIn("border-left", menu.view.styleSheet())
+
     def test_combo_widget_itself_reads_current_selection(self) -> None:
         from qfluentwidgets import ComboBox
 

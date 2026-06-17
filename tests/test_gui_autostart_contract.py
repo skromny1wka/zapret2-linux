@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import sys
 import unittest
-from contextlib import contextmanager
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
 
 
@@ -13,105 +11,76 @@ if str(PROJECT_SRC) not in sys.path:
     sys.path.insert(0, str(PROJECT_SRC))
 
 
-class _FakeCollection:
-    def __init__(self, factory):
-        self._factory = factory
-        self.created = []
-
-    def Create(self, item_type: int):
-        item = self._factory()
-        self.created.append((item_type, item))
-        return item
-
-
-class _FakeTaskDefinition:
+class _FakeShortcut:
     def __init__(self):
-        self.RegistrationInfo = SimpleNamespace(Author="", Description="")
-        self.Settings = SimpleNamespace()
-        self.Principal = SimpleNamespace(
-            UserId=None,
-            GroupId=None,
-            LogonType=None,
-            RunLevel=None,
-        )
-        self.Triggers = _FakeCollection(lambda: SimpleNamespace(Enabled=False, UserId=None))
-        self.Actions = _FakeCollection(
-            lambda: SimpleNamespace(Path="", Arguments="", WorkingDirectory="")
-        )
+        self.TargetPath = ""
+        self.Arguments = ""
+        self.WorkingDirectory = ""
+        self.IconLocation = ""
+        self.saved = False
+
+    def Save(self):
+        self.saved = True
 
 
-class _FakeRootFolder:
+class _FakeShell:
     def __init__(self):
-        self.register_calls = []
+        self.created_paths = []
+        self.shortcut = _FakeShortcut()
 
-    def RegisterTaskDefinition(self, *args):
-        self.register_calls.append(args)
-        return object()
+    def CreateShortcut(self, path: str):
+        self.created_paths.append(path)
+        return self.shortcut
 
 
-class _FakeSchedulerService:
-    def __init__(self):
-        self.task_definition = _FakeTaskDefinition()
-        self.root_folder = _FakeRootFolder()
+class _FakeToggle:
+    def __init__(self, checked: bool = False):
+        self._checked = bool(checked)
+        self.set_calls: list[tuple[bool, bool]] = []
 
-    def NewTask(self, _flags: int):
-        return self.task_definition
+    def isChecked(self) -> bool:  # noqa: N802
+        return self._checked
 
-    def GetFolder(self, _path: str):
-        return self.root_folder
+    def setChecked(self, checked: bool, block_signals: bool = False):  # noqa: N802
+        self.set_calls.append((bool(checked), bool(block_signals)))
+        self._checked = bool(checked)
 
 
 class GuiAutostartContractTests(unittest.TestCase):
-    def test_registers_admin_group_task_without_user_password_credentials(self) -> None:
-        from autostart import task_scheduler_api
+    def test_creates_user_startup_shortcut(self) -> None:
+        from autostart import startup_shortcut_api
 
-        service = _FakeSchedulerService()
-
-        @contextmanager
-        def fake_open_scheduler_service():
-            yield service, SimpleNamespace(com_error=Exception), object(), object()
-
+        shell = _FakeShell()
         exe_path = r"C:\Program Files\Zapret\Zapret.exe"
+        shortcut_path = (
+            r"C:\Users\Tester\AppData\Roaming\Microsoft\Windows\Start Menu"
+            r"\Programs\Startup\ZapretGUI.lnk"
+        )
 
         with patch.object(
-            task_scheduler_api,
-            "_open_scheduler_service",
-            side_effect=fake_open_scheduler_service,
+            startup_shortcut_api,
+            "_dispatch_shell",
+            return_value=shell,
         ):
-            result = task_scheduler_api.register_canonical_autostart_task(exe_path)
+            result = startup_shortcut_api.create_or_update_startup_shortcut(
+                exe_path,
+                shortcut_path=shortcut_path,
+            )
 
         self.assertTrue(result)
-        self.assertEqual(len(service.root_folder.register_calls), 1)
-
-        register_args = service.root_folder.register_calls[0]
-        self.assertEqual(register_args[0], task_scheduler_api.CANONICAL_TASK_NAME)
-        self.assertIs(register_args[1], service.task_definition)
-        self.assertEqual(register_args[2], task_scheduler_api._TASK_CREATE_OR_UPDATE)
-        self.assertIsNone(register_args[3])
-        self.assertIsNone(register_args[4])
-        self.assertEqual(register_args[5], task_scheduler_api._TASK_LOGON_GROUP)
-
-        principal = service.task_definition.Principal
-        self.assertIsNone(principal.UserId)
-        self.assertEqual(principal.GroupId, task_scheduler_api.ADMINISTRATORS_GROUP_SID)
-        self.assertEqual(principal.LogonType, task_scheduler_api._TASK_LOGON_GROUP)
-        self.assertEqual(principal.RunLevel, task_scheduler_api._TASK_RUNLEVEL_HIGHEST)
-
-        trigger = service.task_definition.Triggers.created[0][1]
-        self.assertTrue(trigger.Enabled)
-        self.assertIsNone(trigger.UserId)
-
-        action = service.task_definition.Actions.created[0][1]
-        self.assertEqual(action.Path, exe_path)
-        self.assertEqual(action.Arguments, "--tray")
-        self.assertEqual(action.WorkingDirectory, r"C:\Program Files\Zapret")
+        self.assertEqual(shell.created_paths, [shortcut_path])
+        self.assertEqual(shell.shortcut.TargetPath, exe_path)
+        self.assertEqual(shell.shortcut.Arguments, "--tray")
+        self.assertEqual(shell.shortcut.WorkingDirectory, r"C:\Program Files\Zapret")
+        self.assertEqual(shell.shortcut.IconLocation, exe_path)
+        self.assertTrue(shell.shortcut.saved)
 
     def test_enable_gui_autostart_returns_readable_error_message(self) -> None:
         from autostart.public import enable_gui_autostart
 
         with (
-            patch("startup.admin_check.is_admin", return_value=True),
-            patch("autostart.autostart_exe.setup_autostart_for_exe", return_value=False),
+            patch("autostart.startup_shortcut_api.delete_startup_shortcut", return_value=False),
+            patch("autostart.startup_shortcut_api.create_or_update_startup_shortcut", return_value=False),
         ):
             result = enable_gui_autostart()
 
@@ -169,6 +138,24 @@ class GuiAutostartContractTests(unittest.TestCase):
         save.assert_called_once_with(True)
         self.assertEqual(result.level, "success")
         self.assertIsNone(result.revert_checked)
+
+    def test_gui_autostart_snapshot_sync_blocks_toggle_signal(self) -> None:
+        from core.runtime.program_settings_runtime_service import ProgramSettingsSnapshot
+        from presets.ui.control.control_page_runtime_shared import apply_program_settings_toggles
+
+        toggle = _FakeToggle(False)
+        snapshot = ProgramSettingsSnapshot(
+            revision=(False, True, "normal", False, False),
+            auto_dpi_enabled=False,
+            gui_autostart_enabled=True,
+            tray_close_mode="normal",
+            defender_disabled=False,
+            max_blocked=False,
+        )
+
+        apply_program_settings_toggles(snapshot, gui_autostart_toggle=toggle)
+
+        self.assertEqual(toggle.set_calls, [(True, True)])
 
     def test_gui_autostart_toggle_is_top_program_settings_row_for_both_modes(self) -> None:
         import inspect

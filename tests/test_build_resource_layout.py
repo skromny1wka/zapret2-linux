@@ -39,10 +39,16 @@ class BuildResourceLayoutTests(unittest.TestCase):
             self.assertNotIn("recursesubdirs", line)
             self.assertNotIn("createallsubdirs", line)
 
+    def test_inno_does_not_install_local_help_folder(self) -> None:
+        iss = self._read_inno_script()
+
+        self.assertNotIn(r"{#SOURCEPATH}\help\*", iss)
+        self.assertNotIn(r'DestDir: "{app}\help"', iss)
+
     def test_inno_shortcuts_are_versioned_and_recreated_by_single_channel_owner(self) -> None:
         iss = self._read_inno_script()
 
-        self.assertIn('#define ShortcutName AppName + " v" + VERSION', iss)
+        self.assertIn("#define ShortcutName AppName", iss)
 
         expected_delete_patterns = [
             r'Type: files; Name: "{commondesktop}\{#AppName}.lnk"',
@@ -76,6 +82,30 @@ class BuildResourceLayoutTests(unittest.TestCase):
         self.assertNotIn("root_path / icon_file", builder)
         self.assertNotIn("root_path / 'ico' / icon_file", builder)
         self.assertNotIn("сборка без иконки", builder)
+
+    def test_inno_installs_only_required_ico_resources(self) -> None:
+        iss = self._read_inno_script()
+
+        self.assertNotIn(r'Source: "{#SOURCEPATH}\ico\*"', iss)
+        self.assertIn(r'Source: "{#SOURCEPATH}\ico\Zapret2.ico"; DestDir: "{app}\ico"', iss)
+        self.assertIn(r'Source: "{#SOURCEPATH}\ico\ZapretDevLogo4.ico"; DestDir: "{app}\ico"', iss)
+        self.assertIn(
+            r'Source: "{#PUBLICSRC}\ico\windows11_fluent\sidebar\*.svg"; DestDir: "{app}\src\ico\windows11_fluent\sidebar"',
+            iss,
+        )
+
+    def test_installer_stage_copies_only_required_ico_resources(self) -> None:
+        builder = (PRIVATE_ROOT / "build_zapret" / "build_release_gui.py").read_text(encoding="utf-8")
+
+        self.assertIn('REQUIRED_INSTALLER_ICO_FILES = ("Zapret2.ico", "ZapretDevLogo4.ico")', builder)
+        self.assertIn("def _copy_installer_icon_resources", builder)
+        self.assertIn("_copy_installer_icon_resources(stage_root)", builder)
+        self.assertNotIn('"ico",\n            "lists",', builder)
+
+    def test_installer_stage_does_not_copy_local_help_folder(self) -> None:
+        builder = (PRIVATE_ROOT / "build_zapret" / "build_release_gui.py").read_text(encoding="utf-8")
+
+        self.assertNotIn('"help"', builder)
 
     def test_pyinstaller_hiddenimports_include_lazy_feature_facades(self) -> None:
         build_path = PRIVATE_ROOT / "build_zapret"

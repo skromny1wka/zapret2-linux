@@ -39,7 +39,11 @@ class DnsIspWarningInfoBarTests(unittest.TestCase):
         plan = SimpleNamespace(
             should_show=True,
             title="DNS от провайдера",
-            content="Провайдерский DNS может мешать обходу блокировок.",
+            content=(
+                "У вас установлен DNS от провайдера (получен автоматически через DHCP). "
+                "Провайдерский DNS может подменять ответы и мешать обходу блокировок.\n\n"
+                "Можно вручную применить публичный DNS Quad9 или выбрать другой DNS из списка ниже."
+            ),
             action_text="Применить Quad9",
             dismiss_text="Нет, спасибо",
         )
@@ -51,7 +55,8 @@ class DnsIspWarningInfoBarTests(unittest.TestCase):
             plan=plan,
             qpush_button_cls=_PushButton,
             qt_namespace=SimpleNamespace(
-                CursorShape=SimpleNamespace(PointingHandCursor="pointing")
+                CursorShape=SimpleNamespace(PointingHandCursor="pointing"),
+                Orientation=SimpleNamespace(Vertical="vertical"),
             ),
             on_accept=Mock(),
             log_fn=Mock(),
@@ -62,12 +67,19 @@ class DnsIspWarningInfoBarTests(unittest.TestCase):
 
         info_bar.warning.assert_called_once_with(
             title="DNS от провайдера",
-            content="Провайдерский DNS может мешать обходу блокировок.",
+            content=(
+                "У вас установлен DNS от провайдера (получен автоматически через DHCP).\n"
+                "Провайдерский DNS может подменять ответы и мешать обходу блокировок.\n\n"
+                "Можно вручную применить публичный DNS Quad9 или выбрать другой DNS из списка ниже."
+            ),
+            orient="vertical",
             isClosable=True,
             position="top-right",
             duration=10000,
             parent="window",
         )
+        wrapped_content = info_bar.warning.call_args.kwargs["content"]
+        self.assertLessEqual(max(len(line) for line in wrapped_content.splitlines()), 86)
         self.assertEqual(len(info_bar.bar.added_widgets), 1)
         self.assertEqual(info_bar.bar.added_widgets[0].text, "Применить Quad9")
 

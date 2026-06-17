@@ -2575,7 +2575,6 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
             "_open_telegram_support",
             "_open_discord",
             "_open_forum_for_beginners",
-            "_open_help_folder",
             "_open_telegram_news",
             "_open_kvn_channel",
             "_open_kvn_bot",

@@ -79,6 +79,7 @@ class FolderDefaultsTests(unittest.TestCase):
         self.assertEqual(classify_profile_folder("Tanki X --hostlist=lists/tankix.txt"), "games")
         self.assertEqual(classify_profile_folder("lol-ru --ipset=lists/ipset-lol-ru.txt"), "games")
         self.assertEqual(classify_profile_folder("cloudflare --ipset=lists/ipset-cloudflare.txt"), "hosters")
+        self.assertEqual(classify_profile_folder("digitalocean --ipset=lists/ipset-digitalocean.txt"), "hosters")
         self.assertEqual(classify_profile_folder("amazon --ipset=lists/ipset-amazon.txt"), "hosters")
         self.assertEqual(classify_profile_folder("ovh --ipset=lists/ipset-ovh.txt"), "hosters")
         self.assertEqual(classify_profile_folder("hetzner --ipset=lists/ipset-hetzner.txt"), "hosters")

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-import subprocess
 import webbrowser
 from dataclasses import dataclass
 
@@ -65,25 +63,11 @@ def open_github(url: str) -> AboutActionResult:
         return AboutActionResult(False, str(e))
 
 
-def open_help_folder() -> AboutActionResult:
-    from config.config import HELP_FOLDER
-
-    try:
-        if os.path.exists(HELP_FOLDER):
-            subprocess.Popen(f'explorer "{HELP_FOLDER}"')
-            log(f"Открыта папка: {HELP_FOLDER}", "INFO")
-            return AboutActionResult(True, HELP_FOLDER)
-        return AboutActionResult(False, "Папка с инструкциями не найдена")
-    except Exception as e:
-        return AboutActionResult(False, str(e))
-
-
 __all__ = [
     "AboutActionResult",
     "open_discord",
     "open_docs_home",
     "open_github",
-    "open_help_folder",
     "open_support_discussions",
     "open_telegram",
 ]

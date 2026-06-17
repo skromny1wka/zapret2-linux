@@ -171,6 +171,32 @@ class UserProfileDialogAccessibilityTests(unittest.TestCase):
         self.assertEqual(dialog.warningLabel.accessibleName(), "Ошибка: Введите название profile.")
         self.assertEqual(dialog.warningLabel.property("screenReaderStateText"), "Ошибка: Введите название profile.")
 
+    def test_tcp_ports_must_stay_in_allowed_range(self) -> None:
+        parent = QWidget()
+        self.addCleanup(parent.deleteLater)
+        parent.resize(640, 480)
+        parent.show()
+
+        dialog = CreateUserProfileDialog(parent, name="Bad ports", protocol="tcp", ports="0,443-65536")
+        self.addCleanup(dialog.deleteLater)
+
+        self.assertFalse(dialog.validate())
+        self.assertEqual(
+            dialog.warningLabel.text(),
+            "Порт должен быть от 1 до 65535.",
+        )
+
+    def test_udp_ports_accept_valid_ranges_and_lists(self) -> None:
+        parent = QWidget()
+        self.addCleanup(parent.deleteLater)
+        parent.resize(640, 480)
+        parent.show()
+
+        dialog = CreateUserProfileDialog(parent, name="Voice", protocol="udp", ports="443,50000-50100")
+        self.addCleanup(dialog.deleteLater)
+
+        self.assertTrue(dialog.validate())
+
 
 if __name__ == "__main__":
     unittest.main()

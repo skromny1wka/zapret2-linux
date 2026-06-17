@@ -18,7 +18,6 @@ class AboutPageHelpWidgets:
     docs_group: object
     forum_card: object
     info_card: object
-    folder_card: object
     android_card: object
     github_card: object
     news_group: object
@@ -102,7 +101,6 @@ def build_about_page_help_content(
     setting_card_group_cls,
     fluent_icon,
     on_open_forum,
-    on_open_help_folder,
     on_open_telegram_news,
 ) -> AboutPageHelpWidgets:
     try:
@@ -155,22 +153,6 @@ def build_about_page_help_content(
         description=tr_fn("page.about.help.docs.info.desc", "Руководство и ответы на вопросы"),
     )
 
-    folder_card = push_setting_card_cls(
-        tr_fn("page.about.help.button.open", "Открыть"),
-        fluent_icon.FOLDER,
-        tr_fn("page.about.help.docs.folder.title", "Папка с инструкциями"),
-        tr_fn("page.about.help.docs.folder.desc", "Открыть локальную папку help"),
-    )
-    set_help_card_accessibility(
-        folder_card,
-        action_name=tr_fn(
-            "page.about.help.docs.folder.accessible_name",
-            "Открыть папку с инструкциями",
-        ),
-        description=tr_fn("page.about.help.docs.folder.desc", "Открыть локальную папку help"),
-    )
-    folder_card.clicked.connect(on_open_help_folder)
-
     android_card = hyperlink_card_cls(
         ANDROID_URL,
         tr_fn("page.about.help.button.open", "Открыть"),
@@ -200,7 +182,7 @@ def build_about_page_help_content(
         description=tr_fn("page.about.help.docs.github.desc", "Исходный код и документация"),
     )
 
-    docs_group.addSettingCards([forum_card, info_card, folder_card, android_card, github_card])
+    docs_group.addSettingCards([forum_card, info_card, android_card, github_card])
     layout.addWidget(docs_group)
     layout.addSpacing(8)
 
@@ -268,7 +250,6 @@ def build_about_page_help_content(
         docs_group=docs_group,
         forum_card=forum_card,
         info_card=info_card,
-        folder_card=folder_card,
         android_card=android_card,
         github_card=github_card,
         news_group=news_group,

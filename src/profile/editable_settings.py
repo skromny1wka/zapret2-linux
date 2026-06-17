@@ -28,6 +28,7 @@ class EditableProfileSettings:
     filter_value: str = ""
     filter_editable: bool = True
     filter_role: str = "primary"
+    filter_protocol: str = ""
     in_range: str = "x"
     out_range: str = "a"
 
@@ -38,6 +39,7 @@ def read_editable_profile_settings(profile: Profile) -> EditableProfileSettings:
         filter_value=_editable_filter_value(profile),
         filter_editable=_editable_filter_is_file_based(profile),
         filter_role=_editable_filter_role(profile),
+        filter_protocol=_editable_filter_protocol(profile),
         in_range=_range_value(profile, "--in-range", default="x"),
         out_range=_range_value(profile, "--out-range", default="a"),
     )
@@ -139,6 +141,22 @@ def _editable_filter_role(profile: Profile) -> str:
     if _is_service_exclusion_profile(profile):
         return "exclude"
     return "primary"
+
+
+def _editable_filter_protocol(profile: Profile) -> str:
+    has_udp = False
+    has_tcp = False
+    for line in profile.match.filter_lines:
+        lowered = str(line or "").strip().lower()
+        if lowered.startswith("--filter-udp="):
+            has_udp = True
+        elif lowered.startswith("--filter-tcp="):
+            has_tcp = True
+    if has_udp and not has_tcp:
+        return "udp"
+    if has_tcp and not has_udp:
+        return "tcp"
+    return ""
 
 
 def _is_service_exclusion_profile(profile: Profile) -> bool:

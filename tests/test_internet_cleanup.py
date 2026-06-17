@@ -97,6 +97,33 @@ class InternetCleanupTests(unittest.TestCase):
         self.assertIn("Отказано в доступе.", result.content)
         self.assertNotIn("код 1, Сброс глобальных параметров - OK!", result.content)
 
+    def test_run_internet_cleanup_stops_between_commands(self) -> None:
+        from windows_features.internet_cleanup import run_internet_cleanup
+
+        calls: list[tuple[str, ...]] = []
+        stop_checks = 0
+
+        def command_runner(args, **_kwargs):
+            calls.append(tuple(args))
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        def should_stop() -> bool:
+            nonlocal stop_checks
+            stop_checks += 1
+            return bool(calls)
+
+        result = run_internet_cleanup(
+            command_runner=command_runner,
+            flush_dns_cache=lambda: True,
+            should_stop=should_stop,
+            resolve_system_exe=lambda name: f"C:/Windows/System32/{name}",
+        )
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(result.level, "error")
+        self.assertIn("остановлен", result.content)
+        self.assertGreaterEqual(stop_checks, 2)
+
     def test_internet_cleanup_confirmation_plan_warns_about_reboot(self) -> None:
         import presets.ui.control.control_runtime as control_runtime
 

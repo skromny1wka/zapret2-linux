@@ -661,6 +661,20 @@ class Winws1StrategyRunner(StrategyRunnerBase):
                 stable_start_window_seconds=stable_start_window_seconds,
             )
 
+        if self._maybe_run_windivert_auto_fix_after_failed_spawn(
+            stderr_output,
+            exit_code,
+            retry_count=retry_count,
+        ):
+            log("WinDivert auto-fix succeeded, retrying preset start once", "WARNING")
+            return self._start_from_preset_file_locked(
+                preset_path,
+                strategy_name,
+                retry_count=retry_count + 1,
+                max_retries=max_retries,
+                stable_start_window_seconds=stable_start_window_seconds,
+            )
+
         if self._is_windivert_system_error(stderr_output, exit_code):
             log("WinDivert system error — retry will not help", "WARNING")
             return False

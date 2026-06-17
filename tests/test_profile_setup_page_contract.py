@@ -169,6 +169,17 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertIn("normalized_created_profiles", notify)
         self.assertIn("InfoBar.info", notify)
 
+    def test_preset_setup_page_skips_normalization_infobar_while_hidden(self) -> None:
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page.isVisible = Mock(return_value=False)
+        page.window = Mock(return_value=None)
+        payload = SimpleNamespace(normalized_split_profiles=1, normalized_created_profiles=1)
+
+        with patch("profile.ui.preset_setup_page.InfoBar.info") as info:
+            PresetSetupPageBase._show_profile_normalization_info(page, payload)
+
+        info.assert_not_called()
+
     def test_preset_setup_page_has_add_user_profile_action(self) -> None:
         apply_payload = inspect.getsource(PresetSetupPageBase._apply_payload)
         build_content = inspect.getsource(PresetSetupPageBase._build_content)
@@ -620,6 +631,61 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         profiles_list.apply_view_state.assert_not_called()
         page._show_profile_normalization_info.assert_not_called()
+
+    def test_loaded_view_state_keeps_current_page_search_and_added_filter(self) -> None:
+        item = ProfileListItem(
+            key="profile:1",
+            persistent_key="profile:1",
+            profile_index=0,
+            display_name="YouTube",
+            enabled=True,
+            in_preset=True,
+            strategy_id="strategy",
+            strategy_name="Strategy",
+            match_lines=(),
+            list_type="",
+            rating="",
+            favorite=False,
+            group="common",
+            group_name="Common",
+            order=0,
+        )
+        payload = SimpleNamespace(
+            items=(item,),
+            selected_preset_name="",
+            selected_preset_file_name="custom.txt",
+            normalized_split_profiles=0,
+            normalized_created_profiles=0,
+        )
+        view_state = SimpleNamespace(
+            rows=[{"kind": "profile", "key": "profile:1"}],
+            search_query="old query",
+            show_only_added=False,
+        )
+        profiles_list = SimpleNamespace(
+            update_profiles=Mock(),
+            set_search_query=Mock(),
+            set_show_only_added=Mock(),
+            apply_view_state=Mock(),
+        )
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._content_host_layout = object()
+        page._profiles_list = profiles_list
+        page._profile_search_query = "new query"
+        page._profile_show_only_added = True
+        page.title_label = _TextWidget("Настройка пресета: custom.txt")
+        page.title_key = "page.winws2_pages.title"
+        page.page_title = "Настройка пресета"
+        page._ui_language = "ru"
+        page._show_profile_normalization_info = Mock()
+        page._show_empty_state = Mock()
+        page._log_ui_timing = Mock()
+
+        PresetSetupPageBase._apply_payload(page, payload, view_state=view_state)
+
+        profiles_list.apply_view_state.assert_called_once_with(view_state)
+        profiles_list.set_search_query.assert_called_once_with("new query")
+        profiles_list.set_show_only_added.assert_called_once_with(True)
 
     def test_profile_list_does_not_own_page_background_color(self) -> None:
         list_source = inspect.getsource(ProfilesList._build_ui)
@@ -2118,6 +2184,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         ):
             self.assertIn(attr, source)
         self.assertIn("_profile_folder_action_state_obj().reset()", source)
+        self.assertIn("_deferred_profile_payload_apply = None", source)
         self.assertIn(".stop(", source)
         self.assertIn(".cancel()", source)
 
@@ -3135,6 +3202,81 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._refresh_profile_item_locally.assert_not_called()
         page.refresh_from_preset_switch.assert_not_called()
 
+    def test_profile_setup_change_with_ready_item_clears_deferred_payload(self) -> None:
+        item = SimpleNamespace(key="profile-1")
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._deferred_profile_payload_apply = (object(), None, None)
+        page._replace_profile_item_locally = Mock(return_value=True)
+        page._refresh_profile_item_locally = Mock()
+        page.refresh_from_preset_switch = Mock()
+
+        PresetSetupPageBase.apply_profile_setup_change(page, "profile-1", "strategy", item)
+
+        self.assertIsNone(page._deferred_profile_payload_apply)
+
+    def test_local_profile_list_mutations_clear_deferred_payload(self) -> None:
+        class ProfilesList:
+            def add_profile_item(self, _item) -> bool:
+                return True
+
+            def replace_user_profile_items(self, _profile_id, _items) -> bool:
+                return True
+
+            def remove_user_profile_items(self, _profile_id) -> bool:
+                return True
+
+            def apply_profile_folder_state(self, _state) -> bool:
+                return True
+
+            def move_profile_item(self, *_args) -> bool:
+                return True
+
+        cases = (
+            (
+                "_add_created_user_profile_locally",
+                lambda page: PresetSetupPageBase._add_created_user_profile_locally(
+                    page,
+                    SimpleNamespace(key="profile-1"),
+                ),
+            ),
+            (
+                "_replace_user_profile_items_locally",
+                lambda page: PresetSetupPageBase._replace_user_profile_items_locally(
+                    page,
+                    "user-1",
+                    (SimpleNamespace(key="profile-1"),),
+                ),
+            ),
+            (
+                "_remove_user_profile_items_locally",
+                lambda page: PresetSetupPageBase._remove_user_profile_items_locally(page, "user-1"),
+            ),
+            (
+                "_apply_profile_folder_state_locally",
+                lambda page: PresetSetupPageBase._apply_profile_folder_state_locally(page, {"folder": True}),
+            ),
+            (
+                "_apply_profile_move_locally",
+                lambda page: PresetSetupPageBase._apply_profile_move_locally(
+                    page,
+                    "before",
+                    "profile-1",
+                    destination_profile_key="profile-2",
+                ),
+            ),
+        )
+
+        for name, mutate in cases:
+            with self.subTest(name=name):
+                page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+                page._profiles_list = ProfilesList()
+                page._deferred_profile_payload_apply = (object(), None, None)
+                page._profile_payload_dirty = False
+
+                self.assertTrue(mutate(page))
+
+                self.assertIsNone(page._deferred_profile_payload_apply)
+
     def test_enabled_change_refreshes_only_changed_profile_row(self) -> None:
         page = PresetSetupPageBase.__new__(PresetSetupPageBase)
         page._apply_profile_enabled_locally = Mock(return_value=True)
@@ -3382,7 +3524,7 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         page._apply_payload.assert_not_called()
 
-    def test_pending_profile_payload_apply_is_ignored_when_page_is_hidden(self) -> None:
+    def test_pending_profile_payload_apply_builds_hidden_list_without_showing_it(self) -> None:
         page = PresetSetupPageBase.__new__(PresetSetupPageBase)
         page._profile_load_request_id = 8
         page._cleanup_in_progress = False
@@ -3391,9 +3533,11 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         page._profile_load_refresh_pending = False
         page._profile_payload_request_scheduled = False
         page.isVisible = Mock(return_value=False)
-        page._apply_payload = Mock(
-            side_effect=AssertionError("hidden page must not replace the visible profile list")
+        page._apply_payload = Mock()
+        page._schedule_profiles_list_show_after_page_switch = Mock(
+            side_effect=AssertionError("hidden warmup must not show the list immediately")
         )
+        page._hide_profiles_list_for_next_switch = Mock()
         payload = SimpleNamespace(items=(), selected_preset_name="Old")
         callbacks = []
 
@@ -3408,8 +3552,220 @@ class ProfileSetupPageContractTests(unittest.TestCase):
 
         callbacks[0]()
 
+        page._apply_payload.assert_called_once_with(payload, view_state=None, apply_signature_base=None)
+        page._schedule_profiles_list_show_after_page_switch.assert_not_called()
+        page._hide_profiles_list_for_next_switch.assert_called_once_with()
+        self.assertFalse(page._profile_payload_dirty)
+        self.assertIsNone(page._deferred_profile_payload_apply)
+
+    def test_hidden_profile_payload_apply_builds_hidden_profile_list_for_warmup(self) -> None:
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._profile_load_request_id = 8
+        page._cleanup_in_progress = False
+        page._profile_payload_loaded_once = False
+        page._profile_payload_dirty = True
+        page._profile_load_refresh_pending = False
+        page._profile_payload_request_scheduled = False
+        page.isVisible = Mock(return_value=False)
+        page._apply_payload = Mock()
+        page._schedule_profiles_list_show_after_page_switch = Mock(
+            side_effect=AssertionError("hidden warmup must not show the list immediately")
+        )
+        page._hide_profiles_list_for_next_switch = Mock()
+        payload = SimpleNamespace(items=(), selected_preset_name="Default")
+        callbacks = []
+
+        with patch(
+            "profile.ui.preset_setup_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            PresetSetupPageBase._on_profile_payload_loaded(page, 8, payload)
+
+        self.assertEqual(len(callbacks), 1)
+
+        callbacks[0]()
+
+        page._apply_payload.assert_called_once_with(payload, view_state=None, apply_signature_base=None)
+        page._schedule_profiles_list_show_after_page_switch.assert_not_called()
+        page._hide_profiles_list_for_next_switch.assert_called_once_with()
+        self.assertIsNone(page._deferred_profile_payload_apply)
+        self.assertFalse(page._profile_payload_dirty)
+
+    def test_hidden_warmed_profile_payload_is_applied_on_next_activation(self) -> None:
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        state = SimpleNamespace(
+            is_busy=Mock(return_value=False),
+            has_pending=Mock(return_value=False),
+        )
+        payload = SimpleNamespace(items=(), selected_preset_name="Default")
+        page._cleanup_in_progress = False
+        page._profile_payload_loaded_once = True
+        page._profile_payload_dirty = True
+        page._profile_payload_request_scheduled = False
+        page._deferred_profile_payload_apply = (payload, "view-state", ("signature",))
+        page._profile_load_refresh_state_obj = Mock(return_value=state)
+        page._apply_payload = Mock()
+        page._schedule_profiles_list_show_after_page_switch = Mock()
+        page._schedule_profiles_payload_request = Mock(
+            side_effect=AssertionError("warmed hidden payload must be used before starting another worker")
+        )
+
+        PresetSetupPageBase.on_page_activated(page)
+
+        page._apply_payload.assert_called_once_with(
+            payload,
+            view_state="view-state",
+            apply_signature_base=("signature",),
+        )
+        page._schedule_profiles_payload_request.assert_not_called()
+        page._schedule_profiles_list_show_after_page_switch.assert_called_once_with()
+        self.assertIsNone(page._deferred_profile_payload_apply)
+        self.assertTrue(page._profile_payload_loaded_once)
+        self.assertFalse(page._profile_payload_dirty)
+
+    def test_hidden_warmed_profile_payload_waits_when_refresh_is_busy_on_activation(self) -> None:
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        state = SimpleNamespace(
+            is_busy=Mock(return_value=True),
+            has_pending=Mock(return_value=False),
+        )
+        page._cleanup_in_progress = False
+        page._profile_payload_loaded_once = True
+        page._profile_payload_dirty = False
+        page._profile_payload_request_scheduled = False
+        page._deferred_profile_payload_apply = (object(), "view-state", ("signature",))
+        page._profile_load_refresh_state_obj = Mock(return_value=state)
+        page._apply_payload = Mock()
+        page._schedule_profiles_list_show_after_page_switch = Mock(
+            side_effect=AssertionError("stale visible state must not be shown while refresh is busy")
+        )
+        page._schedule_profiles_payload_request = Mock(
+            side_effect=AssertionError("busy refresh must finish before another request starts")
+        )
+
+        PresetSetupPageBase.on_page_activated(page)
+
         page._apply_payload.assert_not_called()
-        self.assertTrue(page._profile_payload_dirty)
+        page._schedule_profiles_list_show_after_page_switch.assert_not_called()
+        page._schedule_profiles_payload_request.assert_not_called()
+        self.assertIsNotNone(page._deferred_profile_payload_apply)
+        self.assertFalse(page._profile_payload_dirty)
+
+    def test_hidden_warmed_profile_payload_waits_when_newer_apply_is_scheduled(self) -> None:
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        state = SimpleNamespace(
+            is_busy=Mock(return_value=False),
+            has_pending=Mock(return_value=False),
+        )
+        page._cleanup_in_progress = False
+        page._profile_payload_loaded_once = True
+        page._profile_payload_dirty = False
+        page._profile_payload_request_scheduled = False
+        page._profile_payload_apply_scheduled = True
+        page._pending_profile_payload_apply = (object(), "new-view-state", ("new",))
+        page._deferred_profile_payload_apply = (object(), "old-view-state", ("old",))
+        page._profile_load_refresh_state_obj = Mock(return_value=state)
+        page._apply_payload = Mock(
+            side_effect=AssertionError("old deferred payload must wait for newer scheduled apply")
+        )
+        page._schedule_profiles_list_show_after_page_switch = Mock(
+            side_effect=AssertionError("old deferred payload must not be shown before newer apply")
+        )
+        page._schedule_profiles_payload_request = Mock(
+            side_effect=AssertionError("scheduled apply already owns the next visible list")
+        )
+
+        PresetSetupPageBase.on_page_activated(page)
+
+        page._apply_payload.assert_not_called()
+        page._schedule_profiles_list_show_after_page_switch.assert_not_called()
+        page._schedule_profiles_payload_request.assert_not_called()
+        self.assertIsNotNone(page._deferred_profile_payload_apply)
+        self.assertFalse(page._profile_payload_dirty)
+
+    def test_hidden_warmed_profile_payload_applies_after_busy_worker_finish_when_page_visible(self) -> None:
+        from ui.latest_value_worker_state import LatestValueWorkerState
+
+        runtime = SimpleNamespace(is_running=Mock(return_value=False))
+        state = LatestValueWorkerState(runtime, empty_value=False)
+        worker = SimpleNamespace(_request_id=9)
+        payload = SimpleNamespace(items=(), selected_preset_name="Default")
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._cleanup_in_progress = False
+        page._profile_payload_dirty = False
+        page._profile_load_runtime_request_id = 9
+        page._profile_load_refresh_state = state
+        page._profile_load_runtime = runtime
+        page._profile_payload_request_scheduled = False
+        page._deferred_profile_payload_apply = (payload, "view-state", ("signature",))
+        page.isVisible = Mock(return_value=True)
+        page._apply_payload = Mock()
+        page._schedule_profiles_list_show_after_page_switch = Mock()
+
+        PresetSetupPageBase._on_profile_worker_finished(page, worker)
+
+        page._apply_payload.assert_called_once_with(
+            payload,
+            view_state="view-state",
+            apply_signature_base=("signature",),
+        )
+        page._schedule_profiles_list_show_after_page_switch.assert_called_once_with()
+        self.assertIsNone(page._deferred_profile_payload_apply)
+        self.assertTrue(page._profile_payload_loaded_once)
+        self.assertFalse(page._profile_payload_dirty)
+
+    def test_visible_profile_payload_apply_clears_older_deferred_payload(self) -> None:
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        state = SimpleNamespace(has_pending=Mock(return_value=False))
+        old_payload = SimpleNamespace(items=(), selected_preset_name="Old")
+        new_payload = SimpleNamespace(items=(), selected_preset_name="New")
+        page._cleanup_in_progress = False
+        page._profile_payload_request_scheduled = False
+        page._deferred_profile_payload_apply = (old_payload, "old-view", ("old",))
+        page._pending_profile_payload_apply = (new_payload, "new-view", ("new",))
+        page._profile_load_refresh_state_obj = Mock(return_value=state)
+        page.isVisible = Mock(return_value=True)
+        page._apply_payload = Mock()
+        page._schedule_profiles_list_show_after_page_switch = Mock()
+
+        PresetSetupPageBase._run_scheduled_profile_payload_apply(page)
+
+        page._apply_payload.assert_called_once_with(
+            new_payload,
+            view_state="new-view",
+            apply_signature_base=("new",),
+        )
+        page._schedule_profiles_list_show_after_page_switch.assert_called_once_with()
+        self.assertIsNone(page._deferred_profile_payload_apply)
+
+    def test_preset_setup_warmup_initial_load_starts_background_payload_request(self) -> None:
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        state = SimpleNamespace(is_busy=Mock(return_value=False))
+        page._cleanup_in_progress = False
+        page._profile_payload_loaded_once = False
+        page._profile_payload_dirty = True
+        page._profile_load_refresh_state_obj = Mock(return_value=state)
+        page._request_profiles_payload = Mock()
+
+        self.assertTrue(PresetSetupPageBase.warmup_initial_load(page))
+
+        page._request_profiles_payload.assert_called_once_with()
+
+    def test_preset_setup_warmup_initial_load_keeps_deferred_payload(self) -> None:
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        state = SimpleNamespace(is_busy=Mock(return_value=False))
+        page._cleanup_in_progress = False
+        page._profile_payload_loaded_once = True
+        page._profile_payload_dirty = True
+        page._deferred_profile_payload_apply = (object(), None, None)
+        page._profile_load_refresh_state_obj = Mock(return_value=state)
+        page._request_profiles_payload = Mock(
+            side_effect=AssertionError("ready warmed payload must not be replaced by another warmup load")
+        )
+
+        self.assertFalse(PresetSetupPageBase.warmup_initial_load(page))
+
+        page._request_profiles_payload.assert_not_called()
 
     def test_loaded_profile_payload_is_ignored_while_refresh_is_pending(self) -> None:
         page = PresetSetupPageBase.__new__(PresetSetupPageBase)
@@ -3537,6 +3893,60 @@ class ProfileSetupPageContractTests(unittest.TestCase):
             },
         )
 
+    def test_forced_profile_payload_request_clears_deferred_payload_before_start(self) -> None:
+        class _Runtime:
+            def is_running(self) -> bool:
+                return False
+
+            def start_qthread_worker(self, *, worker_factory, bind_worker, on_finished):
+                worker = worker_factory(1)
+                return 1, worker
+
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._cleanup_in_progress = False
+        page._profile_payload_loaded_once = True
+        page._profile_payload_dirty = False
+        page._profile_load_refresh_pending = False
+        page._profile_load_request_id = 41
+        page._profile_load_runtime = _Runtime()
+        page._deferred_profile_payload_apply = (object(), None, None)
+        page._profile_search_query = ""
+        page.launch_method = "zapret2"
+        page._profiles_list = SimpleNamespace(view_state_options=Mock(return_value={}))
+        page._create_profile_list_load_worker = Mock(return_value=SimpleNamespace())
+
+        PresetSetupPageBase._request_profiles_payload(page, force=True)
+
+        self.assertIsNone(page._deferred_profile_payload_apply)
+
+    def test_forced_profile_payload_request_drops_pending_apply_before_start(self) -> None:
+        class _Runtime:
+            def is_running(self) -> bool:
+                return False
+
+            def start_qthread_worker(self, *, worker_factory, bind_worker, on_finished):
+                worker = worker_factory(1)
+                return 1, worker
+
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._cleanup_in_progress = False
+        page._profile_payload_loaded_once = True
+        page._profile_payload_dirty = False
+        page._profile_load_refresh_pending = False
+        page._profile_load_request_id = 41
+        page._profile_load_runtime = _Runtime()
+        page._pending_profile_payload_apply = (object(), None, None)
+        page._profile_payload_apply_scheduled = True
+        page._profile_search_query = ""
+        page.launch_method = "zapret2"
+        page._profiles_list = SimpleNamespace(view_state_options=Mock(return_value={}))
+        page._create_profile_list_load_worker = Mock(return_value=SimpleNamespace())
+
+        PresetSetupPageBase._request_profiles_payload(page, force=True)
+
+        self.assertIsNone(page._pending_profile_payload_apply)
+        self.assertTrue(page._profile_payload_apply_scheduled)
+
     def test_pending_running_profile_refresh_does_not_schedule_extra_timer(self) -> None:
         runtime = SimpleNamespace(is_running=Mock(return_value=True))
         page = PresetSetupPageBase.__new__(PresetSetupPageBase)
@@ -3558,6 +3968,50 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertTrue(page._profile_payload_dirty)
         self.assertFalse(page._profile_payload_request_scheduled)
         self.assertTrue(page._profile_load_refresh_pending)
+
+    def test_pending_running_forced_profile_refresh_clears_deferred_payload(self) -> None:
+        runtime = SimpleNamespace(is_running=Mock(return_value=True))
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._profile_load_runtime = runtime
+        page._profile_load_refresh_pending = True
+        page._profile_payload_request_scheduled = False
+        page._profile_payload_request_force = False
+        page._profile_payload_dirty = False
+        page._deferred_profile_payload_apply = (object(), None, None)
+        page._run_scheduled_profiles_payload_request = Mock(
+            side_effect=AssertionError("pending running worker must not queue another timer")
+        )
+
+        with patch(
+            "profile.ui.preset_setup_page.QTimer.singleShot",
+            side_effect=AssertionError("pending running worker must not queue another timer"),
+        ):
+            PresetSetupPageBase._schedule_profiles_payload_request(page, force=True)
+
+        self.assertIsNone(page._deferred_profile_payload_apply)
+
+    def test_pending_running_forced_profile_refresh_drops_pending_apply(self) -> None:
+        runtime = SimpleNamespace(is_running=Mock(return_value=True))
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._profile_load_runtime = runtime
+        page._profile_load_refresh_pending = True
+        page._profile_payload_request_scheduled = False
+        page._profile_payload_request_force = False
+        page._profile_payload_dirty = False
+        page._pending_profile_payload_apply = (object(), None, None)
+        page._profile_payload_apply_scheduled = True
+        page._run_scheduled_profiles_payload_request = Mock(
+            side_effect=AssertionError("pending running worker must not queue another timer")
+        )
+
+        with patch(
+            "profile.ui.preset_setup_page.QTimer.singleShot",
+            side_effect=AssertionError("pending running worker must not queue another timer"),
+        ):
+            PresetSetupPageBase._schedule_profiles_payload_request(page, force=True)
+
+        self.assertIsNone(page._pending_profile_payload_apply)
+        self.assertTrue(page._profile_payload_apply_scheduled)
 
     def test_preset_setup_content_state_change_schedules_profile_refresh(self) -> None:
         page = PresetSetupPageBase.__new__(PresetSetupPageBase)
@@ -3609,6 +4063,27 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertTrue(page._profile_payload_dirty)
         page._schedule_profiles_payload_request.assert_not_called()
         page._request_profiles_payload.assert_not_called()
+        self.assertEqual(len(callbacks), 1)
+
+        callbacks[0]()
+
+        page._schedule_profiles_payload_request.assert_called_once_with(force=True)
+
+    def test_hidden_preset_setup_active_preset_change_preloads_profiles(self) -> None:
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._cleanup_in_progress = False
+        page._profile_payload_dirty = False
+        page.isVisible = Mock(return_value=False)
+        page._schedule_profiles_payload_request = Mock()
+        callbacks = []
+
+        with patch(
+            "profile.ui.preset_setup_page.QTimer.singleShot",
+            side_effect=lambda _delay, callback: callbacks.append(callback),
+        ):
+            PresetSetupPageBase._on_ui_state_changed(page, object(), frozenset({"active_preset_revision"}))
+
+        self.assertTrue(page._profile_payload_dirty)
         self.assertEqual(len(callbacks), 1)
 
         callbacks[0]()

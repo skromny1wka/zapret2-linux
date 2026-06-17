@@ -6,7 +6,7 @@ from app_notifications import advisory_notification
 def build_autostart_error_notification(message: str) -> dict:
     text = str(message or "").strip()
     if not text:
-        text = "Windows не смог создать задачу автозапуска."
+        text = "Windows не смог создать ярлык автозапуска."
 
     return advisory_notification(
         level="error",

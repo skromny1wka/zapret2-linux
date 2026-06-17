@@ -59,15 +59,16 @@ class ProfileNormalizerTests(unittest.TestCase):
         self.assertEqual(result.preset.profiles[0].match.hostlist_lines, ["--hostlist=lists/discord.txt"])
         self.assertEqual(result.preset.profiles[1].match.ipset_lines, ["--ipset=lists/ipset-discord.txt"])
 
-    def test_keeps_multi_ipset_profile_when_it_matches_all_profiles_template(self) -> None:
+    def test_keeps_catalog_profile_with_multiple_ipsets_unchanged(self) -> None:
         preset = parse_preset_text(
             "\n".join(
                 (
-                    "--name=Исключения (RU сайты)",
+                    "--name=Каталожный набор IP",
                     "--filter-tcp=80,443-65535",
-                    "--ipset=lists/ipset-ru.txt",
-                    "--ipset=lists/ipset-dns.txt",
-                    "--ipset=lists/ipset-exclude.txt",
+                    "--ipset=lists/ipset-one.txt",
+                    "--ipset=lists/ipset-two.txt",
+                    "--ipset=lists/ipset-three.txt",
+                    "--ipset=lists/ipset-four.txt",
                     "--payload=tls_client_hello",
                     "--out-range=-d8",
                     "--lua-desync=pass",
@@ -87,9 +88,10 @@ class ProfileNormalizerTests(unittest.TestCase):
         self.assertEqual(
             result.preset.profiles[0].match.ipset_lines,
             [
-                "--ipset=lists/ipset-ru.txt",
-                "--ipset=lists/ipset-dns.txt",
-                "--ipset=lists/ipset-exclude.txt",
+                "--ipset=lists/ipset-one.txt",
+                "--ipset=lists/ipset-two.txt",
+                "--ipset=lists/ipset-three.txt",
+                "--ipset=lists/ipset-four.txt",
             ],
         )
 

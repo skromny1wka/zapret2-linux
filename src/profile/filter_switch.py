@@ -64,13 +64,18 @@ def _filter_value_for_kind_switch(settings: EditableProfileSettings, filter_kind
     if target_kind == current_kind:
         return normalize_filter_value(current_value, target_kind, filter_role=settings.filter_role)
     if str(settings.filter_role or "").strip().lower() == "exclude":
-        return _paired_exclude_filter_value(current_value, current_kind, target_kind)
+        return _paired_exclude_filter_value(
+            current_value,
+            current_kind,
+            target_kind,
+            filter_protocol=str(settings.filter_protocol or "").strip().lower(),
+        )
     if "," in current_value:
         return ""
     return _paired_primary_filter_value(current_value, current_kind, target_kind)
 
 
-def _paired_exclude_filter_value(value: str, current_kind: str, target_kind: str) -> str:
+def _paired_exclude_filter_value(value: str, current_kind: str, target_kind: str, *, filter_protocol: str = "") -> str:
     raw = str(value or "").strip()
     if not raw:
         return ""
@@ -85,6 +90,8 @@ def _paired_exclude_filter_value(value: str, current_kind: str, target_kind: str
         return ",".join(_replace_filter_path_name(values[0], path, name) for name in _SERVICE_EXCLUDE_IPSET_NAMES)
 
     if current_kind == "ipset" and target_kind == "hostlist":
+        if filter_protocol == "udp":
+            return ""
         names = [PureWindowsPath(item).name.lower() for item in values]
         if len(names) != len(_SERVICE_EXCLUDE_IPSET_NAMES) or frozenset(names) != _SERVICE_EXCLUDE_IPSET_NAME_SET:
             return ""

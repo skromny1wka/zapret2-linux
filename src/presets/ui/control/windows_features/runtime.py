@@ -321,5 +321,10 @@ class ControlPageWindowsFeatureMixin:
     def _stop_internet_cleanup_worker(self) -> None:
         runtime = self.__dict__.get("_internet_cleanup_runtime")
         if runtime is not None:
-            runtime.stop(blocking=False, warning_prefix="Internet cleanup worker")
+            runtime.stop(
+                blocking=True,
+                wait_timeout_ms=45000,
+                terminate_wait_ms=1000,
+                warning_prefix="Internet cleanup worker",
+            )
             runtime.cancel()

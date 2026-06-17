@@ -7,7 +7,7 @@ from main.post_startup_gate import bind_startup_gate, is_startup_host_alive
 from main.post_startup_threading import enqueue_subsystem_task, schedule_after
 
 
-HOSTS_PAGE_WARMUP_DELAY_MS = 5_000
+HOSTS_PAGE_WARMUP_DELAY_MS = 1_000
 
 
 def install_hosts_page_warmup(

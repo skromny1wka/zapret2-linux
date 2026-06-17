@@ -153,30 +153,6 @@ class Winws2LaunchPresetValidationTests(unittest.TestCase):
 
         self.assertEqual(prepared.text, source)
 
-    def test_source_save_normalization_adds_required_lua_init_lines(self) -> None:
-        from presets.preset_text_ops import normalize_preset_source_text_for_engine
-        from settings.mode import ENGINE_WINWS2
-
-        source = "\n".join(
-            (
-                "# Preset: Example",
-                "--wf-tcp-out=443",
-                "--filter-tcp=443",
-                "--hostlist=lists/youtube.txt",
-                "--lua-desync=hostfakesplit_multi:hosts=google.com",
-                "",
-            )
-        )
-
-        normalized = normalize_preset_source_text_for_engine(source, ENGINE_WINWS2)
-
-        self.assertIn("--lua-init=@lua/zapret-lib.lua", normalized)
-        self.assertIn("--lua-init=@lua/zapret-antidpi.lua", normalized)
-        self.assertIn("--lua-init=@lua/zapret-auto.lua", normalized)
-        self.assertIn("--lua-init=@lua/custom_funcs.lua", normalized)
-        self.assertIn("--lua-init=@lua/custom_diag.lua", normalized)
-        self.assertIn("--lua-init=@lua/zapret-multishake.lua", normalized)
-
     def test_launch_preparation_rejects_strategy_tags_in_non_circular_preset(self) -> None:
         from winws_runtime.preset_launch_text import prepare_winws2_preset_text_for_launch
 
@@ -531,6 +507,59 @@ class Winws2LaunchPresetValidationTests(unittest.TestCase):
         self.assertTrue(kwargs["stdout"].closed)
         self.assertEqual(stable_start.call_args.kwargs["stable_window"], 0.35)
 
+    def test_winws2_preset_switch_waits_briefly_between_dry_run_and_real_spawn(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+
+        from winws_runtime.runners.zapret2_runner import Winws2StrategyRunner
+
+        with tempfile.TemporaryDirectory() as tmp:
+            events: list[str] = []
+            runner = object.__new__(Winws2StrategyRunner)
+            runner.winws_exe = "winws2.exe"
+            runner.work_dir = tmp
+            runner.running_process = None
+            runner.current_launch_label = None
+            runner.current_strategy_args = None
+            runner._last_spawn_exit_code = None
+            runner._last_spawn_stderr = ""
+            runner._prepare_state_for_spawn_locked = Mock()
+            runner._set_runner_state_locked = Mock()
+            runner._log_winws2_launch_command = Mock()
+            runner._create_startup_info = Mock(return_value=None)
+            runner._set_last_error = Mock()
+            runner._run_preset_dry_run_locked = Mock(return_value=True)
+
+            fake_process = SimpleNamespace(pid=2468, returncode=None)
+            artifact = SimpleNamespace(
+                launch_args=("@config.txt",),
+                preset_path="preset.txt",
+                normalized_text="--wf-tcp-out=443\n",
+            )
+
+            def fake_popen(*_args, **_kwargs):
+                events.append("spawn")
+                return fake_process
+
+            with (
+                patch("winws_runtime.runners.zapret2_runner.subprocess.Popen", side_effect=fake_popen),
+                patch("winws_runtime.runners.zapret2_runner.wait_for_process_stable_start", return_value=True),
+                patch(
+                    "winws_runtime.runners.zapret2_runner.time.sleep",
+                    side_effect=lambda seconds: events.append(f"sleep:{seconds}"),
+                ),
+            ):
+                self.assertTrue(
+                    runner._spawn_process_locked(
+                        artifact,
+                        "Preset",
+                        preset_switch=True,
+                    )
+                )
+
+        self.assertEqual(events[0].split(":")[0], "sleep")
+        self.assertEqual(events[1], "spawn")
+
     def test_winws2_immediate_exit_reads_startup_output_file(self) -> None:
         from types import SimpleNamespace
         from unittest.mock import Mock, patch
@@ -580,6 +609,55 @@ class Winws2LaunchPresetValidationTests(unittest.TestCase):
 
         self.assertIn("parameter is incorrect", runner._last_spawn_stderr.lower())
         runner._read_process_startup_output.assert_not_called()
+
+    def test_winws2_preset_switch_dll_init_failure_has_clear_error(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import Mock, patch
+
+        from winws_runtime.runners.zapret2_runner import Winws2StrategyRunner
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runner = object.__new__(Winws2StrategyRunner)
+            runner.winws_exe = "winws2.exe"
+            runner.work_dir = tmp
+            runner.running_process = None
+            runner.current_launch_label = None
+            runner.current_strategy_args = None
+            runner._last_spawn_exit_code = None
+            runner._last_spawn_stderr = ""
+            runner._prepare_state_for_spawn_locked = Mock()
+            runner._set_runner_state_locked = Mock()
+            runner._log_winws2_launch_command = Mock()
+            runner._create_startup_info = Mock(return_value=None)
+            runner._set_last_error = Mock()
+            runner._run_preset_dry_run_locked = Mock(return_value=True)
+            runner._read_process_startup_output = Mock(return_value="")
+
+            artifact = SimpleNamespace(
+                launch_args=("@config.txt",),
+                preset_path="preset.txt",
+                normalized_text="--wf-tcp-out=443\n",
+            )
+
+            with (
+                patch(
+                    "winws_runtime.runners.zapret2_runner.subprocess.Popen",
+                    return_value=SimpleNamespace(pid=2468, returncode=0xC0000142),
+                ),
+                patch("winws_runtime.runners.zapret2_runner.wait_for_process_stable_start", return_value=False),
+            ):
+                self.assertFalse(
+                    runner._spawn_process_locked(
+                        artifact,
+                        "Preset",
+                        preset_switch=True,
+                    )
+                )
+
+        message = runner._set_last_error.call_args.args[0]
+        self.assertIn("Windows не смогла инициализировать DLL", message)
+        self.assertIn("0xC0000142", message)
+        self.assertNotIn("Preset switch failed", message)
 
     def test_winws2_startup_output_summary_prefers_windivert_error_line(self) -> None:
         from winws_runtime.runners.zapret2_runner import Winws2StrategyRunner

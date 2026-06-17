@@ -184,16 +184,67 @@ def _clean_protocol(value: object) -> str:
     return protocol
 
 
-def _clean_ports(value: object, protocol: str = "tcp") -> str:
+def validate_user_profile_filter(protocol: object, value: object) -> str | None:
+    clean_protocol = str(protocol or "").strip().lower()
     text = str(value or "").strip().replace(" ", "")
     if not text:
-        raise ValueError("Значение фильтра profile не должно быть пустым")
-    if str(protocol or "").strip().lower() == "l7":
+        return "Значение фильтра profile не должно быть пустым"
+    if clean_protocol == "l7":
         if not re.match(r"^[a-z0-9_,.-]+$", text, flags=re.IGNORECASE):
-            raise ValueError("L7 можно указать словами через запятую, например stun,discord")
-        return text
+            return "L7 можно указать словами через запятую, например stun,discord"
+        return None
+    if clean_protocol not in {"tcp", "udp"}:
+        return "Тип profile должен быть TCP, UDP или L7"
     if not _PORTS_RE.match(text):
-        raise ValueError("Порты можно указать числами, диапазонами и запятыми")
+        return "Порты можно указать числами, диапазонами и запятыми"
+    for raw_token in text.split(","):
+        error = _validate_port_token(raw_token)
+        if error:
+            return error
+    return None
+
+
+def _validate_port_token(token: str) -> str | None:
+    if not token:
+        return "Порты можно указать числами, диапазонами и запятыми"
+    if token.startswith("~"):
+        token = token[1:]
+        if not token:
+            return "Порты можно указать числами, диапазонами и запятыми"
+        if token == "*":
+            return "Порты можно указать числами, диапазонами и запятыми"
+    if token == "*":
+        return None
+    if "-" in token:
+        parts = token.split("-")
+        if len(parts) != 2 or not parts[0] or not parts[1]:
+            return "Порты можно указать числами, диапазонами и запятыми"
+        start = _parse_port_number(parts[0])
+        end = _parse_port_number(parts[1])
+        if start is None or end is None:
+            return "Порт должен быть от 1 до 65535."
+        if start > end:
+            return "Начало диапазона портов не должно быть больше конца."
+        return None
+    if _parse_port_number(token) is None:
+        return "Порт должен быть от 1 до 65535."
+    return None
+
+
+def _parse_port_number(value: str) -> int | None:
+    if not value.isdigit():
+        return None
+    port = int(value)
+    if port < 1 or port > 65535:
+        return None
+    return port
+
+
+def _clean_ports(value: object, protocol: str = "tcp") -> str:
+    text = str(value or "").strip().replace(" ", "")
+    error = validate_user_profile_filter(protocol, text)
+    if error:
+        raise ValueError(error)
     return text
 
 

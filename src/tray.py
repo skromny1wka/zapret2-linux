@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import QApplication, QMenu, QMessageBox, QWidget
 from qfluentwidgets import RoundMenu, Action, FluentIcon
 
 from ui.message_box_accessibility import set_message_box_button_accessibility
+from ui.popup_menu_style import suppress_round_menu_hairline
 
 try:
     from log.log import log
@@ -643,6 +644,7 @@ class SystemTrayManager:
 
     def _apply_menu_style(self, menu: QMenu):
         if isinstance(menu, RoundMenu):
+            suppress_round_menu_hairline(menu)
             return
 
         try:

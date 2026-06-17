@@ -4,7 +4,7 @@ import inspect
 import os
 import unittest
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -698,14 +698,29 @@ class PresetStatusBarPlanTests(unittest.TestCase):
         )
 
         self.assertEqual(stopped_plan.text, "Запустить")
+        self.assertEqual(stopped_plan.icon_name, "PLAY")
         self.assertFalse(stopped_plan.should_stop)
         self.assertTrue(stopped_plan.enabled)
         self.assertEqual(running_plan.text, "Остановить")
+        self.assertEqual(running_plan.icon_name, "STOP")
         self.assertTrue(running_plan.should_stop)
         self.assertTrue(running_plan.enabled)
         self.assertEqual(stopping_plan.text, "Остановить")
+        self.assertEqual(stopping_plan.icon_name, "STOP")
         self.assertTrue(stopping_plan.should_stop)
         self.assertFalse(stopping_plan.enabled)
+
+    def test_raw_editor_runtime_toggle_stop_icon_uses_square_stop_glyph(self) -> None:
+        from presets.ui.common import preset_subpage_base
+
+        with patch.object(
+            preset_subpage_base,
+            "get_themed_qta_icon",
+            return_value="square-stop-icon",
+        ) as get_icon:
+            self.assertEqual(preset_subpage_base._fluent_icon("STOP"), "square-stop-icon")
+
+        get_icon.assert_called_once_with("fa5s.stop")
 
     def test_raw_editor_runtime_toggle_skips_duplicate_button_render(self) -> None:
         from presets.ui.common.preset_subpage_base import (

@@ -8,7 +8,9 @@ from PyQt6.QtCore import (
     Qt,
     QTimer,
     QPoint,
+    QUrl,
 )
+from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -65,7 +67,7 @@ from app.state_store import MainWindowStateStore
 
 from qfluentwidgets import (
     FluentIcon, InfoBar,
-    LineEdit, MessageBox, PrimaryToolButton,
+    LineEdit, MessageBox, PrimaryToolButton, PushButton,
     RoundMenu, StrongBodyLabel,
 )
 
@@ -81,9 +83,11 @@ from ui.presets_menu.model import PresetListModel
 from ui.presets_menu.toolbar import PresetsToolbarLayout
 from ui.presets_menu.common import tr_text as _tr_text
 from ui.latest_value_worker_state import LatestValueWorkerState
+from ui.accessibility import set_control_accessibility, set_state_text
 from ui.message_box_accessibility import set_message_box_button_accessibility
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.queued_worker_state import QueuedWorkerState
+from config.urls import PRESET_INFO_URL
 
 
 @dataclass(frozen=True, slots=True)
@@ -609,6 +613,22 @@ class UserPresetsPageBase(BasePage):
                 ),
                 self.window(),
             )
+            site_button_text = self._tr(
+                f"{self._config.tr_prefix}.info.open_site.button",
+                "Открыть сайт с пресетами",
+            )
+            site_button = PushButton(site_button_text)
+            site_button.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(PRESET_INFO_URL)))
+            set_state_text(site_button, site_button_text)
+            set_control_accessibility(
+                site_button,
+                name=site_button_text,
+                description=self._tr(
+                    f"{self._config.tr_prefix}.info.open_site.description",
+                    "Открывает сайт, где можно посмотреть и скачать пресеты.",
+                ),
+            )
+            box.buttonLayout.insertWidget(0, site_button)
             box.cancelButton.hide()
             set_message_box_button_accessibility(
                 box,

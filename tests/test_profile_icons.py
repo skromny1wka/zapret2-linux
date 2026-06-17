@@ -122,8 +122,17 @@ class ProfileIconTests(unittest.TestCase):
             ("--filter-tcp=80,443-65535", "--ipset=lists/ipset-hetzner.txt"),
         )
 
-        self.assertEqual(icon.icon_name, "fa5s.server")
+        self.assertEqual(icon.icon_name, "simple:hetzner:HE")
         self.assertEqual(icon.color, "#D50C2D")
+
+    def test_digitalocean_profile_uses_hoster_icon(self) -> None:
+        icon = resolve_profile_icon(
+            "DigitalOcean TCP",
+            ("--filter-tcp=80,443-65535", "--ipset=lists/ipset-digitalocean.txt"),
+        )
+
+        self.assertEqual(icon.icon_name, "simple:digitalocean:DO")
+        self.assertEqual(icon.color, "#0080FF")
 
     def test_speedtest_profile_uses_brand_icon_from_list_file(self) -> None:
         icon = resolve_profile_icon(

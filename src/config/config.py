@@ -50,7 +50,6 @@ LUA_FOLDER = os.path.join(MAIN_DIRECTORY, "lua")  # Lua библиотеки д�
 ICO_FOLDER = os.path.join(MAIN_DIRECTORY, "ico")
 THEME_FOLDER = os.path.join(MAIN_DIRECTORY, "themes")
 LOGS_FOLDER = os.path.join(MAIN_DIRECTORY, "logs")
-HELP_FOLDER = os.path.join(MAIN_DIRECTORY, "help")
 
 # Настройка количества сохраняемых лог-файлов
 MAX_LOG_FILES = 50           # zapret_log_*.txt - основные логи приложения

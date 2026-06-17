@@ -235,7 +235,7 @@
 --hostlist=lists/google.txt
 --out-range=-d8
 --payload=tls_client_hello
---lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2
+--lua-desync=multisplit:pos=1,host+2,sld+2,sld+5,sniext+1,sniext+2,endhost-2:seqovl=1
 
 --new
 
@@ -364,8 +364,7 @@
 --hostlist=lists/other.txt
 --out-range=-d10
 --payload=tls_client_hello
---lua-desync=send:repeats=2
---lua-desync=syndata:blob=stun_pat
+--lua-desync=multisplit:pos=1:seqovl=740:seqovl_pattern=stun_pat
 
 --new
 
@@ -445,6 +444,16 @@
 
 --new
 
+--name=Hetzner TCP
+--filter-tcp=80,443-65535
+--ipset=lists/ipset-hetzner.txt
+--out-range=-d8
+--lua-desync=send:repeats=2
+--lua-desync=syndata:blob=tls_google
+--lua-desync=tls_multisplit_sni:seqovl=652:seqovl_pattern=tls_google
+
+--new
+
 --name=OVH TCP
 --filter-tcp=80,443-65535
 --ipset=lists/ipset-ovh.txt
@@ -452,6 +461,14 @@
 --payload=tls_client_hello
 --lua-desync=fake:blob=tls_google:repeats=6:tcp_ts=-600000
 --lua-desync=fakedsplit:pattern=0x00:repeats=6:tcp_ts=-600000
+
+--new
+
+--name=DigitalOcean TCP
+--filter-tcp=80,443-65535
+--ipset=lists/ipset-digitalocean.txt
+--out-range=-d8
+--lua-desync=hostfakesplit:host=ozon.ru:tcp_ts=-1000:tcp_md5:repeats=4
 
 --new
 
@@ -531,6 +548,27 @@
 --out-range=-n8
 --payload=all
 --lua-desync=fake:blob=quic_google:repeats=12:ip_autottl=2,3-20:ip6_autottl=2,3-20:payload=all
+
+--new
+
+--name=DigitalOcean UDP
+--skip
+--filter-udp=443-65535
+--ipset=lists/ipset-digitalocean.txt
+--out-range=-d8
+--lua-desync=fake:blob=quic_google:repeats=12
+
+--new
+
+--name=Hetzner UDP
+--skip
+--filter-udp=443-65535
+--ipset=lists/ipset-hetzner.txt
+--out-range=-d8
+--payload=all
+--lua-desync=send:repeats=2
+--lua-desync=syndata:blob=stun_pat
+--lua-desync=hostfakesplit_multi:hosts=google.com,vimeo.com:tcp_ts=-1000:tcp_md5:repeats=2
 
 --new
 

@@ -117,13 +117,44 @@ class BackendPageDataWarmupTests(unittest.TestCase):
             )
             signal.emit("interactive")
 
-        self.assertEqual(delays, [5000])
+        self.assertEqual(delays, [1000])
         self.assertEqual(queued_tasks, [("hosts", "HostsPageDataWarmup")])
         hosts_feature.warm_page_data_cache.assert_called_once_with()
         self.assertFalse(hasattr(startup_host, "ensure_page"))
-        metric.assert_any_call("StartupHostsPageWarmupQueued", "5000ms after interactive")
+        metric.assert_any_call("StartupHostsPageWarmupQueued", "1000ms after interactive")
         metric.assert_any_call("StartupHostsPageWarmupStarted", "backend_cache")
         metric.assert_any_call("StartupHostsPageWarmupFinished", "backend_cache")
+
+    def test_hosts_feature_warms_services_catalog_plan_for_first_open(self) -> None:
+        import sys
+
+        from app.feature_facades.hosts import build_hosts_feature
+
+        selection = {"Claude": "xbox_dns"}
+        catalog_plan = object()
+        catalog_sig = ("hosts_catalog", 1, 2)
+        public = SimpleNamespace(
+            load_user_selection=Mock(return_value=selection),
+            get_catalog_signature=Mock(return_value=catalog_sig),
+            create_hosts_runtime=Mock(return_value=object()),
+            build_services_catalog_plan=Mock(return_value=catalog_plan),
+        )
+
+        with patch.dict(sys.modules, {"hosts.public": public}):
+            feature = build_hosts_feature()
+
+            self.assertTrue(feature.warm_page_data_cache())
+            warmed = feature.consume_warmed_services_catalog_plan(
+                current_selection=selection,
+                direct_title="Напрямую из hosts",
+                ai_title="ИИ",
+                other_title="Остальные",
+            )
+
+        self.assertIsNotNone(warmed)
+        self.assertIs(warmed.plan, catalog_plan)
+        self.assertEqual(warmed.catalog_signature, catalog_sig)
+        public.build_services_catalog_plan.assert_called_once()
 
     def test_telegram_proxy_page_is_prepared_after_interactive_without_opening_it(self) -> None:
         from app.page_names import PageName
