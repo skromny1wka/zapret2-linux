@@ -59,6 +59,22 @@ KEYBOARD_COLLECTION_ACCESS_MARKERS = (
     "set_item_accessible_text",
 )
 
+CUSTOM_MOUSE_ACTION_MARKERS = (
+    "def mousePressEvent",
+    "def mouseReleaseEvent",
+    "def mouseDoubleClickEvent",
+    ".mousePressEvent =",
+    ".mouseReleaseEvent =",
+    ".mouseDoubleClickEvent =",
+)
+
+CUSTOM_KEYBOARD_ACTION_MARKERS = (
+    "def keyPressEvent",
+    ".keyPressEvent =",
+    "enable_keyboard_click",
+    "enable_keyboard_toggle",
+)
+
 
 def _source(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
@@ -90,6 +106,22 @@ def test_collection_controls_keep_keyboard_or_row_accessibility() -> None:
         if not any(marker in source for marker in KEYBOARD_COLLECTION_WIDGET_MARKERS):
             continue
         if any(marker in source for marker in KEYBOARD_COLLECTION_ACCESS_MARKERS):
+            continue
+        missing.append(rel_path)
+
+    assert missing == []
+
+
+def test_custom_mouse_actions_keep_keyboard_activation() -> None:
+    missing: list[str] = []
+    for path in sorted((ROOT / "src").rglob("*.py")):
+        rel_path = path.relative_to(ROOT).as_posix()
+        if rel_path.startswith("src/themes/cache/"):
+            continue
+        source = path.read_text(encoding="utf-8", errors="ignore")
+        if not any(marker in source for marker in CUSTOM_MOUSE_ACTION_MARKERS):
+            continue
+        if any(marker in source for marker in CUSTOM_KEYBOARD_ACTION_MARKERS):
             continue
         missing.append(rel_path)
 
