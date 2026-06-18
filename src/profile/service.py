@@ -12,6 +12,7 @@ import time
 from log.log import log
 from presets.cache_signatures import path_cache_signature
 from settings.mode import DEFAULT_LAUNCH_METHOD, ENGINE_WINWS2, PRESET_LAUNCH_METHODS, engine_for_launch_method, normalize_launch_method
+from ui.performance_metrics import log_ui_timing_since
 
 from .match_filters import ports_label_from_match_lines, protocol_label_from_match_lines, strategy_catalog_from_match_lines
 from .folders import (
@@ -77,21 +78,8 @@ from .editable_settings import (
 
 PROFILE_LIST_PAYLOAD_CACHE_LIMIT = 24
 PROFILE_SETUP_PAYLOAD_CACHE_LIMIT = 128
-PROFILE_TIMING_LOG_LEVEL = "⏱ PROFILE"
-PROFILE_VISIBLE_TIMING_LABELS = frozenset(
-    {
-        "profile_feature.folder_state.load",
-        "profile_feature.list_profiles.cached",
-        "profile_feature.list_profiles.total",
-        "profile_feature.profile_list_item.build",
-        "profile_feature.profiles.normalize",
-        "profile_feature.selected_preset.parse",
-        "profile_feature.selected_preset.read",
-        "profile_feature.sources.build",
-        "profile_feature.strategy_catalogs.load",
-        "profile_feature.templates.load",
-    }
-)
+
+
 @dataclass(slots=True)
 class _SelectedPresetSnapshot:
     revision: tuple[object, ...]
@@ -1466,12 +1454,13 @@ class ProfilePresetService:
         return revision, manifest, source_text
 
     def _log_timing(self, label: str, started_at: float) -> None:
-        try:
-            elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-            level = PROFILE_TIMING_LOG_LEVEL if label in PROFILE_VISIBLE_TIMING_LABELS else "DEBUG"
-            log(f"{label}: {elapsed_ms:.1f}ms", level)
-        except Exception:
-            pass
+        log_ui_timing_since(
+            "feature",
+            "profile",
+            label,
+            started_at,
+            important=True,
+        )
 
 
 def _engine_for_method(launch_method: str) -> EngineName:

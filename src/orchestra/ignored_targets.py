@@ -13,6 +13,8 @@ except Exception:
     TELEGRAM_PROXY_DOMAINS = [
         "zws4.web.telegram.org",
         "vesta.web.telegram.org",
+        "my.telegram.org",
+        "core.telegram.org",
         "vesta-1.web.telegram.org",
         "venus-1.web.telegram.org",
         "telegram.me",

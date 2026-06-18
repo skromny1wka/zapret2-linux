@@ -7,7 +7,9 @@ from pathlib import Path
 
 
 _STARTUP_METRIC_RE = re.compile(r"\bStartup (?P<marker>Startup[A-Za-z0-9]+):\s+(?P<ms>\d+)ms\b")
-_PAGE_LIFECYCLE_WARMUP_RE = re.compile(r"\bPageLifecycle:\s+(?P<page>[A-Z0-9_]+)\s+warmup\s+(?P<ms>\d+)ms\b")
+_UI_PAGE_WARMUP_RE = re.compile(
+    r"\bUiMetric:\s+scope=page\s+name=(?P<page>[A-Z0-9_]+)\s+stage=warmup\s+elapsed=(?P<ms>\d+)ms\b"
+)
 _STARTUP_PAGE_WARMUP_MARKER_RE = re.compile(r"^StartupPage[A-Za-z0-9]+WarmupQueued$")
 _HIDDEN_TRAY_LAUNCH_MARKER = "Запуск приложения скрыто в трее"
 
@@ -109,7 +111,7 @@ def validate_startup_log_contract(text: str) -> StartupLogContractResult:
         )
 
     for line_number, line in enumerate(log_text.splitlines(), start=1):
-        match = _PAGE_LIFECYCLE_WARMUP_RE.search(line)
+        match = _UI_PAGE_WARMUP_RE.search(line)
         if match is None:
             continue
         errors.append(

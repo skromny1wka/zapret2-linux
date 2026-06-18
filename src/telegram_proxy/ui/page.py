@@ -16,6 +16,7 @@ from PyQt6.QtWidgets import (
 
 from ui.pages.base_page import BasePage
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
+from ui.performance_metrics import log_ui_timing_since
 from telegram_proxy.ui.build import (
     build_telegram_proxy_diag_panel,
     build_telegram_proxy_logs_panel,
@@ -2387,11 +2388,7 @@ class TelegramProxyPage(BasePage):
 
     @staticmethod
     def _log_ui_timing(label: str, started_at: float) -> None:
-        try:
-            elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-            log(f"{label}: {elapsed_ms:.1f}ms", "DEBUG")
-        except Exception:
-            pass
+        log_ui_timing_since("ui", "telegram_proxy", label, started_at)
 
     def hideEvent(self, event):
         if self._log_timer is not None:

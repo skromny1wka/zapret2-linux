@@ -6,6 +6,7 @@ from typing import Any, Callable, Protocol
 
 from log.log import log
 from presets.user_presets_page_plans import UserPresetListPlan, build_preset_rows_plan
+from ui.performance_metrics import log_ui_timing
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,9 +154,12 @@ def apply_presets_rows_plan(
         if not rows_changed:
             if started_at is not None:
                 elapsed_ms = int((time.perf_counter() - started_at) * 1000)
-                log_fn(
-                    f"{log_source}: lightweight list reload skipped {elapsed_ms}ms ({plan.total_presets} presets)",
-                    "DEBUG",
+                log_ui_timing(
+                    "ui",
+                    log_source,
+                    "user_presets.lightweight_reload.skipped",
+                    elapsed_ms,
+                    extra=f"{plan.total_presets} presets",
                 )
             return
         if presets_delegate:
@@ -169,9 +173,12 @@ def apply_presets_rows_plan(
             schedule_layout_resync_fn()
         if started_at is not None:
             elapsed_ms = int((time.perf_counter() - started_at) * 1000)
-            log_fn(
-                f"{log_source}: lightweight list reload {elapsed_ms}ms ({plan.total_presets} presets)",
-                "DEBUG",
+            log_ui_timing(
+                "ui",
+                log_source,
+                "user_presets.lightweight_reload",
+                elapsed_ms,
+                extra=f"{plan.total_presets} presets",
             )
 
     except Exception as exc:

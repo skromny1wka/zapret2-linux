@@ -5,6 +5,7 @@ import time
 from log.log import log
 from main.post_startup_gate import bind_startup_gate, is_startup_host_alive
 from main.post_startup_threading import enqueue_subsystem_task, schedule_after
+from ui.performance_metrics import log_ui_timing_since
 
 
 HOSTS_PAGE_WARMUP_DELAY_MS = 1_000
@@ -30,8 +31,7 @@ def install_hosts_page_warmup(
         except Exception as exc:
             log(f"Фоновая подготовка страницы hosts не выполнена: {exc}", "DEBUG")
             return
-        elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-        log(f"Фоновая подготовка страницы hosts: {elapsed_ms:.1f}ms", "DEBUG")
+        log_ui_timing_since("warmup", "hosts", "backend_page_data", started_at, important=True)
 
     def _start_hosts_page_warmup() -> None:
         if not is_startup_host_alive(startup_host):

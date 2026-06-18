@@ -93,25 +93,35 @@ _MOJIBAKE_MARKERS = (
 _CYRILLIC_RE = re.compile(r"[А-Яа-яЁё]")
 
 
+def _decoded_text_score(text: str) -> int:
+    cyrillic = len(_CYRILLIC_RE.findall(text))
+    mojibake = sum(text.count(marker) for marker in _MOJIBAKE_MARKERS)
+    replacement = text.count("\ufffd")
+    controls = sum(1 for char in text if ord(char) < 32 and char not in "\r\n\t")
+    return cyrillic * 3 - mojibake * 8 - replacement * 20 - controls * 5
+
+
+def _repair_predecoded_mojibake(text: str) -> str:
+    candidates = [text]
+    for source_encoding, target_encoding in (("cp866", "cp1251"), ("cp1251", "cp866")):
+        try:
+            candidates.append(text.encode(source_encoding).decode(target_encoding))
+        except UnicodeError:
+            continue
+    return max(candidates, key=_decoded_text_score)
+
+
 def _decode_command_output(value: Any) -> str:
     if value is None:
         return ""
     if isinstance(value, str):
-        return value
+        return _repair_predecoded_mojibake(value)
     if isinstance(value, bytes):
         candidates = [
             value.decode(encoding, errors="replace")
             for encoding in ("utf-8-sig", "cp866", "cp1251")
         ]
-
-        def score(text: str) -> int:
-            cyrillic = len(_CYRILLIC_RE.findall(text))
-            mojibake = sum(text.count(marker) for marker in _MOJIBAKE_MARKERS)
-            replacement = text.count("\ufffd")
-            controls = sum(1 for char in text if ord(char) < 32 and char not in "\r\n\t")
-            return cyrillic * 3 - mojibake * 8 - replacement * 20 - controls * 5
-
-        return max(candidates, key=score)
+        return max(candidates, key=_decoded_text_score)
     return str(value)
 
 

@@ -1925,7 +1925,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
 
         self.assertIn("time.perf_counter", source)
         self.assertIn("profile_feature.worker.list_profiles.total", source)
-        self.assertIn('PROFILE_TIMING_LOG_LEVEL = "⏱ PROFILE"', module_source)
+        self.assertIn("log_ui_timing_since", module_source)
+        self.assertNotIn("PROFILE_TIMING_LOG_LEVEL", module_source)
 
     def test_profile_list_worker_accepts_warmed_load_result(self) -> None:
         source = inspect.getsource(ProfileListLoadWorker.run)
@@ -2041,7 +2042,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("profile_feature.folder_state.load", source)
         self.assertIn("profile_feature.sources.build", source)
         self.assertIn("profile_feature.profile_list_item.build", source)
-        self.assertIn("PROFILE_VISIBLE_TIMING_LABELS", timing_source)
+        self.assertIn("log_ui_timing_since", timing_source)
+        self.assertIn("important=True", timing_source)
 
     def test_profile_worker_yields_during_large_payload_builds(self) -> None:
         source = inspect.getsource(ProfilePresetService._list_profiles_locked)
@@ -2064,7 +2066,8 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         self.assertIn("profile_ui.profile_list.create", source)
         self.assertIn("profile_ui.profile_list.build", source)
         self.assertIn("profile_ui.profile_list.attach", source)
-        self.assertIn("PROFILE_UI_VISIBLE_TIMING_LABELS", timing_source)
+        self.assertIn("log_ui_timing_since", timing_source)
+        self.assertIn("important=label in", timing_source)
 
     def test_slow_navigation_pages_log_local_timing_stages(self) -> None:
         appearance_source = inspect.getsource(AppearancePage._build_ui)
@@ -4291,13 +4294,13 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         ensure_source = inspect.getsource(WindowPageHost.ensure_page)
 
         self.assertIn("_shown_pages", init_source)
-        self.assertIn("show.first", show_source)
-        self.assertIn("show.repeat", show_source)
-        self.assertIn("log_page_metric", show_source)
-        self.assertIn("show.ensure_page", show_source)
-        self.assertIn("show.stack", show_source)
-        self.assertIn("show.switch", show_source)
-        self.assertIn("show.navigation", show_source)
+        self.assertIn("open.navigation.first", show_source)
+        self.assertIn("open.navigation.repeat", show_source)
+        self.assertIn("log_page_timing", show_source)
+        self.assertIn("open.ensure_page", show_source)
+        self.assertIn("open.stack", show_source)
+        self.assertIn("open.switch", show_source)
+        self.assertIn("open.navigation_sync", show_source)
         self.assertIn("animate=False", show_source)
         self.assertNotIn("animate=bool(first_show and use_nav_route)", show_source)
         self.assertIn("ensure.cached.language", ensure_source)
@@ -4447,7 +4450,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
         host = WindowPageHost(window=type("Window", (), {"stackedWidget": stack})(), page_factory=None)
         events: list[str] = []
 
-        with patch("ui.page_host.log_page_metric", side_effect=lambda _page, stage, *_args, **_kwargs: events.append(stage)):
+        with patch("ui.page_host.log_page_timing", side_effect=lambda _page, stage, *_args, **_kwargs: events.append(stage)):
             self.assertTrue(
                 host.set_stacked_widget_current_page(
                     object(),
@@ -4456,7 +4459,7 @@ class PresetProfileAsyncArchitectureTests(unittest.TestCase):
                 )
             )
 
-        self.assertIn("show.switch.set_current", events)
+        self.assertIn("open.switch.set_current", events)
 
     def test_telegram_proxy_builds_secondary_tabs_lazily(self) -> None:
         setup_source = inspect.getsource(TelegramProxyPage._setup_ui)

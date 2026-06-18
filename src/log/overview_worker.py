@@ -4,7 +4,7 @@ import time
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from log.log import log
+from ui.performance_metrics import log_ui_timing_since
 
 
 class LogsOverviewWorker(QObject):
@@ -30,11 +30,7 @@ class LogsOverviewWorker(QObject):
             if not self._stopped:
                 self.failed.emit(str(exc))
         finally:
-            try:
-                elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-                log(f"logs_feature.overview_worker.total: {elapsed_ms:.1f}ms", "DEBUG")
-            except Exception:
-                pass
+            log_ui_timing_since("worker", "logs_overview", "logs_feature.overview_worker.total", started_at)
             self.finished.emit()
 
     def stop(self) -> None:

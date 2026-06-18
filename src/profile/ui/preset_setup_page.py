@@ -22,16 +22,10 @@ from ui.accessibility import set_control_accessibility, set_state_text
 from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.message_box_accessibility import set_message_box_button_accessibility
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
+from ui.performance_metrics import log_ui_timing_since
 from ui.queued_worker_state import QueuedWorkerState
 
 
-PROFILE_UI_TIMING_LOG_LEVEL = "⏱ PROFILE"
-PROFILE_UI_VISIBLE_TIMING_LABELS = frozenset(
-    {
-        "profile_ui.apply_payload.total",
-        "profile_ui.profile_list.build",
-    }
-)
 PROFILE_PAYLOAD_PRESET_SWITCH_RELOAD_DELAY_MS = 180
 
 
@@ -197,6 +191,9 @@ class PresetSetupPageBase(BasePage):
         self._request_profiles_payload()
         return True
 
+    def _auto_mark_content_ready_after_activation(self) -> bool:
+        return False
+
     def on_page_hidden(self) -> None:
         self._hide_profiles_list_for_next_switch()
 
@@ -232,6 +229,16 @@ class PresetSetupPageBase(BasePage):
             return
         try:
             profile_list.setVisible(True)
+        except Exception:
+            pass
+        self._mark_content_ready_safely(stage="content.profiles_list.visible", extra="list=visible")
+
+    def _mark_content_ready_safely(self, *, stage: str, extra: str = "") -> None:
+        marker = getattr(self, "mark_content_ready", None)
+        if not callable(marker):
+            return
+        try:
+            marker(stage=stage, extra=extra)
         except Exception:
             pass
 
@@ -694,13 +701,14 @@ class PresetSetupPageBase(BasePage):
         return True
 
     def _log_ui_timing(self, label: str, started_at: float, *, extra: str = "") -> None:
-        try:
-            elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-            extra_text = f" | {extra}" if extra else ""
-            level = PROFILE_UI_TIMING_LOG_LEVEL if label in PROFILE_UI_VISIBLE_TIMING_LABELS else "DEBUG"
-            log(f"{self.__class__.__name__}: {label}: {elapsed_ms:.1f}ms{extra_text}", level)
-        except Exception:
-            pass
+        log_ui_timing_since(
+            "ui",
+            self.__class__.__name__,
+            label,
+            started_at,
+            extra=extra,
+            important=label in {"profile_ui.apply_payload.total", "profile_ui.profile_list.build"},
+        )
 
     def _show_profile_normalization_info(self, payload) -> None:
         split_count = int(getattr(payload, "normalized_split_profiles", 0) or 0)
@@ -753,6 +761,7 @@ class PresetSetupPageBase(BasePage):
         label.setWordWrap(True)
         self._content_host_layout.addWidget(label)
         self._empty_state_label = label
+        self._mark_content_ready_safely(stage="content.empty_state.visible", extra="empty_state=visible")
 
     def _on_profile_clicked(self, profile_key: str) -> None:
         self._open_profile_setup(profile_key)

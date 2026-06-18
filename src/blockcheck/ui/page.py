@@ -28,6 +28,7 @@ from blockcheck.ui.helpers import (
 from blockcheck.ui.page_results_workflow import (
     update_target_result_table,
 )
+from ui.performance_metrics import log_ui_timing_since
 from blockcheck.page_run_workflow import (
     request_blockcheck_stop,
     reset_blockcheck_running_ui,
@@ -1134,11 +1135,7 @@ class BlockcheckPage(BasePage):
 
     @staticmethod
     def _log_ui_timing(label: str, started_at: float) -> None:
-        try:
-            elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-            log(f"{label}: {elapsed_ms:.1f}ms", "DEBUG")
-        except Exception:
-            pass
+        log_ui_timing_since("ui", "blockcheck", label, started_at)
 
     def _on_add_domain(self):
         """Add a domain from the input field."""

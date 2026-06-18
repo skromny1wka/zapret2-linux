@@ -6,9 +6,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from log.log import log
 from profile.list_apply_signature import profile_payload_apply_signature_base
-
-
-PROFILE_TIMING_LOG_LEVEL = "⏱ PROFILE"
+from ui.performance_metrics import log_ui_timing_since
 
 
 class ProfileListLoadResult:
@@ -41,8 +39,13 @@ class ProfileListLoadWorker(QThread):
             self.failed.emit(self._request_id, str(exc))
             return
         if isinstance(payload, ProfileListLoadResult):
-            elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-            log(f"profile_feature.worker.list_profiles.total: {elapsed_ms:.1f}ms", PROFILE_TIMING_LOG_LEVEL)
+            log_ui_timing_since(
+                "worker",
+                "profile_list",
+                "profile_feature.worker.list_profiles.total",
+                started_at,
+                important=True,
+            )
             self.loaded.emit(self._request_id, payload)
             return
         view_state = None
@@ -53,6 +56,11 @@ class ProfileListLoadWorker(QThread):
                 log(f"ProfileListLoadWorker: не удалось подготовить view state profile: {exc}", "ERROR")
                 self.failed.emit(self._request_id, str(exc))
                 return
-        elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-        log(f"profile_feature.worker.list_profiles.total: {elapsed_ms:.1f}ms", PROFILE_TIMING_LOG_LEVEL)
+        log_ui_timing_since(
+            "worker",
+            "profile_list",
+            "profile_feature.worker.list_profiles.total",
+            started_at,
+            important=True,
+        )
         self.loaded.emit(self._request_id, ProfileListLoadResult(payload=payload, view_state=view_state))

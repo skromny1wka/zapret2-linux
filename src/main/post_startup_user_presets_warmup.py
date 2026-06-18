@@ -7,6 +7,7 @@ from main.post_startup_gate import bind_startup_gate, is_startup_host_alive
 from main.post_startup_threading import enqueue_subsystem_task, schedule_after
 from settings.dpi.strategy_settings import get_strategy_launch_method
 from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE, is_preset_launch_method, normalize_launch_method
+from ui.performance_metrics import log_ui_timing_since
 
 
 DEFAULT_USER_PRESETS_WARMUP_METHODS: tuple[str, ...] = (ZAPRET2_MODE, ZAPRET1_MODE)
@@ -38,8 +39,14 @@ def install_user_presets_warmup(
         except Exception as exc:
             log(f"Фоновый прогрев списка preset-ов {method} не выполнен: {exc}", "DEBUG")
             return
-        elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-        log(f"Фоновый прогрев списка preset-ов {method}: {elapsed_ms:.1f}ms ({len(metadata or {})} presets)", "DEBUG")
+        log_ui_timing_since(
+            "warmup",
+            method,
+            "user_presets.metadata",
+            started_at,
+            extra=f"{len(metadata or {})} presets",
+            important=True,
+        )
 
     def _start_user_presets_warmup(methods: tuple[str, ...]) -> None:
         log_startup_metric("StartupUserPresetsWarmupStarted", ", ".join(methods))

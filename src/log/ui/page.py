@@ -28,6 +28,7 @@ from ui.accessibility import set_control_accessibility, set_state_text
 from ui.segmented_accessibility import set_segmented_items_accessibility
 from ui.pages.base_page import BasePage, ScrollBlockingTextEdit
 from ui.latest_value_worker_state import LatestValueWorkerState
+from ui.performance_metrics import log_ui_timing_since
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
 from ui.fluent_widgets import QuickActionsBar, SettingsCard, set_tooltip
 from ui.log_limits import MAIN_LOG_VIEW_MAX_LINES
@@ -1449,11 +1450,7 @@ class LogsPage(BasePage):
 
     @staticmethod
     def _log_ui_timing(label: str, started_at: float) -> None:
-        try:
-            elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-            log(f"{label}: {elapsed_ms:.1f}ms", "DEBUG")
-        except Exception:
-            pass
+        log_ui_timing_since("ui", "logs", label, started_at)
 
     def _is_current_worker_finish(self, runtime, worker) -> bool:
         if self.__dict__.get("_cleanup_in_progress", False):

@@ -797,7 +797,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
                 (
                     "[12:00:00] [⏱ STARTUP] ⏱ Startup StartupTTFF: 1000ms | first showEvent",
                     "[12:00:01] [⏱ STARTUP] ⏱ Startup StartupInteractive: 1300ms | ui_ready",
-                    "[12:00:10] [⏱ STARTUP] ⏱ PageLifecycle: NETWORK warmup 237ms",
+                    "[12:00:10] [⏱ UI] ⏱ UiMetric: scope=page name=NETWORK stage=warmup elapsed=237ms",
                 )
             )
         )
@@ -1677,7 +1677,7 @@ class StartupRuntimeSetupTests(unittest.TestCase):
         with (
             patch.object(page_host_module, "apply_ui_language_to_page", side_effect=lambda *_args: None),
             patch.object(page_host_module, "record_startup_page_init_metric", side_effect=lambda *_args: None),
-            patch.object(page_host_module, "log_page_metric", side_effect=lambda *_args, **_kwargs: None),
+            patch.object(page_host_module, "log_page_timing", side_effect=lambda *_args, **_kwargs: None),
         ):
             host.create_eager_pages((PageName.ZAPRET2_MODE_CONTROL,))
 

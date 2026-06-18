@@ -3591,6 +3591,23 @@ class ProfileSetupPageContractTests(unittest.TestCase):
         self.assertIsNone(page._deferred_profile_payload_apply)
         self.assertFalse(page._profile_payload_dirty)
 
+    def test_profile_list_show_marks_page_content_ready(self) -> None:
+        profile_list = SimpleNamespace(setVisible=Mock())
+        page = PresetSetupPageBase.__new__(PresetSetupPageBase)
+        page._cleanup_in_progress = False
+        page._profiles_list = profile_list
+        page._profiles_list_show_scheduled = True
+        page.mark_content_ready = Mock()
+
+        PresetSetupPageBase._show_profiles_list_after_page_switch(page)
+
+        profile_list.setVisible.assert_called_once_with(True)
+        page.mark_content_ready.assert_called_once_with(
+            stage="content.profiles_list.visible",
+            extra="list=visible",
+        )
+        self.assertFalse(page._profiles_list_show_scheduled)
+
     def test_hidden_warmed_profile_payload_is_applied_on_next_activation(self) -> None:
         page = PresetSetupPageBase.__new__(PresetSetupPageBase)
         state = SimpleNamespace(

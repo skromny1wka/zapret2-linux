@@ -25,6 +25,8 @@ TELEGRAM_RELAY_IP = "149.154.167.220"
 TELEGRAM_DOMAINS: list[str] = [
     "zws4.web.telegram.org",
     "vesta.web.telegram.org",
+    "core.telegram.org",
+    "my.telegram.org",
     "vesta-1.web.telegram.org",
     "venus-1.web.telegram.org",
     "telegram.me",

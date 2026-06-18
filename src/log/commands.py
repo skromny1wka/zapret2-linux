@@ -9,6 +9,7 @@ from dataclasses import dataclass
 
 from config.config import LOGS_FOLDER, MAX_DEBUG_LOG_FILES, MAX_LOG_FILES
 from log.log import LOG_FILE, cleanup_old_logs, global_logger, log
+from ui.performance_metrics import log_ui_timing_since
 
 from support_request_bundle import prepare_support_request
 
@@ -172,11 +173,7 @@ def warm_page_data_cache(*, run_cleanup: bool = False) -> LogsPageDataState:
 
 
 def _log_timing(label: str, started_at: float) -> None:
-    try:
-        elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-        log(f"{label}: {elapsed_ms:.1f}ms", "DEBUG")
-    except Exception:
-        pass
+    log_ui_timing_since("feature", "logs", label, started_at)
 
 def get_orchestra_log_path(orchestra_runner):
     try:

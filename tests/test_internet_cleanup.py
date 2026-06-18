@@ -97,6 +97,25 @@ class InternetCleanupTests(unittest.TestCase):
         self.assertIn("Отказано в доступе.", result.content)
         self.assertNotIn("код 1, Сброс глобальных параметров - OK!", result.content)
 
+    def test_run_internet_cleanup_repairs_predecoded_netsh_mojibake(self) -> None:
+        from windows_features.internet_cleanup import run_internet_cleanup
+
+        def command_runner(_args, **_kwargs):
+            return SimpleNamespace(
+                returncode=1,
+                stdout="Сброс - сбой.".encode("cp1251").decode("cp866"),
+                stderr="",
+            )
+
+        result = run_internet_cleanup(
+            command_runner=command_runner,
+            flush_dns_cache=lambda: True,
+            resolve_system_exe=lambda name: f"C:/Windows/System32/{name}",
+        )
+
+        self.assertIn("Сброс - сбой.", result.content)
+        self.assertNotIn("сЁюё", result.content)
+
     def test_run_internet_cleanup_stops_between_commands(self) -> None:
         from windows_features.internet_cleanup import run_internet_cleanup
 

@@ -5,6 +5,7 @@ import time
 from log.log import log
 from main.post_startup_gate import bind_startup_gate, is_startup_host_alive
 from main.post_startup_threading import enqueue_subsystem_task, schedule_after
+from ui.performance_metrics import log_ui_timing_since
 
 
 def install_dns_page_data_warmup(
@@ -23,8 +24,7 @@ def install_dns_page_data_warmup(
         except Exception as exc:
             log(f"Фоновый прогрев данных Network не выполнен: {exc}", "DEBUG")
             return
-        elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-        log(f"Фоновый прогрев данных Network: {elapsed_ms:.1f}ms", "DEBUG")
+        log_ui_timing_since("warmup", "network", "backend_page_data", started_at, important=True)
 
     def _start_dns_page_data_warmup() -> None:
         log_startup_metric("StartupPostInitNetworkDataWarmupStarted", "backend_cache")

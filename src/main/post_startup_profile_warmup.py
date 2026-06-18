@@ -11,6 +11,7 @@ from main.post_startup_threading import enqueue_subsystem_task, schedule_after
 from settings.dpi.strategy_settings import get_strategy_launch_method
 from settings.mode import ZAPRET1_MODE, ZAPRET2_MODE, is_preset_launch_method, normalize_launch_method
 from ui.navigation_pages import resolve_preset_setup_page_for_method, resolve_profile_setup_page_for_method
+from ui.performance_metrics import log_ui_timing_since
 
 
 DEFAULT_PROFILE_WARMUP_METHODS: tuple[str, ...] = (ZAPRET2_MODE, ZAPRET1_MODE)
@@ -55,8 +56,7 @@ def install_profile_warmup(
         except Exception as exc:
             log(f"Фоновый прогрев профилей {method} не выполнен: {exc}", "DEBUG")
             return
-        elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-        log(f"Фоновый прогрев профилей {method}: {elapsed_ms:.1f}ms", "DEBUG")
+        log_ui_timing_since("warmup", method, "profile.list", started_at, important=True)
         if not is_startup_host_alive(startup_host):
             return
         if on_profile_warmup_ready is not None:
@@ -84,8 +84,7 @@ def install_profile_warmup(
         except Exception as exc:
             log(f"Фоновая подготовка страницы профилей preset-а не выполнена: {exc}", "DEBUG")
             return
-        elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-        log(f"Фоновая подготовка страницы профилей preset-а {page_name.name}: {elapsed_ms:.1f}ms", "DEBUG")
+        log_ui_timing_since("warmup", page_name, "ui_page.preset_setup", started_at, important=True)
 
     def _run_profile_setup_page_warmup() -> None:
         if not is_startup_host_alive(startup_host):
@@ -103,8 +102,7 @@ def install_profile_warmup(
         except Exception as exc:
             log(f"Фоновая подготовка страницы настройки profile-а не выполнена: {exc}", "DEBUG")
             return
-        elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-        log(f"Фоновая подготовка страницы настройки profile-а {page_name.name}: {elapsed_ms:.1f}ms", "DEBUG")
+        log_ui_timing_since("warmup", page_name, "ui_page.profile_setup", started_at, important=True)
 
     def _start_profile_warmup(methods: tuple[str, ...]) -> None:
         log_startup_metric("StartupProfileWarmupStarted", ", ".join(methods))

@@ -9,6 +9,7 @@ from PyQt6.QtGui import QColor
 
 from .base_page import BasePage
 import settings.appearance as appearance_settings
+from ui.performance_metrics import log_ui_timing_since
 from ui.pages.appearance_page_lower_build import (
     build_holiday_sections,
     build_opacity_section,
@@ -736,11 +737,7 @@ class AppearancePage(BasePage):
 
     @staticmethod
     def _log_ui_timing(label: str, started_at: float) -> None:
-        try:
-            elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-            log(f"{label}: {elapsed_ms:.1f}ms", "DEBUG")
-        except Exception:
-            pass
+        log_ui_timing_since("ui", "appearance", label, started_at)
 
     def _show_accent_color_dialog(self) -> None:
         """Открывает fluent-диалог выбора цвета с нормальным русским заголовком."""

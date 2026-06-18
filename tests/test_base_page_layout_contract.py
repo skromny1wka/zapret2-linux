@@ -26,14 +26,14 @@ class BasePageLayoutContractTests(unittest.TestCase):
         flush_theme = inspect.getsource(BasePage._flush_page_theme_refresh)
 
         self.assertIn("_log_show_step_timing", show)
-        self.assertIn("show.event.sync_width", show)
-        self.assertIn("show.event.ready_callbacks", show)
-        self.assertIn("show.event.schedule_activation", show)
-        self.assertIn("show.event.schedule_theme_flush", show)
+        self.assertIn("qt_show.sync_width", show)
+        self.assertIn("qt_show.ready_callbacks", show)
+        self.assertIn("qt_show.schedule_activation", show)
+        self.assertIn("qt_show.schedule_theme_flush", show)
         self.assertIn("_schedule_page_theme_refresh_flush", show)
         self.assertNotIn("_flush_page_theme_refresh()", show)
         self.assertIn("QTimer.singleShot(0, self._flush_page_theme_refresh)", schedule_theme)
-        self.assertIn("show.event.theme_flush", flush_theme)
+        self.assertIn("qt_show.theme_flush", flush_theme)
 
     def test_base_page_spontaneous_show_still_runs_activation_hooks(self) -> None:
         show = inspect.getsource(BasePage.showEvent)

@@ -17,7 +17,7 @@ from qfluentwidgets import (
 
 from app.ui_texts import tr as tr_catalog, normalize_language
 from ui.accessibility import remove_scrollbar_arrow_buttons_from_tab_order, set_state_text
-from ui.page_performance import log_page_metric
+from ui.performance_metrics import log_page_timing
 from ui.smooth_scroll import (
     apply_editor_smooth_scroll_preference,
     apply_page_smooth_scroll_preference,
@@ -90,6 +90,8 @@ class BasePage(_FluentScrollArea):
         self._page_first_activation_done = False
         self._page_lifecycle_generation = 0
         self._page_load_generation = 0
+        self._page_open_metric_started_at = 0.0
+        self._page_open_metric_first_show = True
         self._ready_callbacks: list[object] = []
         self._cleanup_in_progress = False
         self._page_theme_refresh = self._create_page_theme_refresh_if_needed()
@@ -187,6 +189,42 @@ class BasePage(_FluentScrollArea):
     def is_page_ready(self) -> bool:
         return bool(self.isVisible()) and not bool(getattr(self, "_cleanup_in_progress", False))
 
+    def _begin_page_open_metric(self, page_name, *, started_at: float, first_show: bool) -> None:
+        self._page_registry_name = page_name
+        try:
+            self._page_open_metric_started_at = float(started_at)
+        except Exception:
+            self._page_open_metric_started_at = _time.perf_counter()
+        self._page_open_metric_first_show = bool(first_show)
+
+    def _auto_mark_content_ready_after_activation(self) -> bool:
+        return True
+
+    def mark_content_ready(
+        self,
+        *,
+        stage: str = "content.ready",
+        extra: str = "",
+        started_at: float | None = None,
+    ) -> None:
+        if started_at is None:
+            started_at = float(self.__dict__.get("_page_open_metric_started_at", 0.0) or 0.0)
+        if started_at <= 0:
+            started_at = _time.perf_counter()
+        elapsed_ms = (_time.perf_counter() - started_at) * 1000.0
+        first_show = bool(self.__dict__.get("_page_open_metric_first_show", True))
+        phase = "first" if first_show else "repeat"
+        budget_attr = "first_show_budget_ms" if first_show else "repeat_show_budget_ms"
+        log_page_timing(
+            self._page_label(),
+            f"{stage}.{phase}",
+            elapsed_ms,
+            budget_ms=self._resolve_page_budget(budget_attr),
+            extra=extra,
+            important=True,
+            threshold_ms=0,
+        )
+
     def run_when_page_ready(self, callback) -> bool:
         if not callable(callback):
             return False
@@ -270,7 +308,7 @@ class BasePage(_FluentScrollArea):
         except Exception:
             pass
         finally:
-            self._log_show_step_timing("show.event.theme_flush", started_at)
+            self._log_show_step_timing("qt_show.theme_flush", started_at)
 
     def _schedule_page_theme_refresh_flush(self) -> None:
         QTimer.singleShot(0, self._flush_page_theme_refresh)
@@ -290,22 +328,22 @@ class BasePage(_FluentScrollArea):
         elapsed_ms = (_time.perf_counter() - started_at) * 1000
         if elapsed_ms < int(threshold_ms):
             return
-        log_page_metric(self._page_label(), stage, elapsed_ms)
+        log_page_timing(self._page_label(), stage, elapsed_ms)
 
     def showEvent(self, event):  # noqa: N802 (Qt override)
         super().showEvent(event)
         step_started_at = _time.perf_counter()
         self._sync_content_width_to_viewport()
-        self._log_show_step_timing("show.event.sync_width", step_started_at)
+        self._log_show_step_timing("qt_show.sync_width", step_started_at)
         step_started_at = _time.perf_counter()
         self._flush_ready_callbacks()
-        self._log_show_step_timing("show.event.ready_callbacks", step_started_at)
+        self._log_show_step_timing("qt_show.ready_callbacks", step_started_at)
         step_started_at = _time.perf_counter()
         self._schedule_activation()
-        self._log_show_step_timing("show.event.schedule_activation", step_started_at)
+        self._log_show_step_timing("qt_show.schedule_activation", step_started_at)
         step_started_at = _time.perf_counter()
         self._schedule_page_theme_refresh_flush()
-        self._log_show_step_timing("show.event.schedule_theme_flush", step_started_at)
+        self._log_show_step_timing("qt_show.schedule_theme_flush", step_started_at)
         self.request_keyboard_focus()
 
     def request_keyboard_focus(self) -> None:
@@ -408,16 +446,20 @@ class BasePage(_FluentScrollArea):
         except Exception:
             pass
         finally:
-            log_page_metric(
+            log_page_timing(
                 self._page_label(),
-                "activation.first" if first_show else "activation.repeat",
+                "open.activation.first" if first_show else "open.activation.repeat",
                 (_time.perf_counter() - started_at) * 1000,
                 budget_ms=(
                     self._resolve_page_budget("first_show_budget_ms")
                     if first_show
                     else self._resolve_page_budget("repeat_show_budget_ms")
                 ),
+                important=True,
+                threshold_ms=0,
             )
+            if self._auto_mark_content_ready_after_activation():
+                self.mark_content_ready()
 
     def _issue_page_lifecycle_token(self, *, reason: str = "") -> int:
         _ = reason

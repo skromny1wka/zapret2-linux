@@ -8,6 +8,7 @@ from qfluentwidgets import FluentIcon
 
 from presets.ui.common.user_presets_accessibility import apply_user_presets_accessibility
 from ui.fluent_widgets import set_tooltip
+from ui.performance_metrics import log_ui_timing
 
 
 def set_widget_text_if_changed(widget, text: str) -> bool:
@@ -93,7 +94,7 @@ def after_user_presets_ui_built(
     except Exception:
         pass
     elapsed_ms = int((time.perf_counter() - started_at) * 1000)
-    log_fn(f"{log_prefix}: lazy ui init {elapsed_ms}ms", "DEBUG")
+    log_ui_timing("ui", log_prefix, "user_presets.lazy_ui_init", elapsed_ms)
 
 
 def bind_user_presets_ui_state_store(

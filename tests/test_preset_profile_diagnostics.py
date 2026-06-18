@@ -56,7 +56,7 @@ class PresetProfileDiagnosticsTests(unittest.TestCase):
         events: list[tuple[str, str]] = []
 
         with patch(
-            "ui.page_host.log_page_metric",
+            "ui.page_host.log_page_timing",
             side_effect=lambda _page, stage, *_args, **kwargs: events.append((stage, str(kwargs.get("extra") or ""))),
         ):
             self.assertTrue(
@@ -67,7 +67,7 @@ class PresetProfileDiagnosticsTests(unittest.TestCase):
                 )
             )
 
-        set_current_extra = next(extra for stage, extra in events if stage == "show.switch.set_current")
+        set_current_extra = next(extra for stage, extra in events if stage == "open.switch.set_current")
         self.assertIn("from=oldPage", set_current_extra)
         self.assertIn("to=newPage", set_current_extra)
         self.assertIn("children=7", set_current_extra)
@@ -77,17 +77,21 @@ class PresetProfileDiagnosticsTests(unittest.TestCase):
     def test_profile_list_visible_timing_includes_internal_steps(self) -> None:
         from profile import service
 
-        self.assertIn("profile_feature.selected_preset.read", service.PROFILE_VISIBLE_TIMING_LABELS)
-        self.assertIn("profile_feature.selected_preset.parse", service.PROFILE_VISIBLE_TIMING_LABELS)
-        self.assertIn("profile_feature.strategy_catalogs.load", service.PROFILE_VISIBLE_TIMING_LABELS)
-        self.assertIn("profile_feature.templates.load", service.PROFILE_VISIBLE_TIMING_LABELS)
-        self.assertIn("profile_feature.profile_list_item.build", service.PROFILE_VISIBLE_TIMING_LABELS)
+        timing_source = inspect.getsource(service.ProfilePresetService._log_timing)
+
+        self.assertIn("log_ui_timing_since", timing_source)
+        self.assertIn('"feature"', timing_source)
+        self.assertIn('"profile"', timing_source)
+        self.assertIn("important=True", timing_source)
 
     def test_user_presets_metadata_read_is_visible_timing(self) -> None:
         import presets.user_presets_runtime_service as runtime_service
 
-        self.assertIn("user_presets.metadata.read", runtime_service.USER_PRESETS_VISIBLE_TIMING_LABELS)
+        timing_source = inspect.getsource(runtime_service._log_user_presets_timing)
         worker_source = inspect.getsource(runtime_service.UserPresetsMetadataLoadWorker.run)
+        self.assertIn("log_ui_timing_since", timing_source)
+        self.assertIn('"feature"', timing_source)
+        self.assertIn('"user_presets"', timing_source)
         self.assertIn("_log_user_presets_timing", worker_source)
         self.assertIn("user_presets.metadata.read", worker_source)
 

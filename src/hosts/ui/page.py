@@ -15,6 +15,7 @@ from hosts.ui.page_runtime import create_page_hosts_runtime, create_runtime_cach
 from ui.pages.base_page import BasePage
 from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
+from ui.performance_metrics import log_ui_timing_since
 from ui.accessibility import set_state_text
 from ui.message_box_accessibility import set_message_box_button_accessibility
 from hosts.ui.sections_build import (
@@ -1755,11 +1756,7 @@ class HostsPage(BasePage):
 
     @staticmethod
     def _log_ui_timing(label: str, started_at: float) -> None:
-        try:
-            elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-            log(f"{label}: {elapsed_ms:.1f}ms", "DEBUG")
-        except Exception:
-            pass
+        log_ui_timing_since("ui", "hosts", label, started_at)
 
     def _is_current_worker_finish(self, runtime, worker) -> bool:
         if self.__dict__.get("_cleanup_in_progress", False):

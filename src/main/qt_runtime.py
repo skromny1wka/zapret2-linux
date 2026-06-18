@@ -110,6 +110,14 @@ def ensure_qt_runtime() -> QApplication:
         return app
 
     t_hooks = _time.perf_counter()
+    t_infobar_duration = _time.perf_counter()
+    from ui.infobar_duration import install_success_infobar_min_duration
+
+    install_success_infobar_min_duration()
+    emit_startup_metric(
+        "StartupQtInfoBarDuration",
+        f"{(_time.perf_counter() - t_infobar_duration) * 1000:.0f}ms",
+    )
     t_combo_guard = _time.perf_counter()
     from ui.combo_popup_guard import install_global_combo_popup_closer
 

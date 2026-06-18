@@ -14,7 +14,7 @@ from ui.navigation.schema import (
     is_page_mode_open_allowed,
 )
 from app.page_names import PageName
-from ui.page_performance import log_page_metric
+from ui.performance_metrics import log_page_timing
 from ui.page_registry import get_page_performance_profile
 from ui.startup_ui_metrics import (
     record_startup_page_init_metric,
@@ -50,7 +50,7 @@ class WindowPageHost:
         elapsed_ms = (time.perf_counter() - started_at) * 1000
         if elapsed_ms < int(threshold_ms):
             return
-        log_page_metric(page_name, stage, elapsed_ms, extra=extra)
+        log_page_timing(page_name, stage, elapsed_ms, extra=extra)
 
     @staticmethod
     def _widget_debug_name(widget) -> str:
@@ -180,7 +180,7 @@ class WindowPageHost:
                 stack.isAnimationEnabled = False
             except Exception:
                 animation_flag_known = False
-            self._log_optional_switch_step(page_name, "show.switch.disable_animation", step_started_at)
+            self._log_optional_switch_step(page_name, "open.switch.disable_animation", step_started_at)
 
         updates_were_enabled = True
         updates_toggled = False
@@ -197,7 +197,7 @@ class WindowPageHost:
                     updates_toggled = True
                 except Exception:
                     updates_toggled = False
-                self._log_optional_switch_step(page_name, "show.switch.disable_updates", step_started_at)
+                self._log_optional_switch_step(page_name, "open.switch.disable_updates", step_started_at)
 
         try:
             step_started_at = time.perf_counter()
@@ -206,7 +206,7 @@ class WindowPageHost:
                 stack.setCurrentWidget(page, False)
             except TypeError:
                 stack.setCurrentWidget(page)
-            self._log_optional_switch_step(page_name, "show.switch.set_current", step_started_at, extra=switch_extra)
+            self._log_optional_switch_step(page_name, "open.switch.set_current", step_started_at, extra=switch_extra)
             return True
         except Exception:
             return False
@@ -219,7 +219,7 @@ class WindowPageHost:
                     stack.isAnimationEnabled = bool(previous_animation_enabled)
                 except Exception:
                     pass
-                self._log_optional_switch_step(page_name, "show.switch.restore_animation", step_started_at)
+                self._log_optional_switch_step(page_name, "open.switch.restore_animation", step_started_at)
 
     def _log_optional_switch_step(
         self,
@@ -242,7 +242,7 @@ class WindowPageHost:
                 update()
         except Exception:
             pass
-        self._log_optional_switch_step(page_name, "show.switch.restore_updates", step_started_at)
+        self._log_optional_switch_step(page_name, "open.switch.restore_updates", step_started_at)
 
     def _schedule_stack_updates_restore(self, stack, set_updates_enabled, page_name: PageName | None) -> None:
         try:
@@ -322,7 +322,7 @@ class WindowPageHost:
             self._log_step_timing(page_name, "ensure.created.stack", step_started_at)
 
         record_startup_page_init_metric(self._window, page_name, created_page.elapsed_ms)
-        log_page_metric(
+        log_page_timing(
             page_name,
             "constructor",
             created_page.elapsed_ms,
@@ -345,20 +345,21 @@ class WindowPageHost:
 
         step_started_at = _time.perf_counter()
         page = self.ensure_page(page_name)
-        self._log_step_timing(page_name, "show.ensure_page", step_started_at)
+        self._log_step_timing(page_name, "open.ensure_page", step_started_at)
         if page is None:
             return False
+        self._begin_page_open_metric(page, page_name, started_at=started_at, first_show=first_show)
 
         step_started_at = _time.perf_counter()
         self.ensure_page_in_stacked_widget(page)
-        self._log_step_timing(page_name, "show.stack", step_started_at)
+        self._log_step_timing(page_name, "open.stack", step_started_at)
         use_nav_route = self.has_nav_item(page_name)
         step_started_at = _time.perf_counter()
         if self.current_page() is page:
             switched = True
         else:
             switched = self.set_stacked_widget_current_page(page, animate=False, page_name=page_name)
-        self._log_step_timing(page_name, "show.switch", step_started_at)
+        self._log_step_timing(page_name, "open.switch", step_started_at)
         if not switched:
             return False
 
@@ -369,20 +370,39 @@ class WindowPageHost:
                 self._window.navigationInterface.setCurrentItem(route_key)
         except Exception:
             pass
-        self._log_step_timing(page_name, "show.navigation", step_started_at)
+        self._log_step_timing(page_name, "open.navigation_sync", step_started_at)
         self._request_page_keyboard_focus(page)
         self._shown_pages.add(page_name)
-        log_page_metric(
+        log_page_timing(
             page_name,
-            "show.first" if first_show else "show.repeat",
+            "open.navigation.first" if first_show else "open.navigation.repeat",
             (_time.perf_counter() - started_at) * 1000,
             budget_ms=self._show_budget_ms(
                 page_name,
                 first_show=first_show,
                 use_nav_route=use_nav_route,
             ),
+            important=True,
+            threshold_ms=0,
         )
         return True
+
+    @staticmethod
+    def _begin_page_open_metric(
+        page: QWidget | None,
+        page_name: PageName,
+        *,
+        started_at: float,
+        first_show: bool,
+    ) -> None:
+        if page is None:
+            return
+        begin = getattr(page, "_begin_page_open_metric", None)
+        if callable(begin):
+            try:
+                begin(page_name, started_at=started_at, first_show=first_show)
+            except Exception:
+                pass
 
     @staticmethod
     def _request_page_keyboard_focus(page: QWidget | None) -> None:

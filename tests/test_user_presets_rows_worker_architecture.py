@@ -132,7 +132,7 @@ class UserPresetsRowsWorkerArchitectureTests(unittest.TestCase):
         worker_source = inspect.getsource(runtime_service.UserPresetsRowsPlanWorker.run)
         apply_source = inspect.getsource(runtime_service.UserPresetsRuntimeService._run_scheduled_rows_plan_apply)
 
-        self.assertIn('USER_PRESETS_TIMING_LOG_LEVEL = "⏱ PRESETS"', module_source)
+        self.assertIn("log_ui_timing_since", module_source)
         self.assertIn("user_presets.rows_plan.build", worker_source)
         self.assertIn("user_presets.rows_plan.apply", apply_source)
         self.assertIn("_log_user_presets_timing", worker_source)

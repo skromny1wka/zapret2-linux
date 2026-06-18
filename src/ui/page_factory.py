@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import QWidget
 from ui.navigation.schema import get_page_route_key
 from app.page_names import PageName
 from ui.page_composition import build_page_deps, validate_page_deps_builder_coverage
-from ui.page_performance import log_page_metric
+from ui.performance_metrics import log_page_timing
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,15 +47,15 @@ class UiPageFactory:
         step_started_at = time.perf_counter()
         module = import_module(module_name)
         page_cls = getattr(module, class_name)
-        log_page_metric(page_name, "factory.import", (time.perf_counter() - step_started_at) * 1000)
+        log_page_timing(page_name, "factory.import", (time.perf_counter() - step_started_at) * 1000)
 
         step_started_at = time.perf_counter()
         page_deps = build_page_deps(self._page_deps_sources, page_name)
-        log_page_metric(page_name, "factory.deps", (time.perf_counter() - step_started_at) * 1000)
+        log_page_timing(page_name, "factory.deps", (time.perf_counter() - step_started_at) * 1000)
 
         step_started_at = time.perf_counter()
         page = page_cls(parent=self._window, **page_deps)
-        log_page_metric(page_name, "factory.constructor", (time.perf_counter() - step_started_at) * 1000)
+        log_page_timing(page_name, "factory.constructor", (time.perf_counter() - step_started_at) * 1000)
 
         route_key = get_page_route_key(page_name)
         if route_key:

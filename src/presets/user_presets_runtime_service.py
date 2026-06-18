@@ -12,27 +12,19 @@ from log.log import log
 from presets.icon_color import normalize_preset_icon_color
 from ui.latest_value_worker_state import LatestValueWorkerState
 from ui.one_shot_worker_runtime import OneShotWorkerRuntime
+from ui.performance_metrics import log_ui_timing_since
 from ui.queued_worker_state import QueuedWorkerState
 
 
-USER_PRESETS_TIMING_LOG_LEVEL = "⏱ PRESETS"
-USER_PRESETS_VISIBLE_TIMING_LABELS = frozenset(
-    {
-        "user_presets.metadata.read",
-        "user_presets.rows_plan.build",
-        "user_presets.rows_plan.apply",
-    }
-)
-
-
 def _log_user_presets_timing(label: str, started_at: float, *, extra: str = "") -> None:
-    try:
-        elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-        extra_text = f" | {extra}" if extra else ""
-        level = USER_PRESETS_TIMING_LOG_LEVEL if label in USER_PRESETS_VISIBLE_TIMING_LABELS else "DEBUG"
-        log(f"{label}: {elapsed_ms:.1f}ms{extra_text}", level)
-    except Exception:
-        pass
+    log_ui_timing_since(
+        "feature",
+        "user_presets",
+        label,
+        started_at,
+        extra=extra,
+        important=True,
+    )
 
 
 @dataclass(slots=True)
