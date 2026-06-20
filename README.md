@@ -84,6 +84,8 @@ sudo linux/zapret-gui
 sudo linux/stop.sh
 ```
 
+Если `apt-get update` зависает на «ожидании заголовков», см. [docs/linux.md](docs/linux.md#устранение-неполадок).
+
 Ручное обновление списков РКН:
 
 ```bash

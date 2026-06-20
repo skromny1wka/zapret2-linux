@@ -102,6 +102,27 @@ zapret/
 
 ## Устранение неполадок
 
+**Установка зависла на «Ожидание заголовков» / apt-get update**
+
+Это зависание зеркала пакетов или медленный интернет. Варианты:
+
+```bash
+# без apt-get update (часто помогает на Kali)
+sudo linux/install.sh --skip-apt-update --runtime /path/to/ZapretTwo
+
+# если пакеты уже стоят вручную
+sudo linux/install.sh --skip-apt --runtime /path/to/ZapretTwo
+
+# blob-файлы уже есть в ZapretTwo/bin — не качать из GitHub
+sudo linux/install.sh --skip-blobs --runtime /path/to/ZapretTwo
+```
+
+Комбинация для проблемной сети:
+
+```bash
+sudo linux/install.sh --skip-apt-update --skip-blobs --runtime ../ZapretTwo
+```
+
 **GUI не стартует**
 
 ```bash

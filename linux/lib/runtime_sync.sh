@@ -39,7 +39,9 @@ install_nfqws2_binary() {
     esac
 
     log "Скачиваю zapret2 ${ZAPRET2_RELEASE}..."
-    curl -fsSL "$ZAPRET2_TARBALL" -o "${tmp_dir}/zapret2.tar.gz"
+    if ! curl_fetch "$ZAPRET2_TARBALL" "${tmp_dir}/zapret2.tar.gz" "nfqws2 (${ZAPRET2_RELEASE})"; then
+        die "Не удалось скачать zapret2. Проверьте интернет или задайте ZAPRET2_RELEASE/ZAPRET2_TARBALL."
+    fi
     tar -xzf "${tmp_dir}/zapret2.tar.gz" -C "$tmp_dir"
 
     local zapret_src
@@ -60,6 +62,11 @@ install_nfqws2_binary() {
 }
 
 fetch_missing_blobs() {
+    if [ "${SKIP_BLOBS:-0}" = "1" ]; then
+        log "Пропуск скачивания blob-файлов (--skip-blobs)"
+        return 0
+    fi
+
     local blob target
     local blob_list="
 tls_clienthello_1.bin
@@ -120,7 +127,7 @@ fake_quic_3.bin
         if [ -f "$target" ]; then
             continue
         fi
-        if curl -fsSL "${BLOB_REPO}/${blob}" -o "$target"; then
+        if curl_fetch "${BLOB_REPO}/${blob}" "$target" "blob ${blob}"; then
             log "  blob: ${blob}"
         else
             rm -f "$target"
@@ -132,8 +139,10 @@ fake_quic_3.bin
 setup_python_env() {
     log "Создаю Python venv..."
     python3 -m venv "$VENV_DIR"
+    export PIP_DEFAULT_TIMEOUT="${PIP_DEFAULT_TIMEOUT:-120}"
+    export PIP_DISABLE_PIP_VERSION_CHECK=1
     "${VENV_DIR}/bin/pip" install --upgrade pip
-    "${VENV_DIR}/bin/pip" install -r "${INSTALL_ROOT}/requirements-linux.txt"
+    "${VENV_DIR}/bin/pip" install --retries 3 --timeout 120 -r "${INSTALL_ROOT}/requirements-linux.txt"
 }
 
 install_launcher() {
