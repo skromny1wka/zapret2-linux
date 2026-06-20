@@ -1,7 +1,11 @@
 #startup/check_start.py
 import os
 import sys
-import winreg
+
+if sys.platform == "win32":
+    import winreg
+else:
+    winreg = None  # type: ignore[assignment]
 
 # Импортируем константы из конфига
 from app_notifications import advisory_notification, notification_action
@@ -32,7 +36,12 @@ def check_system_commands() -> tuple[bool, str]:
             log(f"ERROR: psutil не работает: {e}", level="❌ ERROR")
         except ImportError:
             print(f"ERROR: psutil не работает: {e}")
-    
+
+    if sys.platform != "win32":
+        if failed_commands:
+            return True, "Проблемы при проверке системных компонентов:\n" + "\n".join(f"- {cmd}" for cmd in failed_commands)
+        return False, ""
+
     system_root = os.environ.get("WINDIR", "")
     system32 = os.path.join(system_root, "System32") if system_root else ""
     required_paths = {
@@ -302,6 +311,36 @@ def collect_startup_notifications() -> list[dict]:
     """Собирает стартовые системные события в одном fluent-формате."""
     notifications: list[dict] = []
 
+    if sys.platform != "win32":
+        has_cmd_issues, cmd_msg = check_system_commands()
+        if has_cmd_issues and cmd_msg:
+            notifications.append(
+                advisory_notification(
+                    level="warning",
+                    title="Проверка при запуске",
+                    content=cmd_msg,
+                    source="startup.system_commands",
+                    queue="startup",
+                    duration=15000,
+                    dedupe_key="startup.system_commands",
+                )
+            )
+
+        has_special, special_msg = check_path_for_special_chars()
+        if has_special and special_msg:
+            notifications.append(
+                advisory_notification(
+                    level="warning",
+                    title="Проверка при запуске",
+                    content=special_msg,
+                    source="startup.special_chars_path",
+                    queue="startup",
+                    duration=15000,
+                    dedupe_key="startup.special_chars_path",
+                )
+            )
+        return notifications
+
     has_old_windows, win_error = check_windows_version()
     if has_old_windows:
         notifications.append(
@@ -389,6 +428,8 @@ def _service_exists_reg(name: str) -> bool:
     """
     Проверка через реестр: быстрее и не зависит от локали.
     """
+    if winreg is None:
+        return False
     try:
         key = winreg.OpenKey(
             winreg.HKEY_LOCAL_MACHINE,
@@ -488,6 +529,9 @@ def _is_proxy_enabled() -> tuple[bool, str, str]:
     Возвращает:
     - (is_enabled, proxy_server, error_message)
     """
+    if winreg is None:
+        return False, "", ""
+
     INTERNET_SETTINGS_KEY = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
     
     try:
@@ -520,6 +564,9 @@ def _disable_proxy() -> tuple[bool, str]:
     Возвращает:
     - (success, error_message)
     """
+    if winreg is None:
+        return False, "Управление прокси доступно только в Windows"
+
     INTERNET_SETTINGS_KEY = r"Software\Microsoft\Windows\CurrentVersion\Internet Settings"
     
     # Константы для InternetSetOption
@@ -624,6 +671,9 @@ def check_goodbyedpi() -> tuple[bool, str]:
     """
     Проверяет службы GoodbyeDPI и автоматически удаляет их.
     """
+    if sys.platform != "win32":
+        return False, ""
+
     SERVICE_NAMES = [
         "GoodbyeDPI",
         "GoodbyeDPI Service", 

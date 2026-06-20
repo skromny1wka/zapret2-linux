@@ -344,7 +344,12 @@ class Winws2StrategyRunner(StrategyRunnerBase):
             source_content,
             source_is_circular=source_is_circular,
         )
-        return prepared.text
+        text = prepared.text
+        if os.name != "nt":
+            from platform.linux_support import adapt_preset_text_for_linux
+
+            text = adapt_preset_text_for_linux(text)
+        return text
 
     def _build_winws2_at_config_text(self, prepared_text: str) -> str:
         args = launch_args_from_preset_text(prepared_text)
@@ -867,6 +872,16 @@ class Winws2StrategyRunner(StrategyRunnerBase):
             return False
         self._wait_after_successful_dry_run_before_spawn(preset_switch=preset_switch)
 
+        if os.name != "nt":
+            from platform.linux_support import ensure_linux_firewall
+
+            ok, err = ensure_linux_firewall(artifact.normalized_text)
+            if not ok:
+                message = err or "Не удалось настроить nftables для Linux"
+                self._set_last_error(message, notify=notify_failure)
+                log(message, "ERROR")
+                return False
+
         try:
             startup_output_path = self._startup_output_path_for_artifact(artifact)
             startup_output_file = None
@@ -888,15 +903,16 @@ class Winws2StrategyRunner(StrategyRunnerBase):
                 reason="preset_switch_start" if preset_switch else "start_from_preset",
             )
             try:
-                self.running_process = subprocess.Popen(
-                    cmd,
-                    stdout=startup_stdout,
-                    stderr=startup_stderr,
-                    stdin=subprocess.DEVNULL,
-                    startupinfo=self._create_startup_info(),
-                    creationflags=CREATE_NO_WINDOW,
-                    cwd=self.work_dir
-                )
+                popen_kwargs = {
+                    "stdout": startup_stdout,
+                    "stderr": startup_stderr,
+                    "stdin": subprocess.DEVNULL,
+                    "cwd": self.work_dir,
+                }
+                if os.name == "nt":
+                    popen_kwargs["startupinfo"] = self._create_startup_info()
+                    popen_kwargs["creationflags"] = CREATE_NO_WINDOW
+                self.running_process = subprocess.Popen(cmd, **popen_kwargs)
             finally:
                 if startup_output_file is not None:
                     try:

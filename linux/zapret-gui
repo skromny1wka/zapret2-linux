@@ -1,0 +1,29 @@
+#!/bin/bash
+set -e
+
+ZAPRET_LINUX_DIR="$(cd "$(dirname "$0")" && pwd)"
+ZAPRET_ROOT="$(cd "${ZAPRET_LINUX_DIR}/.." && pwd)"
+VENV_DIR="${ZAPRET_ROOT}/.venv"
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Zapret GUI требует root для NFQUEUE/nftables."
+    echo "Запуск: sudo $0"
+    exit 1
+fi
+
+if [ ! -x "${VENV_DIR}/bin/python" ]; then
+    echo "Python-окружение не найдено. Сначала выполните:"
+    echo "  sudo ${ZAPRET_LINUX_DIR}/install.sh"
+    exit 1
+fi
+
+if [ ! -x "${ZAPRET_ROOT}/exe/nfqws2" ]; then
+    echo "nfqws2 не найден. Сначала выполните:"
+    echo "  sudo ${ZAPRET_LINUX_DIR}/install.sh"
+    exit 1
+fi
+
+export PYTHONPATH="${ZAPRET_ROOT}/src${PYTHONPATH:+:${PYTHONPATH}}"
+export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}"
+cd "$ZAPRET_ROOT"
+exec "${VENV_DIR}/bin/python" "${ZAPRET_ROOT}/src/main.py" "$@"

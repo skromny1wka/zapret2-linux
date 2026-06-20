@@ -4,6 +4,7 @@
 """
 
 import os
+import sys
 import time
 import subprocess
 from dataclasses import dataclass, field
@@ -63,9 +64,21 @@ _WINDIVERT_DRIVER_SERVICE_NAMES = ("WinDivert", "windivert", "WinDivert14", "Win
 
 
 def _find_process_pid_by_name_winapi(process_name: str) -> Optional[int]:
-    """Ищет PID процесса по имени через единый WinAPI-путь."""
+    """Ищет PID процесса по имени через WinAPI или psutil на Linux."""
     expected = str(process_name or "").strip().lower()
     if not expected:
+        return None
+
+    if sys.platform != "win32":
+        try:
+            import psutil
+
+            for proc in psutil.process_iter(["pid", "name"]):
+                name = str(proc.info.get("name") or "").strip().lower()
+                if name == expected or name == f"{expected}.exe":
+                    return int(proc.info["pid"])
+        except Exception:
+            return None
         return None
 
     for pid, name in iter_process_records_winapi():
@@ -285,14 +298,33 @@ def check_common_crash_causes(process_name: str = EXE_NAME_WINWS1) -> Optional[s
     except Exception:
         pass
     
-    # ✅ ПРОВЕРКА 1: Права администратора
+    # ✅ ПРОВЕРКА 1: Права администратора / root
     try:
-        import ctypes
-        if not ctypes.windll.shell32.IsUserAnAdmin():
-            suggestions.append("  ⚠ Программа запущена БЕЗ прав администратора")
-            suggestions.append("     Запустите программу от имени администратора")
-    except:
+        from platform.system_admin import is_elevated
+
+        if not is_elevated():
+            if sys.platform == "win32":
+                suggestions.append("  ⚠ Программа запущена БЕЗ прав администратора")
+                suggestions.append("     Запустите программу от имени администратора")
+            else:
+                suggestions.append("  ⚠ Программа запущена без прав root")
+                suggestions.append("     Запустите: sudo linux/zapret-gui")
+    except Exception:
         pass
+
+    if sys.platform != "win32":
+        try:
+            from platform.linux_support import nftables_table_exists
+
+            if not nftables_table_exists():
+                suggestions.append("  Правила nftables для Zapret не установлены")
+                suggestions.append("     Перезапустите стратегию или проверьте: sudo nft list table inet zapret2")
+        except Exception:
+            pass
+
+        if suggestions:
+            return "\n".join(suggestions)
+        return None
     
     # ✅ ПРОВЕРКА 2: WinDivert драйвер
     try:

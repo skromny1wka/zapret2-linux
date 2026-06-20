@@ -12,6 +12,7 @@ from config.build_info import APP_VERSION
 
 from log.log import log
 
+from platform.system_admin import is_elevated, show_error, show_info
 from startup.admin_check import is_admin
 from utils.subproc import run_hidden
 
@@ -46,7 +47,10 @@ def shell_bootstrap(argv: list[str] | None = None) -> bool:
     args = list(argv or sys.argv)
 
     if "--version" in args:
-        ctypes.windll.user32.MessageBoxW(None, APP_VERSION, "Zapret – версия", 0x40)
+        if sys.platform == "win32":
+            ctypes.windll.user32.MessageBoxW(None, APP_VERSION, "Zapret – версия", 0x40)
+        else:
+            print(APP_VERSION)
         sys.exit(0)
 
     if "--update" in args and len(args) > 3:
@@ -56,6 +60,14 @@ def shell_bootstrap(argv: list[str] | None = None) -> bool:
     start_in_tray = "--tray" in args
 
     if not is_admin():
+        if sys.platform != "win32":
+            show_error(
+                "Zapret на Linux требует root для NFQUEUE/nftables.\n"
+                "Запустите: sudo linux/zapret-gui",
+                title="Zapret",
+            )
+            sys.exit(1)
+
         params = subprocess.list2cmdline(list(args[1:]))
         shell_exec_result = ctypes.windll.shell32.ShellExecuteW(
             None,
@@ -66,11 +78,9 @@ def shell_bootstrap(argv: list[str] | None = None) -> bool:
             1,
         )
         if int(shell_exec_result) <= 32:
-            ctypes.windll.user32.MessageBoxW(
-                None,
+            show_error(
                 "Не удалось запросить права администратора.",
-                "Zapret",
-                0x10,
+                title="Zapret",
             )
         sys.exit(0)
 
@@ -83,11 +93,9 @@ def shell_bootstrap(argv: list[str] | None = None) -> bool:
         if ipc.send_show_command():
             log("Отправлена команда показать окно запущенному экземпляру", "INFO")
         else:
-            ctypes.windll.user32.MessageBoxW(
-                None,
+            show_info(
                 "Экземпляр Zapret уже запущен, но не удалось показать окно!",
-                "Zapret",
-                0x40,
+                title="Zapret",
             )
         sys.exit(0)
 

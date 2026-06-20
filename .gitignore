@@ -15,6 +15,7 @@ downloads/
 eggs/
 .eggs/
 lib/
+!/linux/lib/
 lib64/
 parts/
 sdist/
@@ -66,7 +67,8 @@ src/config/build_info.py
 docs/gui_preset_profile_architecture_plan.md
 www_youtube_com.txt
 /.codex
-/docs
+/docs/*
+!/docs/linux.md
 /logs
 /.superpowers
 /.codex

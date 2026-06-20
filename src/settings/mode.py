@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 
 ZAPRET2_MODE = "zapret2_mode"
 ZAPRET1_MODE = "zapret1_mode"
@@ -39,6 +40,8 @@ DEFAULT_PRESET_FILE_NAME_BY_ENGINE = {
 
 EXE_NAME_WINWS1 = "winws.exe"
 EXE_NAME_WINWS2 = "winws2.exe"
+if sys.platform != "win32":
+    EXE_NAME_WINWS2 = "nfqws2"
 ALL_WINWS_EXE_NAMES = (EXE_NAME_WINWS1, EXE_NAME_WINWS2)
 ALL_WINWS_EXE_NAME_SET = frozenset(ALL_WINWS_EXE_NAMES)
 WINWS_ENGINE_FAMILY_LABEL = f"{ENGINE_WINWS1}/{ENGINE_WINWS2}"

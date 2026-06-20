@@ -180,7 +180,9 @@ def application_bootstrap() -> QApplication:
             f"{(_time.perf_counter() - t_crash) * 1000:.0f}ms",
         )
     except Exception as exc:
-        ctypes.windll.user32.MessageBoxW(None, f"Ошибка инициализации Qt: {exc}", "Zapret", 0x10)
+        from platform.system_admin import show_error
+
+        show_error(f"Ошибка инициализации Qt: {exc}", title="Zapret")
 
     t_theme = _time.perf_counter()
     from qfluentwidgets import Theme, setTheme

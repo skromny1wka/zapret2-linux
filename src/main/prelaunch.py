@@ -44,6 +44,8 @@ def _require_frozen() -> None:
     is_frozen = getattr(sys, "frozen", False) or ("__compiled__" in globals())
     if is_frozen:
         return
+    if sys.platform != "win32":
+        return
 
     try:
         import ctypes

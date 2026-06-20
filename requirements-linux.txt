@@ -1,0 +1,16 @@
+PyQt6
+PyQt6-Qt6
+PyQt6-sip
+PyQt6-Fluent-Widgets
+requests
+urllib3
+PySocks
+cryptography
+psutil
+httpx
+aiohttp
+packaging
+qtawesome
+simplepycons
+pytz
+websockets

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import atexit
+import sys
 import time
 
 from app_notifications import advisory_notification
@@ -10,17 +11,20 @@ from log.log import log
 def collect_startup_checks_payload(*, verbose_logging_enabled: bool) -> dict:
     started_at = time.perf_counter()
     notifications: list[dict] = []
+    bfe_cleanup = None
 
-    from startup.bfe_util import preload_service_status, ensure_bfe_running, cleanup as bfe_cleanup
+    if sys.platform == "win32":
+        from startup.bfe_util import preload_service_status, ensure_bfe_running, cleanup as bfe_cleanup
+
+        preload_service_status("BFE")
+
+        bfe_ok, bfe_notification = ensure_bfe_running()
+        if bfe_notification is not None:
+            notifications.append(bfe_notification)
+        if not bfe_ok:
+            log("BFE не запущен, продолжаем работу после предупреждения", "⚠ WARNING")
+
     from startup.check_start import collect_startup_notifications, check_goodbyedpi, check_mitmproxy
-
-    preload_service_status("BFE")
-
-    bfe_ok, bfe_notification = ensure_bfe_running()
-    if bfe_notification is not None:
-        notifications.append(bfe_notification)
-    if not bfe_ok:
-        log("BFE не запущен, продолжаем работу после предупреждения", "⚠ WARNING")
 
     startup_notifications = collect_startup_notifications()
     notifications.extend(startup_notifications or [])
@@ -30,59 +34,61 @@ def collect_startup_checks_payload(*, verbose_logging_enabled: bool) -> dict:
         "⏱ STARTUP",
     )
 
-    has_gdpi, gdpi_msg = check_goodbyedpi()
-    if has_gdpi and gdpi_msg:
-        notifications.append(
-            advisory_notification(
-                level="warning",
-                title="Проверка при запуске",
-                content=gdpi_msg,
-                source="startup.goodbyedpi",
-                queue="startup",
-                duration=15000,
-                dedupe_key="startup.goodbyedpi",
+    if sys.platform == "win32":
+        has_gdpi, gdpi_msg = check_goodbyedpi()
+        if has_gdpi and gdpi_msg:
+            notifications.append(
+                advisory_notification(
+                    level="warning",
+                    title="Проверка при запуске",
+                    content=gdpi_msg,
+                    source="startup.goodbyedpi",
+                    queue="startup",
+                    duration=15000,
+                    dedupe_key="startup.goodbyedpi",
+                )
             )
-        )
 
-    has_mitmproxy, mitmproxy_msg = check_mitmproxy()
-    if has_mitmproxy and mitmproxy_msg:
-        notifications.append(
-            advisory_notification(
-                level="warning",
-                title="Проверка при запуске",
-                content=mitmproxy_msg,
-                source="startup.mitmproxy",
-                queue="startup",
-                duration=15000,
-                dedupe_key="startup.mitmproxy",
+        has_mitmproxy, mitmproxy_msg = check_mitmproxy()
+        if has_mitmproxy and mitmproxy_msg:
+            notifications.append(
+                advisory_notification(
+                    level="warning",
+                    title="Проверка при запуске",
+                    content=mitmproxy_msg,
+                    source="startup.mitmproxy",
+                    queue="startup",
+                    duration=15000,
+                    dedupe_key="startup.mitmproxy",
+                )
             )
-        )
 
-    try:
-        from startup.kaspersky import _check_kaspersky_antivirus, build_kaspersky_notification
+        try:
+            from startup.kaspersky import _check_kaspersky_antivirus, build_kaspersky_notification
 
-        kaspersky_detected = bool(_check_kaspersky_antivirus())
-        log(
-            f"Kaspersky startup check: detected={'yes' if kaspersky_detected else 'no'}",
-            "⏱ STARTUP",
-        )
-        if kaspersky_detected:
-            kaspersky_notification = build_kaspersky_notification()
-            if kaspersky_notification is not None:
-                log("Обнаружен антивирус Kaspersky", "⚠️ KASPERSKY")
-                notifications.append(kaspersky_notification)
-    except Exception:
-        pass
+            kaspersky_detected = bool(_check_kaspersky_antivirus())
+            log(
+                f"Kaspersky startup check: detected={'yes' if kaspersky_detected else 'no'}",
+                "⏱ STARTUP",
+            )
+            if kaspersky_detected:
+                kaspersky_notification = build_kaspersky_notification()
+                if kaspersky_notification is not None:
+                    log("Обнаружен антивирус Kaspersky", "⚠️ KASPERSKY")
+                    notifications.append(kaspersky_notification)
+        except Exception:
+            pass
 
-    if verbose_logging_enabled:
+    if verbose_logging_enabled and sys.platform == "win32":
         from startup.admin_check_debug import debug_admin_status
 
         debug_admin_status()
 
-    try:
-        atexit.register(bfe_cleanup)
-    except Exception:
-        pass
+    if bfe_cleanup is not None:
+        try:
+            atexit.register(bfe_cleanup)
+        except Exception:
+            pass
 
     return {
         "notifications": notifications,

@@ -1,14 +1,21 @@
 # config/telegram_links.py
 """Утилиты для открытия Telegram ссылок с fallback на https"""
 
+import sys
 import webbrowser
-import winreg
 from log.log import log
+
+if sys.platform == "win32":
+    import winreg
+else:
+    winreg = None  # type: ignore[assignment]
 
 
 
 def is_telegram_installed() -> bool:
     """Проверяет наличие обработчика tg:// протокола в Windows"""
+    if winreg is None:
+        return False
     try:
         # Проверяем реестр на наличие обработчика tg://
         with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, "tg") as key:

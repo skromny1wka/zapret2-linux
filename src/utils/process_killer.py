@@ -3,6 +3,8 @@
 Канонический путь для завершения процессов в runtime-слое.
 """
 
+import os
+import sys
 import ctypes
 from ctypes import wintypes
 from log.log import log
@@ -99,6 +101,47 @@ def kill_process_by_pid(pid: int, wait_timeout_ms: int = 3000) -> bool:
     return kill_process_by_pid_winapi(pid, wait_timeout_ms=wait_timeout_ms)
 
 
+def _kill_process_by_name_psutil(process_name: str, kill_all: bool = True) -> int:
+    try:
+        import psutil
+    except Exception as exc:
+        log(f"psutil недоступен для остановки {process_name}: {exc}", "WARNING")
+        return 0
+
+    target = str(process_name or "").strip().lower()
+    killed_count = 0
+    for proc in psutil.process_iter(["pid", "name"]):
+        try:
+            name = str(proc.info.get("name") or "").strip().lower()
+            if name != target:
+                continue
+            proc.kill()
+            killed_count += 1
+            if not kill_all:
+                break
+        except Exception:
+            continue
+    return killed_count
+
+
+def _get_process_pids_psutil(process_name: str) -> List[int]:
+    try:
+        import psutil
+    except Exception:
+        return []
+
+    target = str(process_name or "").strip().lower()
+    pids: List[int] = []
+    for proc in psutil.process_iter(["pid", "name"]):
+        try:
+            name = str(proc.info.get("name") or "").strip().lower()
+            if name == target:
+                pids.append(int(proc.info["pid"]))
+        except Exception:
+            continue
+    return pids
+
+
 def kill_process_by_name(process_name: str, kill_all: bool = True) -> int:
     """
     Завершает все процессы с указанным именем через Windows API.
@@ -110,6 +153,20 @@ def kill_process_by_name(process_name: str, kill_all: bool = True) -> int:
     Returns:
         Количество завершённых процессов
     """
+    if sys.platform != "win32":
+        from platform.linux_support import kill_linux_winws_processes, linux_process_names
+
+        target = str(process_name or "").strip().lower()
+        if target in {name.lower() for name in linux_process_names()}:
+            killed_count = kill_linux_winws_processes()
+        else:
+            killed_count = _kill_process_by_name_psutil(process_name, kill_all=kill_all)
+        if killed_count > 0:
+            log(f"Завершено {killed_count} процессов {process_name}", "INFO")
+        else:
+            log(f"Процессы {process_name} не найдены или уже завершены", "DEBUG")
+        return killed_count
+
     killed_count = 0
     process_name_lower = str(process_name or "").strip().lower()
     
@@ -200,6 +257,9 @@ def is_process_running(process_name: str) -> bool:
     Returns:
         True если процесс найден
     """
+    if sys.platform != "win32":
+        return bool(_get_process_pids_psutil(process_name))
+
     process_name_lower = str(process_name or "").strip().lower()
     
     try:
@@ -223,6 +283,9 @@ def get_process_pids(process_name: str) -> List[int]:
     Returns:
         Список PID процессов
     """
+    if sys.platform != "win32":
+        return _get_process_pids_psutil(process_name)
+
     pids = []
     process_name_lower = str(process_name or "").strip().lower()
     

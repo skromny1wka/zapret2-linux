@@ -112,7 +112,30 @@ def get_expected_winws_paths() -> dict[str, str]:
     return {name: path for name, path in paths.items() if path}
 
 
+def _iter_winws_process_entries_linux() -> list[tuple[int, str]]:
+    try:
+        import psutil
+    except Exception:
+        return []
+
+    from platform.linux_support import linux_process_names
+
+    targets = {name.lower() for name in linux_process_names()}
+    entries: list[tuple[int, str]] = []
+    for proc in psutil.process_iter(["pid", "name"]):
+        try:
+            name = str(proc.info.get("name") or "").strip().lower()
+            if name in targets:
+                entries.append((int(proc.info["pid"]), name))
+        except Exception:
+            continue
+    return entries
+
+
 def _iter_winws_process_entries() -> list[tuple[int, str]]:
+    if os.name != "nt":
+        return _iter_winws_process_entries_linux()
+
     if (
         _CreateToolhelp32Snapshot is None
         or _Process32FirstW is None
@@ -177,7 +200,17 @@ def find_expected_winws_processes(expected_exe_path: str) -> list[WinwsProcessRe
         if process_name != expected_name:
             continue
         process_path = _query_process_image_path(pid)
-        if not process_path or process_path != normalized_expected_path:
+        if os.name != "nt":
+            if not process_path:
+                try:
+                    import psutil
+
+                    process_path = _normalize_path(psutil.Process(pid).exe())
+                except Exception:
+                    process_path = normalized_expected_path
+            if process_path != normalized_expected_path:
+                continue
+        elif not process_path or process_path != normalized_expected_path:
             continue
         matches.append(
             WinwsProcessRecord(
