@@ -99,6 +99,13 @@ def install_update_check(*args, **kwargs):
 
     return install(*args, **kwargs)
 
+
+def install_rkn_registry_sync(*args, **kwargs):
+    from main.post_startup_rkn_sync import install_rkn_registry_sync as install
+
+    return install(*args, **kwargs)
+
+
 @dataclass(frozen=True, slots=True)
 class PostStartupDeps:
     startup_host: Any
@@ -113,6 +120,7 @@ class PostStartupDeps:
     apply_dns_on_startup_async: Any
     install_tray_post_startup: Any
     updater_feature: Any
+    runtime_feature: Any = None
     hosts_feature: Any = None
     premium_feature: Any = None
     logs_feature: Any = None
@@ -153,6 +161,11 @@ def install_post_startup_tasks(deps: PostStartupDeps) -> None:
     install_lists_check(
         startup_host,
         startup_lists_check=deps.startup_lists_check,
+        log_startup_metric=deps.log_startup_metric,
+    )
+    install_rkn_registry_sync(
+        startup_host,
+        runtime_feature=deps.runtime_feature,
         log_startup_metric=deps.log_startup_metric,
     )
     install_dns_startup(

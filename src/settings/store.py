@@ -429,6 +429,22 @@ def set_auto_update_enabled(value: bool) -> bool:
     return _set_bool(("program", "auto_update_enabled"), value)
 
 
+def get_rkn_lists_auto_update_enabled() -> bool:
+    return _get_bool(("program", "rkn_lists_auto_update_enabled"), True)
+
+
+def set_rkn_lists_auto_update_enabled(value: bool) -> bool:
+    return _set_bool(("program", "rkn_lists_auto_update_enabled"), value)
+
+
+def get_rkn_lists_auto_update_interval_sec() -> int:
+    return max(300, _get_int(("program", "rkn_lists_auto_update_interval_sec"), 3600))
+
+
+def set_rkn_lists_auto_update_interval_sec(value: int) -> bool:
+    return _set_int(("program", "rkn_lists_auto_update_interval_sec"), max(300, min(86400, int(value))))
+
+
 def get_remove_github_api() -> bool:
     return _get_bool(("program", "remove_github_api"), True)
 

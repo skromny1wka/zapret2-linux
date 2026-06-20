@@ -58,6 +58,8 @@ def default_program() -> dict[str, Any]:
         SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS1: "",
         SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS2: "",
         "auto_update_enabled": True,
+        "rkn_lists_auto_update_enabled": True,
+        "rkn_lists_auto_update_interval_sec": 3600,
         "remove_github_api": True,
         "discord_auto_restart": True,
         "max_blocked": False,

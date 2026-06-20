@@ -21,7 +21,7 @@ cd zapret
 # runtime-данные (bin, lua, lists...) — из Windows-сборки ZapretTwo
 # положите рядом или укажите путь через --runtime
 
-chmod +x linux/install.sh linux/zapret-gui linux/stop.sh
+chmod +x linux/install.sh linux/zapret-gui linux/stop.sh linux/rkn-sync.sh
 sudo linux/install.sh --runtime /path/to/ZapretTwo
 ```
 
@@ -49,8 +49,32 @@ sudo linux/stop.sh
 - Запуск `nfqws2` с теми же preset/Lua-стратегиями
 - Автоматическая настройка nftables (порты из `--wf-*` в пресете)
 - Списки доменов, hostlist, ipset
+- **Автообновление реестра РКН/DPI** раз в час (`lists/russia-blacklist.txt`, `lists/base/ipset-all.txt`)
 
-## Что не работает / ограничено
+## Автообновление реестра РКН
+
+GUI автоматически (раз в час):
+
+1. Скачивает домены из открытых реестров РКН и DPI-списков ([Re-filter](https://github.com/1andrevich/Re-filter-lists), [antifilter.download](https://antifilter.download))
+2. Обновляет `lists/russia-blacklist.txt` — используется пресетами Zapret 2
+3. Обновляет `lists/base/ipset-all.txt` — IP/CIDR из реестра
+4. Для новых доменов выполняет DNS-резолв (до 400 адресов за цикл)
+5. Если DPI уже запущен — перезапускает `nfqws2` для применения списков
+
+Ручной запуск на Linux:
+
+```bash
+linux/rkn-sync.sh
+linux/rkn-sync.sh --force
+```
+
+Настройки (в `settings/settings.json`):
+
+- `program.rkn_lists_auto_update_enabled` — включить/выключить (по умолчанию `true`)
+- `program.rkn_lists_auto_update_interval_sec` — интервал в секундах (по умолчанию `3600`)
+
+Состояние последней синхронизации: `lists/.rkn_sync_state.json`
+
 
 | Функция | Статус |
 |---------|--------|

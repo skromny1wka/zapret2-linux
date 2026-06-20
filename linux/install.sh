@@ -83,6 +83,7 @@ install_launcher
 install_desktop_entry
 
 chmod +x "${ZAPRET_LINUX_DIR}/"*.sh 2>/dev/null || true
+chmod +x "${ZAPRET_LINUX_DIR}/zapret-gui" 2>/dev/null || true
 chmod +x "${ZAPRET_LINUX_DIR}/lib/"*.sh 2>/dev/null || true
 
 log ""

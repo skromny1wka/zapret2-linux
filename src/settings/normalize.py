@@ -279,6 +279,16 @@ def normalize_program(data: object) -> dict[str, Any]:
             defaults[SELECTED_SOURCE_PRESET_FILE_NAME_KEY_WINWS2],
         ),
         "auto_update_enabled": as_bool(raw.get("auto_update_enabled"), defaults["auto_update_enabled"]),
+        "rkn_lists_auto_update_enabled": as_bool(
+            raw.get("rkn_lists_auto_update_enabled"),
+            defaults["rkn_lists_auto_update_enabled"],
+        ),
+        "rkn_lists_auto_update_interval_sec": as_int(
+            raw.get("rkn_lists_auto_update_interval_sec"),
+            defaults["rkn_lists_auto_update_interval_sec"],
+            minimum=300,
+            maximum=86400,
+        ),
         "remove_github_api": as_bool(raw.get("remove_github_api"), defaults["remove_github_api"]),
         "discord_auto_restart": as_bool(raw.get("discord_auto_restart"), defaults["discord_auto_restart"]),
         "max_blocked": as_bool(raw.get("max_blocked"), defaults["max_blocked"]),
