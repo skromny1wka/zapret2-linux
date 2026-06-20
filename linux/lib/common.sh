@@ -93,7 +93,7 @@ install_apt_packages() {
     local pkg
 
     if [ "${SKIP_APT:-0}" = "1" ]; then
-        log "Пропуск apt (--skip-apt)"
+        log "apt отключён — пакеты не ставятся (нет «ожидания заголовков»)"
         return 0
     fi
 
@@ -137,15 +137,32 @@ install_apt_packages() {
 check_install_prerequisites() {
     local missing=""
 
-    for cmd in python3 curl tar gzip; do
+    for cmd in python3 curl tar gzip nft; do
         if ! command_exists "$cmd"; then
             missing="${missing} ${cmd}"
         fi
     done
 
     if [ -n "$missing" ]; then
-        die "Не хватает команд:${missing}. Установите зависимости или уберите --skip-apt."
+        log "ERROR: не хватает:${missing}"
+        print_manual_deps_hint
+        die "Установите зависимости вручную (см. выше) и запустите install.sh снова"
     fi
+}
+
+print_manual_deps_hint() {
+    cat <<EOF
+
+--- Зависимости (без install.sh, чтобы apt не зависал) ---
+  sudo apt install -y python3 python3-venv python3-pip python3-pyqt6 nftables curl ipset
+
+Или только скрипт apt (отдельно):
+  sudo linux/install-deps.sh
+
+Потом:
+  sudo linux/install.sh --runtime /path/to/ZapretTwo
+
+EOF
 }
 
 ensure_dirs() {

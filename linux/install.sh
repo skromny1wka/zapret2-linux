@@ -1,8 +1,10 @@
 #!/bin/bash
 set -e
 
-# apt-get update часто зависает на Kali («Ожидание заголовков»). По умолчанию пропускаем.
+# apt на Kali часто зависает на «Ожидание заголовков» — по умолчанию НЕ трогаем apt.
+SKIP_APT="${SKIP_APT:-1}"
 SKIP_APT_UPDATE="${SKIP_APT_UPDATE:-1}"
+SKIP_BLOBS="${SKIP_BLOBS:-1}"
 USE_APT_PYQT="${USE_APT_PYQT:-1}"
 
 ZAPRET_LINUX_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -23,20 +25,22 @@ Usage:
 Options:
   --prefix PATH          Каталог установки (по умолчанию: корень репозитория)
   --runtime PATH         Каталог с runtime-данными (по умолчанию: ../ZapretTwo)
-  --skip-apt             Не вызывать apt (если пакеты уже установлены)
-  --skip-apt-update      Не выполнять apt-get update (включено по умолчанию)
-  --with-apt-update      Принудительно выполнить apt-get update
-  --skip-blobs           Не скачивать blob-файлы из интернета
-  --fast                 Быстрая установка: без apt update, без blob, PyQt6 из apt
-  --pip-pyqt             Качать PyQt6 через pip (медленно, может висеть на 0%)
+  --with-apt             Включить apt-get (по умолчанию apt ОТКЛЮЧЁН — иначе «ожидание заголовков»)
+  --with-apt-update      Вместе с --with-apt: сначала apt-get update
+  --skip-apt             То же что по умолчанию (apt не вызывается)
+  --skip-blobs           Не скачивать blob-файлы из интернета (по умолчанию включено)
+  --with-blobs           Скачивать недостающие blob из GitHub
+  --fast                 То же что по умолчанию (без apt, без blob)
+  --pip-pyqt             PyQt6 через pip, если нет python3-pyqt6 в системе
   -h, --help             Показать справку
 
+Перед установкой (один раз, если apt работает):
+  sudo apt install -y python3 python3-venv python3-pyqt6 nftables curl ipset
+
 Примеры:
-  sudo $0
   sudo $0 --runtime ../ZapretTwo
-  sudo $0 --skip-apt-update
-  sudo $0 --fast --runtime ../ZapretTwo
-  sudo $0 --skip-apt --runtime ../ZapretTwo
+  sudo $0 --with-apt --runtime ../ZapretTwo
+  sudo $0 --pip-pyqt --runtime ../ZapretTwo
 EOF
 }
 
@@ -58,6 +62,10 @@ while [ "$#" -gt 0 ]; do
             SKIP_APT=1
             shift
             ;;
+        --with-apt)
+            SKIP_APT=0
+            shift
+            ;;
         --skip-apt-update)
             SKIP_APT_UPDATE=1
             shift
@@ -70,7 +78,12 @@ while [ "$#" -gt 0 ]; do
             SKIP_BLOBS=1
             shift
             ;;
+        --with-blobs)
+            SKIP_BLOBS=0
+            shift
+            ;;
         --fast)
+            SKIP_APT=1
             SKIP_APT_UPDATE=1
             SKIP_BLOBS=1
             USE_APT_PYQT=1
@@ -101,7 +114,10 @@ ensure_dirs
 log "Установка Zapret для Linux"
 log "Каталог: ${INSTALL_ROOT}"
 log "Runtime: ${RUNTIME_SRC:-не найден}"
-log "Режим: apt-update=$([ "${SKIP_APT_UPDATE:-1}" = "1" ] && echo off || echo on), pyqt=$([ "${USE_APT_PYQT:-1}" = "1" ] && echo apt || echo pip)"
+log "Режим: apt=$([ "${SKIP_APT:-1}" = "1" ] && echo off || echo on), blobs=$([ "${SKIP_BLOBS:-1}" = "1" ] && echo off || echo on), pyqt=$([ "${USE_APT_PYQT:-1}" = "1" ] && echo system/pip-core || echo pip-full)"
+if [ "${SKIP_APT:-1}" = "1" ]; then
+    log "apt отключён (нет «ожидания заголовков»). Зависимости ставьте вручную — см. linux/install-deps.sh"
+fi
 
 TMP_DIR="$(mktemp -d)"
 cleanup() {
@@ -110,10 +126,10 @@ cleanup() {
 trap cleanup EXIT
 
 step "1/7 Системные пакеты (apt)"
-if command_exists apt-get; then
-    install_apt_packages
+if [ "${SKIP_APT:-1}" = "1" ]; then
+    log "Шаг пропущен: apt отключён по умолчанию"
 else
-    log "apt-get не найден. Установите вручную: $APT_PACKAGES"
+    install_apt_packages
 fi
 
 check_install_prerequisites
@@ -139,6 +155,7 @@ install_launcher
 install_desktop_entry
 
 chmod +x "${ZAPRET_LINUX_DIR}/"*.sh 2>/dev/null || true
+chmod +x "${ZAPRET_LINUX_DIR}/install-deps.sh" 2>/dev/null || true
 chmod +x "${ZAPRET_LINUX_DIR}/zapret-gui" 2>/dev/null || true
 chmod +x "${ZAPRET_LINUX_DIR}/lib/"*.sh 2>/dev/null || true
 

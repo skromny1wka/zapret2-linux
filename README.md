@@ -47,15 +47,22 @@
 
 ## Установка
 
+**apt в install.sh по умолчанию отключён** — иначе на Kali часто зависает «Ожидание заголовков».
+
 ```bash
 git clone https://github.com/skromny1wka/zapret2-linux.git
 cd zapret2-linux
 
-chmod +x linux/install.sh linux/zapret-gui linux/stop.sh linux/rkn-sync.sh
+# 1) один раз поставьте пакеты (отдельно от install.sh)
+sudo apt install -y python3 python3-venv python3-pyqt6 nftables curl ipset
 
-# рекомендуется: быстрый режим (без apt update, без blob, PyQt6 из apt)
-sudo linux/install.sh --fast --runtime /path/to/ZapretTwo
+# 2) установка Zapret (apt не вызывается)
+chmod +x linux/install.sh linux/zapret-gui linux/stop.sh
+sudo linux/install.sh --runtime /path/to/ZapretTwo
 ```
+
+Если хотите apt внутри установщика: `sudo linux/install.sh --with-apt --runtime ...`  
+Отдельный скрипт только для apt: `sudo linux/install-deps.sh`
 
 Если `ZapretTwo` лежит рядом с репозиторием:
 
