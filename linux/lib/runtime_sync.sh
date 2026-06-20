@@ -137,12 +137,56 @@ fake_quic_3.bin
 }
 
 setup_python_env() {
+    local req_file="${INSTALL_ROOT}/requirements-linux.txt"
+    local pip_bin=""
+    local venv_flags=()
+
     log "Создаю Python venv..."
-    python3 -m venv "$VENV_DIR"
-    export PIP_DEFAULT_TIMEOUT="${PIP_DEFAULT_TIMEOUT:-120}"
+
+    if [ "${USE_APT_PYQT:-1}" = "1" ] && python3 -c "import PyQt6" 2>/dev/null; then
+        log "PyQt6 найден в системе — venv с --system-site-packages"
+        venv_flags=(--system-site-packages)
+        req_file="${INSTALL_ROOT}/requirements-linux-core.txt"
+    elif [ "${USE_APT_PYQT:-1}" = "1" ] && [ -f "${INSTALL_ROOT}/requirements-linux-core.txt" ]; then
+        log "Буду ставить только лёгкие pip-пакеты (PyQt6 — из apt или --pip-pyqt)"
+        req_file="${INSTALL_ROOT}/requirements-linux-core.txt"
+    fi
+
+    if [ ! -f "$req_file" ]; then
+        req_file="${INSTALL_ROOT}/requirements-linux.txt"
+    fi
+
+    if [ "${USE_APT_PYQT:-0}" != "1" ]; then
+        log "Режим --pip-pyqt: скачиваю PyQt6 через pip (может долго показывать 0%)"
+        req_file="${INSTALL_ROOT}/requirements-linux.txt"
+        venv_flags=()
+    fi
+
+    python3 -m venv "${venv_flags[@]}" "$VENV_DIR"
+    pip_bin="${VENV_DIR}/bin/pip"
+
+    export PIP_DEFAULT_TIMEOUT="${PIP_DEFAULT_TIMEOUT:-60}"
     export PIP_DISABLE_PIP_VERSION_CHECK=1
-    "${VENV_DIR}/bin/pip" install --upgrade pip
-    "${VENV_DIR}/bin/pip" install --retries 3 --timeout 120 -r "${INSTALL_ROOT}/requirements-linux.txt"
+
+    log "Обновляю pip..."
+    run_with_timeout 120 "$pip_bin" install --upgrade pip
+
+    log "Устанавливаю Python-зависимости из $(basename "$req_file")..."
+    log "Если кажется что зависло на 0% — это pip качает пакеты. Ждите или используйте --fast"
+    if ! run_with_timeout 900 "$pip_bin" install \
+        --retries 3 \
+        --timeout 60 \
+        --progress-bar off \
+        --no-cache-dir \
+        -r "$req_file"; then
+        die "pip install не завершился за 15 мин. Попробуйте: sudo $0 --fast --runtime ../ZapretTwo"
+    fi
+
+    if ! "${VENV_DIR}/bin/python" -c "import PyQt6" 2>/dev/null; then
+        die "PyQt6 не найден после установки. На Kali: apt install python3-pyqt6  или  sudo $0 --pip-pyqt"
+    fi
+
+    log "Python-окружение готово"
 }
 
 install_launcher() {

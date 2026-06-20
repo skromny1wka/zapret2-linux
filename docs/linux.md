@@ -102,26 +102,31 @@ zapret/
 
 ## Устранение неполадок
 
-**Установка зависла на «Ожидание заголовков» / apt-get update**
+**Установка зависла на «Ожидание заголовков» / 0%**
 
-Это зависание зеркала пакетов или медленный интернет. Варианты:
-
-```bash
-# без apt-get update (часто помогает на Kali)
-sudo linux/install.sh --skip-apt-update --runtime /path/to/ZapretTwo
-
-# если пакеты уже стоят вручную
-sudo linux/install.sh --skip-apt --runtime /path/to/ZapretTwo
-
-# blob-файлы уже есть в ZapretTwo/bin — не качать из GitHub
-sudo linux/install.sh --skip-blobs --runtime /path/to/ZapretTwo
-```
-
-Комбинация для проблемной сети:
+Чаще всего это `apt-get update` или `pip install PyQt6` (долго показывает 0%).
 
 ```bash
-sudo linux/install.sh --skip-apt-update --skip-blobs --runtime ../ZapretTwo
+cd zapret2-linux
+git pull
+
+# рекомендуемый быстрый режим
+sudo linux/install.sh --fast --runtime /path/to/ZapretTwo
 ```
+
+Что делает `--fast`:
+- не вызывает `apt-get update`
+- не качает blob из GitHub (берёт из ZapretTwo/bin)
+- ставит **PyQt6 из apt**, а не через pip
+
+Если apt тоже тормозит:
+
+```bash
+sudo apt install -y python3 python3-venv python3-pyqt6 nftables curl
+sudo linux/install.sh --skip-apt --skip-blobs --runtime ../ZapretTwo
+```
+
+Установщик печатает шаги `========== 1/7 ... ==========` — смотрите, на каком шаге остановилось.
 
 **GUI не стартует**
 

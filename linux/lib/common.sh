@@ -42,30 +42,51 @@ curl_fetch() {
     if curl \
         --fail \
         --location \
-        --silent \
-        --show-error \
+        --progress-bar \
         --connect-timeout 20 \
-        --max-time 180 \
+        --max-time 300 \
         --retry 2 \
         --retry-delay 2 \
         --output "$output" \
         "$url"; then
+        echo ""
         return 0
     fi
 
+    echo ""
     log "WARN: не удалось скачать ${label}: ${url}"
     return 1
+}
+
+run_with_timeout() {
+    local seconds="$1"
+    shift
+
+    if command_exists timeout; then
+        timeout --kill-after=15 "$seconds" "$@"
+    else
+        "$@"
+    fi
 }
 
 apt_common_opts() {
     printf '%s\n' \
         -o "Dpkg::Options::=--force-confdef" \
         -o "Dpkg::Options::=--force-confold" \
-        -o "Acquire::http::Timeout=30" \
-        -o "Acquire::https::Timeout=30" \
-        -o "Acquire::ftp::Timeout=30" \
-        -o "Acquire::Retries=3" \
+        -o "Acquire::http::Timeout=20" \
+        -o "Acquire::https::Timeout=20" \
+        -o "Acquire::ftp::Timeout=20" \
+        -o "Acquire::Retries=2" \
         -o "Acquire::ForceIPv4=true"
+}
+
+read_apt_opts() {
+    APT_OPTS=()
+    local opt
+    while IFS= read -r opt; do
+        [ -n "$opt" ] || continue
+        APT_OPTS+=("$opt")
+    done < <(apt_common_opts)
 }
 
 install_apt_packages() {
@@ -82,34 +103,35 @@ install_apt_packages() {
     fi
 
     export DEBIAN_FRONTEND=noninteractive
+    read_apt_opts
 
-    local -a apt_opts=()
-    while IFS= read -r opt; do
-        [ -n "$opt" ] || continue
-        apt_opts+=("$opt")
-    done < <(apt_common_opts)
-
-    if [ "${SKIP_APT_UPDATE:-0}" != "1" ]; then
-        log "Обновляю списки пакетов (таймаут 30 с на зеркало)..."
-        if ! apt-get "${apt_opts[@]}" update; then
-            log "WARN: apt-get update завис или завершился с ошибкой."
-            log "      Продолжаю без update. Если установка упадёт — повторите с --skip-apt-update или --skip-apt"
-        fi
+    if [ "${SKIP_APT_UPDATE:-1}" = "1" ]; then
+        log "Пропуск apt-get update (по умолчанию; для update: --with-apt-update)"
     else
-        log "Пропуск apt-get update (--skip-apt-update)"
+        log "Обновляю списки пакетов (жёсткий таймаут 90 с)..."
+        if ! run_with_timeout 90 apt-get "${APT_OPTS[@]}" update; then
+            log "WARN: apt-get update не удался. Продолжаю без update."
+        fi
     fi
 
-    log "Устанавливаю системные пакеты..."
+    log "Устанавливаю системные пакеты (таймаут 10 мин)..."
     # shellcheck disable=SC2086
-    if apt-get "${apt_opts[@]}" install -y --no-install-recommends $APT_PACKAGES; then
-        return 0
+    if run_with_timeout 600 apt-get "${APT_OPTS[@]}" install -y --no-install-recommends $APT_PACKAGES; then
+        log "Основные пакеты установлены"
+    else
+        log "WARN: пакетный набор не установился целиком. Пробую по одному..."
+        for pkg in $APT_PACKAGES; do
+            run_with_timeout 180 apt-get "${APT_OPTS[@]}" install -y --no-install-recommends "$pkg" || \
+                log "WARN: пакет не установлен: $pkg"
+        done
     fi
 
-    log "WARN: не все пакеты установлены одним вызовом. Пробую по одному..."
-    for pkg in $APT_PACKAGES; do
-        apt-get "${apt_opts[@]}" install -y --no-install-recommends "$pkg" || \
-            log "WARN: пакет не установлен: $pkg"
-    done
+    if [ "${USE_APT_PYQT:-1}" = "1" ]; then
+        log "PyQt6 из apt (быстрее, чем pip)..."
+        # shellcheck disable=SC2086
+        run_with_timeout 300 apt-get "${APT_OPTS[@]}" install -y --no-install-recommends $APT_PYQT_PACKAGES || \
+            log "WARN: python3-pyqt6 из apt не установлен — pip попробует сам"
+    fi
 }
 
 check_install_prerequisites() {

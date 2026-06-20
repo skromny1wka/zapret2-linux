@@ -52,7 +52,9 @@ git clone https://github.com/skromny1wka/zapret2-linux.git
 cd zapret2-linux
 
 chmod +x linux/install.sh linux/zapret-gui linux/stop.sh linux/rkn-sync.sh
-sudo linux/install.sh --runtime /path/to/ZapretTwo
+
+# рекомендуется: быстрый режим (без apt update, без blob, PyQt6 из apt)
+sudo linux/install.sh --fast --runtime /path/to/ZapretTwo
 ```
 
 Если `ZapretTwo` лежит рядом с репозиторием:

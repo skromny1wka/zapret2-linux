@@ -17,7 +17,9 @@ ZAPRET2_RELEASE="${ZAPRET2_RELEASE:-v1.0.2}"
 ZAPRET2_TARBALL="https://github.com/bol-van/zapret2/releases/download/${ZAPRET2_RELEASE}/zapret2-${ZAPRET2_RELEASE}.tar.gz"
 BLOB_REPO="https://github.com/youtubediscord/zapret2-youtube-discord/raw/master/bin"
 
-APT_PACKAGES="nftables ipset curl ca-certificates tar gzip python3 python3-venv python3-pip libnetfilter-queue1 libmnl0 libcap2 build-essential libxkbcommon-x11-0 libgl1 libegl1 libdbus-1-3"
+APT_PACKAGES="nftables ipset curl ca-certificates tar gzip python3 python3-venv python3-pip python3-pyqt6 libnetfilter-queue1 libmnl0 libcap2 libxkbcommon-x11-0 libgl1 libegl1 libdbus-1-3"
+APT_PACKAGES_OPTIONAL="build-essential"
+APT_PYQT_PACKAGES="python3-pyqt6 python3-pyqt6.qtsvg"
 
 RUNTIME_DIRS="bin lua lists json bat themes ico windivert.filter exe logs tmp"
 RUNTIME_FILES="preset-zapret2.txt preset-zapret2-orchestra.txt"

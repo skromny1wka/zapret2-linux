@@ -1,0 +1,13 @@
+requests
+urllib3
+PySocks
+cryptography
+psutil
+httpx
+aiohttp
+packaging
+qtawesome
+simplepycons
+pytz
+websockets
+PyQt6-Fluent-Widgets
