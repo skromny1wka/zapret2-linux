@@ -47,7 +47,7 @@
 
 ## Установка одной командой (рекомендуется)
 
-Скрипт сам настроит **российское зеркало apt**, поставит зависимости, скачает `nfqws2` и соберёт GUI.
+Скрипт сам настроит **российское зеркало apt**, скачает репозиторий **архивом (без git)**, поставит зависимости, `nfqws2` и GUI.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/skromny1wka/zapret2-linux/main/linux/install-all.sh -o /tmp/install-all.sh

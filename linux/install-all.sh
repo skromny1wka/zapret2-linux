@@ -4,7 +4,10 @@ set -e
 
 ZAPRET_REPO_URL="${ZAPRET_REPO_URL:-https://github.com/skromny1wka/zapret2-linux.git}"
 ZAPRET_REPO_BRANCH="${ZAPRET_REPO_BRANCH:-main}"
+ZAPRET_REPO_OWNER="${ZAPRET_REPO_OWNER:-skromny1wka}"
+ZAPRET_REPO_NAME="${ZAPRET_REPO_NAME:-zapret2-linux}"
 ZAPRET_RAW_BASE="${ZAPRET_RAW_BASE:-https://raw.githubusercontent.com/skromny1wka/zapret2-linux/main}"
+USE_GIT=0
 INSTALL_DIR="${INSTALL_DIR:-}"
 RUNTIME_SRC=""
 MIRROR_MODE="ru"
@@ -31,7 +34,8 @@ Options:
   --mirror default     Не менять sources.list
   --skip-mirror        То же что --mirror default
   --skip-apt           Не вызывать apt (зависимости уже стоят)
-  --skip-clone         Не клонировать git (уже в каталоге репозитория)
+  --skip-clone         Не скачивать репозиторий (уже в каталоге)
+  --use-git            Клонировать через git (по умолчанию: curl + tar, без git)
   --with-blobs         Скачать blob-файлы в install.sh
   --pip-pyqt           PyQt6 через pip вместо apt
   -h, --help           Справка
@@ -78,6 +82,10 @@ while [ "$#" -gt 0 ]; do
             SKIP_CLONE=1
             shift
             ;;
+        --use-git)
+            USE_GIT=1
+            shift
+            ;;
         --with-blobs)
             EXTRA_INSTALL_ARGS+=(--with-blobs)
             shift
@@ -108,8 +116,16 @@ if [ "$(uname -s)" != "Linux" ]; then
     exit 1
 fi
 
+_real_user_home() {
+    if [ -n "${SUDO_USER:-}" ] && [ "${SUDO_USER}" != "root" ]; then
+        eval echo "~${SUDO_USER}"
+    else
+        echo "${HOME}"
+    fi
+}
+
 _resolve_repo_root() {
-    local script_path script_dir candidate
+    local script_path script_dir
 
     script_path="${BASH_SOURCE[0]}"
     if command -v readlink >/dev/null 2>&1; then
@@ -126,7 +142,7 @@ _resolve_repo_root() {
     if [ -n "$INSTALL_DIR" ]; then
         INSTALL_ROOT="$(cd "$INSTALL_DIR" 2>/dev/null && pwd || echo "$INSTALL_DIR")"
     else
-        INSTALL_ROOT="${HOME}/zapret2-linux"
+        INSTALL_ROOT="$(_real_user_home)/zapret2-linux"
     fi
     ZAPRET_LINUX_DIR="${INSTALL_ROOT}/linux"
 }
@@ -142,39 +158,77 @@ _ensure_repo() {
         exit 1
     fi
 
-    if ! command -v git >/dev/null 2>&1; then
-        echo "ERROR: нужен git. Установите: apt install -y git" >&2
+_load_repo_fetch_lib() {
+    local local_lib="${ZAPRET_LINUX_DIR}/lib/repo_fetch.sh"
+    if [ -f "$local_lib" ]; then
+        # shellcheck source=lib/repo_fetch.sh
+        . "$local_lib"
+        return 0
+    fi
+    if ! command -v curl >/dev/null 2>&1; then
+        return 1
+    fi
+    local tmp base url
+    tmp="$(mktemp)"
+    for base in \
+        "${ZAPRET_RAW_BASE}" \
+        "https://ghproxy.net/https://raw.githubusercontent.com/skromny1wka/zapret2-linux/main" \
+        "https://mirror.ghproxy.com/https://raw.githubusercontent.com/skromny1wka/zapret2-linux/main"; do
+        url="${base}/linux/lib/repo_fetch.sh"
+        log "Загружаю модуль: ${url}"
+        if curl -fsSL --connect-timeout 15 --max-time 90 "$url" -o "$tmp"; then
+            # shellcheck source=/dev/null
+            . "$tmp"
+            rm -f "$tmp"
+            return 0
+        fi
+    done
+    rm -f "$tmp"
+    return 1
+}
+
+    if ! _load_repo_fetch_lib; then
+        echo "ERROR: не удалось загрузить repo_fetch.sh (GitHub недоступен?)" >&2
+        echo "  Скачайте zip вручную: https://github.com/skromny1wka/zapret2-linux/archive/refs/heads/main.zip" >&2
         exit 1
     fi
 
-    log "Клонирую ${ZAPRET_REPO_URL} → ${INSTALL_ROOT}"
-    mkdir -p "$(dirname "$INSTALL_ROOT")"
-    if [ -d "$INSTALL_ROOT/.git" ]; then
-        git -C "$INSTALL_ROOT" fetch origin
-        git -C "$INSTALL_ROOT" checkout "$ZAPRET_REPO_BRANCH"
-        git -C "$INSTALL_ROOT" pull --ff-only origin "$ZAPRET_REPO_BRANCH" || true
+    if [ "$USE_GIT" = "1" ]; then
+        log "Режим git: ${ZAPRET_REPO_URL}"
+        rm -rf "$INSTALL_ROOT"
+        if ! repo_fetch_git_fallback "$ZAPRET_REPO_URL" "$INSTALL_ROOT" "$ZAPRET_REPO_BRANCH"; then
+            echo "ERROR: git clone не удался (таймаут или сеть)" >&2
+            exit 1
+        fi
     else
-        git clone --depth 1 --branch "$ZAPRET_REPO_BRANCH" "$ZAPRET_REPO_URL" "$INSTALL_ROOT"
+        log "Скачиваю архив с GitHub (без git, несколько зеркал)..."
+        if ! install_repo_tree "$INSTALL_ROOT" "$ZAPRET_REPO_OWNER" "$ZAPRET_REPO_NAME" \
+            "$ZAPRET_REPO_BRANCH" "$ZAPRET_REPO_URL"; then
+            echo "ERROR: не удалось скачать репозиторий. Попробуйте позже или:" >&2
+            echo "  git clone ${ZAPRET_REPO_URL} ${INSTALL_ROOT}" >&2
+            echo "  cd ${INSTALL_ROOT} && sudo linux/install-all.sh --skip-clone --runtime ..." >&2
+            exit 1
+        fi
     fi
 
     [ -f "${INSTALL_ROOT}/src/main.py" ] || {
-        echo "ERROR: клон не удался: ${INSTALL_ROOT}" >&2
+        echo "ERROR: установка не удалась: ${INSTALL_ROOT}" >&2
         exit 1
     }
 }
 
 _ensure_minimal_tools() {
-    if command -v curl >/dev/null 2>&1 && command -v git >/dev/null 2>&1; then
+    if command -v curl >/dev/null 2>&1 && command -v tar >/dev/null 2>&1; then
         return 0
     fi
     if [ "$SKIP_APT" = "1" ] || ! command -v apt-get >/dev/null 2>&1; then
-        [ -x "$(command -v curl)" ] || { echo "ERROR: нужен curl" >&2; exit 1; }
-        [ -x "$(command -v git)" ] || { echo "ERROR: нужен git" >&2; exit 1; }
+        command -v curl >/dev/null 2>&1 || { echo "ERROR: нужен curl" >&2; exit 1; }
+        command -v tar >/dev/null 2>&1 || { echo "ERROR: нужен tar" >&2; exit 1; }
         return 0
     fi
-    log "Ставлю curl, git, ca-certificates..."
+    log "Ставлю curl, ca-certificates, tar..."
     export DEBIAN_FRONTEND=noninteractive
-    apt-get install -y --no-install-recommends curl ca-certificates git || true
+    apt-get install -y --no-install-recommends curl ca-certificates tar gzip || true
 }
 
 _mirror_kali_ru_fallback() {
@@ -211,12 +265,17 @@ _load_apt_mirror_lib() {
     fi
     local tmp
     tmp="$(mktemp)"
-    if curl -fsSL "${ZAPRET_RAW_BASE}/linux/lib/apt_mirror.sh" -o "$tmp"; then
-        # shellcheck source=/dev/null
-        . "$tmp"
-        rm -f "$tmp"
-        return 0
-    fi
+    for base in \
+        "${ZAPRET_RAW_BASE}" \
+        "https://ghproxy.net/https://raw.githubusercontent.com/skromny1wka/zapret2-linux/main" \
+        "https://mirror.ghproxy.com/https://raw.githubusercontent.com/skromny1wka/zapret2-linux/main"; do
+        if curl -fsSL --connect-timeout 15 --max-time 60 "${base}/linux/lib/apt_mirror.sh" -o "$tmp"; then
+            # shellcheck source=/dev/null
+            . "$tmp"
+            rm -f "$tmp"
+            return 0
+        fi
+    done
     rm -f "$tmp"
     return 1
 }
@@ -246,12 +305,11 @@ _run_apt_update() {
 }
 
 _resolve_repo_root
-INSTALL_ROOT="${INSTALL_ROOT:-${HOME}/zapret2-linux}"
+INSTALL_ROOT="${INSTALL_ROOT:-$(_real_user_home)/zapret2-linux}"
 ZAPRET_LINUX_DIR="${ZAPRET_LINUX_DIR:-${INSTALL_ROOT}/linux}"
 
 log "========== Zapret: полная установка =========="
-
-_resolve_repo_root
+log "Каталог установки: ${INSTALL_ROOT}"
 
 if [ "$SKIP_APT" != "1" ] && command -v apt-get >/dev/null 2>&1; then
     _mirror_kali_ru_fallback
