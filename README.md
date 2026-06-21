@@ -45,9 +45,32 @@
 
 ---
 
-## Установка
+## Установка одной командой (рекомендуется)
 
-**apt в install.sh по умолчанию отключён** — иначе на Kali часто зависает «Ожидание заголовков».
+Скрипт сам настроит **российское зеркало apt**, поставит зависимости, скачает `nfqws2` и соберёт GUI.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/skromny1wka/zapret2-linux/main/linux/install-all.sh -o /tmp/install-all.sh
+chmod +x /tmp/install-all.sh
+sudo /tmp/install-all.sh --runtime /path/to/ZapretTwo
+```
+
+Если `ZapretTwo` лежит в `~/ZapretTwo` или рядом с репозиторием — путь можно не указывать.
+
+Из уже клонированного репозитория:
+
+```bash
+git clone https://github.com/skromny1wka/zapret2-linux.git
+cd zapret2-linux
+chmod +x linux/install-all.sh
+sudo linux/install-all.sh --runtime ../ZapretTwo
+```
+
+После установки: `sudo linux/zapret-gui`
+
+---
+
+## Установка по шагам (вручную)
 
 ```bash
 git clone https://github.com/skromny1wka/zapret2-linux.git
@@ -130,6 +153,7 @@ linux/rkn-sync.sh --force
 zapret2-linux/
   src/                 # исходники GUI (форк upstream)
   linux/
+    install-all.sh     # всё одной командой (зеркало RU + apt + Zapret)
     install.sh         # установщик
     zapret-gui         # launcher GUI
     stop.sh            # остановка DPI

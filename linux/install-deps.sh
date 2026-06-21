@@ -14,7 +14,7 @@ require_linux
 require_root
 
 log "Установка системных пакетов Zapret через apt"
-log "Если зависает на «Ожидание заголовков» — смените зеркало Kali или прервите Ctrl+C и повторите позже"
+log "Зеркало: Россия (TrueNetwork/Yandex) — настраивается в install-all.sh"
 
 read_apt_opts
 export DEBIAN_FRONTEND=noninteractive
